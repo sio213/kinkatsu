@@ -9,6 +9,7 @@ import { Stack } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
 import 'react-native-reanimated';
 
+// TODO: 以下の値を弄ってみて、変更内容を確認する
 Notifications.setNotificationHandler({
   handleNotification: async () => ({
     shouldShowBanner: true,
