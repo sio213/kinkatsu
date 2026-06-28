@@ -1,4 +1,4 @@
-import { db } from '@/db/client';
+import { db, expoDb } from '@/db/client';
 import { seed } from '@/db/seed';
 import migrations from '@/drizzle/migrations';
 import { useColorScheme } from '@/hooks/use-color-scheme';
@@ -8,6 +8,7 @@ import {
   ThemeProvider,
 } from '@react-navigation/native';
 import { useMigrations } from 'drizzle-orm/expo-sqlite/migrator';
+import { useDrizzleStudio } from 'expo-drizzle-studio-plugin';
 import * as Notifications from 'expo-notifications';
 import { Stack } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
@@ -31,6 +32,9 @@ export const unstable_settings = {
 export default function RootLayout() {
   const colorScheme = useColorScheme();
   const { success } = useMigrations(db, migrations);
+  // DBをブラウザから閲覧できるようにする
+  //　http://192.168.8.135:8081/_expo/plugins/expo-drizzle-studio-plugin
+  useDrizzleStudio(__DEV__ ? expoDb : null);
 
   useEffect(() => {
     if (!success) return;
