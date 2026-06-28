@@ -1,3 +1,5 @@
+import { runMigrations } from '@/db/migration';
+import { seed } from '@/db/seed';
 import { useColorScheme } from '@/hooks/use-color-scheme';
 import {
   DarkTheme,
@@ -7,6 +9,7 @@ import {
 import * as Notifications from 'expo-notifications';
 import { Stack } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
+import { useEffect } from 'react';
 import 'react-native-reanimated';
 
 // TODO: 以下の値を弄ってみて、変更内容を確認する
@@ -25,6 +28,13 @@ export const unstable_settings = {
 
 export default function RootLayout() {
   const colorScheme = useColorScheme();
+
+  useEffect(() => {
+    (async () => {
+      await runMigrations();
+      await seed();
+    })();
+  }, []);
 
   return (
     <ThemeProvider value={colorScheme === 'dark' ? DarkTheme : DefaultTheme}>
