@@ -1,22 +1,15 @@
 import { Image } from 'expo-image';
-import { Platform, StyleSheet } from 'react-native';
+import { Platform, StyleSheet, Text, View } from 'react-native';
 
 import { HelloWave } from '@/components/hello-wave';
 import ParallaxScrollView from '@/components/parallax-scroll-view';
 import { ThemedText } from '@/components/themed-text';
 import { ThemedView } from '@/components/themed-view';
-import { db } from '@/db/client';
+import { useExercises } from '@/hooks/use-exercises';
 import { Link } from 'expo-router';
-import { useEffect } from 'react';
 
 export default function HomeScreen() {
-  useEffect(() => {
-    const load = async () => {
-      const data = await db.query.exercises.findMany();
-      console.log('data: ', data);
-    };
-    load();
-  }, []);
+  const { exercises } = useExercises();
 
   return (
     <ParallaxScrollView
@@ -32,6 +25,12 @@ export default function HomeScreen() {
         <ThemedText type="title">Welcome!</ThemedText>
         <HelloWave />
       </ThemedView>
+      <Text>exercises: </Text>
+      {exercises.map((exercise) => (
+        <View key={exercise.id}>
+          <Text>{exercise.name}</Text>
+        </View>
+      ))}
       <ThemedView style={styles.stepContainer}>
         <ThemedText type="subtitle">Step 1: Try it</ThemedText>
         <ThemedText>

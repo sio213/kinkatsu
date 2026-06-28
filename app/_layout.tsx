@@ -1,11 +1,13 @@
-import { runMigrations } from '@/db/migration';
+import { db } from '@/db/client';
 import { seed } from '@/db/seed';
+import migrations from '@/drizzle/migrations';
 import { useColorScheme } from '@/hooks/use-color-scheme';
 import {
   DarkTheme,
   DefaultTheme,
   ThemeProvider,
 } from '@react-navigation/native';
+import { useMigrations } from 'drizzle-orm/expo-sqlite/migrator';
 import * as Notifications from 'expo-notifications';
 import { Stack } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
@@ -28,13 +30,14 @@ export const unstable_settings = {
 
 export default function RootLayout() {
   const colorScheme = useColorScheme();
+  const { success } = useMigrations(db, migrations);
 
   useEffect(() => {
-    (async () => {
-      await runMigrations();
-      await seed();
-    })();
-  }, []);
+    if (!success) return;
+    seed();
+  }, [success]);
+
+  if (!success) return null;
 
   return (
     <ThemeProvider value={colorScheme === 'dark' ? DarkTheme : DefaultTheme}>
