@@ -1,4 +1,4 @@
-import { integer, sqliteTable, text } from 'drizzle-orm/sqlite-core';
+import { index, integer, sqliteTable, text } from 'drizzle-orm/sqlite-core';
 
 // 種目
 export const exercises = sqliteTable('exercises', {
@@ -6,5 +6,54 @@ export const exercises = sqliteTable('exercises', {
   name: text('name').notNull(),
 });
 
-// 型
 export type Exercise = typeof exercises.$inferSelect;
+
+// リマインダー設定
+export const reminders = sqliteTable('reminders', {
+  id: integer('id').primaryKey({ autoIncrement: true }),
+  title: text('title').notNull(),
+  body: text('body').notNull(),
+  // 'daily' | 'weekly' | 'biweekly' | 'monthly' | 'yearly' | 'interval'
+  kind: text('kind').notNull(),
+  hour: integer('hour').notNull(),
+  minute: integer('minute').notNull(),
+  // weekly/biweekly: JSON "[0,2,4]" (0=日〜6=土)
+  weekdays: text('weekdays'),
+  // monthly: JSON "[1,15,99]" (99=月末)
+  monthdays: text('monthdays'),
+  // biweekly/yearly/interval の起点 (epoch ms)
+  anchorDate: integer('anchor_date'),
+  // interval: N日ごとの N
+  intervalDays: integer('interval_days'),
+  // month_interval: Nヶ月ごとの N
+  intervalMonths: integer('interval_months'),
+  enabled: integer('enabled', { mode: 'boolean' }).notNull().default(true),
+  createdAt: integer('created_at').notNull(),
+  updatedAt: integer('updated_at').notNull(),
+});
+
+export type Reminder = typeof reminders.$inferSelect;
+export type NewReminder = typeof reminders.$inferInsert;
+
+// OS通知識別子の追跡
+export const reminderNotifications = sqliteTable(
+  'reminder_notifications',
+  {
+    id: integer('id').primaryKey({ autoIncrement: true }),
+    reminderId: integer('reminder_id')
+      .notNull()
+      .references(() => reminders.id, { onDelete: 'cascade' }),
+    osNotificationId: text('os_notification_id').notNull(),
+    // 'native' (daily/weekly/monthly) | 'queue' (biweekly/yearly/interval/月末)
+    triggerType: text('trigger_type').notNull(),
+    // queue のみ使用。補充判定用
+    fireAt: integer('fire_at'),
+    createdAt: integer('created_at').notNull(),
+  },
+  (t) => ({
+    byReminder: index('idx_rn_reminder').on(t.reminderId),
+    byFireAt: index('idx_rn_fire_at').on(t.fireAt),
+  }),
+);
+
+export type ReminderNotification = typeof reminderNotifications.$inferSelect;
