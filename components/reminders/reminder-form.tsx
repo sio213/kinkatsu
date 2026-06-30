@@ -1,3 +1,7 @@
+import {
+  DEFAULT_REMINDER_BODY,
+  DEFAULT_REMINDER_TITLE,
+} from '@/lib/notifications/messages';
 import { KIND_LABELS, MONTH_LABELS, WEEKDAY_LABELS } from '@/lib/notifications/format';
 import { resolveMonthDay } from '@/lib/notifications/scheduler';
 import { MONTH_END, type ReminderInput, type ReminderKind } from '@/lib/notifications/types';
@@ -12,14 +16,23 @@ import {
   View,
 } from 'react-native';
 
+const DEFAULT_INPUT: ReminderInput = {
+  title: DEFAULT_REMINDER_TITLE,
+  body: DEFAULT_REMINDER_BODY,
+  kind: 'daily',
+  hour: 18,
+  minute: 0,
+  enabled: true,
+};
+
 type Props = {
-  initial: ReminderInput;
+  initial?: ReminderInput;
   onSubmit: (input: ReminderInput) => void;
   onCancel: () => void;
   submitLabel: string;
 };
 
-export function ReminderForm({ initial, onSubmit, onCancel, submitLabel }: Props) {
+export function ReminderForm({ initial = DEFAULT_INPUT, onSubmit, onCancel, submitLabel }: Props) {
   const [form, setForm] = useState<ReminderInput>(initial);
   const [showAndroidTimePicker, setShowAndroidTimePicker] = useState(false);
 

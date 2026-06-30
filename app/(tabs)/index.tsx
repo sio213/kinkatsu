@@ -7,10 +7,6 @@ import { ThemedText } from '@/components/themed-text';
 import { ThemedView } from '@/components/themed-view';
 import { useReminders } from '@/hooks/use-reminders';
 import {
-  DEFAULT_REMINDER_BODY,
-  DEFAULT_REMINDER_TITLE,
-} from '@/lib/notifications/messages';
-import {
   ensurePermission,
   getPermissionState,
 } from '@/lib/notifications/permissions';
@@ -18,17 +14,6 @@ import type { ReminderInput } from '@/lib/notifications/types';
 import { Image } from 'expo-image';
 import { useCallback, useEffect, useState } from 'react';
 import { Alert, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
-
-function defaultInput(): ReminderInput {
-  return {
-    title: DEFAULT_REMINDER_TITLE,
-    body: DEFAULT_REMINDER_BODY,
-    kind: 'daily',
-    hour: 7,
-    minute: 0,
-    enabled: true,
-  };
-}
 
 export default function HomeScreen() {
   const { reminders, createReminder, updateReminder, toggleReminder, removeReminder, getNextFire } =
@@ -142,7 +127,6 @@ export default function HomeScreen() {
           <View style={styles.addFormWrapper}>
             <Text style={styles.addFormTitle}>リマインダーを追加</Text>
             <ReminderForm
-              initial={defaultInput()}
               onSubmit={handleSubmit}
               onCancel={closeForm}
               submitLabel="追加"
