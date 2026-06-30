@@ -286,7 +286,8 @@ export function getNextFireDate(r: ParsedReminder, from: Date): Date | null {
     if (kind === 'yearly') {
       if (!r.anchorDate) return null;
       const a = new Date(r.anchorDate);
-      const dates = computeYearlyFireDates(from, a.getMonth(), a.getDate(), hour, minute, 1);
+      const anchorDay = r.monthdays?.includes(MONTH_END) ? MONTH_END : a.getDate();
+      const dates = computeYearlyFireDates(from, a.getMonth(), anchorDay, hour, minute, 1);
       return dates[0] ?? null;
     }
     if (kind === 'interval') {
@@ -444,7 +445,8 @@ async function scheduleQueue(r: ParsedReminder, depth: number): Promise<void> {
     dates = computeIntervalFireDates(from, r.anchorDate, r.intervalDays, r.hour, r.minute, need);
   } else if (r.kind === 'yearly' && r.anchorDate) {
     const a = new Date(r.anchorDate);
-    dates = computeYearlyFireDates(from, a.getMonth(), a.getDate(), r.hour, r.minute, need);
+    const anchorDay = r.monthdays?.includes(MONTH_END) ? MONTH_END : a.getDate();
+    dates = computeYearlyFireDates(from, a.getMonth(), anchorDay, r.hour, r.minute, need);
   } else if (r.kind === 'monthly' && r.monthdays?.length) {
     dates = computeMonthlyQueueFireDates(from, r.monthdays, r.hour, r.minute, need);
   } else if (r.kind === 'month_interval' && r.intervalMonths && r.anchorDate && r.monthdays?.length) {

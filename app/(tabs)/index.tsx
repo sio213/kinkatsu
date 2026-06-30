@@ -16,7 +16,7 @@ import { resolveMonthDay } from '@/lib/notifications/scheduler';
 import { MONTH_END, type ReminderInput, type ReminderKind } from '@/lib/notifications/types';
 import DateTimePicker from '@react-native-community/datetimepicker';
 import { Image } from 'expo-image';
-import { useCallback, useEffect, useState } from 'react';
+import { Component, useCallback, useEffect, useState } from 'react';
 import {
   Alert,
   Platform,
@@ -27,6 +27,29 @@ import {
   TouchableOpacity,
   View,
 } from 'react-native';
+
+class ReminderListBoundary extends Component<
+  { children: React.ReactNode },
+  { error: string | null }
+> {
+  state = { error: null };
+  static getDerivedStateFromError(e: Error) { return { error: e.message }; }
+  render() {
+    if (this.state.error) {
+      return (
+        <View style={{ padding: 16, gap: 8 }}>
+          <Text style={{ color: '#DC2626', fontSize: 13 }}>
+            表示エラーが発生しました。アプリを再起動してください。
+          </Text>
+          <TouchableOpacity onPress={() => this.setState({ error: null })}>
+            <Text style={{ color: '#2563EB', fontSize: 13 }}>再試行</Text>
+          </TouchableOpacity>
+        </View>
+      );
+    }
+    return this.props.children;
+  }
+}
 
 const KIND_LABELS: Record<ReminderKind, string> = {
   daily: '毎日',
@@ -72,9 +95,11 @@ function formatKindSummary(r: Reminder): string {
   }
   if (kind === 'yearly' && r.anchorDate) {
     const a = new Date(r.anchorDate);
-    return `毎年 ${a.getMonth() + 1}/${a.getDate()} ${time}`;
+    const mds: number[] = r.monthdays ? JSON.parse(r.monthdays) : [];
+    const dayLabel = mds.includes(MONTH_END) ? '月末' : `${a.getDate()}日`;
+    return `毎年 ${a.getMonth() + 1}月${dayLabel} ${time}`;
   }
-  if (kind === 'interval') return `${r.intervalDays}日ごと ${time}`;
+  if (kind === 'interval') return `${r.intervalDays ?? 2}日ごと ${time}`;
   if (kind === 'month_interval') {
     const months = r.intervalMonths ?? 2;
     const mds: number[] = r.monthdays ? JSON.parse(r.monthdays) : [];
@@ -121,10 +146,13 @@ function ReminderForm({ initial, onSubmit, onCancel, submitLabel }: FormProps) {
     initial.monthdays?.[0] ?? 1,
   );
 
-  // yearly: 月と日
+  // yearly: 月と日（月末フラグ含む）
   const initAnchor = initial.anchorDate ? new Date(initial.anchorDate) : null;
   const [yearlyMonth, setYearlyMonth] = useState<number>(initAnchor?.getMonth() ?? 0);
   const [yearlyDay, setYearlyDay] = useState<number>(initAnchor?.getDate() ?? 1);
+  const [yearlyEom, setYearlyEom] = useState<boolean>(
+    initial.kind === 'yearly' && (initial.monthdays?.includes(MONTH_END) ?? false),
+  );
 
   function set<K extends keyof ReminderInput>(key: K, val: ReminderInput[K]) {
     setForm((f) => ({ ...f, [key]: val }));
@@ -168,13 +196,24 @@ function ReminderForm({ initial, onSubmit, onCancel, submitLabel }: FormProps) {
     if (out.kind === 'yearly') {
       const now = new Date();
       const yr = now.getFullYear();
-      const day = resolveMonthDay(yr, yearlyMonth, yearlyDay);
-      let d = new Date(yr, yearlyMonth, day);
-      if (d <= now) {
-        const dayNext = resolveMonthDay(yr + 1, yearlyMonth, yearlyDay);
-        d = new Date(yr + 1, yearlyMonth, dayNext);
+      if (yearlyEom) {
+        // 月末: anchorDate は月初で保持し、monthdays=[MONTH_END] で識別
+        out.anchorDate = new Date(yr, yearlyMonth, 1).getTime();
+        out.monthdays = [MONTH_END];
+      } else {
+        out.monthdays = undefined;
+        const day = resolveMonthDay(yr, yearlyMonth, yearlyDay);
+        let d = new Date(yr, yearlyMonth, day);
+        if (d <= now) {
+          const dayNext = resolveMonthDay(yr + 1, yearlyMonth, yearlyDay);
+          d = new Date(yr + 1, yearlyMonth, dayNext);
+        }
+        out.anchorDate = d.getTime();
       }
-      out.anchorDate = d.getTime();
+    }
+    if (out.kind === 'interval') {
+      out.intervalDays = out.intervalDays ?? 2;
+      out.anchorDate = out.anchorDate ?? Date.now();
     }
     if (out.kind === 'month_interval') {
       out.intervalMonths = intervalMonths;
@@ -342,14 +381,20 @@ function ReminderForm({ initial, onSubmit, onCancel, submitLabel }: FormProps) {
             {Array.from({ length: 31 }, (_, i) => i + 1).map((day) => (
               <TouchableOpacity
                 key={day}
-                style={[styles.mdChip, yearlyDay === day && styles.chipActive]}
-                onPress={() => setYearlyDay(day)}
+                style={[styles.mdChip, !yearlyEom && yearlyDay === day && styles.chipActive]}
+                onPress={() => { setYearlyDay(day); setYearlyEom(false); }}
               >
-                <Text style={[styles.mdChipText, yearlyDay === day && styles.chipTextActive]}>
+                <Text style={[styles.mdChipText, !yearlyEom && yearlyDay === day && styles.chipTextActive]}>
                   {day}
                 </Text>
               </TouchableOpacity>
             ))}
+            <TouchableOpacity
+              style={[styles.mdChip, styles.mdChipEom, yearlyEom && styles.chipActive]}
+              onPress={() => setYearlyEom(true)}
+            >
+              <Text style={[styles.mdChipText, yearlyEom && styles.chipTextActive]}>月末</Text>
+            </TouchableOpacity>
           </View>
         </>
       )}
@@ -561,6 +606,7 @@ export default function HomeScreen() {
           <Text style={styles.empty}>リマインダーがありません</Text>
         )}
 
+        <ReminderListBoundary>
         {reminders.map((r) => {
           const isEditing = editTarget?.id === r.id && showForm;
           return (
@@ -606,6 +652,7 @@ export default function HomeScreen() {
             </View>
           );
         })}
+        </ReminderListBoundary>
 
         {/* 追加フォーム（編集中でない時） */}
         {showForm && !editTarget && (
