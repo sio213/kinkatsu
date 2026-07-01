@@ -42,3 +42,11 @@
 1. @reviewer — コード品質レビュー（重複・単一責任・パフォーマンス・未使用コード）
 2. @tester — ロジック（関数・状態管理・DB操作）の追加・変更を伴う場合のみ起動
 3. @designer — 実装されたUIの体験・一貫性レビュー
+
+## 実装ルール
+
+### エラーハンドリング
+- DB書き込み（insert / update / delete）は必ず `try/catch` し、失敗時は `Alert.alert` でユーザーに通知する
+- Promise を fire-and-forget にしない。呼び出し側で `await` して `catch` する
+- `useMigrations` の `error` は必ずハンドリングし、失敗時はクラッシュさせずエラー画面を表示する
+- 楽観的UIを使う場合はエラー時に状態を元に戻す
