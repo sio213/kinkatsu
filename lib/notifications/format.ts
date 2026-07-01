@@ -2,10 +2,10 @@ import type { Reminder } from '@/db/schema';
 import { MONTH_END, type ReminderKind } from './types';
 
 export const KIND_LABELS: Record<ReminderKind, string> = {
-  interval: '日',
-  weekly: '週',
-  monthly: '月',
-  yearly: '年',
+  interval: '毎日',
+  weekly: '毎週',
+  monthly: '毎月',
+  yearly: '毎年',
 };
 
 export const WEEKDAY_LABELS = ['日', '月', '火', '水', '木', '金', '土'];
