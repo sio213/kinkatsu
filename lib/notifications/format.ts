@@ -2,13 +2,10 @@ import type { Reminder } from '@/db/schema';
 import { MONTH_END, type ReminderKind } from './types';
 
 export const KIND_LABELS: Record<ReminderKind, string> = {
-  daily: '毎日',
-  weekly: '毎週',
-  biweekly: 'N週ごと',
-  monthly: '毎月',
-  month_interval: 'Nヶ月ごと',
-  yearly: '毎年',
-  interval: 'N日ごと',
+  interval: '日',
+  weekly: '週',
+  monthly: '月',
+  yearly: '年',
 };
 
 export const WEEKDAY_LABELS = ['日', '月', '火', '水', '木', '金', '土'];
@@ -41,40 +38,32 @@ export function formatKindSummary(r: Reminder): string {
   const m = String(r.minute).padStart(2, '0');
   const time = `${h}:${m}`;
 
-  if (kind === 'daily') return `毎日 ${time}`;
+  if (kind === 'interval') {
+    const n = r.intervalDays ?? 1;
+    return n === 1 ? `毎日 ${time}` : `${n}日ごと ${time}`;
+  }
   if (kind === 'weekly') {
     const wds: number[] = r.weekdays ? JSON.parse(r.weekdays) : [];
-    return `毎週 ${wds.map((d) => WEEKDAY_LABELS[d]).join('・')} ${time}`;
-  }
-  if (kind === 'biweekly') {
-    const wds: number[] = r.weekdays ? JSON.parse(r.weekdays) : [];
-    const weeks = r.intervalDays ? Math.round(r.intervalDays / 7) : 2;
-    return `${weeks}週間ごと ${wds.map((d) => WEEKDAY_LABELS[d]).join('・')} ${time}`;
+    const wdLabel = wds.map((d) => WEEKDAY_LABELS[d]).join('・');
+    const n = Math.max(1, Math.round((r.intervalDays ?? 7) / 7));
+    return n === 1 ? `毎週 ${wdLabel} ${time}` : `${n}週ごと ${wdLabel} ${time}`;
   }
   if (kind === 'monthly') {
+    const n = r.intervalMonths ?? 1;
+    const prefix = n === 1 ? '毎月' : `${n}ヶ月ごと`;
     if (r.nthWeek != null && r.nthWeekday != null) {
       const weekLabel = NTH_WEEK_OPTIONS.find((o) => o.value === r.nthWeek)?.label ?? `第${r.nthWeek}`;
-      return `毎月${weekLabel}${WEEKDAY_LABELS[r.nthWeekday]}曜日 ${time}`;
+      return `${prefix}${weekLabel}${WEEKDAY_LABELS[r.nthWeekday]}曜日 ${time}`;
     }
     const mds: number[] = r.monthdays ? JSON.parse(r.monthdays) : [];
-    return `毎月 ${mds.map((d) => (d === MONTH_END ? '月末' : `${d}日`)).join('・')} ${time}`;
+    const dayLabel = mds.map((d) => (d === MONTH_END ? '月末' : `${d}日`)).join('・');
+    return `${prefix} ${dayLabel} ${time}`;
   }
   if (kind === 'yearly' && r.anchorDate) {
     const a = new Date(r.anchorDate);
     const mds: number[] = r.monthdays ? JSON.parse(r.monthdays) : [];
     const dayLabel = mds.includes(MONTH_END) ? '月末' : `${a.getDate()}日`;
     return `毎年 ${a.getMonth() + 1}月${dayLabel} ${time}`;
-  }
-  if (kind === 'interval') return `${r.intervalDays ?? 2}日ごと ${time}`;
-  if (kind === 'month_interval') {
-    const months = r.intervalMonths ?? 2;
-    if (r.nthWeek != null && r.nthWeekday != null) {
-      const weekLabel = NTH_WEEK_OPTIONS.find((o) => o.value === r.nthWeek)?.label ?? `第${r.nthWeek}`;
-      return `${months}ヶ月ごと${weekLabel}${WEEKDAY_LABELS[r.nthWeekday]}曜日 ${time}`;
-    }
-    const mds: number[] = r.monthdays ? JSON.parse(r.monthdays) : [];
-    const dayLabel = mds[0] === MONTH_END ? '月末' : `${mds[0] ?? 1}日`;
-    return `${months}ヶ月ごと ${dayLabel} ${time}`;
   }
   return time;
 }

@@ -29,6 +29,13 @@
       "when": 1782864000000,
       "tag": "0003_nth_weekday",
       "breakpoints": true
+    },
+    {
+      "idx": 4,
+      "version": "6",
+      "when": 1782950400000,
+      "tag": "0004_unify_kinds",
+      "breakpoints": true
     }
   ]
 }

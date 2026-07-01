@@ -59,7 +59,7 @@ describe('resolveMonthDay', () => {
 // normalizeInput
 // ─────────────────────────────────────────────
 describe('normalizeInput', () => {
-  test('7曜日全選択 → daily に変換', () => {
+  test('7曜日全選択でも kind は変わらない', () => {
     const result = normalizeInput({
       title: 'test',
       body: 'test',
@@ -69,8 +69,8 @@ describe('normalizeInput', () => {
       weekdays: [0, 1, 2, 3, 4, 5, 6],
       enabled: true,
     });
-    expect(result.kind).toBe('daily');
-    expect(result.weekdays).toBeUndefined();
+    expect(result.kind).toBe('weekly');
+    expect(result.weekdays).toEqual([0, 1, 2, 3, 4, 5, 6]);
   });
 
   test('月末(99)選択時に 29/30 を除外（2月三重発火防止）', () => {
@@ -300,8 +300,8 @@ describe('getNextFireDate (統合)', () => {
     updatedAt: 0,
   };
 
-  test('daily', () => {
-    const r = { ...base, kind: 'daily', weekdays: null, monthdays: null };
+  test('interval (毎日)', () => {
+    const r = { ...base, kind: 'interval', intervalDays: 1, weekdays: null, monthdays: null };
     expect(getNextFireDate(r, FROM)).toEqual(d('2026-01-06T07:00:00'));
   });
 

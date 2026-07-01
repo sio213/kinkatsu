@@ -13,7 +13,7 @@ export const reminders = sqliteTable('reminders', {
   id: integer('id').primaryKey({ autoIncrement: true }),
   title: text('title').notNull(),
   body: text('body').notNull(),
-  // 'daily' | 'weekly' | 'biweekly' | 'monthly' | 'yearly' | 'interval'
+  // 'interval' | 'weekly' | 'monthly' | 'yearly'
   kind: text('kind').notNull(),
   hour: integer('hour').notNull(),
   minute: integer('minute').notNull(),

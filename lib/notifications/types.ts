@@ -1,13 +1,6 @@
 import type { Reminder } from '@/db/schema';
 
-export type ReminderKind =
-  | 'daily'
-  | 'weekly'
-  | 'biweekly'
-  | 'monthly'
-  | 'yearly'
-  | 'interval'
-  | 'month_interval';
+export type ReminderKind = 'interval' | 'weekly' | 'monthly' | 'yearly';
 
 export type TriggerType = 'native' | 'queue';
 
