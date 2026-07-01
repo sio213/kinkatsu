@@ -27,6 +27,10 @@ export const reminders = sqliteTable('reminders', {
   intervalDays: integer('interval_days'),
   // month_interval: Nヶ月ごとの N
   intervalMonths: integer('interval_months'),
+  // monthly/month_interval: 第N曜日指定 (1〜4, -1=最終)
+  nthWeek: integer('nth_week'),
+  // monthly/month_interval: 曜日 (0=日〜6=土)
+  nthWeekday: integer('nth_weekday'),
   enabled: integer('enabled', { mode: 'boolean' }).notNull().default(true),
   createdAt: integer('created_at').notNull(),
   updatedAt: integer('updated_at').notNull(),

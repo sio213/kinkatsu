@@ -57,7 +57,8 @@ export default function HomeScreen() {
           await createReminder(input);
         }
         closeForm();
-      } catch {
+      } catch (e) {
+        console.error('[reminder save]', e);
         Alert.alert('エラー', 'リマインダーの保存に失敗しました。');
       }
     },

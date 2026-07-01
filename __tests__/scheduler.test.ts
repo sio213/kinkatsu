@@ -293,6 +293,8 @@ describe('getNextFireDate (統合)', () => {
     anchorDate: null,
     intervalDays: null,
     intervalMonths: null,
+    nthWeek: null,
+    nthWeekday: null,
     enabled: true,
     createdAt: 0,
     updatedAt: 0,

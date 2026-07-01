@@ -58,6 +58,7 @@ export function resolveTriggerType(r: ParsedReminder): TriggerType {
   if (kind === 'daily') return 'native';
   if (kind === 'weekly') return 'native';
   if (kind === 'monthly') {
+    if (r.nthWeek != null) return 'queue';
     // 月末(99) or 29〜31 を含む場合はキュー
     if (!monthdays) return 'queue';
     const needsQueue = monthdays.some((d) => d === MONTH_END || d >= 29);
@@ -94,6 +95,68 @@ export function resolveMonthDay(
   const lastDay = new Date(year, month + 1, 0).getDate();
   if (day === MONTH_END || day > lastDay) return lastDay;
   return day;
+}
+
+// 第N曜日の日付を返す。その月に存在しない場合は null
+export function resolveNthWeekdayDay(
+  year: number,
+  month: number, // 0-indexed
+  nthWeek: number, // 1〜4, -1=最終
+  weekday: number, // 0=日〜6=土
+): number | null {
+  const lastDay = new Date(year, month + 1, 0).getDate();
+  if (nthWeek === -1) {
+    const lastDayWD = new Date(year, month, lastDay).getDay();
+    return lastDay - ((lastDayWD - weekday + 7) % 7);
+  }
+  const firstDayWD = new Date(year, month, 1).getDay();
+  const day = 1 + ((weekday - firstDayWD + 7) % 7) + (nthWeek - 1) * 7;
+  return day <= lastDay ? day : null;
+}
+
+export function computeNthWeekdayFireDates(
+  from: Date,
+  nthWeek: number,
+  weekday: number,
+  hour: number,
+  minute: number,
+  count: number,
+  intervalMonths = 1,
+  anchorDate?: number,
+): Date[] {
+  const results: Date[] = [];
+  let year: number;
+  let month: number;
+
+  if (intervalMonths === 1) {
+    year = from.getFullYear();
+    month = from.getMonth();
+  } else {
+    const anchor = anchorDate ? new Date(anchorDate) : from;
+    const anchorYear = anchor.getFullYear();
+    const anchorMonth = anchor.getMonth();
+    const monthsFromAnchor =
+      (from.getFullYear() - anchorYear) * 12 + (from.getMonth() - anchorMonth);
+    const n = Math.max(0, Math.floor(monthsFromAnchor / intervalMonths));
+    const totalMonths = anchorMonth + n * intervalMonths;
+    year = anchorYear + Math.floor(totalMonths / 12);
+    month = ((totalMonths % 12) + 12) % 12;
+  }
+
+  let guard = 0;
+  while (results.length < count && guard < 200) {
+    guard++;
+    const day = resolveNthWeekdayDay(year, month, nthWeek, weekday);
+    if (day !== null) {
+      const candidate = new Date(year, month, day, hour, minute, 0, 0);
+      if (candidate > from) results.push(candidate);
+    }
+    const totalMonths = month + intervalMonths;
+    year += Math.floor(totalMonths / 12);
+    month = totalMonths % 12;
+    if (year > from.getFullYear() + 20) break;
+  }
+  return results;
 }
 
 export function nextDailyFireDate(
@@ -280,6 +343,9 @@ export function getNextFireDate(r: ParsedReminder, from: Date): Date | null {
       return dates[0] ?? null;
     }
     if (kind === 'monthly') {
+      if (r.nthWeek != null && r.nthWeekday != null) {
+        return computeNthWeekdayFireDates(from, r.nthWeek, r.nthWeekday, hour, minute, 1)[0] ?? null;
+      }
       if (!r.monthdays?.length) return null;
       return computeMonthlyQueueFireDates(from, r.monthdays, hour, minute, 1)[0] ?? null;
     }
@@ -296,7 +362,13 @@ export function getNextFireDate(r: ParsedReminder, from: Date): Date | null {
       return dates[0] ?? null;
     }
     if (kind === 'month_interval') {
-      if (!r.intervalMonths || !r.anchorDate || !r.monthdays?.length) return null;
+      if (!r.intervalMonths || !r.anchorDate) return null;
+      if (r.nthWeek != null && r.nthWeekday != null) {
+        return computeNthWeekdayFireDates(
+          from, r.nthWeek, r.nthWeekday, hour, minute, 1, r.intervalMonths, r.anchorDate,
+        )[0] ?? null;
+      }
+      if (!r.monthdays?.length) return null;
       const dates = computeMonthIntervalFireDates(
         from, r.anchorDate, r.intervalMonths, r.monthdays[0], hour, minute, 1,
       );
@@ -447,12 +519,22 @@ async function scheduleQueue(r: ParsedReminder, depth: number): Promise<void> {
     const a = new Date(r.anchorDate);
     const anchorDay = r.monthdays?.includes(MONTH_END) ? MONTH_END : a.getDate();
     dates = computeYearlyFireDates(from, a.getMonth(), anchorDay, r.hour, r.minute, need);
-  } else if (r.kind === 'monthly' && r.monthdays?.length) {
-    dates = computeMonthlyQueueFireDates(from, r.monthdays, r.hour, r.minute, need);
-  } else if (r.kind === 'month_interval' && r.intervalMonths && r.anchorDate && r.monthdays?.length) {
-    dates = computeMonthIntervalFireDates(
-      from, r.anchorDate, r.intervalMonths, r.monthdays[0], r.hour, r.minute, need,
-    );
+  } else if (r.kind === 'monthly') {
+    if (r.nthWeek != null && r.nthWeekday != null) {
+      dates = computeNthWeekdayFireDates(from, r.nthWeek, r.nthWeekday, r.hour, r.minute, need);
+    } else if (r.monthdays?.length) {
+      dates = computeMonthlyQueueFireDates(from, r.monthdays, r.hour, r.minute, need);
+    }
+  } else if (r.kind === 'month_interval' && r.intervalMonths && r.anchorDate) {
+    if (r.nthWeek != null && r.nthWeekday != null) {
+      dates = computeNthWeekdayFireDates(
+        from, r.nthWeek, r.nthWeekday, r.hour, r.minute, need, r.intervalMonths, r.anchorDate,
+      );
+    } else if (r.monthdays?.length) {
+      dates = computeMonthIntervalFireDates(
+        from, r.anchorDate, r.intervalMonths, r.monthdays[0], r.hour, r.minute, need,
+      );
+    }
   }
 
   const nowMs = Date.now();
@@ -512,6 +594,8 @@ export async function createReminder(input: ReminderInput): Promise<number> {
     anchorDate,
     intervalDays: normalized.intervalDays ?? null,
     intervalMonths: normalized.intervalMonths ?? null,
+    nthWeek: normalized.nthWeek ?? null,
+    nthWeekday: normalized.nthWeekday ?? null,
     enabled: normalized.enabled,
     createdAt: now,
     updatedAt: now,
@@ -549,6 +633,8 @@ export async function updateReminder(
       anchorDate,
       intervalDays: normalized.intervalDays ?? null,
       intervalMonths: normalized.intervalMonths ?? null,
+      nthWeek: normalized.nthWeek ?? null,
+      nthWeekday: normalized.nthWeekday ?? null,
       enabled: normalized.enabled,
       updatedAt: now,
     })

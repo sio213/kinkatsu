@@ -2,7 +2,7 @@ import {
   DEFAULT_REMINDER_BODY,
   DEFAULT_REMINDER_TITLE,
 } from '@/lib/notifications/messages';
-import { KIND_LABELS, MONTH_LABELS, WEEKDAY_LABELS } from '@/lib/notifications/format';
+import { KIND_LABELS, MONTH_LABELS, NTH_WEEK_OPTIONS, WEEKDAY_LABELS } from '@/lib/notifications/format';
 import { resolveMonthDay } from '@/lib/notifications/scheduler';
 import { MONTH_END, type ReminderInput, type ReminderKind } from '@/lib/notifications/types';
 import DateTimePicker from '@react-native-community/datetimepicker';
@@ -49,6 +49,26 @@ export function ReminderForm({ initial = DEFAULT_INPUT, onSubmit, onCancel, subm
   const [yearlyDay, setYearlyDay] = useState<number>(initAnchor?.getDate() ?? 1);
   const [yearlyEom, setYearlyEom] = useState<boolean>(
     initial.kind === 'yearly' && (initial.monthdays?.includes(MONTH_END) ?? false),
+  );
+
+  const [monthDayMode, setMonthDayMode] = useState<'day' | 'nth'>(
+    initial.kind === 'monthly' && initial.nthWeek != null ? 'nth' : 'day',
+  );
+  const [monthNthWeek, setMonthNthWeek] = useState<number>(
+    initial.kind === 'monthly' ? (initial.nthWeek ?? 1) : 1,
+  );
+  const [monthNthWeekday, setMonthNthWeekday] = useState<number>(
+    initial.kind === 'monthly' ? (initial.nthWeekday ?? 1) : 1,
+  );
+
+  const [miDayMode, setMiDayMode] = useState<'day' | 'nth'>(
+    initial.kind === 'month_interval' && initial.nthWeek != null ? 'nth' : 'day',
+  );
+  const [miNthWeek, setMiNthWeek] = useState<number>(
+    initial.kind === 'month_interval' ? (initial.nthWeek ?? 1) : 1,
+  );
+  const [miNthWeekday, setMiNthWeekday] = useState<number>(
+    initial.kind === 'month_interval' ? (initial.nthWeekday ?? 1) : 1,
   );
 
   function set<K extends keyof ReminderInput>(key: K, val: ReminderInput[K]) {
@@ -111,10 +131,28 @@ export function ReminderForm({ initial = DEFAULT_INPUT, onSubmit, onCancel, subm
       out.intervalDays = out.intervalDays ?? 2;
       out.anchorDate = out.anchorDate ?? Date.now();
     }
+    if (out.kind === 'monthly') {
+      if (monthDayMode === 'nth') {
+        out.nthWeek = monthNthWeek;
+        out.nthWeekday = monthNthWeekday;
+        out.monthdays = undefined;
+      } else {
+        out.nthWeek = undefined;
+        out.nthWeekday = undefined;
+      }
+    }
     if (out.kind === 'month_interval') {
       out.intervalMonths = intervalMonths;
-      out.monthdays = [monthIntervalDay];
       out.anchorDate = out.anchorDate ?? Date.now();
+      if (miDayMode === 'nth') {
+        out.nthWeek = miNthWeek;
+        out.nthWeekday = miNthWeekday;
+        out.monthdays = undefined;
+      } else {
+        out.monthdays = [monthIntervalDay];
+        out.nthWeek = undefined;
+        out.nthWeekday = undefined;
+      }
     }
     onSubmit(out);
   }
@@ -226,40 +264,92 @@ export function ReminderForm({ initial = DEFAULT_INPUT, onSubmit, onCancel, subm
       {/* 日付 (monthly) */}
       {form.kind === 'monthly' && (
         <>
-          <Text style={styles.label}>日付</Text>
-          <View style={styles.mdGrid}>
-            {Array.from({ length: 31 }, (_, i) => i + 1).map((day) => {
-              const selected = form.monthdays?.includes(day) ?? false;
-              return (
+          <Text style={styles.label}>指定方法</Text>
+          <View style={styles.kindRow}>
+            {(['day', 'nth'] as const).map((mode) => (
+              <TouchableOpacity
+                key={mode}
+                style={[styles.chip, monthDayMode === mode && styles.chipActive]}
+                onPress={() => setMonthDayMode(mode)}
+              >
+                <Text style={[styles.chipText, monthDayMode === mode && styles.chipTextActive]}>
+                  {mode === 'day' ? '日付' : '第N曜日'}
+                </Text>
+              </TouchableOpacity>
+            ))}
+          </View>
+
+          {monthDayMode === 'day' && (
+            <>
+              <Text style={styles.label}>日付</Text>
+              <View style={styles.mdGrid}>
+                {Array.from({ length: 31 }, (_, i) => i + 1).map((day) => {
+                  const selected = form.monthdays?.includes(day) ?? false;
+                  return (
+                    <TouchableOpacity
+                      key={day}
+                      style={[styles.mdChip, selected && styles.chipActive]}
+                      onPress={() => toggleMonthday(day)}
+                    >
+                      <Text style={[styles.mdChipText, selected && styles.chipTextActive]}>
+                        {day}
+                      </Text>
+                    </TouchableOpacity>
+                  );
+                })}
                 <TouchableOpacity
-                  key={day}
-                  style={[styles.mdChip, selected && styles.chipActive]}
-                  onPress={() => toggleMonthday(day)}
+                  style={[
+                    styles.mdChip,
+                    styles.mdChipEom,
+                    (form.monthdays?.includes(MONTH_END) ?? false) && styles.chipActive,
+                  ]}
+                  onPress={() => toggleMonthday(MONTH_END)}
                 >
-                  <Text style={[styles.mdChipText, selected && styles.chipTextActive]}>
-                    {day}
+                  <Text
+                    style={[
+                      styles.mdChipText,
+                      (form.monthdays?.includes(MONTH_END) ?? false) && styles.chipTextActive,
+                    ]}
+                  >
+                    月末
                   </Text>
                 </TouchableOpacity>
-              );
-            })}
-            <TouchableOpacity
-              style={[
-                styles.mdChip,
-                styles.mdChipEom,
-                (form.monthdays?.includes(MONTH_END) ?? false) && styles.chipActive,
-              ]}
-              onPress={() => toggleMonthday(MONTH_END)}
-            >
-              <Text
-                style={[
-                  styles.mdChipText,
-                  (form.monthdays?.includes(MONTH_END) ?? false) && styles.chipTextActive,
-                ]}
-              >
-                月末
-              </Text>
-            </TouchableOpacity>
-          </View>
+              </View>
+            </>
+          )}
+
+          {monthDayMode === 'nth' && (
+            <>
+              <Text style={styles.label}>週</Text>
+              <View style={styles.kindRow}>
+                {NTH_WEEK_OPTIONS.map(({ label, value }) => (
+                  <TouchableOpacity
+                    key={value}
+                    style={[styles.chip, monthNthWeek === value && styles.chipActive]}
+                    onPress={() => setMonthNthWeek(value)}
+                  >
+                    <Text style={[styles.chipText, monthNthWeek === value && styles.chipTextActive]}>
+                      {label}
+                    </Text>
+                  </TouchableOpacity>
+                ))}
+              </View>
+              <Text style={styles.label}>曜日</Text>
+              <View style={styles.wdRow}>
+                {WEEKDAY_LABELS.map((label, i) => (
+                  <TouchableOpacity
+                    key={i}
+                    style={[styles.wdChip, monthNthWeekday === i && styles.chipActive]}
+                    onPress={() => setMonthNthWeekday(i)}
+                  >
+                    <Text style={[styles.wdChipText, monthNthWeekday === i && styles.chipTextActive]}>
+                      {label}
+                    </Text>
+                  </TouchableOpacity>
+                ))}
+              </View>
+            </>
+          )}
         </>
       )}
 
@@ -322,28 +412,81 @@ export function ReminderForm({ initial = DEFAULT_INPUT, onSubmit, onCancel, subm
               <Text style={styles.stepperBtnText}>＋</Text>
             </TouchableOpacity>
           </View>
-          <Text style={styles.label}>日付</Text>
-          <View style={styles.mdGrid}>
-            {Array.from({ length: 31 }, (_, i) => i + 1).map((day) => (
+
+          <Text style={styles.label}>指定方法</Text>
+          <View style={styles.kindRow}>
+            {(['day', 'nth'] as const).map((mode) => (
               <TouchableOpacity
-                key={day}
-                style={[styles.mdChip, monthIntervalDay === day && styles.chipActive]}
-                onPress={() => setMonthIntervalDay(day)}
+                key={mode}
+                style={[styles.chip, miDayMode === mode && styles.chipActive]}
+                onPress={() => setMiDayMode(mode)}
               >
-                <Text style={[styles.mdChipText, monthIntervalDay === day && styles.chipTextActive]}>
-                  {day}
+                <Text style={[styles.chipText, miDayMode === mode && styles.chipTextActive]}>
+                  {mode === 'day' ? '日付' : '第N曜日'}
                 </Text>
               </TouchableOpacity>
             ))}
-            <TouchableOpacity
-              style={[styles.mdChip, styles.mdChipEom, monthIntervalDay === MONTH_END && styles.chipActive]}
-              onPress={() => setMonthIntervalDay(MONTH_END)}
-            >
-              <Text style={[styles.mdChipText, monthIntervalDay === MONTH_END && styles.chipTextActive]}>
-                月末
-              </Text>
-            </TouchableOpacity>
           </View>
+
+          {miDayMode === 'day' && (
+            <>
+              <Text style={styles.label}>日付</Text>
+              <View style={styles.mdGrid}>
+                {Array.from({ length: 31 }, (_, i) => i + 1).map((day) => (
+                  <TouchableOpacity
+                    key={day}
+                    style={[styles.mdChip, monthIntervalDay === day && styles.chipActive]}
+                    onPress={() => setMonthIntervalDay(day)}
+                  >
+                    <Text style={[styles.mdChipText, monthIntervalDay === day && styles.chipTextActive]}>
+                      {day}
+                    </Text>
+                  </TouchableOpacity>
+                ))}
+                <TouchableOpacity
+                  style={[styles.mdChip, styles.mdChipEom, monthIntervalDay === MONTH_END && styles.chipActive]}
+                  onPress={() => setMonthIntervalDay(MONTH_END)}
+                >
+                  <Text style={[styles.mdChipText, monthIntervalDay === MONTH_END && styles.chipTextActive]}>
+                    月末
+                  </Text>
+                </TouchableOpacity>
+              </View>
+            </>
+          )}
+
+          {miDayMode === 'nth' && (
+            <>
+              <Text style={styles.label}>週</Text>
+              <View style={styles.kindRow}>
+                {NTH_WEEK_OPTIONS.map(({ label, value }) => (
+                  <TouchableOpacity
+                    key={value}
+                    style={[styles.chip, miNthWeek === value && styles.chipActive]}
+                    onPress={() => setMiNthWeek(value)}
+                  >
+                    <Text style={[styles.chipText, miNthWeek === value && styles.chipTextActive]}>
+                      {label}
+                    </Text>
+                  </TouchableOpacity>
+                ))}
+              </View>
+              <Text style={styles.label}>曜日</Text>
+              <View style={styles.wdRow}>
+                {WEEKDAY_LABELS.map((label, i) => (
+                  <TouchableOpacity
+                    key={i}
+                    style={[styles.wdChip, miNthWeekday === i && styles.chipActive]}
+                    onPress={() => setMiNthWeekday(i)}
+                  >
+                    <Text style={[styles.wdChipText, miNthWeekday === i && styles.chipTextActive]}>
+                      {label}
+                    </Text>
+                  </TouchableOpacity>
+                ))}
+              </View>
+            </>
+          )}
         </>
       )}
 

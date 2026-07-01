@@ -28,6 +28,8 @@ function buildEditInput(r: Reminder): ReminderInput {
     anchorDate: r.anchorDate ?? undefined,
     intervalDays: r.intervalDays ?? undefined,
     intervalMonths: r.intervalMonths ?? undefined,
+    nthWeek: r.nthWeek ?? undefined,
+    nthWeekday: r.nthWeekday ?? undefined,
     enabled: r.enabled,
   };
 }

@@ -25,6 +25,8 @@ export type ReminderInput = {
   anchorDate?: number; // biweekly/yearly/interval の起点 epoch ms
   intervalDays?: number; // interval のみ
   intervalMonths?: number; // month_interval のみ
+  nthWeek?: number; // monthly/month_interval: 第N週 (1〜4, -1=最終)
+  nthWeekday?: number; // monthly/month_interval: 曜日 (0=日〜6=土)
   enabled: boolean;
 };
 

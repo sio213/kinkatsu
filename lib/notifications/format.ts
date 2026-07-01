@@ -6,12 +6,20 @@ export const KIND_LABELS: Record<ReminderKind, string> = {
   weekly: '毎週',
   biweekly: 'N週ごと',
   monthly: '毎月',
+  month_interval: 'Nヶ月ごと',
   yearly: '毎年',
   interval: 'N日ごと',
-  month_interval: 'Nヶ月ごと',
 };
 
 export const WEEKDAY_LABELS = ['日', '月', '火', '水', '木', '金', '土'];
+
+export const NTH_WEEK_OPTIONS: { label: string; value: number }[] = [
+  { label: '第1', value: 1 },
+  { label: '第2', value: 2 },
+  { label: '第3', value: 3 },
+  { label: '第4', value: 4 },
+  { label: '最終', value: -1 },
+];
 
 export const MONTH_LABELS = [
   '1月', '2月', '3月', '4月', '5月', '6月',
@@ -44,6 +52,10 @@ export function formatKindSummary(r: Reminder): string {
     return `${weeks}週間ごと ${wds.map((d) => WEEKDAY_LABELS[d]).join('・')} ${time}`;
   }
   if (kind === 'monthly') {
+    if (r.nthWeek != null && r.nthWeekday != null) {
+      const weekLabel = NTH_WEEK_OPTIONS.find((o) => o.value === r.nthWeek)?.label ?? `第${r.nthWeek}`;
+      return `毎月${weekLabel}${WEEKDAY_LABELS[r.nthWeekday]}曜日 ${time}`;
+    }
     const mds: number[] = r.monthdays ? JSON.parse(r.monthdays) : [];
     return `毎月 ${mds.map((d) => (d === MONTH_END ? '月末' : `${d}日`)).join('・')} ${time}`;
   }
@@ -56,6 +68,10 @@ export function formatKindSummary(r: Reminder): string {
   if (kind === 'interval') return `${r.intervalDays ?? 2}日ごと ${time}`;
   if (kind === 'month_interval') {
     const months = r.intervalMonths ?? 2;
+    if (r.nthWeek != null && r.nthWeekday != null) {
+      const weekLabel = NTH_WEEK_OPTIONS.find((o) => o.value === r.nthWeek)?.label ?? `第${r.nthWeek}`;
+      return `${months}ヶ月ごと${weekLabel}${WEEKDAY_LABELS[r.nthWeekday]}曜日 ${time}`;
+    }
     const mds: number[] = r.monthdays ? JSON.parse(r.monthdays) : [];
     const dayLabel = mds[0] === MONTH_END ? '月末' : `${mds[0] ?? 1}日`;
     return `${months}ヶ月ごと ${dayLabel} ${time}`;

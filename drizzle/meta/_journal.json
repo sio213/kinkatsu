@@ -22,6 +22,13 @@
       "when": 1782802492151,
       "tag": "0002_oval_jean_grey",
       "breakpoints": true
+    },
+    {
+      "idx": 3,
+      "version": "6",
+      "when": 1782864000000,
+      "tag": "0003_nth_weekday",
+      "breakpoints": true
     }
   ]
 }
