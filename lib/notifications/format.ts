@@ -18,6 +18,15 @@ export const NTH_WEEK_OPTIONS: { label: string; value: number }[] = [
   { label: '最終', value: -1 },
 ];
 
+type ReminderPreset = { label: string; weekdays: number[] | null };
+
+export const REMINDER_PRESETS: ReminderPreset[] = [
+  { label: '毎日',    weekdays: null },
+  { label: '月水金',  weekdays: [1, 3, 5] },
+  { label: '火木土',  weekdays: [2, 4, 6] },
+  { label: '週末のみ', weekdays: [0, 6] },
+];
+
 export const MONTH_LABELS = [
   '1月', '2月', '3月', '4月', '5月', '6月',
   '7月', '8月', '9月', '10月', '11月', '12月',

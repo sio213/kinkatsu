@@ -2,7 +2,7 @@ import {
   DEFAULT_REMINDER_BODY,
   DEFAULT_REMINDER_TITLE,
 } from '@/lib/notifications/messages';
-import { KIND_LABELS, MONTH_LABELS, NTH_WEEK_OPTIONS, WEEKDAY_LABELS } from '@/lib/notifications/format';
+import { KIND_LABELS, MONTH_LABELS, NTH_WEEK_OPTIONS, REMINDER_PRESETS, WEEKDAY_LABELS } from '@/lib/notifications/format';
 import { resolveMonthDay } from '@/lib/notifications/scheduler';
 import { MONTH_END, type ReminderInput, type ReminderKind } from '@/lib/notifications/types';
 import DateTimePicker from '@react-native-community/datetimepicker';
@@ -31,9 +31,10 @@ type Props = {
   onSubmit: (input: ReminderInput) => void;
   onCancel: () => void;
   submitLabel: string;
+  showPresets?: boolean;
 };
 
-export function ReminderForm({ initial = DEFAULT_INPUT, onSubmit, onCancel, submitLabel }: Props) {
+export function ReminderForm({ initial = DEFAULT_INPUT, onSubmit, onCancel, submitLabel, showPresets = true }: Props) {
   const [form, setForm] = useState<ReminderInput>(initial);
   const [showAndroidTimePicker, setShowAndroidTimePicker] = useState(false);
 
@@ -69,6 +70,26 @@ export function ReminderForm({ initial = DEFAULT_INPUT, onSubmit, onCancel, subm
   function set<K extends keyof ReminderInput>(key: K, val: ReminderInput[K]) {
     setForm((f) => ({ ...f, [key]: val }));
   }
+
+  function applyPreset(preset: (typeof REMINDER_PRESETS)[number]) {
+    if (preset.weekdays) {
+      setForm((f) => ({ ...f, kind: 'weekly', weekdays: preset.weekdays! }));
+      setIntervalWeeks(1);
+    } else {
+      setForm((f) => ({ ...f, kind: 'interval', intervalDays: 1 }));
+    }
+  }
+
+  const activePreset = REMINDER_PRESETS.find((p) => {
+    if (p.weekdays) {
+      return (
+        form.kind === 'weekly' &&
+        intervalWeeks === 1 &&
+        JSON.stringify(form.weekdays ?? []) === JSON.stringify(p.weekdays)
+      );
+    }
+    return form.kind === 'interval' && (form.intervalDays ?? 1) === 1;
+  });
 
   function toggleWeekday(wd: number) {
     const current = form.weekdays ?? [];
@@ -158,6 +179,29 @@ export function ReminderForm({ initial = DEFAULT_INPUT, onSubmit, onCancel, subm
 
   return (
     <View style={styles.container}>
+      {showPresets && (
+        <>
+          <Text style={styles.label}>クイック設定</Text>
+          <View style={styles.kindRow}>
+            {REMINDER_PRESETS.map((preset) => {
+              const isActive = activePreset?.label === preset.label;
+              return (
+                <TouchableOpacity
+                  key={preset.label}
+                  style={[styles.chip, isActive && styles.chipActive]}
+                  onPress={() => applyPreset(preset)}
+                  accessibilityLabel={`${preset.label}プリセット`}
+                >
+                  <Text style={[styles.chipText, isActive && styles.chipTextActive]}>
+                    {preset.label}
+                  </Text>
+                </TouchableOpacity>
+              );
+            })}
+          </View>
+        </>
+      )}
+
       <Text style={styles.label}>タイトル</Text>
       <TextInput
         style={styles.input}
