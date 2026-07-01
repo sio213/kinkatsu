@@ -4,9 +4,16 @@ import { index, integer, sqliteTable, text } from 'drizzle-orm/sqlite-core';
 export const exercises = sqliteTable('exercises', {
   id: integer('id').primaryKey({ autoIncrement: true }),
   name: text('name').notNull(),
+  category: text('category').notNull().default(''),
+  favorite: integer('favorite', { mode: 'boolean' }).notNull().default(false),
+  note: text('note'),
+  source: text('source').notNull().default('custom'), // 'preset' | 'custom'
+  createdAt: integer('created_at'),
+  updatedAt: integer('updated_at'),
 });
 
 export type Exercise = typeof exercises.$inferSelect;
+export type NewExercise = typeof exercises.$inferInsert;
 
 // リマインダー設定
 export const reminders = sqliteTable('reminders', {
