@@ -22,7 +22,7 @@ import {
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
-const CATEGORY_FILTERS = [CATEGORY_ALL, ...EXERCISE_CATEGORIES, CATEGORY_FAVORITE] as const;
+const CATEGORY_FILTERS = [CATEGORY_ALL, CATEGORY_FAVORITE, ...EXERCISE_CATEGORIES] as const;
 
 export default function ExercisesScreen() {
   const { exercises, addExercise, updateExercise, toggleFavorite, removeExercise } =
@@ -32,6 +32,7 @@ export default function ExercisesScreen() {
   const [activeCategory, setActiveCategory] = useState<string>(CATEGORY_ALL);
   const [showForm, setShowForm] = useState(false);
   const [editTargetId, setEditTargetId] = useState<number | null>(null);
+  const [formInitialName, setFormInitialName] = useState('');
   const [keyboardInset, setKeyboardInset] = useState(0);
 
   useEffect(() => {
@@ -50,7 +51,8 @@ export default function ExercisesScreen() {
     [exercises, activeCategory, search],
   );
 
-  const openCreate = useCallback(() => {
+  const openCreate = useCallback((name = '') => {
+    setFormInitialName(name);
     setEditTargetId(null);
     setShowForm(true);
   }, []);
@@ -112,7 +114,7 @@ export default function ExercisesScreen() {
       <View style={styles.sectionHeader}>
         <Text style={styles.title}>種目ライブラリ</Text>
         {!showForm && (
-          <TouchableOpacity style={styles.addBtn} onPress={openCreate}>
+          <TouchableOpacity style={styles.addBtn} onPress={() => openCreate()}>
             <Text style={styles.addBtnText}>＋ 追加</Text>
           </TouchableOpacity>
         )}
@@ -149,24 +151,36 @@ export default function ExercisesScreen() {
       {showForm && editTargetId == null && (
         <View style={styles.addFormWrapper}>
           <Text style={styles.addFormTitle}>種目を追加</Text>
-          <ExerciseForm onSubmit={handleSubmit} onCancel={closeForm} submitLabel="追加" />
+          <ExerciseForm
+            initial={{ name: formInitialName }}
+            onSubmit={handleSubmit}
+            onCancel={closeForm}
+            submitLabel="追加"
+          />
         </View>
       )}
     </View>
   );
 
+  const trimmedSearch = search.trim();
   const emptyComponent = !showForm ? (
     <View style={styles.emptyWrapper}>
       <Text style={styles.empty}>
-        {search || activeCategory !== CATEGORY_ALL
-          ? '該当する種目がありません'
-          : '種目がありません'}
+        {trimmedSearch
+          ? `「${trimmedSearch}」は見つかりません`
+          : activeCategory !== CATEGORY_ALL
+            ? '該当する種目がありません'
+            : '種目がありません'}
       </Text>
-      {!search && activeCategory === CATEGORY_ALL && (
-        <TouchableOpacity style={styles.emptyAddBtn} onPress={openCreate}>
+      {trimmedSearch ? (
+        <TouchableOpacity style={styles.emptyAddBtn} onPress={() => openCreate(trimmedSearch)}>
+          <Text style={styles.emptyAddBtnText}>＋ {trimmedSearch}を追加</Text>
+        </TouchableOpacity>
+      ) : activeCategory === CATEGORY_ALL ? (
+        <TouchableOpacity style={styles.emptyAddBtn} onPress={() => openCreate()}>
           <Text style={styles.emptyAddBtnText}>＋ 最初の種目を追加</Text>
         </TouchableOpacity>
-      )}
+      ) : null}
     </View>
   ) : null;
 
