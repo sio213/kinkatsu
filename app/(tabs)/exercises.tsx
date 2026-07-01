@@ -94,6 +94,18 @@ export default function ExercisesScreen() {
     [removeExercise],
   );
 
+  const handleToggleFavorite = useCallback(
+    async (id: number, favorite: boolean) => {
+      try {
+        await toggleFavorite(id, favorite);
+      } catch (err) {
+        console.error('[toggle favorite]', err);
+        Alert.alert('エラー', 'お気に入りの更新に失敗しました。');
+      }
+    },
+    [toggleFavorite],
+  );
+
   const renderItem = useCallback(
     ({ item: e }: { item: Exercise }) => (
       <ExerciseCard
@@ -102,11 +114,11 @@ export default function ExercisesScreen() {
         onEdit={() => openEdit(e.id)}
         onCloseEdit={closeForm}
         onDelete={() => handleDelete(e.id, e.name)}
-        onToggleFavorite={(fav) => toggleFavorite(e.id, fav)}
+        onToggleFavorite={(fav) => handleToggleFavorite(e.id, fav)}
         onSubmit={handleSubmit}
       />
     ),
-    [editTargetId, showForm, openEdit, closeForm, handleDelete, toggleFavorite, handleSubmit],
+    [editTargetId, showForm, openEdit, closeForm, handleDelete, handleToggleFavorite, handleSubmit],
   );
 
   const listHeader = (
@@ -189,6 +201,7 @@ export default function ExercisesScreen() {
       <FlatList
         style={styles.list}
         data={filtered}
+        extraData={filtered}
         keyExtractor={(item) => String(item.id)}
         renderItem={renderItem}
         ItemSeparatorComponent={() => <View style={styles.separator} />}

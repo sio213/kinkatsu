@@ -1,4 +1,5 @@
 import type { Exercise } from '@/db/schema';
+import { useEffect, useState } from 'react';
 import { StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import { ExerciseForm, type ExerciseFormValues } from './exercise-form';
 
@@ -21,6 +22,18 @@ export function ExerciseCard({
   onToggleFavorite,
   onSubmit,
 }: Props) {
+  const [localFav, setLocalFav] = useState(!!e.favorite);
+
+  useEffect(() => {
+    setLocalFav(!!e.favorite);
+  }, [e.favorite]);
+
+  function handleFavoritePress() {
+    const next = !localFav;
+    setLocalFav(next);
+    onToggleFavorite(next);
+  }
+
   return (
     <View>
       <View style={styles.card}>
@@ -39,12 +52,12 @@ export function ExerciseCard({
             </View>
           </View>
           <TouchableOpacity
-            onPress={() => onToggleFavorite(!e.favorite)}
+            onPress={handleFavoritePress}
             hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
-            accessibilityLabel={e.favorite ? 'お気に入り解除' : 'お気に入りに追加'}
+            accessibilityLabel={localFav ? 'お気に入り解除' : 'お気に入りに追加'}
           >
-            <Text style={[styles.star, e.favorite && styles.starActive]}>
-              {e.favorite ? '★' : '☆'}
+            <Text style={[styles.star, localFav && styles.starActive]}>
+              {localFav ? '★' : '☆'}
             </Text>
           </TouchableOpacity>
         </View>
