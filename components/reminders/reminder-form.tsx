@@ -173,6 +173,7 @@ export function ReminderForm({ initial = DEFAULT_INPUT, onSubmit, onCancel, subm
         onChangeText={(v) => set('body', v)}
         placeholder="通知内容"
         multiline
+        scrollEnabled={false}
       />
 
       <Text style={styles.label}>時刻</Text>
@@ -481,7 +482,7 @@ const styles = StyleSheet.create({
     color: '#1E293B',
     backgroundColor: '#fff',
   },
-  inputMulti: { minHeight: 64, textAlignVertical: 'top' },
+  inputMulti: { minHeight: 80, textAlignVertical: 'top' },
 
   timeButton: {
     backgroundColor: '#fff',

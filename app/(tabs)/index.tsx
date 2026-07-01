@@ -1,25 +1,41 @@
-import ParallaxScrollView from '@/components/parallax-scroll-view';
 import { PermissionBanner } from '@/components/reminders/permission-banner';
 import { ReminderCard } from '@/components/reminders/reminder-card';
 import { ReminderForm } from '@/components/reminders/reminder-form';
 import { ReminderListBoundary } from '@/components/reminders/reminder-list-boundary';
-import { ThemedText } from '@/components/themed-text';
-import { ThemedView } from '@/components/themed-view';
 import { useReminders } from '@/hooks/use-reminders';
 import {
   ensurePermission,
   getPermissionState,
 } from '@/lib/notifications/permissions';
 import type { ReminderInput } from '@/lib/notifications/types';
-import { Image } from 'expo-image';
 import { useCallback, useEffect, useState } from 'react';
-import { Alert, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
+import {
+  Alert,
+  Keyboard,
+  ScrollView,
+  StyleSheet,
+  Text,
+  TouchableOpacity,
+  View,
+} from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
 
 export default function HomeScreen() {
   const { reminders, createReminder, updateReminder, toggleReminder, removeReminder, getNextFire } =
     useReminders();
 
   const [permState, setPermState] = useState<'granted' | 'denied' | 'undetermined' | null>(null);
+  const [keyboardInset, setKeyboardInset] = useState(0);
+
+  useEffect(() => {
+    const show = Keyboard.addListener('keyboardWillShow', (e) => {
+      setKeyboardInset(e.endCoordinates.height + 32);
+    });
+    const hide = Keyboard.addListener('keyboardWillHide', () => {
+      setKeyboardInset(0);
+    });
+    return () => { show.remove(); hide.remove(); };
+  }, []);
   const [showForm, setShowForm] = useState(false);
   const [editTargetId, setEditTargetId] = useState<number | null>(null);
 
@@ -81,69 +97,67 @@ export default function HomeScreen() {
   }, []);
 
   return (
-    <ParallaxScrollView
-      headerBackgroundColor={{ light: '#A1CEDC', dark: '#1D3D47' }}
-      headerImage={
-        <Image
-          source={require('@/assets/images/partial-react-logo.png')}
-          style={styles.reactLogo}
-        />
-      }
-    >
-      {permState && permState !== 'granted' && (
-        <PermissionBanner state={permState} onRequest={handleRequestPermission} />
-      )}
-
-      <ThemedView style={styles.section}>
-        <View style={styles.sectionHeader}>
-          <ThemedText type="subtitle">筋トレリマインダー</ThemedText>
-          {!showForm && (
-            <TouchableOpacity style={styles.addBtn} onPress={openCreate}>
-              <Text style={styles.addBtnText}>＋ 追加</Text>
-            </TouchableOpacity>
+    <SafeAreaView style={styles.safeArea}>
+        <ScrollView
+          contentContainerStyle={styles.scroll}
+          keyboardShouldPersistTaps="handled"
+          contentInset={{ bottom: keyboardInset }}
+          scrollIndicatorInsets={{ bottom: keyboardInset }}
+        >
+          {permState && permState !== 'granted' && (
+            <PermissionBanner state={permState} onRequest={handleRequestPermission} />
           )}
-        </View>
 
-        {reminders.length === 0 && !showForm && (
-          <Text style={styles.empty}>リマインダーがありません</Text>
-        )}
-
-        <ReminderListBoundary>
-          {reminders.map((r) => (
-            <ReminderCard
-              key={r.id}
-              reminder={r}
-              isEditing={editTargetId === r.id && showForm}
-              onEdit={() => openEdit(r.id)}
-              onCloseEdit={closeForm}
-              onDelete={() => handleDelete(r.id)}
-              onToggle={(enabled) => toggleReminder(r.id, enabled)}
-              onSubmit={handleSubmit}
-              getNextFire={getNextFire}
-            />
-          ))}
-        </ReminderListBoundary>
-
-        {showForm && editTargetId == null && (
-          <View style={styles.addFormWrapper}>
-            <Text style={styles.addFormTitle}>リマインダーを追加</Text>
-            <ReminderForm
-              onSubmit={handleSubmit}
-              onCancel={closeForm}
-              submitLabel="追加"
-            />
+          <View style={styles.sectionHeader}>
+            <Text style={styles.title}>筋トレリマインダー</Text>
+            {!showForm && (
+              <TouchableOpacity style={styles.addBtn} onPress={openCreate}>
+                <Text style={styles.addBtnText}>＋ 追加</Text>
+              </TouchableOpacity>
+            )}
           </View>
-        )}
-      </ThemedView>
-    </ParallaxScrollView>
+
+          {reminders.length === 0 && !showForm && (
+            <Text style={styles.empty}>リマインダーがありません</Text>
+          )}
+
+          <ReminderListBoundary>
+            {reminders.map((r) => (
+              <ReminderCard
+                key={r.id}
+                reminder={r}
+                isEditing={editTargetId === r.id && showForm}
+                onEdit={() => openEdit(r.id)}
+                onCloseEdit={closeForm}
+                onDelete={() => handleDelete(r.id)}
+                onToggle={(enabled) => toggleReminder(r.id, enabled)}
+                onSubmit={handleSubmit}
+                getNextFire={getNextFire}
+              />
+            ))}
+          </ReminderListBoundary>
+
+          {showForm && editTargetId == null && (
+            <View style={styles.addFormWrapper}>
+              <Text style={styles.addFormTitle}>リマインダーを追加</Text>
+              <ReminderForm
+                onSubmit={handleSubmit}
+                onCancel={closeForm}
+                submitLabel="追加"
+              />
+            </View>
+          )}
+        </ScrollView>
+    </SafeAreaView>
   );
 }
 
 const styles = StyleSheet.create({
-  reactLogo: { height: 178, width: 290, bottom: 0, left: 0, position: 'absolute' },
+  safeArea: { flex: 1, backgroundColor: '#fff' },
+  scroll: { padding: 16, gap: 12, paddingBottom: 40 },
 
-  section: { gap: 12, paddingBottom: 24 },
   sectionHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
+  title: { fontSize: 18, fontWeight: '700', color: '#1E293B' },
   addBtn: {
     backgroundColor: '#2563EB',
     borderRadius: 8,
