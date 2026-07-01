@@ -1,0 +1,1 @@
+ALTER TABLE `reminders` ADD `interval_months` integer;

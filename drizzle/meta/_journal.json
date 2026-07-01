@@ -8,6 +8,34 @@
       "when": 1782616081601,
       "tag": "0000_rapid_diamondback",
       "breakpoints": true
+    },
+    {
+      "idx": 1,
+      "version": "6",
+      "when": 1782800897222,
+      "tag": "0001_safe_screwball",
+      "breakpoints": true
+    },
+    {
+      "idx": 2,
+      "version": "6",
+      "when": 1782802492151,
+      "tag": "0002_oval_jean_grey",
+      "breakpoints": true
+    },
+    {
+      "idx": 3,
+      "version": "6",
+      "when": 1782864000000,
+      "tag": "0003_nth_weekday",
+      "breakpoints": true
+    },
+    {
+      "idx": 4,
+      "version": "6",
+      "when": 1782950400000,
+      "tag": "0004_unify_kinds",
+      "breakpoints": true
     }
   ]
 }
