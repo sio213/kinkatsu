@@ -1,15 +1,84 @@
-import { Image } from 'expo-image';
-import { Platform, StyleSheet, Text, View } from 'react-native';
-
-import { HelloWave } from '@/components/hello-wave';
 import ParallaxScrollView from '@/components/parallax-scroll-view';
+import { PermissionBanner } from '@/components/reminders/permission-banner';
+import { ReminderCard } from '@/components/reminders/reminder-card';
+import { ReminderForm } from '@/components/reminders/reminder-form';
+import { ReminderListBoundary } from '@/components/reminders/reminder-list-boundary';
 import { ThemedText } from '@/components/themed-text';
 import { ThemedView } from '@/components/themed-view';
-import { useExercises } from '@/hooks/use-exercises';
-import { Link } from 'expo-router';
+import { useReminders } from '@/hooks/use-reminders';
+import {
+  ensurePermission,
+  getPermissionState,
+} from '@/lib/notifications/permissions';
+import type { ReminderInput } from '@/lib/notifications/types';
+import { Image } from 'expo-image';
+import { useCallback, useEffect, useState } from 'react';
+import { Alert, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 
 export default function HomeScreen() {
-  const { exercises } = useExercises();
+  const { reminders, createReminder, updateReminder, toggleReminder, removeReminder, getNextFire } =
+    useReminders();
+
+  const [permState, setPermState] = useState<'granted' | 'denied' | 'undetermined' | null>(null);
+  const [showForm, setShowForm] = useState(false);
+  const [editTargetId, setEditTargetId] = useState<number | null>(null);
+
+  useEffect(() => {
+    getPermissionState().then(setPermState);
+  }, []);
+
+  const openCreate = useCallback(() => {
+    setEditTargetId(null);
+    setShowForm(true);
+  }, []);
+
+  const openEdit = useCallback((id: number) => {
+    setEditTargetId(id);
+    setShowForm(true);
+  }, []);
+
+  const closeForm = useCallback(() => {
+    setShowForm(false);
+    setEditTargetId(null);
+  }, []);
+
+  const handleSubmit = useCallback(
+    async (input: ReminderInput) => {
+      const perm = await ensurePermission();
+      setPermState(perm);
+      if (perm !== 'granted') {
+        Alert.alert('通知が許可されていません', '設定から通知を有効にしてください。');
+        return;
+      }
+      try {
+        if (editTargetId != null) {
+          await updateReminder(editTargetId, input);
+        } else {
+          await createReminder(input);
+        }
+        closeForm();
+      } catch (e) {
+        console.error('[reminder save]', e);
+        Alert.alert('エラー', 'リマインダーの保存に失敗しました。');
+      }
+    },
+    [editTargetId, createReminder, updateReminder, closeForm],
+  );
+
+  const handleDelete = useCallback(
+    (id: number) => {
+      Alert.alert('削除', 'このリマインダーを削除しますか？', [
+        { text: 'キャンセル', style: 'cancel' },
+        { text: '削除', style: 'destructive', onPress: () => removeReminder(id) },
+      ]);
+    },
+    [removeReminder],
+  );
+
+  const handleRequestPermission = useCallback(async () => {
+    const r = await ensurePermission();
+    setPermState(r);
+  }, []);
 
   return (
     <ParallaxScrollView
@@ -21,96 +90,76 @@ export default function HomeScreen() {
         />
       }
     >
-      <ThemedView style={styles.titleContainer}>
-        <ThemedText type="title">Welcome!</ThemedText>
-        <HelloWave />
-      </ThemedView>
-      <Text>exercises: </Text>
-      {exercises.map((exercise) => (
-        <View key={exercise.id}>
-          <Text>{exercise.name}</Text>
-        </View>
-      ))}
-      <ThemedView style={styles.stepContainer}>
-        <ThemedText type="subtitle">Step 1: Try it</ThemedText>
-        <ThemedText>
-          Edit{' '}
-          <ThemedText type="defaultSemiBold">app/(tabs)/index.tsx</ThemedText>{' '}
-          to see changes. Press{' '}
-          <ThemedText type="defaultSemiBold">
-            {Platform.select({
-              ios: 'cmd + d',
-              android: 'cmd + m',
-              web: 'F12',
-            })}
-          </ThemedText>
-          to open developer tools.
-        </ThemedText>
-      </ThemedView>
-      <ThemedView style={styles.stepContainer}>
-        <Link href="/modal">
-          <Link.Trigger>
-            <ThemedText type="subtitle">Step 2: Explore</ThemedText>
-          </Link.Trigger>
-          <Link.Preview />
-          <Link.Menu>
-            <Link.MenuAction
-              title="Action"
-              icon="cube"
-              onPress={() => alert('Action pressed')}
-            />
-            <Link.MenuAction
-              title="Share"
-              icon="square.and.arrow.up"
-              onPress={() => alert('Share pressed')}
-            />
-            <Link.Menu title="More" icon="ellipsis">
-              <Link.MenuAction
-                title="Delete"
-                icon="trash"
-                destructive
-                onPress={() => alert('Delete pressed')}
-              />
-            </Link.Menu>
-          </Link.Menu>
-        </Link>
+      {permState && permState !== 'granted' && (
+        <PermissionBanner state={permState} onRequest={handleRequestPermission} />
+      )}
 
-        <ThemedText>
-          {`Tap the Explore tab to learn more about what's included in this starter app.`}
-        </ThemedText>
-      </ThemedView>
-      <ThemedView style={styles.stepContainer}>
-        <ThemedText type="subtitle">Step 3: Get a fresh start</ThemedText>
-        <ThemedText>
-          {`When you're ready, run `}
-          <ThemedText type="defaultSemiBold">
-            npm run reset-project
-          </ThemedText>{' '}
-          to get a fresh <ThemedText type="defaultSemiBold">app</ThemedText>{' '}
-          directory. This will move the current{' '}
-          <ThemedText type="defaultSemiBold">app</ThemedText> to{' '}
-          <ThemedText type="defaultSemiBold">app-example</ThemedText>.
-        </ThemedText>
+      <ThemedView style={styles.section}>
+        <View style={styles.sectionHeader}>
+          <ThemedText type="subtitle">筋トレリマインダー</ThemedText>
+          {!showForm && (
+            <TouchableOpacity style={styles.addBtn} onPress={openCreate}>
+              <Text style={styles.addBtnText}>＋ 追加</Text>
+            </TouchableOpacity>
+          )}
+        </View>
+
+        {reminders.length === 0 && !showForm && (
+          <Text style={styles.empty}>リマインダーがありません</Text>
+        )}
+
+        <ReminderListBoundary>
+          {reminders.map((r) => (
+            <ReminderCard
+              key={r.id}
+              reminder={r}
+              isEditing={editTargetId === r.id && showForm}
+              onEdit={() => openEdit(r.id)}
+              onCloseEdit={closeForm}
+              onDelete={() => handleDelete(r.id)}
+              onToggle={(enabled) => toggleReminder(r.id, enabled)}
+              onSubmit={handleSubmit}
+              getNextFire={getNextFire}
+            />
+          ))}
+        </ReminderListBoundary>
+
+        {showForm && editTargetId == null && (
+          <View style={styles.addFormWrapper}>
+            <Text style={styles.addFormTitle}>リマインダーを追加</Text>
+            <ReminderForm
+              onSubmit={handleSubmit}
+              onCancel={closeForm}
+              submitLabel="追加"
+            />
+          </View>
+        )}
       </ThemedView>
     </ParallaxScrollView>
   );
 }
 
 const styles = StyleSheet.create({
-  titleContainer: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 8,
+  reactLogo: { height: 178, width: 290, bottom: 0, left: 0, position: 'absolute' },
+
+  section: { gap: 12, paddingBottom: 24 },
+  sectionHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
+  addBtn: {
+    backgroundColor: '#2563EB',
+    borderRadius: 8,
+    paddingHorizontal: 14,
+    paddingVertical: 6,
   },
-  stepContainer: {
-    gap: 8,
-    marginBottom: 8,
+  addBtnText: { color: '#fff', fontWeight: '600', fontSize: 14 },
+  empty: { color: '#999', textAlign: 'center', paddingVertical: 16 },
+
+  addFormWrapper: {
+    backgroundColor: '#F1F5F9',
+    borderRadius: 10,
+    padding: 16,
+    borderWidth: 1,
+    borderColor: '#E2E8F0',
+    marginTop: 4,
   },
-  reactLogo: {
-    height: 178,
-    width: 290,
-    bottom: 0,
-    left: 0,
-    position: 'absolute',
-  },
+  addFormTitle: { fontSize: 15, fontWeight: '700', color: '#1E293B', marginBottom: 8 },
 });
