@@ -4,7 +4,8 @@ import { useRouter } from 'expo-router';
 import { memo, useEffect, useState } from 'react';
 import { Alert, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import { getExerciseImages } from '@/lib/exercises/images';
-import { ExerciseForm, type ExerciseFormValues } from './exercise-form';
+import type { ExerciseFormValues } from '@/lib/exercises/validation';
+import { ExerciseForm } from './exercise-form';
 
 type Props = {
   exercise: Exercise;

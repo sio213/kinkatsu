@@ -1,3 +1,4 @@
+import { FormLabel } from '@/components/ui/form-label';
 import {
   DEFAULT_REMINDER_BODY,
   DEFAULT_REMINDER_TITLE,
@@ -37,6 +38,10 @@ type Props = {
 export function ReminderForm({ initial = DEFAULT_INPUT, onSubmit, onCancel, submitLabel, showPresets = true }: Props) {
   const [form, setForm] = useState<ReminderInput>(initial);
   const [showAndroidTimePicker, setShowAndroidTimePicker] = useState(false);
+  const [attemptedSubmit, setAttemptedSubmit] = useState(false);
+
+  const titleValid = form.title.trim().length > 0;
+  const bodyValid = form.body.trim().length > 0;
 
   const [intervalWeeks, setIntervalWeeks] = useState<number>(
     initial.kind === 'weekly' ? Math.max(1, Math.round((initial.intervalDays ?? 7) / 7)) : 1,
@@ -122,6 +127,11 @@ export function ReminderForm({ initial = DEFAULT_INPUT, onSubmit, onCancel, subm
   }
 
   function handleSubmit() {
+    if (!titleValid || !bodyValid) {
+      setAttemptedSubmit(true);
+      return;
+    }
+
     const out = { ...form };
 
     if (out.kind === 'interval') {
@@ -181,7 +191,7 @@ export function ReminderForm({ initial = DEFAULT_INPUT, onSubmit, onCancel, subm
     <View style={styles.container}>
       {showPresets && (
         <>
-          <Text style={styles.label}>クイック設定</Text>
+          <FormLabel containerStyle={styles.labelSpacing}>クイック設定</FormLabel>
           <View style={styles.kindRow}>
             {REMINDER_PRESETS.map((preset) => {
               const isActive = activePreset?.label === preset.label;
@@ -202,15 +212,18 @@ export function ReminderForm({ initial = DEFAULT_INPUT, onSubmit, onCancel, subm
         </>
       )}
 
-      <Text style={styles.label}>タイトル</Text>
+      <FormLabel required containerStyle={styles.labelSpacing}>タイトル</FormLabel>
       <TextInput
         style={styles.input}
         value={form.title}
         onChangeText={(v) => set('title', v)}
         placeholder="タイトル"
       />
+      {attemptedSubmit && !titleValid ? (
+        <Text style={styles.errorText}>タイトルを入力してください</Text>
+      ) : null}
 
-      <Text style={styles.label}>通知内容</Text>
+      <FormLabel required containerStyle={styles.labelSpacing}>通知内容</FormLabel>
       <TextInput
         style={[styles.input, styles.inputMulti]}
         value={form.body}
@@ -219,8 +232,11 @@ export function ReminderForm({ initial = DEFAULT_INPUT, onSubmit, onCancel, subm
         multiline
         scrollEnabled={false}
       />
+      {attemptedSubmit && !bodyValid ? (
+        <Text style={styles.errorText}>通知内容を入力してください</Text>
+      ) : null}
 
-      <Text style={styles.label}>時刻</Text>
+      <FormLabel containerStyle={styles.labelSpacing}>時刻</FormLabel>
       {Platform.OS === 'android' && (
         <TouchableOpacity
           style={styles.timeButton}
@@ -239,7 +255,7 @@ export function ReminderForm({ initial = DEFAULT_INPUT, onSubmit, onCancel, subm
         />
       )}
 
-      <Text style={styles.label}>繰り返し</Text>
+      <FormLabel containerStyle={styles.labelSpacing}>繰り返し</FormLabel>
       <View style={styles.kindRow}>
         {(Object.keys(KIND_LABELS) as ReminderKind[]).map((k) => (
           <TouchableOpacity
@@ -257,7 +273,7 @@ export function ReminderForm({ initial = DEFAULT_INPUT, onSubmit, onCancel, subm
       {/* 日単位 */}
       {form.kind === 'interval' && (
         <>
-          <Text style={styles.label}>間隔</Text>
+          <FormLabel containerStyle={styles.labelSpacing}>間隔</FormLabel>
           <View style={styles.stepperRow}>
             <TouchableOpacity
               style={styles.stepperBtn}
@@ -281,7 +297,7 @@ export function ReminderForm({ initial = DEFAULT_INPUT, onSubmit, onCancel, subm
       {/* 週単位 */}
       {form.kind === 'weekly' && (
         <>
-          <Text style={styles.label}>間隔</Text>
+          <FormLabel containerStyle={styles.labelSpacing}>間隔</FormLabel>
           <View style={styles.stepperRow}>
             <TouchableOpacity
               style={styles.stepperBtn}
@@ -299,7 +315,7 @@ export function ReminderForm({ initial = DEFAULT_INPUT, onSubmit, onCancel, subm
               <Text style={styles.stepperBtnText}>＋</Text>
             </TouchableOpacity>
           </View>
-          <Text style={styles.label}>曜日</Text>
+          <FormLabel containerStyle={styles.labelSpacing}>曜日</FormLabel>
           <View style={styles.wdRow}>
             {WEEKDAY_LABELS.map((label, i) => {
               const selected = form.weekdays?.includes(i) ?? false;
@@ -322,7 +338,7 @@ export function ReminderForm({ initial = DEFAULT_INPUT, onSubmit, onCancel, subm
       {/* 月単位 */}
       {form.kind === 'monthly' && (
         <>
-          <Text style={styles.label}>間隔</Text>
+          <FormLabel containerStyle={styles.labelSpacing}>間隔</FormLabel>
           <View style={styles.stepperRow}>
             <TouchableOpacity
               style={styles.stepperBtn}
@@ -341,7 +357,7 @@ export function ReminderForm({ initial = DEFAULT_INPUT, onSubmit, onCancel, subm
             </TouchableOpacity>
           </View>
 
-          <Text style={styles.label}>指定方法</Text>
+          <FormLabel containerStyle={styles.labelSpacing}>指定方法</FormLabel>
           <View style={styles.kindRow}>
             {(['day', 'nth'] as const).map((mode) => (
               <TouchableOpacity
@@ -358,7 +374,7 @@ export function ReminderForm({ initial = DEFAULT_INPUT, onSubmit, onCancel, subm
 
           {monthDayMode === 'day' && intervalMonths === 1 && (
             <>
-              <Text style={styles.label}>日付（複数選択可）</Text>
+              <FormLabel containerStyle={styles.labelSpacing}>日付（複数選択可）</FormLabel>
               <View style={styles.mdGrid}>
                 {Array.from({ length: 31 }, (_, i) => i + 1).map((day) => {
                   const selected = form.monthdays?.includes(day) ?? false;
@@ -397,7 +413,7 @@ export function ReminderForm({ initial = DEFAULT_INPUT, onSubmit, onCancel, subm
 
           {monthDayMode === 'day' && intervalMonths > 1 && (
             <>
-              <Text style={styles.label}>日付</Text>
+              <FormLabel containerStyle={styles.labelSpacing}>日付</FormLabel>
               <View style={styles.mdGrid}>
                 {Array.from({ length: 31 }, (_, i) => i + 1).map((day) => (
                   <TouchableOpacity
@@ -428,7 +444,7 @@ export function ReminderForm({ initial = DEFAULT_INPUT, onSubmit, onCancel, subm
 
           {monthDayMode === 'nth' && (
             <>
-              <Text style={styles.label}>週</Text>
+              <FormLabel containerStyle={styles.labelSpacing}>週</FormLabel>
               <View style={styles.kindRow}>
                 {NTH_WEEK_OPTIONS.map(({ label, value }) => (
                   <TouchableOpacity
@@ -442,7 +458,7 @@ export function ReminderForm({ initial = DEFAULT_INPUT, onSubmit, onCancel, subm
                   </TouchableOpacity>
                 ))}
               </View>
-              <Text style={styles.label}>曜日</Text>
+              <FormLabel containerStyle={styles.labelSpacing}>曜日</FormLabel>
               <View style={styles.wdRow}>
                 {WEEKDAY_LABELS.map((label, i) => (
                   <TouchableOpacity
@@ -464,7 +480,7 @@ export function ReminderForm({ initial = DEFAULT_INPUT, onSubmit, onCancel, subm
       {/* 年単位 */}
       {form.kind === 'yearly' && (
         <>
-          <Text style={styles.label}>月</Text>
+          <FormLabel containerStyle={styles.labelSpacing}>月</FormLabel>
           <View style={styles.kindRow}>
             {MONTH_LABELS.map((label, i) => (
               <TouchableOpacity
@@ -478,7 +494,7 @@ export function ReminderForm({ initial = DEFAULT_INPUT, onSubmit, onCancel, subm
               </TouchableOpacity>
             ))}
           </View>
-          <Text style={styles.label}>日</Text>
+          <FormLabel containerStyle={styles.labelSpacing}>日</FormLabel>
           <View style={styles.mdGrid}>
             {Array.from({ length: 31 }, (_, i) => i + 1).map((day) => (
               <TouchableOpacity
@@ -502,10 +518,22 @@ export function ReminderForm({ initial = DEFAULT_INPUT, onSubmit, onCancel, subm
       )}
 
       <View style={styles.buttons}>
-        <TouchableOpacity style={styles.cancelBtn} onPress={onCancel}>
+        <TouchableOpacity
+          style={styles.cancelBtn}
+          onPress={onCancel}
+          accessibilityLabel="キャンセル"
+        >
           <Text style={styles.cancelBtnText}>キャンセル</Text>
         </TouchableOpacity>
-        <TouchableOpacity style={styles.submitBtn} onPress={handleSubmit}>
+        <TouchableOpacity
+          style={[
+            styles.submitBtn,
+            attemptedSubmit && (!titleValid || !bodyValid) && styles.submitBtnDisabled,
+          ]}
+          onPress={handleSubmit}
+          disabled={attemptedSubmit && (!titleValid || !bodyValid)}
+          accessibilityLabel={submitLabel}
+        >
           <Text style={styles.submitBtnText}>{submitLabel}</Text>
         </TouchableOpacity>
       </View>
@@ -515,7 +543,8 @@ export function ReminderForm({ initial = DEFAULT_INPUT, onSubmit, onCancel, subm
 
 const styles = StyleSheet.create({
   container: { gap: 0 },
-  label: { fontSize: 13, fontWeight: '600', color: '#475569', marginTop: 12, marginBottom: 4 },
+  labelSpacing: { marginTop: 12, marginBottom: 4 },
+  errorText: { fontSize: 12, color: '#DC2626', marginBottom: 4 },
   input: {
     borderWidth: 1,
     borderColor: '#CBD5E1',
@@ -595,5 +624,6 @@ const styles = StyleSheet.create({
   cancelBtn: { flex: 1, padding: 12, borderRadius: 10, backgroundColor: '#E2E8F0', alignItems: 'center' },
   cancelBtnText: { fontSize: 15, color: '#475569', fontWeight: '600' },
   submitBtn: { flex: 1, padding: 12, borderRadius: 10, backgroundColor: '#2563EB', alignItems: 'center' },
+  submitBtnDisabled: { backgroundColor: '#94A3B8' },
   submitBtnText: { fontSize: 15, color: '#fff', fontWeight: '600' },
 });

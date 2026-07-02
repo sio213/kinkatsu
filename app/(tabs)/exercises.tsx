@@ -1,6 +1,6 @@
 import { chipStyles } from '@/components/exercises/chip-styles';
 import { ExerciseCard } from '@/components/exercises/exercise-card';
-import { ExerciseForm, type ExerciseFormValues } from '@/components/exercises/exercise-form';
+import { ExerciseForm } from '@/components/exercises/exercise-form';
 import { ListErrorBoundary } from '@/components/ui/list-error-boundary';
 import type { Exercise } from '@/db/schema';
 import { useExercises } from '@/hooks/use-exercises';
@@ -11,6 +11,7 @@ import {
   EXERCISE_CATEGORIES,
 } from '@/lib/exercises/constants';
 import { filterExercises } from '@/lib/exercises/filter';
+import type { ExerciseFormValues } from '@/lib/exercises/validation';
 import { useCallback, useMemo, useRef, useState } from 'react';
 import {
   Alert,
