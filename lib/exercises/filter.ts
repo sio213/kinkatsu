@@ -1,6 +1,13 @@
 import type { Exercise } from '@/db/schema';
 import { CATEGORY_ALL, CATEGORY_FAVORITE, CATEGORY_ORDER } from './constants';
 
+export function normalizeForSearch(value: string): string {
+  return value
+    .normalize('NFKC')
+    .replace(/[ぁ-ゖ]/g, (ch) => String.fromCharCode(ch.charCodeAt(0) + 0x60))
+    .toLowerCase();
+}
+
 export function filterExercises(
   exercises: Exercise[],
   activeCategory: string,
@@ -12,9 +19,10 @@ export function filterExercises(
   } else if (activeCategory !== CATEGORY_ALL) {
     list = list.filter((e) => e.category === activeCategory);
   }
-  if (search.trim()) {
-    const q = search.trim().toLowerCase();
-    list = list.filter((e) => e.name.toLowerCase().includes(q));
+  const trimmedSearch = search.trim();
+  if (trimmedSearch) {
+    const q = normalizeForSearch(trimmedSearch);
+    list = list.filter((e) => normalizeForSearch(e.name).includes(q));
   }
   return [...list].sort((a, b) => {
     const ai = CATEGORY_ORDER[a.category] ?? 99;
