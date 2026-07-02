@@ -109,15 +109,6 @@ export default function ExerciseDetailScreen() {
             </View>
           </View>
 
-          <TouchableOpacity
-            style={styles.youtubeBtn}
-            onPress={() => handleYoutubeSearch(exercise.name)}
-            hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
-            accessibilityLabel={`${exercise.name}のフォーム動画をYouTubeで検索`}
-          >
-            <Text style={styles.youtubeBtnText}>YouTubeで検索</Text>
-          </TouchableOpacity>
-
           {guide ? (
             <>
               <View style={styles.section}>
@@ -155,6 +146,15 @@ export default function ExerciseDetailScreen() {
           ) : (
             <Text style={styles.noGuide}>この種目の解説はまだありません</Text>
           )}
+
+          <TouchableOpacity
+            style={styles.youtubeBtn}
+            onPress={() => handleYoutubeSearch(exercise.name)}
+            hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+            accessibilityLabel={`${exercise.name}のフォーム動画をYouTubeで検索`}
+          >
+            <Text style={styles.youtubeBtnText}>YouTubeで検索</Text>
+          </TouchableOpacity>
         </View>
       </ScrollView>
     </SafeAreaView>
