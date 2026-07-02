@@ -19,7 +19,7 @@ import * as Notifications from 'expo-notifications';
 import { Stack } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
 import { useEffect, useRef } from 'react';
-import { AppState, type AppStateStatus } from 'react-native';
+import { AppState, type AppStateStatus, StyleSheet, Text, View } from 'react-native';
 import 'react-native-reanimated';
 
 Notifications.setNotificationHandler({
@@ -51,7 +51,7 @@ async function onAppStart() {
 
 export default function RootLayout() {
   const colorScheme = useColorScheme();
-  const { success } = useMigrations(db, migrations);
+  const { success, error: migrationError } = useMigrations(db, migrations);
   // DBをブラウザから閲覧できるようにする
   //　http://192.168.8.135:8081/_expo/plugins/expo-drizzle-studio-plugin
   useDrizzleStudio(__DEV__ ? expoDb : null);
@@ -60,7 +60,7 @@ export default function RootLayout() {
 
   useEffect(() => {
     if (!success) return;
-    seed();
+    seed().catch(() => {});
     onAppStart().catch(() => {});
 
     const sub = AppState.addEventListener('change', (next) => {
@@ -72,12 +72,28 @@ export default function RootLayout() {
     return () => sub.remove();
   }, [success]);
 
+  if (migrationError) {
+    return (
+      <View style={migrationStyles.container}>
+        <Text style={migrationStyles.title}>起動に失敗しました</Text>
+        <Text style={migrationStyles.body}>
+          アプリを再起動してください。{'\n'}
+          改善しない場合はアプリを再インストールしてください。
+        </Text>
+      </View>
+    );
+  }
+
   if (!success) return null;
 
   return (
     <ThemeProvider value={colorScheme === 'dark' ? DarkTheme : DefaultTheme}>
       <Stack>
         <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
+        <Stack.Screen
+          name="exercise/[id]"
+          options={{ presentation: 'modal', headerShown: false }}
+        />
         <Stack.Screen
           name="modal"
           options={{ presentation: 'modal', title: 'Modal' }}
@@ -87,3 +103,9 @@ export default function RootLayout() {
     </ThemeProvider>
   );
 }
+
+const migrationStyles = StyleSheet.create({
+  container: { flex: 1, justifyContent: 'center', alignItems: 'center', padding: 32, gap: 12 },
+  title: { fontSize: 17, fontWeight: '700', color: '#DC2626' },
+  body: { fontSize: 14, color: '#64748B', textAlign: 'center', lineHeight: 22 },
+});
