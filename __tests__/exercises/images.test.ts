@@ -22,6 +22,10 @@ describe('getExerciseImages', () => {
       expect(getExerciseImages(make({ slug: 'nonexistent_exercise' }))).toBeUndefined();
     });
 
+    it('slugがnull → undefined', () => {
+      expect(getExerciseImages(make({ slug: null }))).toBeUndefined();
+    });
+
     it('ダンベルカール → source あり、thumbnail なし', () => {
       const result = getExerciseImages(make({ slug: 'dumbbell_curl', name: 'ダンベルカール' }));
       expect(result).toBeDefined();

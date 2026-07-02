@@ -147,14 +147,18 @@ export default function ExercisesScreen() {
       >
         {CATEGORY_FILTERS.map((cat) => {
           const isActive = activeCategory === cat;
+          const label = getCategoryLabel(cat);
           return (
             <TouchableOpacity
               key={cat}
               style={[chipStyles.chip, isActive && chipStyles.chipActive]}
               onPress={() => setActiveCategory(cat)}
+              accessibilityRole="radio"
+              accessibilityState={{ checked: isActive }}
+              accessibilityLabel={label}
             >
               <Text style={[chipStyles.chipText, isActive && chipStyles.chipTextActive]}>
-                {getCategoryLabel(cat)}
+                {label}
               </Text>
             </TouchableOpacity>
           );

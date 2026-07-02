@@ -57,6 +57,13 @@
       "when": 1783209600000,
       "tag": "0007_exercise_category_slug",
       "breakpoints": true
+    },
+    {
+      "idx": 8,
+      "version": "6",
+      "when": 1783296000000,
+      "tag": "0008_backfill_exercise_slug",
+      "breakpoints": true
     }
   ]
 }
