@@ -122,7 +122,8 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     justifyContent: 'flex-end',
     paddingHorizontal: 16,
-    paddingVertical: 8,
+    paddingTop: 20,
+    paddingBottom: 8,
   },
   closeBtn: {
     width: 36,
