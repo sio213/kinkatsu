@@ -1,7 +1,7 @@
 import type { Exercise } from '@/db/schema';
 import { Image } from 'expo-image';
 import { useRouter } from 'expo-router';
-import { useEffect, useState } from 'react';
+import { memo, useEffect, useState } from 'react';
 import { Alert, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import { getExerciseImages } from '@/lib/exercises/images';
 import { ExerciseForm, type ExerciseFormValues } from './exercise-form';
@@ -9,14 +9,14 @@ import { ExerciseForm, type ExerciseFormValues } from './exercise-form';
 type Props = {
   exercise: Exercise;
   isEditing: boolean;
-  onEdit: () => void;
+  onEdit: (id: number) => void;
   onCloseEdit: () => void;
-  onDelete: () => void;
-  onToggleFavorite: (favorite: boolean) => Promise<void>;
+  onDelete: (id: number, name: string) => void;
+  onToggleFavorite: (id: number, favorite: boolean) => Promise<void>;
   onSubmit: (values: ExerciseFormValues) => void;
 };
 
-export function ExerciseCard({
+export const ExerciseCard = memo(function ExerciseCard({
   exercise: e,
   isEditing,
   onEdit,
@@ -36,7 +36,7 @@ export function ExerciseCard({
     const next = !localFav;
     setLocalFav(next);
     try {
-      await onToggleFavorite(next);
+      await onToggleFavorite(e.id, next);
     } catch (err) {
       console.error('[toggle favorite]', err);
       setLocalFav(!next);
@@ -72,7 +72,7 @@ export function ExerciseCard({
           </View>
           <TouchableOpacity
             onPress={handleFavoritePress}
-            hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+            hitSlop={{ top: 12, bottom: 12, left: 12, right: 12 }}
             accessibilityLabel={localFav ? 'お気に入り解除' : 'お気に入りに追加'}
           >
             <Text style={[styles.star, localFav && styles.starActive]}>
@@ -84,14 +84,14 @@ export function ExerciseCard({
         <View style={styles.actions}>
           <TouchableOpacity
             style={styles.actionBtn}
-            onPress={isEditing ? onCloseEdit : onEdit}
+            onPress={isEditing ? onCloseEdit : () => onEdit(e.id)}
             accessibilityLabel={isEditing ? '編集を閉じる' : `${e.name}を編集`}
           >
             <Text style={styles.actionBtnText}>{isEditing ? '閉じる' : '編集'}</Text>
           </TouchableOpacity>
           <TouchableOpacity
             style={[styles.actionBtn, styles.actionBtnDanger]}
-            onPress={onDelete}
+            onPress={() => onDelete(e.id, e.name)}
             accessibilityLabel={`${e.name}を削除`}
           >
             <Text style={[styles.actionBtnText, styles.actionBtnDangerText]}>削除</Text>
@@ -107,12 +107,13 @@ export function ExerciseCard({
             onSubmit={onSubmit}
             onCancel={onCloseEdit}
             submitLabel="保存"
+            autoFocus={false}
           />
         </View>
       )}
     </View>
   );
-}
+});
 
 const styles = StyleSheet.create({
   card: {

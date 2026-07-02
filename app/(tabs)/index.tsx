@@ -1,7 +1,8 @@
 import { PermissionBanner } from '@/components/reminders/permission-banner';
 import { ReminderCard } from '@/components/reminders/reminder-card';
 import { ReminderForm } from '@/components/reminders/reminder-form';
-import { ReminderListBoundary } from '@/components/reminders/reminder-list-boundary';
+import { ListErrorBoundary } from '@/components/ui/list-error-boundary';
+import { useKeyboardInset } from '@/hooks/use-keyboard-inset';
 import { useReminders } from '@/hooks/use-reminders';
 import {
   ensurePermission,
@@ -11,7 +12,6 @@ import type { ReminderInput } from '@/lib/notifications/types';
 import { useCallback, useEffect, useState } from 'react';
 import {
   Alert,
-  Keyboard,
   ScrollView,
   StyleSheet,
   Text,
@@ -25,17 +25,7 @@ export default function HomeScreen() {
     useReminders();
 
   const [permState, setPermState] = useState<'granted' | 'denied' | 'undetermined' | null>(null);
-  const [keyboardInset, setKeyboardInset] = useState(0);
-
-  useEffect(() => {
-    const show = Keyboard.addListener('keyboardWillShow', (e) => {
-      setKeyboardInset(e.endCoordinates.height + 32);
-    });
-    const hide = Keyboard.addListener('keyboardWillHide', () => {
-      setKeyboardInset(0);
-    });
-    return () => { show.remove(); hide.remove(); };
-  }, []);
+  const keyboardInset = useKeyboardInset();
   const [showForm, setShowForm] = useState(false);
   const [editTargetId, setEditTargetId] = useState<number | null>(null);
 
@@ -121,7 +111,7 @@ export default function HomeScreen() {
             <Text style={styles.empty}>リマインダーがありません</Text>
           )}
 
-          <ReminderListBoundary>
+          <ListErrorBoundary>
             {reminders.map((r) => (
               <ReminderCard
                 key={r.id}
@@ -135,7 +125,7 @@ export default function HomeScreen() {
                 getNextFire={getNextFire}
               />
             ))}
-          </ReminderListBoundary>
+          </ListErrorBoundary>
 
           {showForm && editTargetId == null && (
             <View style={styles.addFormWrapper}>

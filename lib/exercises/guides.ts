@@ -1,4 +1,5 @@
 import type { Exercise } from '@/db/schema';
+import { isPresetExercise } from './constants';
 
 export type ExerciseGuide = {
   muscle: string;
@@ -585,6 +586,6 @@ const GUIDES: Record<string, ExerciseGuide> = {
 };
 
 export function getGuide(exercise: Exercise): ExerciseGuide | undefined {
-  if (exercise.source !== 'preset') return undefined;
+  if (!isPresetExercise(exercise)) return undefined;
   return GUIDES[exercise.name];
 }

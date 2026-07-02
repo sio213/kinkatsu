@@ -1,18 +1,20 @@
+import { chipStyles } from '@/components/exercises/chip-styles';
 import { ExerciseCard } from '@/components/exercises/exercise-card';
 import { ExerciseForm, type ExerciseFormValues } from '@/components/exercises/exercise-form';
+import { ListErrorBoundary } from '@/components/ui/list-error-boundary';
 import type { Exercise } from '@/db/schema';
 import { useExercises } from '@/hooks/use-exercises';
+import { useKeyboardInset } from '@/hooks/use-keyboard-inset';
 import {
   CATEGORY_ALL,
   CATEGORY_FAVORITE,
   EXERCISE_CATEGORIES,
 } from '@/lib/exercises/constants';
 import { filterExercises } from '@/lib/exercises/filter';
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useCallback, useMemo, useRef, useState } from 'react';
 import {
   Alert,
   FlatList,
-  Keyboard,
   ScrollView,
   StyleSheet,
   Text,
@@ -33,18 +35,7 @@ export default function ExercisesScreen() {
   const [showForm, setShowForm] = useState(false);
   const [editTargetId, setEditTargetId] = useState<number | null>(null);
   const [formInitialName, setFormInitialName] = useState('');
-  const [keyboardInset, setKeyboardInset] = useState(0);
-
-  useEffect(() => {
-    const show = Keyboard.addListener('keyboardWillShow', (e) => {
-      setKeyboardInset(e.endCoordinates.height + 32);
-    });
-    const hide = Keyboard.addListener('keyboardWillHide', () => setKeyboardInset(0));
-    return () => {
-      show.remove();
-      hide.remove();
-    };
-  }, []);
+  const keyboardInset = useKeyboardInset();
 
   const filtered = useMemo(
     () => filterExercises(exercises, activeCategory, search),
@@ -67,11 +58,16 @@ export default function ExercisesScreen() {
     setEditTargetId(null);
   }, []);
 
+  // renderItem/ExerciseCard の props 参照を editTargetId の変化で壊さないよう ref 経由で読む
+  const editTargetIdRef = useRef(editTargetId);
+  editTargetIdRef.current = editTargetId;
+
   const handleSubmit = useCallback(
     async (values: ExerciseFormValues) => {
       try {
-        if (editTargetId != null) {
-          await updateExercise(editTargetId, values);
+        const targetId = editTargetIdRef.current;
+        if (targetId != null) {
+          await updateExercise(targetId, values);
         } else {
           await addExercise(values.name, values.category, values.note ?? undefined);
         }
@@ -81,7 +77,7 @@ export default function ExercisesScreen() {
         Alert.alert('エラー', '種目の保存に失敗しました。');
       }
     },
-    [editTargetId, addExercise, updateExercise, closeForm],
+    [addExercise, updateExercise, closeForm],
   );
 
   const handleDelete = useCallback(
@@ -105,24 +101,21 @@ export default function ExercisesScreen() {
     [removeExercise],
   );
 
-  const handleToggleFavorite = useCallback(
-    (id: number, favorite: boolean) => toggleFavorite(id, favorite),
-    [toggleFavorite],
-  );
-
   const renderItem = useCallback(
     ({ item: e }: { item: Exercise }) => (
-      <ExerciseCard
-        exercise={e}
-        isEditing={editTargetId === e.id && showForm}
-        onEdit={() => openEdit(e.id)}
-        onCloseEdit={closeForm}
-        onDelete={() => handleDelete(e.id, e.name)}
-        onToggleFavorite={(fav) => handleToggleFavorite(e.id, fav)}
-        onSubmit={handleSubmit}
-      />
+      <ListErrorBoundary>
+        <ExerciseCard
+          exercise={e}
+          isEditing={editTargetId === e.id && showForm}
+          onEdit={openEdit}
+          onCloseEdit={closeForm}
+          onDelete={handleDelete}
+          onToggleFavorite={toggleFavorite}
+          onSubmit={handleSubmit}
+        />
+      </ListErrorBoundary>
     ),
-    [editTargetId, showForm, openEdit, closeForm, handleDelete, handleToggleFavorite, handleSubmit],
+    [editTargetId, showForm, openEdit, closeForm, handleDelete, toggleFavorite, handleSubmit],
   );
 
   const listHeader = (
@@ -155,10 +148,10 @@ export default function ExercisesScreen() {
           return (
             <TouchableOpacity
               key={cat}
-              style={[styles.chip, isActive && styles.chipActive]}
+              style={[chipStyles.chip, isActive && chipStyles.chipActive]}
               onPress={() => setActiveCategory(cat)}
             >
-              <Text style={[styles.chipText, isActive && styles.chipTextActive]}>{cat}</Text>
+              <Text style={[chipStyles.chipText, isActive && chipStyles.chipTextActive]}>{cat}</Text>
             </TouchableOpacity>
           );
         })}
@@ -205,7 +198,6 @@ export default function ExercisesScreen() {
       <FlatList
         style={styles.list}
         data={filtered}
-        extraData={filtered}
         keyExtractor={(item) => String(item.id)}
         renderItem={renderItem}
         ItemSeparatorComponent={() => <View style={styles.separator} />}
@@ -252,17 +244,6 @@ const styles = StyleSheet.create({
   },
 
   categoryScroll: { gap: 6 },
-  chip: {
-    borderRadius: 16,
-    paddingHorizontal: 14,
-    paddingVertical: 6,
-    backgroundColor: '#F1F5F9',
-    borderWidth: 1,
-    borderColor: '#E2E8F0',
-  },
-  chipActive: { backgroundColor: '#2563EB', borderColor: '#2563EB' },
-  chipText: { fontSize: 13, color: '#64748B', fontWeight: '500' },
-  chipTextActive: { color: '#fff' },
 
   separator: { height: 8 },
 

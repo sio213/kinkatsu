@@ -1,7 +1,7 @@
 import { Component } from 'react';
 import { Text, TouchableOpacity, View } from 'react-native';
 
-export class ReminderListBoundary extends Component<
+export class ListErrorBoundary extends Component<
   { children: React.ReactNode },
   { error: string | null }
 > {

@@ -13,7 +13,6 @@ export const exercises = sqliteTable('exercises', {
 });
 
 export type Exercise = typeof exercises.$inferSelect;
-export type NewExercise = typeof exercises.$inferInsert;
 
 // リマインダー設定
 export const reminders = sqliteTable('reminders', {

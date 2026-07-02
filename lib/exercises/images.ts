@@ -1,4 +1,5 @@
 import type { Exercise } from '@/db/schema';
+import { isPresetExercise } from './constants';
 
 type ExerciseImages = { source: number; thumbnail?: number };
 
@@ -15,6 +16,6 @@ const IMAGES: Record<string, ExerciseImages> = {
 export function getExerciseImages(
   exercise: Exercise,
 ): ExerciseImages | undefined {
-  if (exercise.source !== 'preset') return undefined;
+  if (!isPresetExercise(exercise)) return undefined;
   return IMAGES[exercise.name];
 }

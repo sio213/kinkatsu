@@ -37,7 +37,7 @@ jest.mock('drizzle-orm/expo-sqlite', () => ({
 
 import React from 'react';
 import { act, create } from 'react-test-renderer';
-import { useExercises } from '@/hooks/use-exercises';
+import { useExercise, useExercises } from '@/hooks/use-exercises';
 
 type HookResult = ReturnType<typeof useExercises>;
 let captured: HookResult;
@@ -50,6 +50,19 @@ function Harness() {
 function mount() {
   act(() => { create(React.createElement(Harness)); });
   return captured;
+}
+
+type SingleHookResult = ReturnType<typeof useExercise>;
+let capturedSingle: SingleHookResult;
+
+function SingleHarness({ id }: { id: number }) {
+  capturedSingle = useExercise(id);
+  return null;
+}
+
+function mountSingle(id: number) {
+  act(() => { create(React.createElement(SingleHarness, { id })); });
+  return capturedSingle;
 }
 
 beforeEach(() => {
@@ -142,5 +155,54 @@ describe('useExercises', () => {
         await result;
       });
     });
+  });
+
+  describe('DB書き込み失敗時、呼び出し元が catch できるよう reject を伝播する', () => {
+    it('addExercise: insert失敗時に reject する', async () => {
+      const { addExercise } = mount();
+      mockValues.mockRejectedValueOnce(new Error('insert failed'));
+      await expect(addExercise('ベンチプレス', '胸')).rejects.toThrow('insert failed');
+    });
+
+    it('updateExercise: update失敗時に reject する', async () => {
+      const { updateExercise } = mount();
+      mockWhere.mockRejectedValueOnce(new Error('update failed'));
+      await expect(updateExercise(1, { name: '新しい名前' })).rejects.toThrow('update failed');
+    });
+
+    it('toggleFavorite: update失敗時に reject する', async () => {
+      const { toggleFavorite } = mount();
+      mockWhere.mockRejectedValueOnce(new Error('update failed'));
+      await expect(toggleFavorite(1, true)).rejects.toThrow('update failed');
+    });
+
+    it('removeExercise: delete失敗時に reject する', async () => {
+      const { removeExercise } = mount();
+      mockWhere.mockRejectedValueOnce(new Error('delete failed'));
+      await expect(removeExercise(1)).rejects.toThrow('delete failed');
+    });
+  });
+});
+
+describe('useExercise', () => {
+  it('data=undefined のとき loaded=false, exercise=undefined', () => {
+    const result = mountSingle(1);
+    expect(result.loaded).toBe(false);
+    expect(result.exercise).toBeUndefined();
+  });
+
+  it('data=[]（該当idなし）のとき loaded=true, exercise=undefined', () => {
+    mockData = [];
+    const result = mountSingle(999);
+    expect(result.loaded).toBe(true);
+    expect(result.exercise).toBeUndefined();
+  });
+
+  it('data=[item] のとき loaded=true, exercise=item', () => {
+    const fake = { id: 1, name: 'ベンチプレス', category: '胸' };
+    mockData = [fake];
+    const result = mountSingle(1);
+    expect(result.loaded).toBe(true);
+    expect(result.exercise).toBe(fake);
   });
 });

@@ -36,9 +36,32 @@ export default function ExerciseDetailScreen() {
   const { id } = useLocalSearchParams<{ id: string }>();
   const router = useRouter();
 
-  const exercise = useExercise(Number(id));
+  const { exercise, loaded } = useExercise(Number(id));
 
-  if (!exercise) return null;
+  if (!loaded) return null;
+
+  if (!exercise) {
+    return (
+      <SafeAreaView style={styles.safe}>
+        <View style={styles.header}>
+          <TouchableOpacity
+            style={styles.closeBtn}
+            hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+            accessibilityLabel="閉じる"
+            onPress={() => router.back()}
+          >
+            <Text style={styles.closeBtnText}>✕</Text>
+          </TouchableOpacity>
+        </View>
+        <View style={styles.notFound}>
+          <Text style={styles.notFoundText}>種目が見つかりません</Text>
+          <TouchableOpacity style={styles.notFoundBackBtn} onPress={() => router.back()}>
+            <Text style={styles.notFoundBackBtnText}>一覧に戻る</Text>
+          </TouchableOpacity>
+        </View>
+      </SafeAreaView>
+    );
+  }
 
   const guide = getGuide(exercise);
   const images = getExerciseImages(exercise);
@@ -46,7 +69,12 @@ export default function ExerciseDetailScreen() {
   return (
     <SafeAreaView style={styles.safe}>
       <View style={styles.header}>
-        <TouchableOpacity style={styles.closeBtn} onPress={() => router.back()}>
+        <TouchableOpacity
+          style={styles.closeBtn}
+          hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+          accessibilityLabel="閉じる"
+          onPress={() => router.back()}
+        >
           <Text style={styles.closeBtnText}>✕</Text>
         </TouchableOpacity>
       </View>
@@ -128,6 +156,16 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
   },
   closeBtnText: { fontSize: 16, color: '#475569' },
+
+  notFound: { flex: 1, alignItems: 'center', justifyContent: 'center', gap: 16, paddingHorizontal: 24 },
+  notFoundText: { fontSize: 15, color: '#64748B' },
+  notFoundBackBtn: {
+    backgroundColor: '#2563EB',
+    borderRadius: 8,
+    paddingHorizontal: 20,
+    paddingVertical: 10,
+  },
+  notFoundBackBtnText: { color: '#fff', fontWeight: '600', fontSize: 14 },
 
   content: { paddingBottom: 48 },
 

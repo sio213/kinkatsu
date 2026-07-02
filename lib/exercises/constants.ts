@@ -18,3 +18,7 @@ export const CATEGORY_FAVORITE = '★' as const;
 export const CATEGORY_ORDER: Record<string, number> = Object.fromEntries(
   EXERCISE_CATEGORIES.map((c, i) => [c, i]),
 );
+
+export function isPresetExercise(exercise: { source: string }): boolean {
+  return exercise.source === 'preset';
+}
