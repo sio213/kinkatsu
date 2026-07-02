@@ -1,16 +1,30 @@
-import { index, integer, sqliteTable, text } from 'drizzle-orm/sqlite-core';
+import {
+  index,
+  integer,
+  sqliteTable,
+  text,
+  uniqueIndex,
+} from 'drizzle-orm/sqlite-core';
 
 // 種目
-export const exercises = sqliteTable('exercises', {
-  id: integer('id').primaryKey({ autoIncrement: true }),
-  name: text('name').notNull(),
-  category: text('category').notNull().default(''),
-  favorite: integer('favorite', { mode: 'boolean' }).notNull().default(false),
-  note: text('note'),
-  source: text('source').notNull().default('custom'), // 'preset' | 'custom'
-  createdAt: integer('created_at'),
-  updatedAt: integer('updated_at'),
-});
+export const exercises = sqliteTable(
+  'exercises',
+  {
+    id: integer('id').primaryKey({ autoIncrement: true }),
+    name: text('name').notNull(),
+    // preset種目の安定した識別子（将来の多言語対応用）。custom種目はnull。
+    slug: text('slug'),
+    category: text('category').notNull().default(''),
+    favorite: integer('favorite', { mode: 'boolean' }).notNull().default(false),
+    note: text('note'),
+    source: text('source').notNull().default('custom'), // 'preset' | 'custom'
+    createdAt: integer('created_at'),
+    updatedAt: integer('updated_at'),
+  },
+  (t) => ({
+    bySlug: uniqueIndex('idx_exercises_slug').on(t.slug),
+  }),
+);
 
 export type Exercise = typeof exercises.$inferSelect;
 

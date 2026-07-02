@@ -3,7 +3,7 @@ import { getGuide } from '@/lib/exercises/guides';
 
 function make(overrides: Partial<Exercise> = {}): Exercise {
   return {
-    id: 1, name: 'ベンチプレス', category: '胸',
+    id: 1, name: 'ベンチプレス', slug: 'bench_press', category: '胸',
     favorite: false, note: null, source: 'preset',
     createdAt: 0, updatedAt: 0, ...overrides,
   };
@@ -14,20 +14,20 @@ describe('getGuide', () => {
     expect(getGuide(make({ source: 'custom' }))).toBeUndefined();
   });
 
-  it('存在しない名前 → undefined', () => {
-    expect(getGuide(make({ name: '存在しない種目' }))).toBeUndefined();
+  it('存在しないslug → undefined', () => {
+    expect(getGuide(make({ slug: 'nonexistent_exercise' }))).toBeUndefined();
   });
 
-  it('空文字の名前 → undefined', () => {
-    expect(getGuide(make({ name: '' }))).toBeUndefined();
+  it('slugがnull → undefined', () => {
+    expect(getGuide(make({ slug: null }))).toBeUndefined();
   });
 
   it('ベンチプレス → ガイドを返す', () => {
-    expect(getGuide(make({ name: 'ベンチプレス' }))).toBeDefined();
+    expect(getGuide(make({ slug: 'bench_press' }))).toBeDefined();
   });
 
   it('返却ガイドが muscle / points / caution / breath を持つ', () => {
-    const guide = getGuide(make({ name: 'ベンチプレス' }))!;
+    const guide = getGuide(make({ slug: 'bench_press' }))!;
     expect(typeof guide.muscle).toBe('string');
     expect(Array.isArray(guide.points)).toBe(true);
     expect(guide.points.length).toBeGreaterThan(0);
@@ -36,7 +36,7 @@ describe('getGuide', () => {
   });
 
   it('スクワット → 大腿四頭筋を含む', () => {
-    const guide = getGuide(make({ name: 'スクワット', category: '脚' }))!;
+    const guide = getGuide(make({ slug: 'squat', name: 'スクワット', category: '脚' }))!;
     expect(guide.muscle).toContain('大腿四頭筋');
   });
 });

@@ -4,24 +4,24 @@ import { CATEGORY_ALL, CATEGORY_FAVORITE } from '@/lib/exercises/constants';
 
 function make(overrides: Partial<Exercise> & { name: string; category: string }): Exercise {
   return {
-    id: 1, favorite: false, note: null, source: 'preset',
+    id: 1, slug: null, favorite: false, note: null, source: 'preset',
     createdAt: 0, updatedAt: 0, ...overrides,
   };
 }
 
-const CHEST  = make({ id: 1, name: 'ベンチプレス',   category: '胸' });
-const CHEST2 = make({ id: 2, name: 'ダンベルフライ', category: '胸' });
-const SHOULDER = make({ id: 3, name: 'サイドレイズ', category: '肩' });
-const FAV    = make({ id: 4, name: 'スクワット',     category: '脚', favorite: true });
+const CHEST  = make({ id: 1, name: 'ベンチプレス',   category: 'chest' });
+const CHEST2 = make({ id: 2, name: 'ダンベルフライ', category: 'chest' });
+const SHOULDER = make({ id: 3, name: 'サイドレイズ', category: 'shoulder' });
+const FAV    = make({ id: 4, name: 'スクワット',     category: 'leg', favorite: true });
 const UNKNOWN = make({ id: 5, name: 'テスト種目',    category: '未知カテゴリ' });
 
 const ALL = [CHEST, CHEST2, SHOULDER, FAV, UNKNOWN];
 
-const CUSTOM_ALNUM = make({ id: 6, name: 'EZバーカール', category: '腕' });
-const CUSTOM_PAREN = make({ id: 7, name: 'チェストプレス（マシン）', category: '胸' });
-const CUSTOM_CHOON = make({ id: 8, name: 'カーフレイズ', category: '脚' });
-const CUSTOM_KANJI = make({ id: 9, name: '縄跳び', category: '有酸素' });
-const CUSTOM_HIRA  = make({ id: 10, name: 'なわとび', category: '有酸素' });
+const CUSTOM_ALNUM = make({ id: 6, name: 'EZバーカール', category: 'arm' });
+const CUSTOM_PAREN = make({ id: 7, name: 'チェストプレス（マシン）', category: 'chest' });
+const CUSTOM_CHOON = make({ id: 8, name: 'カーフレイズ', category: 'leg' });
+const CUSTOM_KANJI = make({ id: 9, name: '縄跳び', category: 'cardio' });
+const CUSTOM_HIRA  = make({ id: 10, name: 'なわとび', category: 'cardio' });
 
 const EXT = [...ALL, CUSTOM_ALNUM, CUSTOM_PAREN, CUSTOM_CHOON, CUSTOM_KANJI, CUSTOM_HIRA];
 
@@ -45,9 +45,9 @@ describe('filterExercises', () => {
       expect(filterExercises([CHEST, CHEST2], CATEGORY_FAVORITE, '')).toEqual([]);
     });
 
-    it('特定カテゴリ（胸）→ 胸のみ', () => {
-      const result = filterExercises(ALL, '胸', '');
-      expect(result.every((e) => e.category === '胸')).toBe(true);
+    it('特定カテゴリ（chest）→ chestのみ', () => {
+      const result = filterExercises(ALL, 'chest', '');
+      expect(result.every((e) => e.category === 'chest')).toBe(true);
       expect(result).toHaveLength(2);
     });
 
@@ -151,17 +151,17 @@ describe('filterExercises', () => {
 
   describe('カテゴリ + search の複合', () => {
     it('AND 条件で絞り込む', () => {
-      const result = filterExercises(ALL, '胸', 'ダンベル');
+      const result = filterExercises(ALL, 'chest', 'ダンベル');
       expect(result).toHaveLength(1);
       expect(result[0].name).toBe('ダンベルフライ');
     });
   });
 
   describe('ソート', () => {
-    it('CATEGORY_ORDER 昇順（胸 < 肩）', () => {
+    it('CATEGORY_ORDER 昇順（chest < shoulder）', () => {
       const result = filterExercises([SHOULDER, CHEST], CATEGORY_ALL, '');
-      expect(result[0].category).toBe('胸');
-      expect(result[1].category).toBe('肩');
+      expect(result[0].category).toBe('chest');
+      expect(result[1].category).toBe('shoulder');
     });
 
     it('同カテゴリ内は名前の localeCompare("ja") 昇順', () => {

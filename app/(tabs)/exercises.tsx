@@ -9,6 +9,7 @@ import {
   CATEGORY_ALL,
   CATEGORY_FAVORITE,
   EXERCISE_CATEGORIES,
+  getCategoryLabel,
 } from '@/lib/exercises/constants';
 import { filterExercises } from '@/lib/exercises/filter';
 import type { ExerciseFormValues } from '@/lib/exercises/validation';
@@ -146,13 +147,19 @@ export default function ExercisesScreen() {
       >
         {CATEGORY_FILTERS.map((cat) => {
           const isActive = activeCategory === cat;
+          const label = getCategoryLabel(cat);
           return (
             <TouchableOpacity
               key={cat}
               style={[chipStyles.chip, isActive && chipStyles.chipActive]}
               onPress={() => setActiveCategory(cat)}
+              accessibilityRole="radio"
+              accessibilityState={{ checked: isActive }}
+              accessibilityLabel={label}
             >
-              <Text style={[chipStyles.chipText, isActive && chipStyles.chipTextActive]}>{cat}</Text>
+              <Text style={[chipStyles.chipText, isActive && chipStyles.chipTextActive]}>
+                {label}
+              </Text>
             </TouchableOpacity>
           );
         })}
