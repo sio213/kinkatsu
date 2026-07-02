@@ -73,6 +73,7 @@ export default function RootLayout() {
   }, [success]);
 
   if (migrationError) {
+    console.error('[migration error]', migrationError);
     return (
       <View style={migrationStyles.container}>
         <Text style={migrationStyles.title}>起動に失敗しました</Text>
