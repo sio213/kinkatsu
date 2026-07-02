@@ -80,6 +80,7 @@ export default function ExerciseDetailScreen() {
 
   const guide = getGuide(exercise);
   const images = getExerciseImages(exercise);
+  const hasContent = Boolean(guide) || Boolean(exercise.note);
 
   return (
     <SafeAreaView style={styles.safe}>
@@ -147,14 +148,16 @@ export default function ExerciseDetailScreen() {
             <Text style={styles.noGuide}>この種目の解説はまだありません</Text>
           )}
 
-          <TouchableOpacity
-            style={styles.youtubeBtn}
-            onPress={() => handleYoutubeSearch(exercise.name)}
-            hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
-            accessibilityLabel={`${exercise.name}のフォーム動画をYouTubeで検索`}
-          >
-            <Text style={styles.youtubeBtnText}>YouTubeで検索</Text>
-          </TouchableOpacity>
+          <View style={[styles.youtubeSection, !hasContent && styles.youtubeSectionCentered]}>
+            <TouchableOpacity
+              style={styles.youtubeBtn}
+              onPress={() => handleYoutubeSearch(exercise.name)}
+              hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+              accessibilityLabel={`${exercise.name}のフォーム動画をYouTubeで検索`}
+            >
+              <Text style={styles.youtubeBtnText}>YouTubeで検索</Text>
+            </TouchableOpacity>
+          </View>
         </View>
       </ScrollView>
     </SafeAreaView>
@@ -220,6 +223,18 @@ const styles = StyleSheet.create({
   },
   categoryText: { fontSize: 13, color: '#2563EB', fontWeight: '600' },
 
+  youtubeSection: {
+    marginTop: 4,
+    paddingTop: 20,
+    borderTopWidth: 1,
+    borderTopColor: '#E2E8F0',
+  },
+  youtubeSectionCentered: {
+    alignItems: 'center',
+    marginTop: 0,
+    paddingTop: 0,
+    borderTopWidth: 0,
+  },
   youtubeBtn: {
     alignSelf: 'flex-start',
     borderRadius: 8,
