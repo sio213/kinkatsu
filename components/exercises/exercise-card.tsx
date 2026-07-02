@@ -1,6 +1,9 @@
 import type { Exercise } from '@/db/schema';
+import { Image } from 'expo-image';
+import { useRouter } from 'expo-router';
 import { useEffect, useState } from 'react';
 import { StyleSheet, Text, TouchableOpacity, View } from 'react-native';
+import { getExerciseImages } from '@/lib/exercises/images';
 import { ExerciseForm, type ExerciseFormValues } from './exercise-form';
 
 type Props = {
@@ -22,6 +25,7 @@ export function ExerciseCard({
   onToggleFavorite,
   onSubmit,
 }: Props) {
+  const router = useRouter();
   const [localFav, setLocalFav] = useState(!!e.favorite);
 
   useEffect(() => {
@@ -34,12 +38,21 @@ export function ExerciseCard({
     onToggleFavorite(next);
   }
 
+  const images = getExerciseImages(e);
+
   return (
     <View>
       <View style={styles.card}>
         <View style={styles.cardMain}>
+          {images?.thumbnail != null && (
+            <TouchableOpacity onPress={() => router.push(`/exercise/${e.id}`)}>
+              <Image source={images.thumbnail} style={styles.thumbnail} contentFit="cover" />
+            </TouchableOpacity>
+          )}
           <View style={styles.info}>
-            <Text style={styles.name}>{e.name}</Text>
+            <TouchableOpacity onPress={() => router.push(`/exercise/${e.id}`)}>
+              <Text style={styles.name}>{e.name}</Text>
+            </TouchableOpacity>
             <View style={styles.meta}>
               <View style={styles.categoryChip}>
                 <Text style={styles.categoryText}>{e.category}</Text>
@@ -105,6 +118,7 @@ const styles = StyleSheet.create({
     borderColor: '#E2E8F0',
   },
   cardMain: { flexDirection: 'row', alignItems: 'center', gap: 8 },
+  thumbnail: { width: 60, height: 60, borderRadius: 6 },
   info: { flex: 1, gap: 4 },
   name: { fontSize: 15, fontWeight: '600', color: '#1E293B' },
   meta: { flexDirection: 'row', alignItems: 'center', gap: 6 },

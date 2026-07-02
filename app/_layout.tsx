@@ -60,7 +60,7 @@ export default function RootLayout() {
 
   useEffect(() => {
     if (!success) return;
-    seed();
+    seed().catch(() => {});
     onAppStart().catch(() => {});
 
     const sub = AppState.addEventListener('change', (next) => {
@@ -90,6 +90,10 @@ export default function RootLayout() {
     <ThemeProvider value={colorScheme === 'dark' ? DarkTheme : DefaultTheme}>
       <Stack>
         <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
+        <Stack.Screen
+          name="exercise/[id]"
+          options={{ presentation: 'modal', headerShown: false }}
+        />
         <Stack.Screen
           name="modal"
           options={{ presentation: 'modal', title: 'Modal' }}

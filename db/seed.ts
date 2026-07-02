@@ -1,8 +1,9 @@
 import { db } from './client';
 import { exercises } from './schema';
 import { eq } from 'drizzle-orm';
+import type { ExerciseCategory } from '@/lib/exercises/constants';
 
-type PresetExercise = { name: string; category: string };
+type PresetExercise = { name: string; category: ExerciseCategory };
 
 const PRESET_EXERCISES: PresetExercise[] = [
   // 胸
@@ -32,13 +33,14 @@ const PRESET_EXERCISES: PresetExercise[] = [
   { name: 'フレンチプレス', category: '腕' },
   { name: 'ディップス', category: '腕' },
   // 体幹
-  { name: 'クランチ', category: '体幹' },
   { name: 'プランク', category: '体幹' },
-  { name: 'レッグレイズ', category: '体幹' },
-  { name: 'ロシアンツイスト', category: '体幹' },
-  { name: 'アブローラー', category: '体幹' },
   { name: 'サイドプランク', category: '体幹' },
-  { name: 'バイシクルクランチ', category: '体幹' },
+  // 腹筋
+  { name: 'クランチ', category: '腹筋' },
+  { name: 'レッグレイズ', category: '腹筋' },
+  { name: 'ロシアンツイスト', category: '腹筋' },
+  { name: 'アブローラー', category: '腹筋' },
+  { name: 'バイシクルクランチ', category: '腹筋' },
   // 背中
   { name: 'デッドリフト', category: '背中' },
   { name: 'ラットプルダウン', category: '背中' },
@@ -66,29 +68,44 @@ const PRESET_EXERCISES: PresetExercise[] = [
   { name: 'レッグカール', category: '脚' },
   { name: 'レッグエクステンション', category: '脚' },
   { name: 'カーフレイズ', category: '脚' },
-  { name: 'ヒップスラスト', category: '脚' },
   { name: 'ゴブレットスクワット', category: '脚' },
+  // お尻
+  { name: 'ヒップスラスト', category: 'お尻' },
 ];
 
 export const seed = async () => {
   console.log('🌱 Seeding start...');
 
-  const existing = await db
-    .select()
-    .from(exercises)
-    .where(eq(exercises.source, 'preset'))
-    .limit(1);
+  try {
+    const existingPresets = await db
+      .select()
+      .from(exercises)
+      .where(eq(exercises.source, 'preset'));
+    const existingByName = new Map(existingPresets.map((e) => [e.name, e]));
 
-  if (existing.length > 0) {
-    console.log('⏭️  Seeding Skipped');
-    return;
+    const now = Date.now();
+    const toInsert = PRESET_EXERCISES.filter((p) => !existingByName.has(p.name));
+    const toUpdate = PRESET_EXERCISES.filter((p) => {
+      const existing = existingByName.get(p.name);
+      return existing !== undefined && existing.category !== p.category;
+    });
+
+    if (toInsert.length > 0) {
+      await db
+        .insert(exercises)
+        .values(toInsert.map((e) => ({ ...e, source: 'preset', createdAt: now, updatedAt: now })));
+    }
+
+    for (const p of toUpdate) {
+      const existing = existingByName.get(p.name)!;
+      await db
+        .update(exercises)
+        .set({ category: p.category, updatedAt: now })
+        .where(eq(exercises.id, existing.id));
+    }
+
+    console.log(`✅ exercises: +${toInsert.length} inserted, ${toUpdate.length} updated`);
+  } catch (e) {
+    console.error('🚨 Seeding failed', e);
   }
-
-  const now = Date.now();
-  const inserted = await db
-    .insert(exercises)
-    .values(PRESET_EXERCISES.map((e) => ({ ...e, source: 'preset', createdAt: now, updatedAt: now })))
-    .returning();
-
-  console.log(`✅ exercises: ${inserted.length} rows`);
 };
