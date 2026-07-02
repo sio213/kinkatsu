@@ -9,6 +9,7 @@ import {
   CATEGORY_ALL,
   CATEGORY_FAVORITE,
   EXERCISE_CATEGORIES,
+  getCategoryLabel,
 } from '@/lib/exercises/constants';
 import { filterExercises } from '@/lib/exercises/filter';
 import type { ExerciseFormValues } from '@/lib/exercises/validation';
@@ -152,7 +153,9 @@ export default function ExercisesScreen() {
               style={[chipStyles.chip, isActive && chipStyles.chipActive]}
               onPress={() => setActiveCategory(cat)}
             >
-              <Text style={[chipStyles.chipText, isActive && chipStyles.chipTextActive]}>{cat}</Text>
+              <Text style={[chipStyles.chipText, isActive && chipStyles.chipTextActive]}>
+                {getCategoryLabel(cat)}
+              </Text>
             </TouchableOpacity>
           );
         })}

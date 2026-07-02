@@ -4,6 +4,7 @@ import { useRouter } from 'expo-router';
 import { memo, useEffect, useState } from 'react';
 import { Alert, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import { getExerciseImages } from '@/lib/exercises/images';
+import { getCategoryLabel } from '@/lib/exercises/constants';
 import type { ExerciseFormValues } from '@/lib/exercises/validation';
 import { ExerciseForm } from './exercise-form';
 
@@ -62,7 +63,7 @@ export const ExerciseCard = memo(function ExerciseCard({
             </TouchableOpacity>
             <View style={styles.meta}>
               <View style={styles.categoryChip}>
-                <Text style={styles.categoryText}>{e.category}</Text>
+                <Text style={styles.categoryText}>{getCategoryLabel(e.category)}</Text>
               </View>
               {e.note ? (
                 <Text style={styles.note} numberOfLines={1}>

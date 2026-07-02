@@ -1,6 +1,10 @@
 import { chipStyles } from '@/components/exercises/chip-styles';
 import { FormLabel } from '@/components/ui/form-label';
-import { EXERCISE_CATEGORIES, type ExerciseCategory } from '@/lib/exercises/constants';
+import {
+  EXERCISE_CATEGORIES,
+  getCategoryLabel,
+  type ExerciseCategory,
+} from '@/lib/exercises/constants';
 import {
   exerciseSchema,
   type ExerciseFormValues,
@@ -81,6 +85,7 @@ export function ExerciseForm({
           <View style={styles.chipRow}>
             {EXERCISE_CATEGORIES.map((cat) => {
               const isActive = value === cat;
+              const label = getCategoryLabel(cat);
               return (
                 <TouchableOpacity
                   key={cat}
@@ -88,9 +93,9 @@ export function ExerciseForm({
                   onPress={() => onChange(cat)}
                   accessibilityRole="radio"
                   accessibilityState={{ checked: isActive }}
-                  accessibilityLabel={cat}
+                  accessibilityLabel={label}
                 >
-                  <Text style={[chipStyles.chipText, isActive && chipStyles.chipTextActive]}>{cat}</Text>
+                  <Text style={[chipStyles.chipText, isActive && chipStyles.chipTextActive]}>{label}</Text>
                 </TouchableOpacity>
               );
             })}

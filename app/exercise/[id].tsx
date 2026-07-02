@@ -1,5 +1,6 @@
 import { getGuide } from '@/lib/exercises/guides';
 import { getExerciseImages } from '@/lib/exercises/images';
+import { getCategoryLabel } from '@/lib/exercises/constants';
 import { useExercise } from '@/hooks/use-exercises';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { useVideoPlayer, VideoView } from 'expo-video';
@@ -90,7 +91,7 @@ export default function ExerciseDetailScreen() {
           <View style={styles.titleRow}>
             <Text style={styles.name}>{exercise.name}</Text>
             <View style={styles.categoryChip}>
-              <Text style={styles.categoryText}>{exercise.category}</Text>
+              <Text style={styles.categoryText}>{getCategoryLabel(exercise.category)}</Text>
             </View>
           </View>
 
