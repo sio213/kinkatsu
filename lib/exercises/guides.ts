@@ -10,7 +10,7 @@ export type ExerciseGuide = {
 
 const GUIDES: Record<string, ExerciseGuide> = {
   // 胸
-  'ベンチプレス': {
+  bench_press: {
     muscle: '大胸筋・三角筋前部・上腕三頭筋',
     points: [
       '肩甲骨を寄せて胸を張り、背中に自然なアーチを作る',
@@ -20,7 +20,7 @@ const GUIDES: Record<string, ExerciseGuide> = {
     caution: '手首を寝かせない・肩をすくめない・バウンドさせない',
     breath: '下ろすときに吸い、押し上げるときに吐く',
   },
-  'インクラインベンチプレス': {
+  incline_bench_press: {
     muscle: '大胸筋上部・三角筋前部・上腕三頭筋',
     points: [
       'ベンチ角度は30〜45度に設定する',
@@ -30,7 +30,7 @@ const GUIDES: Record<string, ExerciseGuide> = {
     caution: '角度が高すぎると肩への負担が大きくなる',
     breath: '下ろすときに吸い、押し上げるときに吐く',
   },
-  'デクラインベンチプレス': {
+  decline_bench_press: {
     muscle: '大胸筋下部・上腕三頭筋',
     points: [
       'ベンチを15〜30度下げて足をパッドに固定する',
@@ -40,7 +40,7 @@ const GUIDES: Record<string, ExerciseGuide> = {
     caution: 'バーを落下させないようセーフティバーを必ず設定する',
     breath: '下ろすときに吸い、押し上げるときに吐く',
   },
-  'ダンベルフライ': {
+  dumbbell_fly: {
     muscle: '大胸筋・三角筋前部',
     points: [
       '肘を軽く曲げた状態（約15〜20度）で固定し、その角度を保ったまま動かす',
@@ -50,7 +50,7 @@ const GUIDES: Record<string, ExerciseGuide> = {
     caution: '肘を伸ばしきらない・ダンベルが耳より下に落ちない',
     breath: '開くときに吸い、閉じるときに吐く',
   },
-  'インクラインダンベルフライ': {
+  incline_dumbbell_fly: {
     muscle: '大胸筋上部',
     points: [
       'ベンチ角度は30〜45度に設定する',
@@ -60,7 +60,7 @@ const GUIDES: Record<string, ExerciseGuide> = {
     caution: '肩が前に出ないよう肩甲骨を引いた姿勢を維持する',
     breath: '開くときに吸い、閉じるときに吐く',
   },
-  'ケーブルクロスオーバー': {
+  cable_crossover: {
     muscle: '大胸筋・三角筋前部',
     points: [
       'ケーブルを高い位置にセットし、前傾姿勢で両手を前に引き寄せる',
@@ -70,7 +70,7 @@ const GUIDES: Record<string, ExerciseGuide> = {
     caution: '上体が前後に揺れないようコアを安定させる',
     breath: '開くときに吸い、引き寄せるときに吐く',
   },
-  'チェストプレス（マシン）': {
+  chest_press_machine: {
     muscle: '大胸筋・三角筋前部・上腕三頭筋',
     points: [
       'シートを調整してグリップが胸の高さに来るようにする',
@@ -80,7 +80,7 @@ const GUIDES: Record<string, ExerciseGuide> = {
     caution: '肩をすくめない・首に力を入れない',
     breath: '引くときに吸い、押すときに吐く',
   },
-  'プッシュアップ': {
+  push_up: {
     muscle: '大胸筋・三角筋前部・上腕三頭筋・体幹',
     points: [
       '手の幅は肩幅より少し広め、体は頭からかかとまで一直線を維持',
@@ -92,7 +92,7 @@ const GUIDES: Record<string, ExerciseGuide> = {
   },
 
   // 肩
-  'バーベルショルダープレス': {
+  barbell_shoulder_press: {
     muscle: '三角筋（前部・中部）・上腕三頭筋・僧帽筋',
     points: [
       'バーを鎖骨の前に置き、グリップは肩幅よりやや広め',
@@ -102,7 +102,7 @@ const GUIDES: Record<string, ExerciseGuide> = {
     caution: '腰を反らせない・ひじが前に出すぎない',
     breath: '下ろすときに吸い、押し上げるときに吐く',
   },
-  'ダンベルショルダープレス': {
+  dumbbell_shoulder_press: {
     muscle: '三角筋（前部・中部）・上腕三頭筋',
     points: [
       'ダンベルを耳の横・肩の高さに構える',
@@ -112,7 +112,7 @@ const GUIDES: Record<string, ExerciseGuide> = {
     caution: '体が左右に傾かないようコアを安定させる',
     breath: '下ろすときに吸い、押し上げるときに吐く',
   },
-  'サイドレイズ': {
+  side_raise: {
     muscle: '三角筋中部',
     points: [
       '肘を軽く曲げた状態を維持し、小指側を少し上げるイメージで横に開く',
@@ -122,7 +122,7 @@ const GUIDES: Record<string, ExerciseGuide> = {
     caution: '肩をすくめない・重量は軽めからスタート',
     breath: '上げるときに吐き、下ろすときに吸う',
   },
-  'フロントレイズ': {
+  front_raise: {
     muscle: '三角筋前部',
     points: [
       '腕を真っ直ぐ前に上げ、肩の高さで1秒止める',
@@ -132,7 +132,7 @@ const GUIDES: Record<string, ExerciseGuide> = {
     caution: '肩が前に巻き込まないよう胸を張る',
     breath: '上げるときに吐き、下ろすときに吸う',
   },
-  'リアデルトフライ': {
+  rear_delt_fly: {
     muscle: '三角筋後部・僧帽筋・菱形筋',
     points: [
       '前傾姿勢（上体を床と平行に近い角度）で構える',
@@ -142,7 +142,7 @@ const GUIDES: Record<string, ExerciseGuide> = {
     caution: '首に力を入れない・腰を反らせない',
     breath: '上げるときに吐き、下ろすときに吸う',
   },
-  'フェイスプル': {
+  face_pull: {
     muscle: '三角筋後部・僧帽筋・回旋筋腱板',
     points: [
       'ケーブルを顔の高さにセットし、ロープアタッチメントを使う',
@@ -152,7 +152,7 @@ const GUIDES: Record<string, ExerciseGuide> = {
     caution: '肩の健康維持に有効なので軽い重量で丁寧に行う',
     breath: '引くときに吐き、戻すときに吸う',
   },
-  'アーノルドプレス': {
+  arnold_press: {
     muscle: '三角筋（前部・中部・後部）・上腕三頭筋',
     points: [
       '手のひらを自分に向けてダンベルを顎の高さに構えるところからスタート',
@@ -164,7 +164,7 @@ const GUIDES: Record<string, ExerciseGuide> = {
   },
 
   // 腕
-  'バーベルカール': {
+  barbell_curl: {
     muscle: '上腕二頭筋・上腕筋',
     points: [
       '肘を体側に固定して動かさない',
@@ -174,7 +174,7 @@ const GUIDES: Record<string, ExerciseGuide> = {
     caution: '体の反動を使わない・肘が前後に動かない',
     breath: '上げるときに吐き、下ろすときに吸う',
   },
-  'ダンベルカール': {
+  dumbbell_curl: {
     muscle: '上腕二頭筋・上腕筋',
     points: [
       '左右交互または両腕同時でできる',
@@ -184,7 +184,7 @@ const GUIDES: Record<string, ExerciseGuide> = {
     caution: '肩が前に出ない・体が揺れない',
     breath: '上げるときに吐き、下ろすときに吸う',
   },
-  'ハンマーカール': {
+  hammer_curl: {
     muscle: '上腕二頭筋・上腕筋・腕橈骨筋',
     points: [
       '手のひらを内側（親指が上）に向けたまま持ち上げる',
@@ -194,7 +194,7 @@ const GUIDES: Record<string, ExerciseGuide> = {
     caution: '手首を曲げない・ニュートラルグリップを保つ',
     breath: '上げるときに吐き、下ろすときに吸う',
   },
-  'プリーチャーカール': {
+  preacher_curl: {
     muscle: '上腕二頭筋（下部）',
     points: [
       'パッドに上腕の裏をしっかり密着させる',
@@ -204,7 +204,7 @@ const GUIDES: Record<string, ExerciseGuide> = {
     caution: '肘をパッドから離さない・急に下ろさない（肘の怪我に注意）',
     breath: '上げるときに吐き、下ろすときに吸う',
   },
-  'トライセプスプレスダウン': {
+  triceps_pushdown: {
     muscle: '上腕三頭筋',
     points: [
       'ケーブルを高い位置にセットし、肘を体側に固定する',
@@ -214,7 +214,7 @@ const GUIDES: Record<string, ExerciseGuide> = {
     caution: '肘が体から離れない・上体を前傾させすぎない',
     breath: '押し下げるときに吐き、戻すときに吸う',
   },
-  'トライセプスエクステンション': {
+  triceps_extension: {
     muscle: '上腕三頭筋（長頭）',
     points: [
       '頭の後ろでダンベルを持ち、肘だけを動かして上に伸ばす',
@@ -224,7 +224,7 @@ const GUIDES: Record<string, ExerciseGuide> = {
     caution: '肘を固定する・ダンベルを頭に落とさないよう注意',
     breath: '伸ばすときに吐き、下ろすときに吸う',
   },
-  'フレンチプレス': {
+  french_press: {
     muscle: '上腕三頭筋（長頭）',
     points: [
       'ベンチに仰向けになり、バーを額の上方向に向けて保持',
@@ -234,7 +234,7 @@ const GUIDES: Record<string, ExerciseGuide> = {
     caution: '肘が外に開かない・バーを顔に落とさないよう注意',
     breath: '下ろすときに吸い、押し上げるときに吐く',
   },
-  'ディップス': {
+  dips: {
     muscle: '上腕三頭筋・大胸筋下部・三角筋前部',
     points: [
       '体を垂直に保つと三頭筋メイン、前傾すると大胸筋メインになる',
@@ -246,7 +246,7 @@ const GUIDES: Record<string, ExerciseGuide> = {
   },
 
   // 体幹
-  'プランク': {
+  plank: {
     muscle: '腹横筋・腹直筋・多裂筋・体幹全体',
     points: [
       '肘は肩の真下に置き、体を頭からかかとまで一直線に保つ',
@@ -256,7 +256,7 @@ const GUIDES: Record<string, ExerciseGuide> = {
     caution: '腰が落ちない・お尻が上がらない',
     breath: '自然な呼吸を続けながらキープ',
   },
-  'サイドプランク': {
+  side_plank: {
     muscle: '腹斜筋・腹横筋・中臀筋',
     points: [
       '体の横向きで肘を肩の真下に置き、体を一直線に保つ',
@@ -267,7 +267,7 @@ const GUIDES: Record<string, ExerciseGuide> = {
     breath: '自然な呼吸を続けながらキープ',
   },
   // 腹筋
-  'クランチ': {
+  crunch: {
     muscle: '腹直筋',
     points: [
       '膝を曲げて仰向けになり、手を頭の後ろに軽く添える',
@@ -277,7 +277,7 @@ const GUIDES: Record<string, ExerciseGuide> = {
     caution: '首を引っ張らない・腰で起き上がらない',
     breath: '起こすときに吐き、下ろすときに吸う',
   },
-  'レッグレイズ': {
+  leg_raise: {
     muscle: '腹直筋下部・腸腰筋',
     points: [
       '仰向けで両手を体の横または腰の下に置く',
@@ -287,7 +287,7 @@ const GUIDES: Record<string, ExerciseGuide> = {
     caution: '勢いをつけない・腰を床から離さない',
     breath: '上げるときに吐き、下ろすときに吸う',
   },
-  'ロシアンツイスト': {
+  russian_twist: {
     muscle: '腹斜筋・腹直筋',
     points: [
       '上体を45度に傾け、膝を90度に曲げて足を浮かせる',
@@ -297,7 +297,7 @@ const GUIDES: Record<string, ExerciseGuide> = {
     caution: '腰への負担が大きいので痛みがある場合は中止',
     breath: 'ひねるときに吐き、戻すときに吸う',
   },
-  'アブローラー': {
+  ab_wheel_rollout: {
     muscle: '腹直筋・腹横筋・肩・体幹全体',
     points: [
       '膝をついてローラーをゆっくり前方に転がす',
@@ -307,7 +307,7 @@ const GUIDES: Record<string, ExerciseGuide> = {
     caution: '初心者は膝をついた状態から始める・腰を反らせない',
     breath: '伸ばすときに吸い、戻すときに吐く',
   },
-  'バイシクルクランチ': {
+  bicycle_crunch: {
     muscle: '腹斜筋・腹直筋',
     points: [
       '仰向けで両手を頭の後ろに添え、肩甲骨を浮かせる',
@@ -319,7 +319,7 @@ const GUIDES: Record<string, ExerciseGuide> = {
   },
 
   // 背中
-  'デッドリフト': {
+  deadlift: {
     muscle: '脊柱起立筋・ハムストリング・臀筋・広背筋・僧帽筋',
     points: [
       'バーはすねに密着させ、肩はバーの真上かやや前に位置する',
@@ -329,7 +329,7 @@ const GUIDES: Record<string, ExerciseGuide> = {
     caution: '絶対に背中を丸めない・腰への負荷が非常に高い種目',
     breath: '引き上げる前に深く吸って止め（腹圧）、上がったら吐く',
   },
-  'ラットプルダウン': {
+  lat_pulldown: {
     muscle: '広背筋・大円筋・上腕二頭筋',
     points: [
       'グリップは肩幅より広め、少し後傾した姿勢でバーを引く',
@@ -339,7 +339,7 @@ const GUIDES: Record<string, ExerciseGuide> = {
     caution: 'バーを首の後ろに下ろさない・上体を揺らさない',
     breath: '引くときに吐き、戻すときに吸う',
   },
-  'シーテッドケーブルロウ': {
+  seated_cable_row: {
     muscle: '広背筋・僧帽筋・菱形筋・上腕二頭筋',
     points: [
       '背筋を伸ばして座り、膝は軽く曲げた状態でグリップを握る',
@@ -349,7 +349,7 @@ const GUIDES: Record<string, ExerciseGuide> = {
     caution: '上体を大きく後ろに倒さない・丸まらない',
     breath: '引くときに吐き、戻すときに吸う',
   },
-  'バーベルロウ': {
+  barbell_row: {
     muscle: '広背筋・僧帽筋・菱形筋・上腕二頭筋・脊柱起立筋',
     points: [
       '上体を床と水平に近い角度（45〜60度）まで前傾する',
@@ -359,7 +359,7 @@ const GUIDES: Record<string, ExerciseGuide> = {
     caution: '腰を丸めない・重量を上げすぎない',
     breath: '引くときに吐き、戻すときに吸う',
   },
-  'ダンベルワンハンドロウ': {
+  dumbbell_one_arm_row: {
     muscle: '広背筋・大円筋・上腕二頭筋',
     points: [
       '片方の手と膝をベンチについて体を安定させる',
@@ -369,7 +369,7 @@ const GUIDES: Record<string, ExerciseGuide> = {
     caution: '体を捻らない・引いた腕の肘を外に開かない',
     breath: '引くときに吐き、下ろすときに吸う',
   },
-  'チンニング（懸垂）': {
+  chin_up: {
     muscle: '広背筋・大円筋・上腕二頭筋',
     points: [
       '逆手（アンダーグリップ）で握り、肩幅程度の幅でぶら下がる',
@@ -379,7 +379,7 @@ const GUIDES: Record<string, ExerciseGuide> = {
     caution: 'ゆりかごのように体を振らない・肩を痛めないよう注意',
     breath: '引き上げるときに吐き、下ろすときに吸う',
   },
-  'プルアップ': {
+  pull_up: {
     muscle: '広背筋・大円筋・上腕二頭筋・体幹',
     points: [
       '順手（オーバーグリップ）で肩幅より広めに握る',
@@ -389,7 +389,7 @@ const GUIDES: Record<string, ExerciseGuide> = {
     caution: '体を振って反動を使わない・肘を完全に伸ばした状態から引く',
     breath: '引き上げるときに吐き、下ろすときに吸う',
   },
-  'ハイロウ': {
+  high_row: {
     muscle: '広背筋・菱形筋・僧帽筋',
     points: [
       'ケーブルを高い位置にセットし、少し後傾した姿勢でグリップ',
@@ -399,7 +399,7 @@ const GUIDES: Record<string, ExerciseGuide> = {
     caution: '肩が前に出ないよう引ききったところで肩甲骨を寄せる',
     breath: '引くときに吐き、戻すときに吸う',
   },
-  'バックエクステンション': {
+  back_extension: {
     muscle: '脊柱起立筋・ハムストリング・臀筋',
     points: [
       'バックエクステション台に足を固定して上体を下げる',
@@ -411,7 +411,7 @@ const GUIDES: Record<string, ExerciseGuide> = {
   },
 
   // 有酸素
-  'ランニング': {
+  running: {
     muscle: '大腿四頭筋・ハムストリング・臀筋・ふくらはぎ・心肺機能',
     points: [
       '着地は足の中央（ミッドフット）を意識し、かかとから強く着かない',
@@ -421,7 +421,7 @@ const GUIDES: Record<string, ExerciseGuide> = {
     caution: '急に距離や速度を上げない・膝の痛みが出たらすぐ中止',
     breath: '鼻から吸って口から吐く・リズムに合わせて自然に',
   },
-  'ウォーキング': {
+  walking: {
     muscle: '下肢全体・心肺機能（低負荷）',
     points: [
       '背筋を伸ばしてやや大股で歩く',
@@ -431,7 +431,7 @@ const GUIDES: Record<string, ExerciseGuide> = {
     caution: '膝が内側に入らないよう真っ直ぐ前に踏み出す',
     breath: '自然な呼吸で問題なし',
   },
-  'サイクリング': {
+  cycling: {
     muscle: '大腿四頭筋・ハムストリング・臀筋・心肺機能',
     points: [
       'サドルの高さは脚がほぼ伸びきる（膝が少し曲がる）位置に調整',
@@ -441,7 +441,7 @@ const GUIDES: Record<string, ExerciseGuide> = {
     caution: '膝への負担が大きい場合はサドルを高くして対応',
     breath: '自然な呼吸・負荷に合わせてリズムを調整',
   },
-  'ロウイング（エルゴ）': {
+  rowing_ergometer: {
     muscle: '背中全体・脚・腕・心肺機能（全身運動）',
     points: [
       'フォームは「脚→体幹→腕」の順番で動かす（引くとき）',
@@ -451,7 +451,7 @@ const GUIDES: Record<string, ExerciseGuide> = {
     caution: '腰が丸まると腰痛の原因になる・背中のフォームを優先',
     breath: '引くときに吐き、戻すときに吸う',
   },
-  '縄跳び': {
+  jump_rope: {
     muscle: 'ふくらはぎ・肩・体幹・心肺機能',
     points: [
       'つま先で着地し、かかとが完全に床につかないよう小さくジャンプ',
@@ -461,7 +461,7 @@ const GUIDES: Record<string, ExerciseGuide> = {
     caution: '硬い床で長時間行うと膝・足首に負担がかかる',
     breath: 'リズムに合わせて自然に呼吸する',
   },
-  'バーピー': {
+  burpee: {
     muscle: '全身・心肺機能',
     points: [
       '立位→スクワットで手を床に→プランク→プッシュアップ→スクワットに戻る→ジャンプの順番',
@@ -473,7 +473,7 @@ const GUIDES: Record<string, ExerciseGuide> = {
   },
 
   // 脚
-  'スクワット': {
+  squat: {
     muscle: '大腿四頭筋・ハムストリング・臀筋・体幹',
     points: [
       '足は肩幅程度、つま先はやや外向きに開く',
@@ -483,7 +483,7 @@ const GUIDES: Record<string, ExerciseGuide> = {
     caution: '膝がつま先より内側に入らない・かかとが浮かない・腰が丸まらない',
     breath: 'しゃがむときに吸い、立ち上がるときに吐く',
   },
-  'フロントスクワット': {
+  front_squat: {
     muscle: '大腿四頭筋（特に）・体幹・臀筋',
     points: [
       'バーを鎖骨の上・三角筋前部に置き、肘を高く上げてキープ',
@@ -493,7 +493,7 @@ const GUIDES: Record<string, ExerciseGuide> = {
     caution: '肘が下がるとバーが落ちる・手首を無理に曲げない',
     breath: 'しゃがむときに吸い、立ち上がるときに吐く',
   },
-  'レッグプレス': {
+  leg_press: {
     muscle: '大腿四頭筋・ハムストリング・臀筋',
     points: [
       '足の位置を高くすると臀筋・ハムに、低くすると大腿四頭筋に効く',
@@ -503,7 +503,7 @@ const GUIDES: Record<string, ExerciseGuide> = {
     caution: '腰がシートから浮かない・ストッパーを外す前に安全確認',
     breath: '押し出すときに吐き、戻すときに吸う',
   },
-  'ルーマニアンデッドリフト': {
+  romanian_deadlift: {
     muscle: 'ハムストリング・臀筋・脊柱起立筋',
     points: [
       '膝をわずかに曲げたまま固定し、股関節を折り畳むようにバーを下ろす',
@@ -513,7 +513,7 @@ const GUIDES: Record<string, ExerciseGuide> = {
     caution: '腰を丸めない・膝を過度に曲げない（デッドリフトとの違い）',
     breath: '下ろすときに吸い、上げるときに吐く',
   },
-  'ランジ': {
+  lunge: {
     muscle: '大腿四頭筋・臀筋・ハムストリング',
     points: [
       '大きく一歩踏み出し、前膝が90度になるまで下げる',
@@ -523,7 +523,7 @@ const GUIDES: Record<string, ExerciseGuide> = {
     caution: '前膝がつま先より前に出ない・上体が前に倒れない',
     breath: '下げるときに吸い、戻るときに吐く',
   },
-  'ブルガリアンスプリットスクワット': {
+  bulgarian_split_squat: {
     muscle: '大腿四頭筋・臀筋・ハムストリング',
     points: [
       '後ろ足の甲をベンチに乗せ、前足は遠めに位置する',
@@ -533,7 +533,7 @@ const GUIDES: Record<string, ExerciseGuide> = {
     caution: '前膝が内側に入らない・上体を前に倒しすぎない',
     breath: '下げるときに吸い、上げるときに吐く',
   },
-  'レッグカール': {
+  leg_curl: {
     muscle: 'ハムストリング',
     points: [
       'うつ伏せでパッドを足首にセットし、太ももはパッドに密着',
@@ -543,7 +543,7 @@ const GUIDES: Record<string, ExerciseGuide> = {
     caution: '腰が浮かない・膝を痛めないよう重量管理に注意',
     breath: '上げるときに吐き、下ろすときに吸う',
   },
-  'レッグエクステンション': {
+  leg_extension: {
     muscle: '大腿四頭筋',
     points: [
       'シートに座り、パッドを足首に当てて脚を伸ばす',
@@ -553,7 +553,7 @@ const GUIDES: Record<string, ExerciseGuide> = {
     caution: '膝に痛みがある場合は使用を避ける・反動を使わない',
     breath: '上げるときに吐き、下ろすときに吸う',
   },
-  'カーフレイズ': {
+  calf_raise: {
     muscle: '腓腹筋・ヒラメ筋（ふくらはぎ）',
     points: [
       'つま先立ちになり、かかとをできるだけ高く上げる',
@@ -563,7 +563,7 @@ const GUIDES: Record<string, ExerciseGuide> = {
     caution: 'アキレス腱への負担が大きいので丁寧に行う',
     breath: '上げるときに吐き、下ろすときに吸う',
   },
-  'ヒップスラスト': {
+  hip_thrust: {
     muscle: '臀筋（特に大臀筋）・ハムストリング',
     points: [
       '肩甲骨をベンチに乗せ、バーベルを骨盤に乗せる（パッドを使う）',
@@ -573,7 +573,7 @@ const GUIDES: Record<string, ExerciseGuide> = {
     caution: '腰を反らさず骨盤をフラットに保つ・バーが骨盤に直接当たらないようパッドを使う',
     breath: '上げるときに吐き、下ろすときに吸う',
   },
-  'ゴブレットスクワット': {
+  goblet_squat: {
     muscle: '大腿四頭筋・臀筋・体幹・内転筋',
     points: [
       'ダンベルまたはケトルベルを両手で胸の前に持つ',
@@ -586,6 +586,6 @@ const GUIDES: Record<string, ExerciseGuide> = {
 };
 
 export function getGuide(exercise: Exercise): ExerciseGuide | undefined {
-  if (!isPresetExercise(exercise)) return undefined;
-  return GUIDES[exercise.name];
+  if (!isPresetExercise(exercise) || !exercise.slug) return undefined;
+  return GUIDES[exercise.slug];
 }

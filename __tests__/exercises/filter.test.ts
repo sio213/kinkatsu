@@ -4,7 +4,7 @@ import { CATEGORY_ALL, CATEGORY_FAVORITE } from '@/lib/exercises/constants';
 
 function make(overrides: Partial<Exercise> & { name: string; category: string }): Exercise {
   return {
-    id: 1, favorite: false, note: null, source: 'preset',
+    id: 1, slug: null, favorite: false, note: null, source: 'preset',
     createdAt: 0, updatedAt: 0, ...overrides,
   };
 }

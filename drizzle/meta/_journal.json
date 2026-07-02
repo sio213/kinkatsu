@@ -43,6 +43,13 @@
       "when": 1783036800000,
       "tag": "0005_exercise_library",
       "breakpoints": true
+    },
+    {
+      "idx": 6,
+      "version": "6",
+      "when": 1782992400926,
+      "tag": "0006_add_exercise_slug",
+      "breakpoints": true
     }
   ]
 }
