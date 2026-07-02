@@ -1,9 +1,12 @@
 import { getGuide } from '@/lib/exercises/guides';
 import { getExerciseImages } from '@/lib/exercises/images';
+import { getYoutubeSearchUrl } from '@/lib/exercises/youtube';
 import { useExercise } from '@/hooks/use-exercises';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { useVideoPlayer, VideoView } from 'expo-video';
+import { openBrowserAsync, WebBrowserPresentationStyle } from 'expo-web-browser';
 import {
+  Alert,
   Dimensions,
   ScrollView,
   StyleSheet,
@@ -30,6 +33,18 @@ function Mp4Player({ source }: { source: number }) {
       nativeControls={false}
     />
   );
+}
+
+// ExternalLinkを使わないのは、失敗時にAlertでユーザーに通知する必要があるため
+async function handleYoutubeSearch(exerciseName: string) {
+  try {
+    await openBrowserAsync(getYoutubeSearchUrl(exerciseName), {
+      presentationStyle: WebBrowserPresentationStyle.AUTOMATIC,
+    });
+  } catch (err) {
+    console.error('[youtube search]', err);
+    Alert.alert('エラー', 'ブラウザを開けませんでした。');
+  }
 }
 
 export default function ExerciseDetailScreen() {
@@ -65,6 +80,7 @@ export default function ExerciseDetailScreen() {
 
   const guide = getGuide(exercise);
   const images = getExerciseImages(exercise);
+  const hasContent = Boolean(guide) || Boolean(exercise.note);
 
   return (
     <SafeAreaView style={styles.safe}>
@@ -131,6 +147,17 @@ export default function ExerciseDetailScreen() {
           ) : (
             <Text style={styles.noGuide}>この種目の解説はまだありません</Text>
           )}
+
+          <View style={[styles.youtubeSection, !hasContent && styles.youtubeSectionCentered]}>
+            <TouchableOpacity
+              style={styles.youtubeBtn}
+              onPress={() => handleYoutubeSearch(exercise.name)}
+              hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+              accessibilityLabel={`${exercise.name}のフォーム動画をYouTubeで検索`}
+            >
+              <Text style={styles.youtubeBtnText}>YouTubeで検索</Text>
+            </TouchableOpacity>
+          </View>
         </View>
       </ScrollView>
     </SafeAreaView>
@@ -195,6 +222,29 @@ const styles = StyleSheet.create({
     paddingVertical: 4,
   },
   categoryText: { fontSize: 13, color: '#2563EB', fontWeight: '600' },
+
+  youtubeSection: {
+    marginTop: 4,
+    paddingTop: 20,
+    borderTopWidth: 1,
+    borderTopColor: '#E2E8F0',
+  },
+  youtubeSectionCentered: {
+    alignItems: 'center',
+    marginTop: 0,
+    paddingTop: 0,
+    borderTopWidth: 0,
+  },
+  youtubeBtn: {
+    alignSelf: 'flex-start',
+    borderRadius: 8,
+    borderWidth: 1,
+    borderColor: '#CBD5E1',
+    backgroundColor: '#fff',
+    paddingHorizontal: 14,
+    paddingVertical: 8,
+  },
+  youtubeBtnText: { fontSize: 13, fontWeight: '600', color: '#2563EB' },
 
   section: { gap: 8 },
   sectionTitle: { fontSize: 13, fontWeight: '700', color: '#64748B', letterSpacing: 0.5 },
