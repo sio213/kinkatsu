@@ -2,7 +2,7 @@ import type { Exercise } from '@/db/schema';
 import { Image } from 'expo-image';
 import { useRouter } from 'expo-router';
 import { useEffect, useState } from 'react';
-import { StyleSheet, Text, TouchableOpacity, View } from 'react-native';
+import { Alert, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import { getExerciseImages } from '@/lib/exercises/images';
 import { ExerciseForm, type ExerciseFormValues } from './exercise-form';
 
@@ -12,7 +12,7 @@ type Props = {
   onEdit: () => void;
   onCloseEdit: () => void;
   onDelete: () => void;
-  onToggleFavorite: (favorite: boolean) => void;
+  onToggleFavorite: (favorite: boolean) => Promise<void>;
   onSubmit: (values: ExerciseFormValues) => void;
 };
 
@@ -32,10 +32,16 @@ export function ExerciseCard({
     setLocalFav(!!e.favorite);
   }, [e.favorite]);
 
-  function handleFavoritePress() {
+  async function handleFavoritePress() {
     const next = !localFav;
     setLocalFav(next);
-    onToggleFavorite(next);
+    try {
+      await onToggleFavorite(next);
+    } catch (err) {
+      console.error('[toggle favorite]', err);
+      setLocalFav(!next);
+      Alert.alert('エラー', 'お気に入りの更新に失敗しました。');
+    }
   }
 
   const images = getExerciseImages(e);

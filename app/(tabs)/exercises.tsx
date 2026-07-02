@@ -88,21 +88,25 @@ export default function ExercisesScreen() {
     (id: number, name: string) => {
       Alert.alert('削除', `「${name}」を削除しますか？`, [
         { text: 'キャンセル', style: 'cancel' },
-        { text: '削除', style: 'destructive', onPress: () => removeExercise(id) },
+        {
+          text: '削除',
+          style: 'destructive',
+          onPress: async () => {
+            try {
+              await removeExercise(id);
+            } catch (e) {
+              console.error('[exercise delete]', e);
+              Alert.alert('エラー', '削除に失敗しました。');
+            }
+          },
+        },
       ]);
     },
     [removeExercise],
   );
 
   const handleToggleFavorite = useCallback(
-    async (id: number, favorite: boolean) => {
-      try {
-        await toggleFavorite(id, favorite);
-      } catch (err) {
-        console.error('[toggle favorite]', err);
-        Alert.alert('エラー', 'お気に入りの更新に失敗しました。');
-      }
-    },
+    (id: number, favorite: boolean) => toggleFavorite(id, favorite),
     [toggleFavorite],
   );
 

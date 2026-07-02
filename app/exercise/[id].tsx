@@ -1,9 +1,6 @@
-import { db } from '@/db/client';
-import { exercises } from '@/db/schema';
 import { getGuide } from '@/lib/exercises/guides';
 import { getExerciseImages } from '@/lib/exercises/images';
-import { eq } from 'drizzle-orm';
-import { useLiveQuery } from 'drizzle-orm/expo-sqlite';
+import { useExercise } from '@/hooks/use-exercises';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { useVideoPlayer, VideoView } from 'expo-video';
 import {
@@ -39,10 +36,7 @@ export default function ExerciseDetailScreen() {
   const { id } = useLocalSearchParams<{ id: string }>();
   const router = useRouter();
 
-  const { data } = useLiveQuery(
-    db.select().from(exercises).where(eq(exercises.id, Number(id))).limit(1),
-  );
-  const exercise = data?.[0];
+  const exercise = useExercise(Number(id));
 
   if (!exercise) return null;
 
