@@ -29,19 +29,19 @@ export function PermissionBanner({ state, onRequest }: Props) {
 
 const styles = StyleSheet.create({
   banner: {
-    backgroundColor: Colors.light.warningSurface,
+    backgroundColor: Colors.warningSurface,
     borderRadius: 8,
     padding: 12,
     marginBottom: 8,
     gap: 8,
   },
-  text: { color: Colors.light.warningText, fontSize: 13 },
+  text: { color: Colors.warningText, fontSize: 13 },
   btn: {
-    backgroundColor: Colors.light.warning,
+    backgroundColor: Colors.warning,
     borderRadius: 6,
     paddingVertical: 6,
     paddingHorizontal: 12,
     alignSelf: 'flex-start',
   },
-  btnText: { color: Colors.light.onAccent, fontSize: 13, fontWeight: '600' },
+  btnText: { color: Colors.onAccent, fontSize: 13, fontWeight: '600' },
 });

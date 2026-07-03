@@ -222,7 +222,7 @@ export default function ExercisesScreen() {
 }
 
 const styles = StyleSheet.create({
-  safeArea: { flex: 1, backgroundColor: Colors.light.background },
+  safeArea: { flex: 1, backgroundColor: Colors.background },
   list: { flex: 1 },
   content: { paddingHorizontal: 16, paddingBottom: 40 },
 
@@ -232,24 +232,24 @@ const styles = StyleSheet.create({
     justifyContent: 'space-between',
     alignItems: 'center',
   },
-  title: { fontSize: 18, fontWeight: '700', color: Colors.light.textPrimary },
+  title: { fontSize: 18, fontWeight: '700', color: Colors.textPrimary },
   addBtn: {
-    backgroundColor: Colors.light.accent,
+    backgroundColor: Colors.accent,
     borderRadius: 8,
     paddingHorizontal: 14,
     paddingVertical: 6,
   },
-  addBtnText: { color: Colors.light.onAccent, fontWeight: '600', fontSize: 14 },
+  addBtnText: { color: Colors.onAccent, fontWeight: '600', fontSize: 14 },
 
   searchInput: {
     borderWidth: 1,
-    borderColor: Colors.light.borderStrong,
+    borderColor: Colors.borderStrong,
     borderRadius: 10,
     paddingHorizontal: 12,
     paddingVertical: 8,
     fontSize: 15,
-    color: Colors.light.textPrimary,
-    backgroundColor: Colors.light.surfaceMuted,
+    color: Colors.textPrimary,
+    backgroundColor: Colors.surfaceMuted,
   },
 
   categoryScroll: { gap: 6 },
@@ -257,21 +257,21 @@ const styles = StyleSheet.create({
   separator: { height: 8 },
 
   emptyWrapper: { alignItems: 'center', paddingVertical: 32, gap: 12 },
-  empty: { color: Colors.light.textPlaceholder, fontSize: 14 },
+  empty: { color: Colors.textPlaceholder, fontSize: 14 },
   emptyAddBtn: {
-    backgroundColor: Colors.light.accent,
+    backgroundColor: Colors.accent,
     borderRadius: 8,
     paddingHorizontal: 20,
     paddingVertical: 10,
   },
-  emptyAddBtnText: { color: Colors.light.onAccent, fontWeight: '600', fontSize: 14 },
+  emptyAddBtnText: { color: Colors.onAccent, fontWeight: '600', fontSize: 14 },
 
   addFormWrapper: {
-    backgroundColor: Colors.light.surfaceSubtle,
+    backgroundColor: Colors.surfaceSubtle,
     borderRadius: 10,
     padding: 16,
     borderWidth: 1,
-    borderColor: Colors.light.border,
+    borderColor: Colors.border,
   },
-  addFormTitle: { fontSize: 15, fontWeight: '700', color: Colors.light.textPrimary, marginBottom: 8 },
+  addFormTitle: { fontSize: 15, fontWeight: '700', color: Colors.textPrimary, marginBottom: 8 },
 });

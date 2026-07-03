@@ -12,7 +12,7 @@ export default function RecordScreen() {
         </View>
 
         <View style={styles.empty}>
-          <IconSymbol name="list.bullet.clipboard" size={40} color={Colors.light.borderStrong} />
+          <IconSymbol name="list.bullet.clipboard" size={40} color={Colors.borderStrong} />
           <Text style={styles.emptyText}>トレーニング記録機能は準備中です</Text>
         </View>
       </View>
@@ -21,12 +21,12 @@ export default function RecordScreen() {
 }
 
 const styles = StyleSheet.create({
-  safeArea: { flex: 1, backgroundColor: Colors.light.background },
+  safeArea: { flex: 1, backgroundColor: Colors.background },
   container: { flex: 1, padding: 16 },
 
   sectionHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
-  title: { fontSize: 18, fontWeight: '700', color: Colors.light.textPrimary },
+  title: { fontSize: 18, fontWeight: '700', color: Colors.textPrimary },
 
   empty: { flex: 1, alignItems: 'center', justifyContent: 'center', gap: 8 },
-  emptyText: { fontSize: 14, color: Colors.light.textPlaceholder, textAlign: 'center' },
+  emptyText: { fontSize: 14, color: Colors.textPlaceholder, textAlign: 'center' },
 });

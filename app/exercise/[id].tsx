@@ -167,7 +167,7 @@ export default function ExerciseDetailScreen() {
 }
 
 const styles = StyleSheet.create({
-  safe: { flex: 1, backgroundColor: Colors.light.background },
+  safe: { flex: 1, backgroundColor: Colors.background },
 
   header: {
     flexDirection: 'row',
@@ -180,26 +180,26 @@ const styles = StyleSheet.create({
     width: 36,
     height: 36,
     borderRadius: 18,
-    backgroundColor: Colors.light.surfaceSubtle,
+    backgroundColor: Colors.surfaceSubtle,
     alignItems: 'center',
     justifyContent: 'center',
   },
-  closeBtnText: { fontSize: 16, color: Colors.light.textSecondary },
+  closeBtnText: { fontSize: 16, color: Colors.textSecondary },
 
   notFound: { flex: 1, alignItems: 'center', justifyContent: 'center', gap: 16, paddingHorizontal: 24 },
-  notFoundText: { fontSize: 15, color: Colors.light.textMuted },
+  notFoundText: { fontSize: 15, color: Colors.textMuted },
   notFoundBackBtn: {
-    backgroundColor: Colors.light.accent,
+    backgroundColor: Colors.accent,
     borderRadius: 8,
     paddingHorizontal: 20,
     paddingVertical: 10,
   },
-  notFoundBackBtnText: { color: Colors.light.onAccent, fontWeight: '600', fontSize: 14 },
+  notFoundBackBtnText: { color: Colors.onAccent, fontWeight: '600', fontSize: 14 },
 
   content: { paddingBottom: 48 },
 
   mediaBox: {
-    backgroundColor: Colors.light.surfaceMuted,
+    backgroundColor: Colors.surfaceMuted,
     alignItems: 'center',
     paddingVertical: 16,
   },
@@ -216,20 +216,20 @@ const styles = StyleSheet.create({
     gap: 10,
     flexWrap: 'wrap',
   },
-  name: { fontSize: 22, fontWeight: '700', color: Colors.light.textPrimary, flex: 1 },
+  name: { fontSize: 22, fontWeight: '700', color: Colors.textPrimary, flex: 1 },
   categoryChip: {
-    backgroundColor: Colors.light.accentSurface,
+    backgroundColor: Colors.accentSurface,
     borderRadius: 10,
     paddingHorizontal: 10,
     paddingVertical: 4,
   },
-  categoryText: { fontSize: 13, color: Colors.light.accent, fontWeight: '600' },
+  categoryText: { fontSize: 13, color: Colors.accent, fontWeight: '600' },
 
   youtubeSection: {
     marginTop: 4,
     paddingTop: 20,
     borderTopWidth: 1,
-    borderTopColor: Colors.light.border,
+    borderTopColor: Colors.border,
   },
   youtubeSectionCentered: {
     alignItems: 'center',
@@ -241,39 +241,39 @@ const styles = StyleSheet.create({
     alignSelf: 'flex-start',
     borderRadius: 8,
     borderWidth: 1,
-    borderColor: Colors.light.borderStrong,
-    backgroundColor: Colors.light.surface,
+    borderColor: Colors.borderStrong,
+    backgroundColor: Colors.surface,
     paddingHorizontal: 14,
     paddingVertical: 8,
   },
-  youtubeBtnText: { fontSize: 13, fontWeight: '600', color: Colors.light.accent },
+  youtubeBtnText: { fontSize: 13, fontWeight: '600', color: Colors.accent },
 
   section: { gap: 8 },
-  sectionTitle: { fontSize: 13, fontWeight: '700', color: Colors.light.textMuted, letterSpacing: 0.5 },
-  sectionBody: { fontSize: 15, color: Colors.light.textBody, lineHeight: 22 },
+  sectionTitle: { fontSize: 13, fontWeight: '700', color: Colors.textMuted, letterSpacing: 0.5 },
+  sectionBody: { fontSize: 15, color: Colors.textBody, lineHeight: 22 },
 
   pointRow: { flexDirection: 'row', gap: 10, alignItems: 'flex-start' },
   pointNumber: {
     width: 22,
     height: 22,
     borderRadius: 11,
-    backgroundColor: Colors.light.accent,
-    color: Colors.light.onAccent,
+    backgroundColor: Colors.accent,
+    color: Colors.onAccent,
     fontSize: 12,
     fontWeight: '700',
     textAlign: 'center',
     lineHeight: 22,
   },
-  pointText: { flex: 1, fontSize: 15, color: Colors.light.textBody, lineHeight: 22 },
+  pointText: { flex: 1, fontSize: 15, color: Colors.textBody, lineHeight: 22 },
 
   cautionBox: {
-    backgroundColor: Colors.light.warningSurface,
+    backgroundColor: Colors.warningSurface,
     borderRadius: 8,
     padding: 12,
     borderLeftWidth: 3,
-    borderLeftColor: Colors.light.warningAccent,
+    borderLeftColor: Colors.warningAccent,
   },
-  cautionText: { fontSize: 14, color: Colors.light.warningText, lineHeight: 20 },
+  cautionText: { fontSize: 14, color: Colors.warningText, lineHeight: 20 },
 
-  noGuide: { fontSize: 14, color: Colors.light.textPlaceholder, textAlign: 'center', paddingVertical: 24 },
+  noGuide: { fontSize: 14, color: Colors.textPlaceholder, textAlign: 'center', paddingVertical: 24 },
 });

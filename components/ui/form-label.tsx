@@ -26,12 +26,12 @@ export function FormLabel({ children, required = false, containerStyle }: Props)
 
 const styles = StyleSheet.create({
   row: { flexDirection: 'row', alignItems: 'center', gap: 6 },
-  label: { fontSize: 13, fontWeight: '600', color: Colors.light.textSecondary },
+  label: { fontSize: 13, fontWeight: '600', color: Colors.textSecondary },
   badge: {
-    backgroundColor: Colors.light.dangerSurface,
+    backgroundColor: Colors.dangerSurface,
     borderRadius: 4,
     paddingHorizontal: 5,
     paddingVertical: 1,
   },
-  badgeText: { fontSize: 10, fontWeight: '700', color: Colors.light.danger, letterSpacing: 0.3 },
+  badgeText: { fontSize: 10, fontWeight: '700', color: Colors.danger, letterSpacing: 0.3 },
 });

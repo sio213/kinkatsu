@@ -150,17 +150,17 @@ const styles = StyleSheet.create({
 
   input: {
     borderWidth: 1,
-    borderColor: Colors.light.borderStrong,
+    borderColor: Colors.borderStrong,
     borderRadius: 8,
     paddingHorizontal: 12,
     paddingVertical: 8,
     fontSize: 15,
-    color: Colors.light.textPrimary,
-    backgroundColor: Colors.light.surface,
+    color: Colors.textPrimary,
+    backgroundColor: Colors.surface,
   },
   inputMultiline: { minHeight: 56, textAlignVertical: 'top' },
 
-  errorText: { fontSize: 12, color: Colors.light.danger, marginTop: -4 },
+  errorText: { fontSize: 12, color: Colors.danger, marginTop: -4 },
 
   chipRow: { flexDirection: 'row', flexWrap: 'wrap', gap: 6 },
 
@@ -169,17 +169,17 @@ const styles = StyleSheet.create({
     flex: 1,
     borderRadius: 8,
     paddingVertical: 10,
-    backgroundColor: Colors.light.border,
+    backgroundColor: Colors.border,
     alignItems: 'center',
   },
-  cancelBtnText: { fontSize: 14, fontWeight: '600', color: Colors.light.textSecondary },
+  cancelBtnText: { fontSize: 14, fontWeight: '600', color: Colors.textSecondary },
   submitBtn: {
     flex: 2,
     borderRadius: 8,
     paddingVertical: 10,
-    backgroundColor: Colors.light.accent,
+    backgroundColor: Colors.accent,
     alignItems: 'center',
   },
-  submitBtnDisabled: { backgroundColor: Colors.light.textPlaceholder },
-  submitBtnText: { fontSize: 14, fontWeight: '600', color: Colors.light.onAccent },
+  submitBtnDisabled: { backgroundColor: Colors.textPlaceholder },
+  submitBtnText: { fontSize: 14, fontWeight: '600', color: Colors.onAccent },
 });

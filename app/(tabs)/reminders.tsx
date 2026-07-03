@@ -144,27 +144,27 @@ export default function RemindersScreen() {
 }
 
 const styles = StyleSheet.create({
-  safeArea: { flex: 1, backgroundColor: Colors.light.background },
+  safeArea: { flex: 1, backgroundColor: Colors.background },
   scroll: { padding: 16, gap: 12, paddingBottom: 40 },
 
   sectionHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
-  title: { fontSize: 18, fontWeight: '700', color: Colors.light.textPrimary },
+  title: { fontSize: 18, fontWeight: '700', color: Colors.textPrimary },
   addBtn: {
-    backgroundColor: Colors.light.accent,
+    backgroundColor: Colors.accent,
     borderRadius: 8,
     paddingHorizontal: 14,
     paddingVertical: 6,
   },
-  addBtnText: { color: Colors.light.onAccent, fontWeight: '600', fontSize: 14 },
-  empty: { color: Colors.light.textPlaceholder, textAlign: 'center', paddingVertical: 16 },
+  addBtnText: { color: Colors.onAccent, fontWeight: '600', fontSize: 14 },
+  empty: { color: Colors.textPlaceholder, textAlign: 'center', paddingVertical: 16 },
 
   addFormWrapper: {
-    backgroundColor: Colors.light.surfaceSubtle,
+    backgroundColor: Colors.surfaceSubtle,
     borderRadius: 10,
     padding: 16,
     borderWidth: 1,
-    borderColor: Colors.light.border,
+    borderColor: Colors.border,
     marginTop: 4,
   },
-  addFormTitle: { fontSize: 15, fontWeight: '700', color: Colors.light.textPrimary, marginBottom: 8 },
+  addFormTitle: { fontSize: 15, fontWeight: '700', color: Colors.textPrimary, marginBottom: 8 },
 });

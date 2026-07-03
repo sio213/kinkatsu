@@ -108,6 +108,6 @@ export default function RootLayout() {
 
 const migrationStyles = StyleSheet.create({
   container: { flex: 1, justifyContent: 'center', alignItems: 'center', padding: 32, gap: 12 },
-  title: { fontSize: 17, fontWeight: '700', color: Colors.light.danger },
-  body: { fontSize: 14, color: Colors.light.textSecondary, textAlign: 'center', lineHeight: 22 },
+  title: { fontSize: 17, fontWeight: '700', color: Colors.danger },
+  body: { fontSize: 14, color: Colors.textSecondary, textAlign: 'center', lineHeight: 22 },
 });
