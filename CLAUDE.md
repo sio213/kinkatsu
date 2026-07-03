@@ -32,6 +32,18 @@
 - 「あったらいいな」という機能案が出てきたら、都度📋バックログに追加する（ステータス: アイデア）。
 - 「💡 アイデア」DBは別物（事業アイデア出し用）なので混同しない。kinkatsu内の話は必ず📋バックログへ。
 
+## Google Drive（成果物・ナレッジ管理）
+
+kinkatsu用のGoogle Driveフォルダが `仕事 > Webサービス > 🏋️ kinkatsu` 配下にある: https://drive.google.com/drive/folders/1uB-teWweWEZJ7jFCQi5wdsbsC47lnsT6
+
+- 戦略/ — 上記Notion各ページへのリンク集のみ。実体はNotion側なので複製しない
+- ソースコード/ — 実体は置かない。ローカルパス（このリポジトリ）を示すREADMEのみ。gitリポジトリ（.git・node_modules・ios/Pods等の大量の小ファイル）をGoogle Drive同期対象に入れると同期破損・不安定化のリスクがあるため、実体は絶対にここに置かないこと
+- デザイン・UI案/ — UI/UXモックアップ、AI生成デザイン案
+- ナレッジ/ — 競合・市場調査の一次資料（サマリーはNotion「競合アプリ」ページ）
+- 画像/ — 購入素材（GymVisual等）、AI生成画像
+- ストア素材（App Store申請用）/ — ロードマップPhase 3のApp Store申請用
+- 法務・規約（プライバシーポリシー等）/ — App Store申請や機微データを扱う機能（進捗写真機能など）に必要なプライバシーポリシー等の草案置き場
+
 ## ワークフロー
 
 ### 要件定義・設計フェーズ
