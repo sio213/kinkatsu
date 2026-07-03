@@ -1,3 +1,4 @@
+import { Colors } from '@/constants/theme';
 import { StyleSheet } from 'react-native';
 
 export const chipStyles = StyleSheet.create({
@@ -5,11 +6,11 @@ export const chipStyles = StyleSheet.create({
     borderRadius: 16,
     paddingHorizontal: 14,
     paddingVertical: 6,
-    backgroundColor: '#F1F5F9',
+    backgroundColor: Colors.light.surfaceSubtle,
     borderWidth: 1,
-    borderColor: '#E2E8F0',
+    borderColor: Colors.light.border,
   },
-  chipActive: { backgroundColor: '#2563EB', borderColor: '#2563EB' },
-  chipText: { fontSize: 13, color: '#64748B', fontWeight: '500' },
-  chipTextActive: { color: '#fff' },
+  chipActive: { backgroundColor: Colors.light.accent, borderColor: Colors.light.accent },
+  chipText: { fontSize: 13, color: Colors.light.textMuted, fontWeight: '500' },
+  chipTextActive: { color: Colors.light.onAccent },
 });

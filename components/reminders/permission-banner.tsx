@@ -1,3 +1,4 @@
+import { Colors } from '@/constants/theme';
 import { openSettings } from '@/lib/notifications/permissions';
 import { StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 
@@ -28,19 +29,19 @@ export function PermissionBanner({ state, onRequest }: Props) {
 
 const styles = StyleSheet.create({
   banner: {
-    backgroundColor: '#FEF3C7',
+    backgroundColor: Colors.light.warningSurface,
     borderRadius: 8,
     padding: 12,
     marginBottom: 8,
     gap: 8,
   },
-  text: { color: '#92400E', fontSize: 13 },
+  text: { color: Colors.light.warningText, fontSize: 13 },
   btn: {
-    backgroundColor: '#D97706',
+    backgroundColor: Colors.light.warning,
     borderRadius: 6,
     paddingVertical: 6,
     paddingHorizontal: 12,
     alignSelf: 'flex-start',
   },
-  btnText: { color: '#fff', fontSize: 13, fontWeight: '600' },
+  btnText: { color: Colors.light.onAccent, fontSize: 13, fontWeight: '600' },
 });

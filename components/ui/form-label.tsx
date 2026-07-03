@@ -1,3 +1,4 @@
+import { Colors } from '@/constants/theme';
 import { StyleSheet, Text, View, type StyleProp, type ViewStyle } from 'react-native';
 
 type Props = {
@@ -25,12 +26,12 @@ export function FormLabel({ children, required = false, containerStyle }: Props)
 
 const styles = StyleSheet.create({
   row: { flexDirection: 'row', alignItems: 'center', gap: 6 },
-  label: { fontSize: 13, fontWeight: '600', color: '#475569' },
+  label: { fontSize: 13, fontWeight: '600', color: Colors.light.textSecondary },
   badge: {
-    backgroundColor: '#FEE2E2',
+    backgroundColor: Colors.light.dangerSurface,
     borderRadius: 4,
     paddingHorizontal: 5,
     paddingVertical: 1,
   },
-  badgeText: { fontSize: 10, fontWeight: '700', color: '#DC2626', letterSpacing: 0.3 },
+  badgeText: { fontSize: 10, fontWeight: '700', color: Colors.light.danger, letterSpacing: 0.3 },
 });

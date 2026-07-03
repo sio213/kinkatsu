@@ -2,6 +2,7 @@ import { PermissionBanner } from '@/components/reminders/permission-banner';
 import { ReminderCard } from '@/components/reminders/reminder-card';
 import { ReminderForm } from '@/components/reminders/reminder-form';
 import { ListErrorBoundary } from '@/components/ui/list-error-boundary';
+import { Colors } from '@/constants/theme';
 import { useKeyboardInset } from '@/hooks/use-keyboard-inset';
 import { useReminders } from '@/hooks/use-reminders';
 import {
@@ -143,27 +144,27 @@ export default function RemindersScreen() {
 }
 
 const styles = StyleSheet.create({
-  safeArea: { flex: 1, backgroundColor: '#fff' },
+  safeArea: { flex: 1, backgroundColor: Colors.light.background },
   scroll: { padding: 16, gap: 12, paddingBottom: 40 },
 
   sectionHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
-  title: { fontSize: 18, fontWeight: '700', color: '#1E293B' },
+  title: { fontSize: 18, fontWeight: '700', color: Colors.light.textPrimary },
   addBtn: {
-    backgroundColor: '#2563EB',
+    backgroundColor: Colors.light.accent,
     borderRadius: 8,
     paddingHorizontal: 14,
     paddingVertical: 6,
   },
-  addBtnText: { color: '#fff', fontWeight: '600', fontSize: 14 },
-  empty: { color: '#999', textAlign: 'center', paddingVertical: 16 },
+  addBtnText: { color: Colors.light.onAccent, fontWeight: '600', fontSize: 14 },
+  empty: { color: Colors.light.textPlaceholder, textAlign: 'center', paddingVertical: 16 },
 
   addFormWrapper: {
-    backgroundColor: '#F1F5F9',
+    backgroundColor: Colors.light.surfaceSubtle,
     borderRadius: 10,
     padding: 16,
     borderWidth: 1,
-    borderColor: '#E2E8F0',
+    borderColor: Colors.light.border,
     marginTop: 4,
   },
-  addFormTitle: { fontSize: 15, fontWeight: '700', color: '#1E293B', marginBottom: 8 },
+  addFormTitle: { fontSize: 15, fontWeight: '700', color: Colors.light.textPrimary, marginBottom: 8 },
 });

@@ -1,3 +1,4 @@
+import { Colors } from '@/constants/theme';
 import { db, expoDb } from '@/db/client';
 import { seed } from '@/db/seed';
 import migrations from '@/drizzle/migrations';
@@ -107,6 +108,6 @@ export default function RootLayout() {
 
 const migrationStyles = StyleSheet.create({
   container: { flex: 1, justifyContent: 'center', alignItems: 'center', padding: 32, gap: 12 },
-  title: { fontSize: 17, fontWeight: '700', color: '#DC2626' },
-  body: { fontSize: 14, color: '#64748B', textAlign: 'center', lineHeight: 22 },
+  title: { fontSize: 17, fontWeight: '700', color: Colors.light.danger },
+  body: { fontSize: 14, color: Colors.light.textSecondary, textAlign: 'center', lineHeight: 22 },
 });

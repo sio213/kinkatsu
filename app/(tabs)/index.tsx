@@ -1,4 +1,5 @@
 import { IconSymbol } from '@/components/ui/icon-symbol';
+import { Colors } from '@/constants/theme';
 import { StyleSheet, Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
@@ -11,7 +12,7 @@ export default function RecordScreen() {
         </View>
 
         <View style={styles.empty}>
-          <IconSymbol name="list.bullet.clipboard" size={40} color="#CBD5E1" />
+          <IconSymbol name="list.bullet.clipboard" size={40} color={Colors.light.borderStrong} />
           <Text style={styles.emptyText}>トレーニング記録機能は準備中です</Text>
         </View>
       </View>
@@ -20,12 +21,12 @@ export default function RecordScreen() {
 }
 
 const styles = StyleSheet.create({
-  safeArea: { flex: 1, backgroundColor: '#fff' },
+  safeArea: { flex: 1, backgroundColor: Colors.light.background },
   container: { flex: 1, padding: 16 },
 
   sectionHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
-  title: { fontSize: 18, fontWeight: '700', color: '#1E293B' },
+  title: { fontSize: 18, fontWeight: '700', color: Colors.light.textPrimary },
 
   empty: { flex: 1, alignItems: 'center', justifyContent: 'center', gap: 8 },
-  emptyText: { fontSize: 14, color: '#94A3B8', textAlign: 'center' },
+  emptyText: { fontSize: 14, color: Colors.light.textPlaceholder, textAlign: 'center' },
 });

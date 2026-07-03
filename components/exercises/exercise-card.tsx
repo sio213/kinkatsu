@@ -1,3 +1,4 @@
+import { Colors } from '@/constants/theme';
 import type { Exercise } from '@/db/schema';
 import { Image } from 'expo-image';
 import { useRouter } from 'expo-router';
@@ -119,49 +120,49 @@ export const ExerciseCard = memo(function ExerciseCard({
 
 const styles = StyleSheet.create({
   card: {
-    backgroundColor: '#F8FAFC',
+    backgroundColor: Colors.light.surfaceMuted,
     borderRadius: 10,
     padding: 12,
     gap: 8,
     borderWidth: 1,
-    borderColor: '#E2E8F0',
+    borderColor: Colors.light.border,
   },
   cardMain: { flexDirection: 'row', alignItems: 'center', gap: 8 },
   thumbnail: { width: 60, height: 60, borderRadius: 6 },
   info: { flex: 1, gap: 4 },
-  name: { fontSize: 15, fontWeight: '600', color: '#1E293B' },
+  name: { fontSize: 15, fontWeight: '600', color: Colors.light.textPrimary },
   meta: { flexDirection: 'row', alignItems: 'center', gap: 6 },
   categoryChip: {
-    backgroundColor: '#EFF6FF',
+    backgroundColor: Colors.light.accentSurface,
     borderRadius: 10,
     paddingHorizontal: 8,
     paddingVertical: 4,
   },
-  categoryText: { fontSize: 12, color: '#2563EB', fontWeight: '600' },
-  note: { fontSize: 12, color: '#94A3B8', flex: 1 },
+  categoryText: { fontSize: 12, color: Colors.light.accent, fontWeight: '600' },
+  note: { fontSize: 12, color: Colors.light.textPlaceholder, flex: 1 },
 
-  star: { fontSize: 20, color: '#CBD5E1' },
-  starActive: { color: '#F59E0B' },
+  star: { fontSize: 20, color: Colors.light.borderStrong },
+  starActive: { color: Colors.light.favorite },
 
   actions: { flexDirection: 'row', gap: 8 },
   actionBtn: {
     borderRadius: 6,
     paddingVertical: 10,
     paddingHorizontal: 14,
-    backgroundColor: '#E2E8F0',
+    backgroundColor: Colors.light.border,
     alignItems: 'center',
   },
-  actionBtnText: { fontSize: 13, color: '#334155', fontWeight: '500' },
-  actionBtnDanger: { backgroundColor: '#FEE2E2' },
-  actionBtnDangerText: { color: '#DC2626' },
+  actionBtnText: { fontSize: 13, color: Colors.light.textBody, fontWeight: '500' },
+  actionBtnDanger: { backgroundColor: Colors.light.dangerSurface },
+  actionBtnDangerText: { color: Colors.light.danger },
 
   editWrapper: {
-    backgroundColor: '#F1F5F9',
+    backgroundColor: Colors.light.surfaceSubtle,
     borderRadius: 10,
     padding: 16,
     borderWidth: 1,
-    borderColor: '#E2E8F0',
+    borderColor: Colors.light.border,
     marginTop: 4,
   },
-  editTitle: { fontSize: 15, fontWeight: '700', color: '#1E293B', marginBottom: 8 },
+  editTitle: { fontSize: 15, fontWeight: '700', color: Colors.light.textPrimary, marginBottom: 8 },
 });
