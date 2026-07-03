@@ -1,3 +1,4 @@
+import { Colors } from '@/constants/theme';
 import type { Reminder } from '@/db/schema';
 import { formatKindSummary, formatNextFire } from '@/lib/notifications/format';
 import type { ReminderInput, ReminderKind } from '@/lib/notifications/types';
@@ -87,37 +88,37 @@ export function ReminderCard({
 
 const styles = StyleSheet.create({
   card: {
-    backgroundColor: '#F8FAFC',
+    backgroundColor: Colors.surfaceMuted,
     borderRadius: 10,
     padding: 12,
     gap: 8,
     borderWidth: 1,
-    borderColor: '#E2E8F0',
+    borderColor: Colors.border,
   },
   cardMain: { flexDirection: 'row', alignItems: 'center', gap: 12 },
   info: { flex: 1, gap: 2 },
-  title: { fontSize: 15, fontWeight: '600', color: '#1E293B' },
-  summary: { fontSize: 13, color: '#64748B' },
-  next: { fontSize: 11, color: '#94A3B8' },
+  title: { fontSize: 15, fontWeight: '600', color: Colors.textPrimary },
+  summary: { fontSize: 13, color: Colors.textMuted },
+  next: { fontSize: 11, color: Colors.textPlaceholder },
 
   actions: { flexDirection: 'row', gap: 8 },
   actionBtn: {
     borderRadius: 6,
     paddingVertical: 4,
     paddingHorizontal: 10,
-    backgroundColor: '#E2E8F0',
+    backgroundColor: Colors.border,
   },
-  actionBtnText: { fontSize: 12, color: '#334155', fontWeight: '500' },
-  actionBtnDanger: { backgroundColor: '#FEE2E2' },
-  actionBtnDangerText: { color: '#DC2626' },
+  actionBtnText: { fontSize: 12, color: Colors.textBody, fontWeight: '500' },
+  actionBtnDanger: { backgroundColor: Colors.dangerSurface },
+  actionBtnDangerText: { color: Colors.danger },
 
   editWrapper: {
-    backgroundColor: '#F1F5F9',
+    backgroundColor: Colors.surfaceSubtle,
     borderRadius: 10,
     padding: 16,
     borderWidth: 1,
-    borderColor: '#E2E8F0',
+    borderColor: Colors.border,
     marginTop: 4,
   },
-  editTitle: { fontSize: 15, fontWeight: '700', color: '#1E293B', marginBottom: 8 },
+  editTitle: { fontSize: 15, fontWeight: '700', color: Colors.textPrimary, marginBottom: 8 },
 });

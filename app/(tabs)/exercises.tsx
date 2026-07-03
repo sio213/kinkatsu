@@ -2,6 +2,7 @@ import { chipStyles } from '@/components/exercises/chip-styles';
 import { ExerciseCard } from '@/components/exercises/exercise-card';
 import { ExerciseForm } from '@/components/exercises/exercise-form';
 import { ListErrorBoundary } from '@/components/ui/list-error-boundary';
+import { Colors } from '@/constants/theme';
 import type { Exercise } from '@/db/schema';
 import { useExercises } from '@/hooks/use-exercises';
 import { useKeyboardInset } from '@/hooks/use-keyboard-inset';
@@ -221,7 +222,7 @@ export default function ExercisesScreen() {
 }
 
 const styles = StyleSheet.create({
-  safeArea: { flex: 1, backgroundColor: '#fff' },
+  safeArea: { flex: 1, backgroundColor: Colors.background },
   list: { flex: 1 },
   content: { paddingHorizontal: 16, paddingBottom: 40 },
 
@@ -231,24 +232,24 @@ const styles = StyleSheet.create({
     justifyContent: 'space-between',
     alignItems: 'center',
   },
-  title: { fontSize: 18, fontWeight: '700', color: '#1E293B' },
+  title: { fontSize: 18, fontWeight: '700', color: Colors.textPrimary },
   addBtn: {
-    backgroundColor: '#2563EB',
+    backgroundColor: Colors.accent,
     borderRadius: 8,
     paddingHorizontal: 14,
     paddingVertical: 6,
   },
-  addBtnText: { color: '#fff', fontWeight: '600', fontSize: 14 },
+  addBtnText: { color: Colors.onAccent, fontWeight: '600', fontSize: 14 },
 
   searchInput: {
     borderWidth: 1,
-    borderColor: '#CBD5E1',
+    borderColor: Colors.borderStrong,
     borderRadius: 10,
     paddingHorizontal: 12,
     paddingVertical: 8,
     fontSize: 15,
-    color: '#1E293B',
-    backgroundColor: '#F8FAFC',
+    color: Colors.textPrimary,
+    backgroundColor: Colors.surfaceMuted,
   },
 
   categoryScroll: { gap: 6 },
@@ -256,21 +257,21 @@ const styles = StyleSheet.create({
   separator: { height: 8 },
 
   emptyWrapper: { alignItems: 'center', paddingVertical: 32, gap: 12 },
-  empty: { color: '#94A3B8', fontSize: 14 },
+  empty: { color: Colors.textPlaceholder, fontSize: 14 },
   emptyAddBtn: {
-    backgroundColor: '#2563EB',
+    backgroundColor: Colors.accent,
     borderRadius: 8,
     paddingHorizontal: 20,
     paddingVertical: 10,
   },
-  emptyAddBtnText: { color: '#fff', fontWeight: '600', fontSize: 14 },
+  emptyAddBtnText: { color: Colors.onAccent, fontWeight: '600', fontSize: 14 },
 
   addFormWrapper: {
-    backgroundColor: '#F1F5F9',
+    backgroundColor: Colors.surfaceSubtle,
     borderRadius: 10,
     padding: 16,
     borderWidth: 1,
-    borderColor: '#E2E8F0',
+    borderColor: Colors.border,
   },
-  addFormTitle: { fontSize: 15, fontWeight: '700', color: '#1E293B', marginBottom: 8 },
+  addFormTitle: { fontSize: 15, fontWeight: '700', color: Colors.textPrimary, marginBottom: 8 },
 });
