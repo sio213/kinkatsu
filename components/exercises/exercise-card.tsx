@@ -50,11 +50,6 @@ export const ExerciseCard = memo(function ExerciseCard({
           <View style={styles.categoryChip}>
             <Text style={styles.categoryText}>{getCategoryLabel(e.category)}</Text>
           </View>
-          {e.note ? (
-            <Text style={styles.note} numberOfLines={1}>
-              {e.note}
-            </Text>
-          ) : null}
         </View>
       </View>
       <TouchableOpacity
@@ -82,7 +77,14 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: Colors.border,
   },
-  thumbnail: { width: 60, height: 60, borderRadius: 6 },
+  thumbnail: {
+    width: 46,
+    height: 46,
+    borderRadius: 7,
+    backgroundColor: Colors.surfaceSubtle,
+    borderWidth: 1,
+    borderColor: Colors.border,
+  },
   info: { flex: 1, gap: 4 },
   name: { fontSize: 15, fontWeight: '600', color: Colors.textPrimary },
   meta: { flexDirection: 'row', alignItems: 'center', gap: 6 },
@@ -90,10 +92,9 @@ const styles = StyleSheet.create({
     backgroundColor: Colors.accentSurface,
     borderRadius: 10,
     paddingHorizontal: 8,
-    paddingVertical: 4,
+    paddingVertical: 3,
   },
-  categoryText: { fontSize: 12, color: Colors.accent, fontWeight: '600' },
-  note: { fontSize: 12, color: Colors.textPlaceholder, flex: 1 },
+  categoryText: { fontSize: 11.5, color: Colors.accent, fontWeight: '600' },
 
   star: { fontSize: 20, color: Colors.borderStrong },
   starActive: { color: Colors.favorite },
