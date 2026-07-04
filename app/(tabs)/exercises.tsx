@@ -1,6 +1,5 @@
 import { chipStyles } from '@/components/exercises/chip-styles';
 import { ExerciseCard } from '@/components/exercises/exercise-card';
-import { ExerciseForm } from '@/components/exercises/exercise-form';
 import { IconSymbol } from '@/components/ui/icon-symbol';
 import { ListErrorBoundary } from '@/components/ui/list-error-boundary';
 import { Colors } from '@/constants/theme';
@@ -14,10 +13,9 @@ import {
   getCategoryLabel,
 } from '@/lib/exercises/constants';
 import { filterExercises } from '@/lib/exercises/filter';
-import type { ExerciseFormValues } from '@/lib/exercises/validation';
+import { useRouter } from 'expo-router';
 import { useCallback, useMemo, useState } from 'react';
 import {
-  Alert,
   FlatList,
   Platform,
   ScrollView,
@@ -32,12 +30,11 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 const CATEGORY_FILTERS = [CATEGORY_ALL, CATEGORY_FAVORITE, ...EXERCISE_CATEGORIES] as const;
 
 export default function ExercisesScreen() {
-  const { exercises, addExercise, toggleFavorite } = useExercises();
+  const { exercises, toggleFavorite } = useExercises();
+  const router = useRouter();
 
   const [search, setSearch] = useState('');
   const [activeCategory, setActiveCategory] = useState<string>(CATEGORY_ALL);
-  const [showForm, setShowForm] = useState(false);
-  const [formInitialName, setFormInitialName] = useState('');
   const keyboardInset = useKeyboardInset();
 
   const filtered = useMemo(
@@ -45,26 +42,11 @@ export default function ExercisesScreen() {
     [exercises, activeCategory, search],
   );
 
-  const openCreate = useCallback((name = '') => {
-    setFormInitialName(name);
-    setShowForm(true);
-  }, []);
-
-  const closeForm = useCallback(() => {
-    setShowForm(false);
-  }, []);
-
-  const handleSubmit = useCallback(
-    async (values: ExerciseFormValues) => {
-      try {
-        await addExercise(values);
-        closeForm();
-      } catch (e) {
-        console.error('[exercise save]', e);
-        Alert.alert('エラー', '種目の保存に失敗しました。');
-      }
+  const openCreate = useCallback(
+    (name = '') => {
+      router.push({ pathname: '/exercise/new', params: { name } });
     },
-    [addExercise, closeForm],
+    [router],
   );
 
   const renderItem = useCallback(
@@ -80,11 +62,9 @@ export default function ExercisesScreen() {
     <View style={styles.headerArea}>
       <View style={styles.sectionHeader}>
         <Text style={styles.title}>種目ライブラリ</Text>
-        {!showForm && (
-          <TouchableOpacity style={styles.addBtn} onPress={() => openCreate()}>
-            <Text style={styles.addBtnText}>＋ 追加</Text>
-          </TouchableOpacity>
-        )}
+        <TouchableOpacity style={styles.addBtn} onPress={() => openCreate()}>
+          <Text style={styles.addBtnText}>＋ 追加</Text>
+        </TouchableOpacity>
       </View>
 
       <View style={styles.searchWrapper}>
@@ -136,23 +116,11 @@ export default function ExercisesScreen() {
           );
         })}
       </ScrollView>
-
-      {showForm && (
-        <View style={styles.addFormWrapper}>
-          <Text style={styles.addFormTitle}>種目を追加</Text>
-          <ExerciseForm
-            initial={{ name: formInitialName }}
-            onSubmit={handleSubmit}
-            onCancel={closeForm}
-            submitLabel="追加"
-          />
-        </View>
-      )}
     </View>
   );
 
   const trimmedSearch = search.trim();
-  const emptyComponent = !showForm ? (
+  const emptyComponent = (
     <View style={styles.emptyWrapper}>
       <Text style={styles.empty}>
         {trimmedSearch
@@ -171,7 +139,7 @@ export default function ExercisesScreen() {
         </TouchableOpacity>
       ) : null}
     </View>
-  ) : null;
+  );
 
   return (
     <SafeAreaView style={styles.safeArea} edges={['top']}>
@@ -254,13 +222,4 @@ const styles = StyleSheet.create({
     paddingVertical: 10,
   },
   emptyAddBtnText: { color: Colors.onAccent, fontWeight: '600', fontSize: 14 },
-
-  addFormWrapper: {
-    backgroundColor: Colors.surfaceSubtle,
-    borderRadius: 10,
-    padding: 16,
-    borderWidth: 1,
-    borderColor: Colors.border,
-  },
-  addFormTitle: { fontSize: 15, fontWeight: '700', color: Colors.textPrimary, marginBottom: 8 },
 });
