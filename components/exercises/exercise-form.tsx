@@ -39,6 +39,7 @@ type Props = {
     note?: string | null;
     favorite?: boolean;
     formPoints?: string[] | null;
+    source?: string;
   };
   onSubmit: (values: ExerciseFormValues) => void;
   onCancel: () => void;
@@ -79,6 +80,9 @@ export const ExerciseForm = forwardRef<ExerciseFormHandle, Props>(function Exerc
   });
   const hasErrors = Object.keys(errors).length > 0;
   const submitDisabled = isSubmitting || (isSubmitted && hasErrors);
+  // プリセット種目は詳細画面でgetGuide()の解説を表示するため、フォームのポイントは編集不可
+  // （メモ欄と役割が重複する上、保存しても表示されない「書き込み専用」状態になるのを避ける）
+  const isPreset = initial?.source === 'preset';
 
   useImperativeHandle(ref, () => ({ submit: () => handleSubmit(onSubmit)() }), [
     handleSubmit,
@@ -140,46 +144,50 @@ export const ExerciseForm = forwardRef<ExerciseFormHandle, Props>(function Exerc
         <Text style={styles.errorText}>{errors.category.message}</Text>
       ) : null}
 
-      <FormLabel>フォームのポイント</FormLabel>
-      <Controller
-        control={control}
-        name="formPoints"
-        render={({ field: { value, onChange } }) => (
-          <View style={styles.pointList}>
-            {value.map((point, index) => (
-              <View key={index} style={styles.pointRow}>
-                <Text style={styles.pointNumber}>{index + 1}</Text>
-                <TextInput
-                  style={[styles.input, styles.pointInput]}
-                  value={point}
-                  onChangeText={(text) => {
-                    const next = [...value];
-                    next[index] = text;
-                    onChange(next);
-                  }}
-                  placeholder="ポイントを入力"
-                  accessibilityLabel={`フォームのポイント${index + 1}`}
-                />
+      {!isPreset && (
+        <>
+          <FormLabel>フォームのポイント</FormLabel>
+          <Controller
+            control={control}
+            name="formPoints"
+            render={({ field: { value, onChange } }) => (
+              <View style={styles.pointList}>
+                {value.map((point, index) => (
+                  <View key={index} style={styles.pointRow}>
+                    <Text style={styles.pointNumber}>{index + 1}</Text>
+                    <TextInput
+                      style={[styles.input, styles.pointInput]}
+                      value={point}
+                      onChangeText={(text) => {
+                        const next = [...value];
+                        next[index] = text;
+                        onChange(next);
+                      }}
+                      placeholder="ポイントを入力"
+                      accessibilityLabel={`フォームのポイント${index + 1}`}
+                    />
+                    <TouchableOpacity
+                      style={styles.pointRemoveBtn}
+                      onPress={() => onChange(value.filter((_, i) => i !== index))}
+                      hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+                      accessibilityLabel={`ポイント${index + 1}を削除`}
+                    >
+                      <Text style={styles.pointRemoveBtnText}>×</Text>
+                    </TouchableOpacity>
+                  </View>
+                ))}
                 <TouchableOpacity
-                  style={styles.pointRemoveBtn}
-                  onPress={() => onChange(value.filter((_, i) => i !== index))}
-                  hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
-                  accessibilityLabel={`ポイント${index + 1}を削除`}
+                  style={styles.pointAddBtn}
+                  onPress={() => onChange([...value, ''])}
+                  accessibilityLabel="ポイントを追加"
                 >
-                  <Text style={styles.pointRemoveBtnText}>×</Text>
+                  <Text style={styles.pointAddBtnText}>＋ ポイントを追加</Text>
                 </TouchableOpacity>
               </View>
-            ))}
-            <TouchableOpacity
-              style={styles.pointAddBtn}
-              onPress={() => onChange([...value, ''])}
-              accessibilityLabel="ポイントを追加"
-            >
-              <Text style={styles.pointAddBtnText}>＋ ポイントを追加</Text>
-            </TouchableOpacity>
-          </View>
-        )}
-      />
+            )}
+          />
+        </>
+      )}
 
       <FormLabel>メモ</FormLabel>
       <Controller

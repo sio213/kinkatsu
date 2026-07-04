@@ -150,6 +150,53 @@ describe('メモ表示（プリセットのnoteが握りつぶされるバグの
   });
 });
 
+describe('フォームのポイント表示（カスタム種目のformPointsが書き込み専用になるバグの再発防止）', () => {
+  test('guideなしformPointsありのとき、フォームのポイントが表示される', () => {
+    mockUseExercise.mockReturnValue({
+      exercise: makeExercise({
+        source: 'custom',
+        slug: null,
+        formPoints: JSON.stringify(['肩甲骨を寄せる', 'バーを胸に下ろす']),
+      }),
+      loaded: true,
+    });
+
+    const root = render();
+    const texts = allTexts(root);
+    expect(texts).toContain('フォームのポイント');
+    expect(texts).toContain('肩甲骨を寄せる');
+    expect(texts).toContain('バーを胸に下ろす');
+    expect(texts).not.toContain('この種目の解説はまだありません');
+  });
+
+  test('guideなしformPointsなしnoteなしのとき「解説はまだありません」が表示される', () => {
+    mockUseExercise.mockReturnValue({
+      exercise: makeExercise({ source: 'custom', slug: null, formPoints: null, note: null }),
+      loaded: true,
+    });
+
+    const root = render();
+    expect(allTexts(root)).toContain('この種目の解説はまだありません');
+  });
+
+  test('guideありのとき、exercise.formPointsが設定されていてもguide側のフォームのポイントのみ表示される（重複しない）', () => {
+    mockUseExercise.mockReturnValue({
+      exercise: makeExercise({
+        source: 'preset',
+        slug: 'bench_press',
+        formPoints: JSON.stringify(['カスタムで上書きしたポイント']),
+      }),
+      loaded: true,
+    });
+
+    const root = render();
+    const texts = allTexts(root);
+    const pointsHeadingCount = texts.filter((t: unknown) => t === 'フォームのポイント').length;
+    expect(pointsHeadingCount).toBe(1);
+    expect(texts).not.toContain('カスタムで上書きしたポイント');
+  });
+});
+
 describe('⋮メニュー: 削除はカスタム種目のみ表示', () => {
   test('source=customのとき削除メニューが表示される', () => {
     mockUseExercise.mockReturnValue({

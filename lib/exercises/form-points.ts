@@ -5,5 +5,10 @@ export function serializeFormPoints(points: string[]): string | null {
 }
 
 export function parseFormPoints(value: string | null): string[] {
-  return value ? JSON.parse(value) : [];
+  if (!value) return [];
+  try {
+    return JSON.parse(value);
+  } catch {
+    return [];
+  }
 }

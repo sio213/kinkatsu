@@ -3,6 +3,7 @@ import { DesignIcon } from '@/components/ui/design-icon';
 import { IconSymbol } from '@/components/ui/icon-symbol';
 import { SectionHeading } from '@/components/ui/section-heading';
 import { getGuide } from '@/lib/exercises/guides';
+import { parseFormPoints } from '@/lib/exercises/form-points';
 import { getExerciseImages } from '@/lib/exercises/images';
 import { getCategoryLabel } from '@/lib/exercises/constants';
 import { getYoutubeSearchUrl } from '@/lib/exercises/youtube';
@@ -28,6 +29,19 @@ import {
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 const SCREEN_WIDTH = Dimensions.get('window').width;
+
+function FormPointsList({ points }: { points: string[] }) {
+  return (
+    <>
+      {points.map((p, i) => (
+        <View key={i} style={styles.pointRow}>
+          <Text style={styles.pointNumber}>{i + 1}</Text>
+          <Text style={styles.pointText}>{p}</Text>
+        </View>
+      ))}
+    </>
+  );
+}
 
 function Mp4Player({ source }: { source: number }) {
   const player = useVideoPlayer(source, (p) => {
@@ -116,8 +130,9 @@ export default function ExerciseDetailScreen() {
   }
 
   const guide = getGuide(exercise);
+  const formPoints = parseFormPoints(exercise.formPoints);
   const images = getExerciseImages(exercise);
-  const hasContent = Boolean(guide) || Boolean(exercise.note);
+  const hasContent = Boolean(guide) || Boolean(exercise.note) || formPoints.length > 0;
 
   return (
     <SafeAreaView style={styles.safe} edges={['bottom']}>
@@ -196,12 +211,7 @@ export default function ExerciseDetailScreen() {
 
               <View style={styles.section}>
                 <SectionHeading>フォームのポイント</SectionHeading>
-                {guide.points.map((p, i) => (
-                  <View key={i} style={styles.pointRow}>
-                    <Text style={styles.pointNumber}>{i + 1}</Text>
-                    <Text style={styles.pointText}>{p}</Text>
-                  </View>
-                ))}
+                <FormPointsList points={guide.points} />
               </View>
 
               <View style={styles.section}>
@@ -218,6 +228,13 @@ export default function ExerciseDetailScreen() {
             </>
           )}
 
+          {!guide && formPoints.length > 0 && (
+            <View style={styles.section}>
+              <SectionHeading>フォームのポイント</SectionHeading>
+              <FormPointsList points={formPoints} />
+            </View>
+          )}
+
           {exercise.note && (
             <View style={styles.section}>
               <SectionHeading>メモ</SectionHeading>
@@ -225,7 +242,7 @@ export default function ExerciseDetailScreen() {
             </View>
           )}
 
-          {!guide && !exercise.note && (
+          {!guide && !exercise.note && formPoints.length === 0 && (
             <Text style={styles.noGuide}>この種目の解説はまだありません</Text>
           )}
 
