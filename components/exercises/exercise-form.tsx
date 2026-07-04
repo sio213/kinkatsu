@@ -38,7 +38,6 @@ type Props = {
     category?: string;
     note?: string | null;
     favorite?: boolean;
-    muscle?: string | null;
     formPoints?: string[] | null;
   };
   onSubmit: (values: ExerciseFormValues) => void;
@@ -75,7 +74,6 @@ export const ExerciseForm = forwardRef<ExerciseFormHandle, Props>(function Exerc
       category: toExerciseCategory(initial?.category),
       note: initial?.note ?? '',
       favorite: initial?.favorite ?? false,
-      muscle: initial?.muscle ?? '',
       formPoints: initial?.formPoints?.length ? initial.formPoints : [''],
     },
   });
@@ -141,21 +139,6 @@ export const ExerciseForm = forwardRef<ExerciseFormHandle, Props>(function Exerc
       {errors.category ? (
         <Text style={styles.errorText}>{errors.category.message}</Text>
       ) : null}
-
-      <FormLabel>使う筋肉</FormLabel>
-      <Controller
-        control={control}
-        name="muscle"
-        render={({ field: { value, onChange } }) => (
-          <TextInput
-            style={styles.input}
-            value={value ?? ''}
-            onChangeText={onChange}
-            placeholder="例: 大胸筋・三角筋前部"
-            accessibilityLabel="使う筋肉"
-          />
-        )}
-      />
 
       <FormLabel>フォームのポイント</FormLabel>
       <Controller

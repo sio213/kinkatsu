@@ -91,7 +91,7 @@ describe('useExercises', () => {
     it('note: null を渡すとそのまま渡る', async () => {
       const { addExercise } = mount();
       await act(async () => {
-        await addExercise({ name: 'ベンチプレス', category: 'chest', note: null, favorite: false, muscle: null, formPoints: [] });
+        await addExercise({ name: 'ベンチプレス', category: 'chest', note: null, favorite: false, formPoints: [] });
       });
       expect(mockValues).toHaveBeenCalledWith(expect.objectContaining({ note: null }));
     });
@@ -99,7 +99,7 @@ describe('useExercises', () => {
     it('note 指定時その値が渡る', async () => {
       const { addExercise } = mount();
       await act(async () => {
-        await addExercise({ name: 'ベンチプレス', category: 'chest', note: 'メモ', favorite: false, muscle: null, formPoints: [] });
+        await addExercise({ name: 'ベンチプレス', category: 'chest', note: 'メモ', favorite: false, formPoints: [] });
       });
       expect(mockValues).toHaveBeenCalledWith(expect.objectContaining({ note: 'メモ' }));
     });
@@ -107,7 +107,7 @@ describe('useExercises', () => {
     it('source は常に "custom"', async () => {
       const { addExercise } = mount();
       await act(async () => {
-        await addExercise({ name: 'ベンチプレス', category: 'chest', note: null, favorite: false, muscle: null, formPoints: [] });
+        await addExercise({ name: 'ベンチプレス', category: 'chest', note: null, favorite: false, formPoints: [] });
       });
       expect(mockValues).toHaveBeenCalledWith(expect.objectContaining({ source: 'custom' }));
     });
@@ -116,7 +116,7 @@ describe('useExercises', () => {
       const before = Date.now();
       const { addExercise } = mount();
       await act(async () => {
-        await addExercise({ name: 'ベンチプレス', category: 'chest', note: null, favorite: false, muscle: null, formPoints: [] });
+        await addExercise({ name: 'ベンチプレス', category: 'chest', note: null, favorite: false, formPoints: [] });
       });
       const after = Date.now();
       const payload = (mockValues as jest.Mock).mock.calls[0][0];
@@ -127,7 +127,7 @@ describe('useExercises', () => {
     it('favorite: false を渡すとそのまま渡る', async () => {
       const { addExercise } = mount();
       await act(async () => {
-        await addExercise({ name: 'ベンチプレス', category: 'chest', note: null, favorite: false, muscle: null, formPoints: [] });
+        await addExercise({ name: 'ベンチプレス', category: 'chest', note: null, favorite: false, formPoints: [] });
       });
       expect(mockValues).toHaveBeenCalledWith(expect.objectContaining({ favorite: false }));
     });
@@ -135,7 +135,7 @@ describe('useExercises', () => {
     it('favorite: true を渡すとそのまま渡る', async () => {
       const { addExercise } = mount();
       await act(async () => {
-        await addExercise({ name: 'ベンチプレス', category: 'chest', note: null, favorite: true, muscle: null, formPoints: [] });
+        await addExercise({ name: 'ベンチプレス', category: 'chest', note: null, favorite: true, formPoints: [] });
       });
       expect(mockValues).toHaveBeenCalledWith(expect.objectContaining({ favorite: true }));
     });
@@ -148,7 +148,6 @@ describe('useExercises', () => {
           category: 'chest',
           note: null,
           favorite: false,
-          muscle: null,
           formPoints: ['肩甲骨を寄せる', 'バーを胸に下ろす'],
         });
       });
@@ -167,7 +166,6 @@ describe('useExercises', () => {
           category: 'chest',
           note: null,
           favorite: false,
-          muscle: null,
           formPoints: [],
         });
       });
@@ -279,7 +277,7 @@ describe('useExercises', () => {
       const { addExercise } = mount();
       mockValues.mockRejectedValueOnce(new Error('insert failed'));
       await expect(
-        addExercise({ name: 'ベンチプレス', category: 'chest', note: null, favorite: false, muscle: null, formPoints: [] }),
+        addExercise({ name: 'ベンチプレス', category: 'chest', note: null, favorite: false, formPoints: [] }),
       ).rejects.toThrow('insert failed');
     });
 

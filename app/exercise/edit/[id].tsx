@@ -64,7 +64,6 @@ export default function ExerciseEditScreen() {
               category: exercise.category,
               note: exercise.note,
               favorite: exercise.favorite,
-              muscle: exercise.muscle,
               formPoints: parseFormPoints(exercise.formPoints),
             }}
             onSubmit={handleSubmit}

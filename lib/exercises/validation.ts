@@ -12,11 +12,6 @@ export const exerciseSchema = z.object({
     .transform((v) => v || null)
     .nullable(),
   favorite: z.boolean(),
-  muscle: z
-    .string()
-    .trim()
-    .transform((v) => v || null)
-    .nullable(),
   formPoints: z
     .array(z.string())
     .transform((points) => points.map((p) => p.trim()).filter((p) => p.length > 0)),
