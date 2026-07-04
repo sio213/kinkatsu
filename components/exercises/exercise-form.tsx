@@ -1,5 +1,7 @@
 import { chipStyles } from '@/components/exercises/chip-styles';
 import { FormLabel } from '@/components/ui/form-label';
+import { PrimaryButton } from '@/components/ui/primary-button';
+import { SectionHeading } from '@/components/ui/section-heading';
 import { Colors } from '@/constants/theme';
 import {
   EXERCISE_CATEGORIES,
@@ -11,9 +13,11 @@ import {
   type ExerciseFormValues,
 } from '@/lib/exercises/validation';
 import { zodResolver } from '@hookform/resolvers/zod';
+import { forwardRef, useEffect, useImperativeHandle } from 'react';
 import { Controller, useForm } from 'react-hook-form';
 import {
   StyleSheet,
+  Switch,
   Text,
   TextInput,
   TouchableOpacity,
@@ -26,21 +30,33 @@ function toExerciseCategory(value: string | undefined): ExerciseCategory | undef
     : undefined;
 }
 
+export type ExerciseFormHandle = { submit: () => void };
+
 type Props = {
-  initial?: { name?: string; category?: string; note?: string | null };
+  initial?: { name?: string; category?: string; note?: string | null; favorite?: boolean };
   onSubmit: (values: ExerciseFormValues) => void;
   onCancel: () => void;
   submitLabel?: string;
   autoFocus?: boolean;
+  showCancel?: boolean;
+  // 呼び出し側が下部固定ボタンを自前で描画する場合はfalseにする（onSubmitDisabledChangeで無効状態を受け取る）
+  showFooter?: boolean;
+  onSubmitDisabledChange?: (disabled: boolean) => void;
 };
 
-export function ExerciseForm({
-  initial,
-  onSubmit,
-  onCancel,
-  submitLabel = '追加',
-  autoFocus = true,
-}: Props) {
+export const ExerciseForm = forwardRef<ExerciseFormHandle, Props>(function ExerciseForm(
+  {
+    initial,
+    onSubmit,
+    onCancel,
+    submitLabel = '追加',
+    autoFocus = true,
+    showCancel = true,
+    showFooter = true,
+    onSubmitDisabledChange,
+  },
+  ref,
+) {
   const {
     control,
     handleSubmit,
@@ -51,10 +67,20 @@ export function ExerciseForm({
       name: initial?.name ?? '',
       category: toExerciseCategory(initial?.category),
       note: initial?.note ?? '',
+      favorite: initial?.favorite ?? false,
     },
   });
   const hasErrors = Object.keys(errors).length > 0;
   const submitDisabled = isSubmitting || (isSubmitted && hasErrors);
+
+  useImperativeHandle(ref, () => ({ submit: () => handleSubmit(onSubmit)() }), [
+    handleSubmit,
+    onSubmit,
+  ]);
+
+  useEffect(() => {
+    onSubmitDisabledChange?.(submitDisabled);
+  }, [submitDisabled, onSubmitDisabledChange]);
 
   return (
     <View style={styles.container}>
@@ -64,7 +90,7 @@ export function ExerciseForm({
         name="name"
         render={({ field: { value, onChange } }) => (
           <TextInput
-            style={styles.input}
+            style={[styles.input, styles.nameInput]}
             value={value}
             onChangeText={onChange}
             placeholder="例: ベンチプレス"
@@ -124,26 +150,45 @@ export function ExerciseForm({
         )}
       />
 
-      <View style={styles.buttons}>
-        <TouchableOpacity
-          style={styles.cancelBtn}
-          onPress={onCancel}
-          accessibilityLabel="キャンセル"
-        >
-          <Text style={styles.cancelBtnText}>キャンセル</Text>
-        </TouchableOpacity>
-        <TouchableOpacity
-          style={[styles.submitBtn, submitDisabled && styles.submitBtnDisabled]}
-          onPress={handleSubmit(onSubmit)}
-          disabled={submitDisabled}
-          accessibilityLabel={submitLabel}
-        >
-          <Text style={styles.submitBtnText}>{submitLabel}</Text>
-        </TouchableOpacity>
+      <View style={styles.favoriteRow}>
+        <SectionHeading>お気に入りに追加</SectionHeading>
+        <Controller
+          control={control}
+          name="favorite"
+          render={({ field: { value, onChange } }) => (
+            <Switch
+              value={value}
+              onValueChange={onChange}
+              trackColor={{ true: Colors.accent, false: Colors.borderStrong }}
+              thumbColor={Colors.surface}
+              accessibilityLabel="お気に入りに追加"
+            />
+          )}
+        />
       </View>
+
+      {showFooter && (
+        <View style={styles.buttons}>
+          {showCancel && (
+            <TouchableOpacity
+              style={styles.cancelBtn}
+              onPress={onCancel}
+              accessibilityLabel="キャンセル"
+            >
+              <Text style={styles.cancelBtnText}>キャンセル</Text>
+            </TouchableOpacity>
+          )}
+          <PrimaryButton
+            label={submitLabel}
+            onPress={handleSubmit(onSubmit)}
+            disabled={submitDisabled}
+            style={styles.submitBtn}
+          />
+        </View>
+      )}
     </View>
   );
-}
+});
 
 const styles = StyleSheet.create({
   container: { gap: 8 },
@@ -152,17 +197,25 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: Colors.borderStrong,
     borderRadius: 8,
-    paddingHorizontal: 12,
-    paddingVertical: 8,
-    fontSize: 15,
+    paddingHorizontal: 11,
+    paddingVertical: 9,
+    fontSize: 14,
     color: Colors.textPrimary,
     backgroundColor: Colors.surface,
   },
+  nameInput: { fontSize: 15, fontWeight: '600' },
   inputMultiline: { minHeight: 56, textAlignVertical: 'top' },
 
   errorText: { fontSize: 12, color: Colors.danger, marginTop: -4 },
 
   chipRow: { flexDirection: 'row', flexWrap: 'wrap', gap: 6 },
+
+  favoriteRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    paddingVertical: 2,
+  },
 
   buttons: { flexDirection: 'row', gap: 8, marginTop: 4 },
   cancelBtn: {
@@ -173,13 +226,5 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   cancelBtnText: { fontSize: 14, fontWeight: '600', color: Colors.textSecondary },
-  submitBtn: {
-    flex: 2,
-    borderRadius: 8,
-    paddingVertical: 10,
-    backgroundColor: Colors.accent,
-    alignItems: 'center',
-  },
-  submitBtnDisabled: { backgroundColor: Colors.textPlaceholder },
-  submitBtnText: { fontSize: 14, fontWeight: '600', color: Colors.onAccent },
+  submitBtn: { flex: 2 },
 });

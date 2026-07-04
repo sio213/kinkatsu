@@ -18,6 +18,7 @@ const MAPPING = {
   'paperplane.fill': 'send',
   'chevron.left.forwardslash.chevron.right': 'code',
   'chevron.right': 'chevron-right',
+  ellipsis: 'more-vert',
   'dumbbell.fill': 'fitness-center',
   'list.bullet.clipboard': 'assignment',
   'bell.fill': 'notifications',

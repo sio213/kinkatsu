@@ -9,11 +9,9 @@ export function useExercises() {
   const { data } = useLiveQuery(db.select().from(exercises));
 
   const addExercise = useCallback(
-    async (name: string, category: string, note?: string) => {
+    async (values: Pick<Exercise, 'name' | 'category' | 'note' | 'favorite'>) => {
       await db.insert(exercises).values({
-        name,
-        category,
-        note: note ?? null,
+        ...values,
         source: 'custom',
         createdAt: Date.now(),
         updatedAt: Date.now(),
@@ -23,7 +21,7 @@ export function useExercises() {
   );
 
   const updateExercise = useCallback(
-    async (id: number, values: Partial<Pick<Exercise, 'name' | 'category' | 'note'>>) => {
+    async (id: number, values: Partial<Pick<Exercise, 'name' | 'category' | 'note' | 'favorite'>>) => {
       await db
         .update(exercises)
         .set({ ...values, updatedAt: Date.now() })

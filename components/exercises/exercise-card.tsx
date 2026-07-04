@@ -2,10 +2,11 @@ import { Colors } from '@/constants/theme';
 import type { Exercise } from '@/db/schema';
 import { Image } from 'expo-image';
 import { useRouter } from 'expo-router';
-import { memo, useEffect, useState } from 'react';
-import { Alert, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
+import { memo } from 'react';
+import { StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import { getExerciseImages } from '@/lib/exercises/images';
 import { getCategoryLabel } from '@/lib/exercises/constants';
+import { useFavoriteToggle } from '@/hooks/use-favorite-toggle';
 
 type Props = {
   exercise: Exercise;
@@ -17,23 +18,7 @@ export const ExerciseCard = memo(function ExerciseCard({
   onToggleFavorite,
 }: Props) {
   const router = useRouter();
-  const [localFav, setLocalFav] = useState(!!e.favorite);
-
-  useEffect(() => {
-    setLocalFav(!!e.favorite);
-  }, [e.favorite]);
-
-  async function handleFavoritePress() {
-    const next = !localFav;
-    setLocalFav(next);
-    try {
-      await onToggleFavorite(e.id, next);
-    } catch (err) {
-      console.error('[toggle favorite]', err);
-      setLocalFav(!next);
-      Alert.alert('エラー', 'お気に入りの更新に失敗しました。');
-    }
-  }
+  const { localFav, toggle: handleFavoritePress } = useFavoriteToggle(e.id, e.favorite, onToggleFavorite);
 
   const images = getExerciseImages(e);
 

@@ -1,5 +1,6 @@
 import { Colors } from '@/constants/theme';
 import { StyleSheet, Text, View, type StyleProp, type ViewStyle } from 'react-native';
+import { SectionHeading } from './section-heading';
 
 type Props = {
   children: string;
@@ -7,26 +8,28 @@ type Props = {
   containerStyle?: StyleProp<ViewStyle>;
 };
 
+// フォーム項目のラベル。必須/任意バッジを必ず表示する（見出しだけ欲しい場合はSectionHeadingを使う）
 export function FormLabel({ children, required = false, containerStyle }: Props) {
   return (
-    <View
-      style={[styles.row, containerStyle]}
-      accessible
-      accessibilityLabel={required ? `${children}、必須` : children}
+    <SectionHeading
+      containerStyle={containerStyle}
+      accessibilityLabel={required ? `${children}、必須` : `${children}、任意`}
+      trailing={
+        required ? (
+          <View style={styles.badge}>
+            <Text style={styles.badgeText}>必須</Text>
+          </View>
+        ) : (
+          <Text style={styles.optionalText}>任意</Text>
+        )
+      }
     >
-      <Text style={styles.label}>{children}</Text>
-      {required ? (
-        <View style={styles.badge}>
-          <Text style={styles.badgeText}>必須</Text>
-        </View>
-      ) : null}
-    </View>
+      {children}
+    </SectionHeading>
   );
 }
 
 const styles = StyleSheet.create({
-  row: { flexDirection: 'row', alignItems: 'center', gap: 6 },
-  label: { fontSize: 13, fontWeight: '600', color: Colors.textSecondary },
   badge: {
     backgroundColor: Colors.dangerSurface,
     borderRadius: 4,
@@ -34,4 +37,5 @@ const styles = StyleSheet.create({
     paddingVertical: 1,
   },
   badgeText: { fontSize: 10, fontWeight: '700', color: Colors.danger, letterSpacing: 0.3 },
+  optionalText: { fontSize: 11, fontWeight: '500', color: Colors.textPlaceholder },
 });

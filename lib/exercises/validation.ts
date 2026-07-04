@@ -11,6 +11,7 @@ export const exerciseSchema = z.object({
     .trim()
     .transform((v) => v || null)
     .nullable(),
+  favorite: z.boolean(),
 });
 
 export type ExerciseFormValues = z.infer<typeof exerciseSchema>;

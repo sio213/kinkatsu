@@ -84,32 +84,56 @@ describe('useExercises', () => {
   });
 
   describe('addExercise', () => {
-    it('note 省略時 note: null', async () => {
+    it('note: null を渡すとそのまま渡る', async () => {
       const { addExercise } = mount();
-      await act(async () => { await addExercise('ベンチプレス', '胸'); });
+      await act(async () => {
+        await addExercise({ name: 'ベンチプレス', category: '胸', note: null, favorite: false });
+      });
       expect(mockValues).toHaveBeenCalledWith(expect.objectContaining({ note: null }));
     });
 
     it('note 指定時その値が渡る', async () => {
       const { addExercise } = mount();
-      await act(async () => { await addExercise('ベンチプレス', '胸', 'メモ'); });
+      await act(async () => {
+        await addExercise({ name: 'ベンチプレス', category: '胸', note: 'メモ', favorite: false });
+      });
       expect(mockValues).toHaveBeenCalledWith(expect.objectContaining({ note: 'メモ' }));
     });
 
     it('source は常に "custom"', async () => {
       const { addExercise } = mount();
-      await act(async () => { await addExercise('ベンチプレス', '胸'); });
+      await act(async () => {
+        await addExercise({ name: 'ベンチプレス', category: '胸', note: null, favorite: false });
+      });
       expect(mockValues).toHaveBeenCalledWith(expect.objectContaining({ source: 'custom' }));
     });
 
     it('createdAt / updatedAt に数値が入る', async () => {
       const before = Date.now();
       const { addExercise } = mount();
-      await act(async () => { await addExercise('ベンチプレス', '胸'); });
+      await act(async () => {
+        await addExercise({ name: 'ベンチプレス', category: '胸', note: null, favorite: false });
+      });
       const after = Date.now();
       const payload = (mockValues as jest.Mock).mock.calls[0][0];
       expect(payload.createdAt).toBeGreaterThanOrEqual(before);
       expect(payload.createdAt).toBeLessThanOrEqual(after);
+    });
+
+    it('favorite: false を渡すとそのまま渡る', async () => {
+      const { addExercise } = mount();
+      await act(async () => {
+        await addExercise({ name: 'ベンチプレス', category: '胸', note: null, favorite: false });
+      });
+      expect(mockValues).toHaveBeenCalledWith(expect.objectContaining({ favorite: false }));
+    });
+
+    it('favorite: true を渡すとそのまま渡る', async () => {
+      const { addExercise } = mount();
+      await act(async () => {
+        await addExercise({ name: 'ベンチプレス', category: '胸', note: null, favorite: true });
+      });
+      expect(mockValues).toHaveBeenCalledWith(expect.objectContaining({ favorite: true }));
     });
   });
 
@@ -129,6 +153,14 @@ describe('useExercises', () => {
       const { updateExercise } = mount();
       await act(async () => { await updateExercise(1, { name: '新しい名前' }); });
       expect((mockSet as jest.Mock).mock.calls[0][0].category).toBeUndefined();
+    });
+
+    it('favorite のみ渡すと favorite だけ SET され、name は含まない', async () => {
+      const { updateExercise } = mount();
+      await act(async () => { await updateExercise(1, { favorite: true }); });
+      const payload = (mockSet as jest.Mock).mock.calls[0][0];
+      expect(payload.favorite).toBe(true);
+      expect(payload.name).toBeUndefined();
     });
   });
 
@@ -161,7 +193,9 @@ describe('useExercises', () => {
     it('addExercise: insert失敗時に reject する', async () => {
       const { addExercise } = mount();
       mockValues.mockRejectedValueOnce(new Error('insert failed'));
-      await expect(addExercise('ベンチプレス', '胸')).rejects.toThrow('insert failed');
+      await expect(
+        addExercise({ name: 'ベンチプレス', category: '胸', note: null, favorite: false }),
+      ).rejects.toThrow('insert failed');
     });
 
     it('updateExercise: update失敗時に reject する', async () => {

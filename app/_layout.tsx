@@ -1,4 +1,4 @@
-import { Colors } from '@/constants/theme';
+import { Colors, headerOptions } from '@/constants/theme';
 import { db, expoDb } from '@/db/client';
 import { seed } from '@/db/seed';
 import migrations from '@/drizzle/migrations';
@@ -90,12 +90,10 @@ export default function RootLayout() {
 
   return (
     <ThemeProvider value={colorScheme === 'dark' ? DarkTheme : DefaultTheme}>
-      <Stack>
+      <Stack screenOptions={headerOptions}>
         <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
-        <Stack.Screen
-          name="exercise/[id]"
-          options={{ presentation: 'modal', headerShown: false }}
-        />
+        <Stack.Screen name="exercise/[id]" options={{ title: '' }} />
+        <Stack.Screen name="exercise/edit/[id]" options={{ title: '種目を編集' }} />
         <Stack.Screen
           name="modal"
           options={{ presentation: 'modal', title: 'Modal' }}
