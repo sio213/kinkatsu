@@ -3,7 +3,7 @@ import { PrimaryButton } from '@/components/ui/primary-button';
 import { Colors } from '@/constants/theme';
 import { useExercises } from '@/hooks/use-exercises';
 import type { ExerciseFormValues } from '@/lib/exercises/validation';
-import { Stack, useLocalSearchParams, useRouter } from 'expo-router';
+import { useLocalSearchParams, useRouter } from 'expo-router';
 import { useCallback, useRef, useState } from 'react';
 import {
   Alert,
@@ -11,8 +11,6 @@ import {
   Platform,
   ScrollView,
   StyleSheet,
-  Text,
-  TouchableOpacity,
   View,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
@@ -39,24 +37,6 @@ export default function ExerciseNewScreen() {
 
   return (
     <SafeAreaView style={styles.safe} edges={['bottom']}>
-      <Stack.Screen
-        options={{
-          // モーダル表示なのでネイティブの戻るチェブロンは出ない。スワイプダウンで閉じられるのと
-          // 同じ意味の明示的な閉じる手段として、キャンセルボタンを独自に描画する
-          headerTitleAlign: 'left',
-          headerLeft: () => null,
-          headerRight: () => (
-            <TouchableOpacity
-              onPress={() => router.back()}
-              hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
-              accessibilityRole="button"
-              accessibilityLabel="キャンセル"
-            >
-              <Text style={styles.cancelText}>キャンセル</Text>
-            </TouchableOpacity>
-          ),
-        }}
-      />
       <KeyboardAvoidingView
         style={styles.flex}
         behavior={Platform.OS === 'ios' ? 'padding' : undefined}
@@ -96,6 +76,4 @@ const styles = StyleSheet.create({
     borderTopWidth: 1,
     borderTopColor: Colors.border,
   },
-
-  cancelText: { fontSize: 15, color: Colors.accent },
 });

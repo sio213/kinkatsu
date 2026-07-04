@@ -5,10 +5,6 @@ const mockAddExercise = jest.fn();
 jest.mock('expo-router', () => ({
   useRouter: () => ({ back: mockBack }),
   useLocalSearchParams: () => mockUseLocalSearchParams(),
-  Stack: {
-    Screen: ({ options }: { options?: { headerRight?: () => unknown } }) =>
-      options?.headerRight ? options.headerRight() : null,
-  },
 }));
 
 jest.mock('@/hooks/use-exercises', () => ({
@@ -112,15 +108,4 @@ test('未入力のまま保存を押すと、保存ボタンがdisabledになり
 
   expect(mockAddExercise).not.toHaveBeenCalled();
   expect(findButtonByLabel(root, '保存する')!.props.disabled).toBe(true);
-});
-
-test('ヘッダーのキャンセルボタンでrouter.backが呼ばれる', () => {
-  const root = render();
-
-  const cancelBtn = findButtonByLabel(root, 'キャンセル')!;
-  act(() => {
-    cancelBtn.props.onPress();
-  });
-
-  expect(mockBack).toHaveBeenCalled();
 });
