@@ -3,16 +3,20 @@
 var mockValues: jest.Mock;
 var mockWhere: jest.Mock;
 var mockSet: jest.Mock;
+var mockSelectLimit: jest.Mock;
 var mockData: unknown[] | undefined;
 
 jest.mock('@/db/client', () => {
   mockValues = jest.fn().mockResolvedValue(undefined);
   mockWhere = jest.fn().mockResolvedValue(undefined);
   mockSet = jest.fn().mockReturnValue({ where: () => mockWhere() });
+  // removeExercise が削除前に select().where().limit(1) でsourceを確認するためのモック。
+  // デフォルトは「該当なし」= []（既存の削除系テストの挙動に影響しないようにする）
+  mockSelectLimit = jest.fn().mockResolvedValue([]);
 
   const mockFrom = jest.fn().mockReturnValue({
     orderBy: jest.fn().mockReturnValue({}),
-    where: jest.fn().mockReturnValue({ limit: jest.fn().mockReturnValue({}) }),
+    where: jest.fn().mockReturnValue({ limit: (...args: unknown[]) => mockSelectLimit(...args) }),
   });
 
   return {
@@ -186,6 +190,31 @@ describe('useExercises', () => {
         expect(result).toBeInstanceOf(Promise);
         await result;
       });
+    });
+
+    it('source=customの種目は削除できる', async () => {
+      mockSelectLimit.mockResolvedValueOnce([{ id: 1, source: 'custom' }]);
+      const { removeExercise } = mount();
+      await act(async () => {
+        await removeExercise(1);
+      });
+      expect(mockWhere).toHaveBeenCalled();
+    });
+
+    it('source=presetの種目は削除がブロックされ、DELETEは実行されない', async () => {
+      mockSelectLimit.mockResolvedValueOnce([{ id: 1, source: 'preset' }]);
+      const { removeExercise } = mount();
+      await expect(removeExercise(1)).rejects.toThrow('プリセット種目は削除できません');
+      expect(mockWhere).not.toHaveBeenCalled();
+    });
+
+    it('該当する種目が見つからない場合はブロックせずDELETEを試みる', async () => {
+      mockSelectLimit.mockResolvedValueOnce([]);
+      const { removeExercise } = mount();
+      await act(async () => {
+        await removeExercise(999);
+      });
+      expect(mockWhere).toHaveBeenCalled();
     });
   });
 

@@ -41,6 +41,12 @@ export function useExercises() {
   );
 
   const removeExercise = useCallback(async (id: number) => {
+    // UI（詳細画面の⋮メニュー）はcustom種目にしか削除ボタンを出さないが、直接呼ばれた場合の
+    // 保険としてフック側でもプリセット種目の削除をブロックする
+    const [target] = await db.select().from(exercises).where(eq(exercises.id, id)).limit(1);
+    if (target?.source === 'preset') {
+      throw new Error('プリセット種目は削除できません');
+    }
     await db.delete(exercises).where(eq(exercises.id, id));
   }, []);
 
