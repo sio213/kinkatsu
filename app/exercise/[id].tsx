@@ -41,6 +41,15 @@ function Mp4Player({ source }: { source: number }) {
   );
 }
 
+function SectionHeading({ title }: { title: string }) {
+  return (
+    <View style={styles.sectionHeadingRow}>
+      <View style={styles.sectionHeadingBar} />
+      <Text style={styles.sectionTitle}>{title}</Text>
+    </View>
+  );
+}
+
 // ExternalLinkを使わないのは、失敗時にAlertでユーザーに通知する必要があるため
 async function handleYoutubeSearch(exerciseName: string) {
   try {
@@ -120,7 +129,7 @@ export default function ExerciseDetailScreen() {
               accessibilityLabel="戻る"
               onPress={() => router.back()}
             >
-              <Text style={styles.backBtnText}>‹</Text>
+              <IconSymbol name="chevron.left" size={22} color={Colors.textPlaceholder} />
             </TouchableOpacity>
           </View>
         </View>
@@ -148,7 +157,7 @@ export default function ExerciseDetailScreen() {
             accessibilityLabel="戻る"
             onPress={() => router.back()}
           >
-            <Text style={styles.backBtnText}>‹</Text>
+            <IconSymbol name="chevron.left" size={22} color={Colors.textPlaceholder} />
           </TouchableOpacity>
           <Text style={styles.headerTitle} numberOfLines={1}>
             {exercise.name}
@@ -159,7 +168,11 @@ export default function ExerciseDetailScreen() {
             accessibilityLabel="メニューを開く"
             onPress={() => setMenuOpen((v) => !v)}
           >
-            <Text style={[styles.iconBtnText, menuOpen && styles.iconBtnTextActive]}>⋮</Text>
+            <IconSymbol
+              name="ellipsis"
+              size={22}
+              color={menuOpen ? Colors.accent : Colors.textPlaceholder}
+            />
           </TouchableOpacity>
         </View>
 
@@ -211,7 +224,7 @@ export default function ExerciseDetailScreen() {
 
         <View style={styles.body}>
           <View style={styles.section}>
-            <Text style={styles.sectionTitle}>カテゴリ</Text>
+            <SectionHeading title="カテゴリ" />
             <View style={styles.categoryChip}>
               <Text style={styles.categoryText}>{getCategoryLabel(exercise.category)}</Text>
             </View>
@@ -220,12 +233,12 @@ export default function ExerciseDetailScreen() {
           {guide ? (
             <>
               <View style={styles.section}>
-                <Text style={styles.sectionTitle}>使う筋肉</Text>
+                <SectionHeading title="使う筋肉" />
                 <Text style={styles.sectionBody}>{guide.muscle}</Text>
               </View>
 
               <View style={styles.section}>
-                <Text style={styles.sectionTitle}>フォームのポイント</Text>
+                <SectionHeading title="フォームのポイント" />
                 {guide.points.map((p, i) => (
                   <View key={i} style={styles.pointRow}>
                     <Text style={styles.pointNumber}>{i + 1}</Text>
@@ -235,20 +248,20 @@ export default function ExerciseDetailScreen() {
               </View>
 
               <View style={styles.section}>
-                <Text style={styles.sectionTitle}>よくあるミス</Text>
+                <SectionHeading title="よくあるミス" />
                 <View style={styles.cautionBox}>
                   <Text style={styles.cautionText}>⚠️ {guide.caution}</Text>
                 </View>
               </View>
 
               <View style={styles.section}>
-                <Text style={styles.sectionTitle}>呼吸法</Text>
+                <SectionHeading title="呼吸法" />
                 <Text style={styles.sectionBody}>{guide.breath}</Text>
               </View>
             </>
           ) : exercise.note ? (
             <View style={styles.section}>
-              <Text style={styles.sectionTitle}>メモ</Text>
+              <SectionHeading title="メモ" />
               <Text style={styles.sectionBody}>{exercise.note}</Text>
             </View>
           ) : (
@@ -285,8 +298,13 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     gap: 10,
   },
-  headerTitle: { flex: 1, fontSize: 16, fontWeight: '700', color: Colors.textPrimary },
-  backBtnText: { fontSize: 22, color: Colors.textPlaceholder },
+  headerTitle: {
+    flex: 1,
+    fontSize: 16,
+    fontWeight: '700',
+    color: Colors.textPrimary,
+    textAlign: 'center',
+  },
 
   iconBtn: {
     width: 36,
@@ -295,9 +313,6 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
   },
-  iconBtnText: { fontSize: 20, color: Colors.textPlaceholder, fontWeight: '700' },
-  iconBtnTextActive: { color: Colors.accent },
-
   menuBackdrop: {
     position: 'absolute',
     top: -1000,
@@ -415,7 +430,14 @@ const styles = StyleSheet.create({
   youtubeBtnText: { fontSize: 13, fontWeight: '600', color: Colors.accent },
 
   section: { gap: 8 },
-  sectionTitle: { fontSize: 13, fontWeight: '700', color: Colors.textMuted, letterSpacing: 0.5 },
+  sectionHeadingRow: { flexDirection: 'row', alignItems: 'center', gap: 7 },
+  sectionHeadingBar: { width: 3, height: 14, borderRadius: 2, backgroundColor: Colors.accent },
+  sectionTitle: {
+    fontSize: 13,
+    fontWeight: '700',
+    color: Colors.textBody,
+    letterSpacing: 0.2,
+  },
   sectionBody: { fontSize: 15, color: Colors.textBody, lineHeight: 22 },
 
   pointRow: { flexDirection: 'row', gap: 10, alignItems: 'flex-start' },
