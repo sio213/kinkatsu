@@ -14,7 +14,7 @@ import {
 } from '@/lib/exercises/constants';
 import { filterExercises } from '@/lib/exercises/filter';
 import type { ExerciseFormValues } from '@/lib/exercises/validation';
-import { useCallback, useMemo, useRef, useState } from 'react';
+import { useCallback, useMemo, useState } from 'react';
 import {
   Alert,
   FlatList,
@@ -30,13 +30,11 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 const CATEGORY_FILTERS = [CATEGORY_ALL, CATEGORY_FAVORITE, ...EXERCISE_CATEGORIES] as const;
 
 export default function ExercisesScreen() {
-  const { exercises, addExercise, updateExercise, toggleFavorite, removeExercise } =
-    useExercises();
+  const { exercises, addExercise, toggleFavorite } = useExercises();
 
   const [search, setSearch] = useState('');
   const [activeCategory, setActiveCategory] = useState<string>(CATEGORY_ALL);
   const [showForm, setShowForm] = useState(false);
-  const [editTargetId, setEditTargetId] = useState<number | null>(null);
   const [formInitialName, setFormInitialName] = useState('');
   const keyboardInset = useKeyboardInset();
 
@@ -47,78 +45,33 @@ export default function ExercisesScreen() {
 
   const openCreate = useCallback((name = '') => {
     setFormInitialName(name);
-    setEditTargetId(null);
-    setShowForm(true);
-  }, []);
-
-  const openEdit = useCallback((id: number) => {
-    setEditTargetId(id);
     setShowForm(true);
   }, []);
 
   const closeForm = useCallback(() => {
     setShowForm(false);
-    setEditTargetId(null);
   }, []);
-
-  // renderItem/ExerciseCard の props 参照を editTargetId の変化で壊さないよう ref 経由で読む
-  const editTargetIdRef = useRef(editTargetId);
-  editTargetIdRef.current = editTargetId;
 
   const handleSubmit = useCallback(
     async (values: ExerciseFormValues) => {
       try {
-        const targetId = editTargetIdRef.current;
-        if (targetId != null) {
-          await updateExercise(targetId, values);
-        } else {
-          await addExercise(values.name, values.category, values.note ?? undefined);
-        }
+        await addExercise(values.name, values.category, values.note ?? undefined);
         closeForm();
       } catch (e) {
         console.error('[exercise save]', e);
         Alert.alert('エラー', '種目の保存に失敗しました。');
       }
     },
-    [addExercise, updateExercise, closeForm],
-  );
-
-  const handleDelete = useCallback(
-    (id: number, name: string) => {
-      Alert.alert('削除', `「${name}」を削除しますか？`, [
-        { text: 'キャンセル', style: 'cancel' },
-        {
-          text: '削除',
-          style: 'destructive',
-          onPress: async () => {
-            try {
-              await removeExercise(id);
-            } catch (e) {
-              console.error('[exercise delete]', e);
-              Alert.alert('エラー', '削除に失敗しました。');
-            }
-          },
-        },
-      ]);
-    },
-    [removeExercise],
+    [addExercise, closeForm],
   );
 
   const renderItem = useCallback(
     ({ item: e }: { item: Exercise }) => (
       <ListErrorBoundary>
-        <ExerciseCard
-          exercise={e}
-          isEditing={editTargetId === e.id && showForm}
-          onEdit={openEdit}
-          onCloseEdit={closeForm}
-          onDelete={handleDelete}
-          onToggleFavorite={toggleFavorite}
-          onSubmit={handleSubmit}
-        />
+        <ExerciseCard exercise={e} onToggleFavorite={toggleFavorite} />
       </ListErrorBoundary>
     ),
-    [editTargetId, showForm, openEdit, closeForm, handleDelete, toggleFavorite, handleSubmit],
+    [toggleFavorite],
   );
 
   const listHeader = (
@@ -166,7 +119,7 @@ export default function ExercisesScreen() {
         })}
       </ScrollView>
 
-      {showForm && editTargetId == null && (
+      {showForm && (
         <View style={styles.addFormWrapper}>
           <Text style={styles.addFormTitle}>種目を追加</Text>
           <ExerciseForm

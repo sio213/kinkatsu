@@ -6,27 +6,15 @@ import { memo, useEffect, useState } from 'react';
 import { Alert, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import { getExerciseImages } from '@/lib/exercises/images';
 import { getCategoryLabel } from '@/lib/exercises/constants';
-import type { ExerciseFormValues } from '@/lib/exercises/validation';
-import { ExerciseForm } from './exercise-form';
 
 type Props = {
   exercise: Exercise;
-  isEditing: boolean;
-  onEdit: (id: number) => void;
-  onCloseEdit: () => void;
-  onDelete: (id: number, name: string) => void;
   onToggleFavorite: (id: number, favorite: boolean) => Promise<void>;
-  onSubmit: (values: ExerciseFormValues) => void;
 };
 
 export const ExerciseCard = memo(function ExerciseCard({
   exercise: e,
-  isEditing,
-  onEdit,
-  onCloseEdit,
-  onDelete,
   onToggleFavorite,
-  onSubmit,
 }: Props) {
   const router = useRouter();
   const [localFav, setLocalFav] = useState(!!e.favorite);
@@ -50,84 +38,52 @@ export const ExerciseCard = memo(function ExerciseCard({
   const images = getExerciseImages(e);
 
   return (
-    <View>
-      <View style={styles.card}>
-        <View style={styles.cardMain}>
-          {images?.thumbnail != null && (
-            <TouchableOpacity onPress={() => router.push(`/exercise/${e.id}`)}>
-              <Image source={images.thumbnail} style={styles.thumbnail} contentFit="cover" />
-            </TouchableOpacity>
-          )}
-          <View style={styles.info}>
-            <TouchableOpacity onPress={() => router.push(`/exercise/${e.id}`)}>
-              <Text style={styles.name}>{e.name}</Text>
-            </TouchableOpacity>
-            <View style={styles.meta}>
-              <View style={styles.categoryChip}>
-                <Text style={styles.categoryText}>{getCategoryLabel(e.category)}</Text>
-              </View>
-              {e.note ? (
-                <Text style={styles.note} numberOfLines={1}>
-                  {e.note}
-                </Text>
-              ) : null}
-            </View>
+    <TouchableOpacity
+      style={styles.card}
+      onPress={() => router.push(`/exercise/${e.id}`)}
+      accessibilityLabel={`${e.name}の詳細を見る`}
+    >
+      {images?.thumbnail != null && (
+        <Image source={images.thumbnail} style={styles.thumbnail} contentFit="cover" />
+      )}
+      <View style={styles.info}>
+        <Text style={styles.name}>{e.name}</Text>
+        <View style={styles.meta}>
+          <View style={styles.categoryChip}>
+            <Text style={styles.categoryText}>{getCategoryLabel(e.category)}</Text>
           </View>
-          <TouchableOpacity
-            onPress={handleFavoritePress}
-            hitSlop={{ top: 12, bottom: 12, left: 12, right: 12 }}
-            accessibilityLabel={localFav ? 'お気に入り解除' : 'お気に入りに追加'}
-          >
-            <Text style={[styles.star, localFav && styles.starActive]}>
-              {localFav ? '★' : '☆'}
+          {e.note ? (
+            <Text style={styles.note} numberOfLines={1}>
+              {e.note}
             </Text>
-          </TouchableOpacity>
-        </View>
-
-        <View style={styles.actions}>
-          <TouchableOpacity
-            style={styles.actionBtn}
-            onPress={isEditing ? onCloseEdit : () => onEdit(e.id)}
-            accessibilityLabel={isEditing ? '編集を閉じる' : `${e.name}を編集`}
-          >
-            <Text style={styles.actionBtnText}>{isEditing ? '閉じる' : '編集'}</Text>
-          </TouchableOpacity>
-          <TouchableOpacity
-            style={[styles.actionBtn, styles.actionBtnDanger]}
-            onPress={() => onDelete(e.id, e.name)}
-            accessibilityLabel={`${e.name}を削除`}
-          >
-            <Text style={[styles.actionBtnText, styles.actionBtnDangerText]}>削除</Text>
-          </TouchableOpacity>
+          ) : null}
         </View>
       </View>
-
-      {isEditing && (
-        <View style={styles.editWrapper}>
-          <Text style={styles.editTitle}>種目を編集</Text>
-          <ExerciseForm
-            initial={{ name: e.name, category: e.category, note: e.note }}
-            onSubmit={onSubmit}
-            onCancel={onCloseEdit}
-            submitLabel="保存"
-            autoFocus={false}
-          />
-        </View>
-      )}
-    </View>
+      <TouchableOpacity
+        onPress={handleFavoritePress}
+        hitSlop={{ top: 12, bottom: 12, left: 12, right: 12 }}
+        accessibilityLabel={localFav ? 'お気に入り解除' : 'お気に入りに追加'}
+      >
+        <Text style={[styles.star, localFav && styles.starActive]}>
+          {localFav ? '★' : '☆'}
+        </Text>
+      </TouchableOpacity>
+      <Text style={styles.chevron}>›</Text>
+    </TouchableOpacity>
   );
 });
 
 const styles = StyleSheet.create({
   card: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
     backgroundColor: Colors.surfaceMuted,
     borderRadius: 10,
     padding: 12,
-    gap: 8,
     borderWidth: 1,
     borderColor: Colors.border,
   },
-  cardMain: { flexDirection: 'row', alignItems: 'center', gap: 8 },
   thumbnail: { width: 60, height: 60, borderRadius: 6 },
   info: { flex: 1, gap: 4 },
   name: { fontSize: 15, fontWeight: '600', color: Colors.textPrimary },
@@ -144,25 +100,5 @@ const styles = StyleSheet.create({
   star: { fontSize: 20, color: Colors.borderStrong },
   starActive: { color: Colors.favorite },
 
-  actions: { flexDirection: 'row', gap: 8 },
-  actionBtn: {
-    borderRadius: 6,
-    paddingVertical: 10,
-    paddingHorizontal: 14,
-    backgroundColor: Colors.border,
-    alignItems: 'center',
-  },
-  actionBtnText: { fontSize: 13, color: Colors.textBody, fontWeight: '500' },
-  actionBtnDanger: { backgroundColor: Colors.dangerSurface },
-  actionBtnDangerText: { color: Colors.danger },
-
-  editWrapper: {
-    backgroundColor: Colors.surfaceSubtle,
-    borderRadius: 10,
-    padding: 16,
-    borderWidth: 1,
-    borderColor: Colors.border,
-    marginTop: 4,
-  },
-  editTitle: { fontSize: 15, fontWeight: '700', color: Colors.textPrimary, marginBottom: 8 },
+  chevron: { fontSize: 20, color: Colors.borderStrong, fontWeight: '600' },
 });
