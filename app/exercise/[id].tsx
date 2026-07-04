@@ -223,7 +223,7 @@ export default function ExerciseDetailScreen() {
             </View>
           </View>
 
-          {guide ? (
+          {guide && (
             <>
               <View style={styles.section}>
                 <FormLabel hideBadge>使う筋肉</FormLabel>
@@ -252,12 +252,16 @@ export default function ExerciseDetailScreen() {
                 <Text style={styles.sectionBody}>{guide.breath}</Text>
               </View>
             </>
-          ) : exercise.note ? (
+          )}
+
+          {exercise.note && (
             <View style={styles.section}>
               <FormLabel hideBadge>メモ</FormLabel>
               <Text style={styles.sectionBody}>{exercise.note}</Text>
             </View>
-          ) : (
+          )}
+
+          {!guide && !exercise.note && (
             <Text style={styles.noGuide}>この種目の解説はまだありません</Text>
           )}
 
