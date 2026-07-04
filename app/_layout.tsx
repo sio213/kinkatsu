@@ -1,4 +1,4 @@
-import { Colors } from '@/constants/theme';
+import { Colors, headerOptions } from '@/constants/theme';
 import { db, expoDb } from '@/db/client';
 import { seed } from '@/db/seed';
 import migrations from '@/drizzle/migrations';
@@ -34,18 +34,6 @@ Notifications.setNotificationHandler({
 
 export const unstable_settings = {
   anchor: '(tabs)',
-};
-
-// 種目詳細・編集画面共通のネイティブヘッダー設定。戻るアイコンの色とタイトルの色を分けるため
-// headerTintColor（戻るアイコン）と headerTitleStyle.color（タイトル）を別々に指定している
-const exerciseHeaderOptions = {
-  title: '',
-  headerBackButtonDisplayMode: 'minimal' as const,
-  headerTintColor: Colors.textPlaceholder,
-  headerTitleAlign: 'center' as const,
-  headerTitleStyle: { fontSize: 16, fontWeight: '700' as const, color: Colors.textPrimary },
-  headerShadowVisible: false,
-  headerStyle: { backgroundColor: Colors.background },
 };
 
 let appStarting = false;
@@ -102,13 +90,10 @@ export default function RootLayout() {
 
   return (
     <ThemeProvider value={colorScheme === 'dark' ? DarkTheme : DefaultTheme}>
-      <Stack>
+      <Stack screenOptions={headerOptions}>
         <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
-        <Stack.Screen name="exercise/[id]" options={exerciseHeaderOptions} />
-        <Stack.Screen
-          name="exercise/edit/[id]"
-          options={{ ...exerciseHeaderOptions, title: '種目を編集' }}
-        />
+        <Stack.Screen name="exercise/[id]" options={{ title: '' }} />
+        <Stack.Screen name="exercise/edit/[id]" options={{ title: '種目を編集' }} />
         <Stack.Screen
           name="modal"
           options={{ presentation: 'modal', title: 'Modal' }}

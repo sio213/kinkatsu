@@ -5,6 +5,7 @@
  * 将来ダークモードをやるなら、その時に light/dark で出し分ける構造に戻す。
  */
 
+import type { NativeStackNavigationOptions } from '@react-navigation/native-stack';
 import { Platform } from 'react-native';
 
 const Palette = {
@@ -66,6 +67,20 @@ export const Colors = {
   tabIconDefault: Palette.slate500,
   tabIconSelected: Palette.blue600,
   tint: Palette.blue600,
+};
+
+/**
+ * プッシュ画面共通のネイティブヘッダー設定（戻るアイコン最小表示・中央揃えタイトル・影なし）。
+ * `<Stack screenOptions={headerOptions}>` に一度だけ渡し、各画面はtitle等の差分のみoptionsで指定する。
+ * 戻るアイコンの色とタイトルの色を分けるため headerTintColor と headerTitleStyle.color を別々に指定している。
+ */
+export const headerOptions: NativeStackNavigationOptions = {
+  headerBackButtonDisplayMode: 'minimal',
+  headerTintColor: Colors.textPlaceholder,
+  headerTitleAlign: 'center',
+  headerTitleStyle: { fontSize: 16, fontWeight: '700', color: Colors.textPrimary },
+  headerShadowVisible: false,
+  headerStyle: { backgroundColor: Colors.background },
 };
 
 export const Fonts = Platform.select({
