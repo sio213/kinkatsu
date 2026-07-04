@@ -148,6 +148,7 @@ export const ExerciseForm = forwardRef<ExerciseFormHandle, Props>(function Exerc
           <View style={styles.pointList}>
             {value.map((point, index) => (
               <View key={index} style={styles.pointRow}>
+                <Text style={styles.pointNumber}>{index + 1}</Text>
                 <TextInput
                   style={[styles.input, styles.pointInput]}
                   value={point}
@@ -156,7 +157,7 @@ export const ExerciseForm = forwardRef<ExerciseFormHandle, Props>(function Exerc
                     next[index] = text;
                     onChange(next);
                   }}
-                  placeholder={`ポイント${index + 1}`}
+                  placeholder="ポイントを入力"
                   accessibilityLabel={`フォームのポイント${index + 1}`}
                 />
                 <TouchableOpacity
@@ -259,6 +260,17 @@ const styles = StyleSheet.create({
 
   pointList: { gap: 8 },
   pointRow: { flexDirection: 'row', alignItems: 'center', gap: 8 },
+  pointNumber: {
+    width: 22,
+    height: 22,
+    borderRadius: 11,
+    backgroundColor: Colors.accent,
+    color: Colors.onAccent,
+    fontSize: 12,
+    fontWeight: '700',
+    textAlign: 'center',
+    lineHeight: 22,
+  },
   pointInput: { flex: 1 },
   pointRemoveBtn: {
     width: 28,
@@ -267,7 +279,13 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
   },
   pointRemoveBtnText: { fontSize: 16, color: Colors.textPlaceholder },
-  pointAddBtn: { alignSelf: 'flex-start', paddingVertical: 4 },
+  pointAddBtn: {
+    alignSelf: 'flex-start',
+    backgroundColor: Colors.accentSurface,
+    borderRadius: 20,
+    paddingHorizontal: 14,
+    paddingVertical: 8,
+  },
   pointAddBtnText: { fontSize: 13, fontWeight: '600', color: Colors.accent },
 
   favoriteRow: {
