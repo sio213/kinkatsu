@@ -1,6 +1,7 @@
 import { chipStyles } from '@/components/exercises/chip-styles';
 import { ExerciseCard } from '@/components/exercises/exercise-card';
 import { ExerciseForm } from '@/components/exercises/exercise-form';
+import { IconSymbol } from '@/components/ui/icon-symbol';
 import { ListErrorBoundary } from '@/components/ui/list-error-boundary';
 import { Colors } from '@/constants/theme';
 import type { Exercise } from '@/db/schema';
@@ -85,14 +86,19 @@ export default function ExercisesScreen() {
         )}
       </View>
 
-      <TextInput
-        style={styles.searchInput}
-        value={search}
-        onChangeText={setSearch}
-        placeholder="種目を検索..."
-        clearButtonMode="while-editing"
-        returnKeyType="search"
-      />
+      <View style={styles.searchWrapper}>
+        <View style={styles.searchIconWrapper}>
+          <IconSymbol name="magnifyingglass" size={18} color={Colors.textPlaceholder} />
+        </View>
+        <TextInput
+          style={styles.searchInput}
+          value={search}
+          onChangeText={setSearch}
+          placeholder="種目を検索..."
+          clearButtonMode="while-editing"
+          returnKeyType="search"
+        />
+      </View>
 
       <ScrollView
         horizontal
@@ -194,13 +200,23 @@ const styles = StyleSheet.create({
   },
   addBtnText: { color: Colors.onAccent, fontWeight: '600', fontSize: 14 },
 
+  searchWrapper: { position: 'relative', justifyContent: 'center' },
+  searchIconWrapper: {
+    position: 'absolute',
+    left: 11,
+    top: 0,
+    bottom: 0,
+    justifyContent: 'center',
+    zIndex: 1,
+  },
   searchInput: {
     borderWidth: 1,
     borderColor: Colors.borderStrong,
-    borderRadius: 10,
-    paddingHorizontal: 12,
-    paddingVertical: 8,
-    fontSize: 15,
+    borderRadius: 8,
+    paddingLeft: 36,
+    paddingRight: 12,
+    paddingVertical: 9,
+    fontSize: 14,
     color: Colors.textPrimary,
     backgroundColor: Colors.surfaceMuted,
   },
