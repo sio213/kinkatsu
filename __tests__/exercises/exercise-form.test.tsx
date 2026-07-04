@@ -1,7 +1,7 @@
 import React from 'react';
 import { act, create, type ReactTestInstance } from 'react-test-renderer';
-import { Text, TextInput, TouchableOpacity } from 'react-native';
-import { ExerciseForm } from '@/components/exercises/exercise-form';
+import { Switch, Text, TextInput, TouchableOpacity } from 'react-native';
+import { ExerciseForm, type ExerciseFormHandle } from '@/components/exercises/exercise-form';
 
 function getInputs(root: ReactTestInstance) {
   return root.findAllByType(TextInput);
@@ -152,4 +152,93 @@ test('送信失敗後、送信ボタンは disabled になる', async () => {
   });
 
   expect(findButtonByLabel(root, '追加')!.props.disabled).toBe(true);
+});
+
+test('favoriteスイッチをONにして送信すると favorite: true で onSubmit が呼ばれる', async () => {
+  const { root, onSubmit } = await renderForm();
+
+  const [nameInput] = getInputs(root);
+  await act(async () => {
+    nameInput.props.onChangeText('ベンチプレス');
+  });
+  const chestChip = findButtonByLabel(root, '胸')!;
+  await act(async () => {
+    chestChip.props.onPress();
+  });
+  const favoriteSwitch = root.findByType(Switch);
+  await act(async () => {
+    favoriteSwitch.props.onValueChange(true);
+  });
+
+  const submitBtn = findButtonByLabel(root, '追加')!;
+  await act(async () => {
+    await submitBtn.props.onPress();
+  });
+
+  expect(onSubmit.mock.calls[0][0]).toEqual({
+    name: 'ベンチプレス',
+    category: 'chest',
+    note: null,
+    favorite: true,
+  });
+});
+
+test('initial.favorite=true のとき Switch の初期値が true になる', async () => {
+  const { root } = await renderForm({
+    initial: { name: 'ベンチプレス', category: 'chest', favorite: true },
+  });
+
+  expect(root.findByType(Switch).props.value).toBe(true);
+});
+
+test('ref経由の submit() でもバリデーション・送信が実行される', async () => {
+  const ref = React.createRef<ExerciseFormHandle>();
+  const onSubmit = jest.fn();
+  let instance!: ReturnType<typeof create>;
+  act(() => {
+    instance = create(
+      React.createElement(ExerciseForm, { ref, onSubmit, onCancel: jest.fn() }),
+    );
+  });
+
+  const [nameInput] = getInputs(instance.root);
+  await act(async () => {
+    nameInput.props.onChangeText('スクワット');
+  });
+  const legChip = findButtonByLabel(instance.root, '脚')!;
+  await act(async () => {
+    legChip.props.onPress();
+  });
+
+  await act(async () => {
+    ref.current!.submit();
+  });
+
+  expect(onSubmit.mock.calls[0][0]).toEqual({
+    name: 'スクワット',
+    category: 'leg',
+    note: null,
+    favorite: false,
+  });
+});
+
+test('showFooter=false のとき内蔵のキャンセル/送信ボタンは描画されない', async () => {
+  const { root } = await renderForm({ showFooter: false });
+
+  expect(findButtonByLabel(root, '追加')).toBeUndefined();
+  expect(findButtonByLabel(root, 'キャンセル')).toBeUndefined();
+});
+
+test('onSubmitDisabledChange が初期はfalse、送信失敗後にtrueで呼ばれる', async () => {
+  const onSubmitDisabledChange = jest.fn();
+  const { root } = await renderForm({ onSubmitDisabledChange });
+
+  expect(onSubmitDisabledChange).toHaveBeenCalledWith(false);
+
+  const submitBtn = findButtonByLabel(root, '追加')!;
+  await act(async () => {
+    await submitBtn.props.onPress();
+  });
+
+  expect(onSubmitDisabledChange).toHaveBeenLastCalledWith(true);
 });

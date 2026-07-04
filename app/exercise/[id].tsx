@@ -1,20 +1,23 @@
 import { Colors } from '@/constants/theme';
-import { IconSymbol } from '@/components/ui/icon-symbol';
 import { DesignIcon } from '@/components/ui/design-icon';
-import { FormLabel } from '@/components/ui/form-label';
+import { IconSymbol } from '@/components/ui/icon-symbol';
+import { ScreenHeader } from '@/components/ui/screen-header';
+import { SectionHeading } from '@/components/ui/section-heading';
 import { getGuide } from '@/lib/exercises/guides';
 import { getExerciseImages } from '@/lib/exercises/images';
 import { getCategoryLabel } from '@/lib/exercises/constants';
 import { getYoutubeSearchUrl } from '@/lib/exercises/youtube';
 import { useExercise, useExercises } from '@/hooks/use-exercises';
+import { useFavoriteToggle } from '@/hooks/use-favorite-toggle';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { useVideoPlayer, VideoView } from 'expo-video';
 import { Image } from 'expo-image';
 import { openBrowserAsync, WebBrowserPresentationStyle } from 'expo-web-browser';
-import { useEffect, useState } from 'react';
+import { useState } from 'react';
 import {
   Alert,
   Dimensions,
+  Modal,
   Pressable,
   ScrollView,
   StyleSheet,
@@ -22,9 +25,11 @@ import {
   TouchableOpacity,
   View,
 } from 'react-native';
-import { SafeAreaView } from 'react-native-safe-area-context';
+import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 
 const SCREEN_WIDTH = Dimensions.get('window').width;
+// ScreenHeaderの実描画高さ（paddingTop 20 + アイコンボタン 36 + paddingBottom 8）。Modal内でのメニュー位置計算に使う
+const HEADER_HEIGHT = 64;
 
 function Mp4Player({ source }: { source: number }) {
   const player = useVideoPlayer(source, (p) => {
@@ -58,29 +63,17 @@ async function handleYoutubeSearch(exerciseName: string) {
 export default function ExerciseDetailScreen() {
   const { id } = useLocalSearchParams<{ id: string }>();
   const router = useRouter();
+  const insets = useSafeAreaInsets();
 
   const { exercise, loaded } = useExercise(Number(id));
   const { toggleFavorite, removeExercise } = useExercises();
+  const { localFav, toggle: handleFavoritePress } = useFavoriteToggle(
+    exercise?.id,
+    exercise?.favorite,
+    toggleFavorite,
+  );
 
   const [menuOpen, setMenuOpen] = useState(false);
-  const [localFav, setLocalFav] = useState(!!exercise?.favorite);
-
-  useEffect(() => {
-    setLocalFav(!!exercise?.favorite);
-  }, [exercise?.favorite]);
-
-  async function handleFavoritePress() {
-    if (!exercise) return;
-    const next = !localFav;
-    setLocalFav(next);
-    try {
-      await toggleFavorite(exercise.id, next);
-    } catch (err) {
-      console.error('[toggle favorite]', err);
-      setLocalFav(!next);
-      Alert.alert('エラー', 'お気に入りの更新に失敗しました。');
-    }
-  }
 
   function handleEdit() {
     if (!exercise) return;
@@ -114,18 +107,7 @@ export default function ExerciseDetailScreen() {
   if (!exercise) {
     return (
       <SafeAreaView style={styles.safe}>
-        <View style={styles.header}>
-          <View style={styles.headerRow}>
-            <TouchableOpacity
-              style={styles.iconBtn}
-              hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
-              accessibilityLabel="戻る"
-              onPress={() => router.back()}
-            >
-              <IconSymbol name="chevron.left" size={22} color={Colors.textPlaceholder} />
-            </TouchableOpacity>
-          </View>
-        </View>
+        <ScreenHeader title="" onBack={() => router.back()} />
         <View style={styles.notFound}>
           <Text style={styles.notFoundText}>種目が見つかりません</Text>
           <TouchableOpacity style={styles.notFoundBackBtn} onPress={() => router.back()}>
@@ -142,23 +124,16 @@ export default function ExerciseDetailScreen() {
 
   return (
     <SafeAreaView style={styles.safe}>
-      <View style={styles.header}>
-        <View style={styles.headerRow}>
+      <ScreenHeader
+        title={exercise.name}
+        onBack={() => router.back()}
+        right={
           <TouchableOpacity
-            style={styles.iconBtn}
-            hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
-            accessibilityLabel="戻る"
-            onPress={() => router.back()}
-          >
-            <IconSymbol name="chevron.left" size={22} color={Colors.textPlaceholder} />
-          </TouchableOpacity>
-          <Text style={styles.headerTitle} numberOfLines={1}>
-            {exercise.name}
-          </Text>
-          <TouchableOpacity
-            style={styles.iconBtn}
+            style={styles.menuTrigger}
             hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
             accessibilityLabel="メニューを開く"
+            accessibilityRole="button"
+            accessibilityState={{ expanded: menuOpen }}
             onPress={() => setMenuOpen((v) => !v)}
           >
             <IconSymbol
@@ -167,34 +142,25 @@ export default function ExerciseDetailScreen() {
               color={menuOpen ? Colors.accent : Colors.textPlaceholder}
             />
           </TouchableOpacity>
-        </View>
+        }
+      />
 
-        {menuOpen && (
-          <>
-            <Pressable style={styles.menuBackdrop} onPress={() => setMenuOpen(false)} />
-            <View style={styles.menu}>
-              <TouchableOpacity
-                style={styles.menuItem}
-                onPress={handleEdit}
-                accessibilityLabel="編集"
-              >
-                <DesignIcon name="edit" size={18} color={Colors.textMuted} />
-                <Text style={styles.menuItemText}>編集</Text>
-              </TouchableOpacity>
-              {exercise.source === 'custom' && (
-                <TouchableOpacity
-                  style={styles.menuItem}
-                  onPress={handleDelete}
-                  accessibilityLabel="削除"
-                >
-                  <DesignIcon name="delete-outline" size={18} color={Colors.danger} />
-                  <Text style={[styles.menuItemText, styles.menuItemDanger]}>削除</Text>
-                </TouchableOpacity>
-              )}
-            </View>
-          </>
-        )}
-      </View>
+      {/* Modalで独立レイヤーに描画することで、ScrollViewとの描画順の衝突を避ける */}
+      <Modal visible={menuOpen} transparent animationType="fade" onRequestClose={() => setMenuOpen(false)}>
+        <Pressable style={styles.menuBackdrop} onPress={() => setMenuOpen(false)} />
+        <View style={[styles.menu, { top: insets.top + HEADER_HEIGHT, right: 16 }]}>
+          <TouchableOpacity style={styles.menuItem} onPress={handleEdit} accessibilityLabel="編集">
+            <DesignIcon name="edit" size={18} color={Colors.textMuted} />
+            <Text style={styles.menuItemText}>編集</Text>
+          </TouchableOpacity>
+          {exercise.source === 'custom' && (
+            <TouchableOpacity style={styles.menuItem} onPress={handleDelete} accessibilityLabel="削除">
+              <DesignIcon name="delete-outline" size={18} color={Colors.danger} />
+              <Text style={[styles.menuItemText, styles.menuItemDanger]}>削除</Text>
+            </TouchableOpacity>
+          )}
+        </View>
+      </Modal>
 
       <ScrollView contentContainerStyle={styles.content}>
         <View style={styles.mediaBox}>
@@ -217,7 +183,7 @@ export default function ExerciseDetailScreen() {
 
         <View style={styles.body}>
           <View style={styles.section}>
-            <FormLabel hideBadge>カテゴリ</FormLabel>
+            <SectionHeading>カテゴリ</SectionHeading>
             <View style={styles.categoryChip}>
               <Text style={styles.categoryText}>{getCategoryLabel(exercise.category)}</Text>
             </View>
@@ -226,12 +192,12 @@ export default function ExerciseDetailScreen() {
           {guide && (
             <>
               <View style={styles.section}>
-                <FormLabel hideBadge>使う筋肉</FormLabel>
+                <SectionHeading>使う筋肉</SectionHeading>
                 <Text style={styles.sectionBody}>{guide.muscle}</Text>
               </View>
 
               <View style={styles.section}>
-                <FormLabel hideBadge>フォームのポイント</FormLabel>
+                <SectionHeading>フォームのポイント</SectionHeading>
                 {guide.points.map((p, i) => (
                   <View key={i} style={styles.pointRow}>
                     <Text style={styles.pointNumber}>{i + 1}</Text>
@@ -241,14 +207,14 @@ export default function ExerciseDetailScreen() {
               </View>
 
               <View style={styles.section}>
-                <FormLabel hideBadge>よくあるミス</FormLabel>
+                <SectionHeading>よくあるミス</SectionHeading>
                 <View style={styles.cautionBox}>
                   <Text style={styles.cautionText}>⚠️ {guide.caution}</Text>
                 </View>
               </View>
 
               <View style={styles.section}>
-                <FormLabel hideBadge>呼吸法</FormLabel>
+                <SectionHeading>呼吸法</SectionHeading>
                 <Text style={styles.sectionBody}>{guide.breath}</Text>
               </View>
             </>
@@ -256,7 +222,7 @@ export default function ExerciseDetailScreen() {
 
           {exercise.note && (
             <View style={styles.section}>
-              <FormLabel hideBadge>メモ</FormLabel>
+              <SectionHeading>メモ</SectionHeading>
               <Text style={styles.sectionBody}>{exercise.note}</Text>
             </View>
           )}
@@ -284,45 +250,16 @@ export default function ExerciseDetailScreen() {
 const styles = StyleSheet.create({
   safe: { flex: 1, backgroundColor: Colors.background },
 
-  header: {
-    position: 'relative',
-    paddingHorizontal: 16,
-    paddingTop: 20,
-    paddingBottom: 8,
-  },
-  headerRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 10,
-  },
-  headerTitle: {
-    flex: 1,
-    fontSize: 16,
-    fontWeight: '700',
-    color: Colors.textPrimary,
-    textAlign: 'center',
-  },
-
-  iconBtn: {
+  menuTrigger: {
     width: 36,
     height: 36,
-    borderRadius: 18,
     alignItems: 'center',
     justifyContent: 'center',
   },
-  menuBackdrop: {
-    position: 'absolute',
-    top: -1000,
-    bottom: -1000,
-    left: -1000,
-    right: -1000,
-    zIndex: 10,
-  },
+
+  menuBackdrop: { flex: 1 },
   menu: {
     position: 'absolute',
-    top: 58,
-    right: 16,
-    zIndex: 11,
     backgroundColor: Colors.surface,
     borderWidth: 1,
     borderColor: Colors.border,

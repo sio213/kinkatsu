@@ -1,5 +1,7 @@
 import { chipStyles } from '@/components/exercises/chip-styles';
 import { FormLabel } from '@/components/ui/form-label';
+import { PrimaryButton } from '@/components/ui/primary-button';
+import { SectionHeading } from '@/components/ui/section-heading';
 import { Colors } from '@/constants/theme';
 import {
   EXERCISE_CATEGORIES,
@@ -149,7 +151,7 @@ export const ExerciseForm = forwardRef<ExerciseFormHandle, Props>(function Exerc
       />
 
       <View style={styles.favoriteRow}>
-        <FormLabel hideBadge>お気に入りに追加</FormLabel>
+        <SectionHeading>お気に入りに追加</SectionHeading>
         <Controller
           control={control}
           name="favorite"
@@ -176,14 +178,12 @@ export const ExerciseForm = forwardRef<ExerciseFormHandle, Props>(function Exerc
               <Text style={styles.cancelBtnText}>キャンセル</Text>
             </TouchableOpacity>
           )}
-          <TouchableOpacity
-            style={[styles.submitBtn, submitDisabled && styles.submitBtnDisabled]}
+          <PrimaryButton
+            label={submitLabel}
             onPress={handleSubmit(onSubmit)}
             disabled={submitDisabled}
-            accessibilityLabel={submitLabel}
-          >
-            <Text style={styles.submitBtnText}>{submitLabel}</Text>
-          </TouchableOpacity>
+            style={styles.submitBtn}
+          />
         </View>
       )}
     </View>
@@ -226,14 +226,5 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   cancelBtnText: { fontSize: 14, fontWeight: '600', color: Colors.textSecondary },
-  submitBtn: {
-    flex: 2,
-    borderRadius: 8,
-    paddingVertical: 13,
-    backgroundColor: Colors.accent,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  submitBtnDisabled: { backgroundColor: Colors.textPlaceholder },
-  submitBtnText: { fontSize: 15, fontWeight: '600', color: Colors.onAccent },
+  submitBtn: { flex: 2 },
 });
