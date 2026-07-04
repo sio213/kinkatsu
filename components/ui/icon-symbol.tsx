@@ -22,6 +22,8 @@ const MAPPING = {
   'list.bullet.clipboard': 'assignment',
   'bell.fill': 'notifications',
   magnifyingglass: 'search',
+  pencil: 'edit',
+  trash: 'delete',
 } as IconMapping;
 
 /**

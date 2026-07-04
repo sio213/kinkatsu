@@ -1,4 +1,5 @@
 import { Colors } from '@/constants/theme';
+import { IconSymbol } from '@/components/ui/icon-symbol';
 import { getGuide } from '@/lib/exercises/guides';
 import { getExerciseImages } from '@/lib/exercises/images';
 import { getCategoryLabel } from '@/lib/exercises/constants';
@@ -112,14 +113,14 @@ export default function ExerciseDetailScreen() {
     return (
       <SafeAreaView style={styles.safe}>
         <View style={styles.header}>
-          <View style={styles.headerActions}>
+          <View style={styles.headerRow}>
             <TouchableOpacity
               style={styles.iconBtn}
               hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
-              accessibilityLabel="閉じる"
+              accessibilityLabel="戻る"
               onPress={() => router.back()}
             >
-              <Text style={styles.closeBtnText}>✕</Text>
+              <Text style={styles.backBtnText}>‹</Text>
             </TouchableOpacity>
           </View>
         </View>
@@ -140,22 +141,25 @@ export default function ExerciseDetailScreen() {
   return (
     <SafeAreaView style={styles.safe}>
       <View style={styles.header}>
-        <View style={styles.headerActions}>
+        <View style={styles.headerRow}>
+          <TouchableOpacity
+            style={styles.iconBtn}
+            hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+            accessibilityLabel="戻る"
+            onPress={() => router.back()}
+          >
+            <Text style={styles.backBtnText}>‹</Text>
+          </TouchableOpacity>
+          <Text style={styles.headerTitle} numberOfLines={1}>
+            {exercise.name}
+          </Text>
           <TouchableOpacity
             style={styles.iconBtn}
             hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
             accessibilityLabel="メニューを開く"
             onPress={() => setMenuOpen((v) => !v)}
           >
-            <Text style={styles.iconBtnText}>⋮</Text>
-          </TouchableOpacity>
-          <TouchableOpacity
-            style={styles.iconBtn}
-            hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
-            accessibilityLabel="閉じる"
-            onPress={() => router.back()}
-          >
-            <Text style={styles.closeBtnText}>✕</Text>
+            <Text style={[styles.iconBtnText, menuOpen && styles.iconBtnTextActive]}>⋮</Text>
           </TouchableOpacity>
         </View>
 
@@ -168,6 +172,7 @@ export default function ExerciseDetailScreen() {
                 onPress={handleEdit}
                 accessibilityLabel="編集"
               >
+                <IconSymbol name="pencil" size={18} color={Colors.textMuted} />
                 <Text style={styles.menuItemText}>編集</Text>
               </TouchableOpacity>
               {exercise.source === 'custom' && (
@@ -176,6 +181,7 @@ export default function ExerciseDetailScreen() {
                   onPress={handleDelete}
                   accessibilityLabel="削除"
                 >
+                  <IconSymbol name="trash" size={18} color={Colors.danger} />
                   <Text style={[styles.menuItemText, styles.menuItemDanger]}>削除</Text>
                 </TouchableOpacity>
               )}
@@ -204,8 +210,8 @@ export default function ExerciseDetailScreen() {
         </View>
 
         <View style={styles.body}>
-          <View style={styles.titleRow}>
-            <Text style={styles.name}>{exercise.name}</Text>
+          <View style={styles.section}>
+            <Text style={styles.sectionTitle}>カテゴリ</Text>
             <View style={styles.categoryChip}>
               <Text style={styles.categoryText}>{getCategoryLabel(exercise.category)}</Text>
             </View>
@@ -274,22 +280,23 @@ const styles = StyleSheet.create({
     paddingTop: 20,
     paddingBottom: 8,
   },
-  headerActions: {
+  headerRow: {
     flexDirection: 'row',
-    justifyContent: 'flex-end',
-    gap: 8,
+    alignItems: 'center',
+    gap: 10,
   },
-  closeBtnText: { fontSize: 16, color: Colors.textSecondary },
+  headerTitle: { flex: 1, fontSize: 16, fontWeight: '700', color: Colors.textPrimary },
+  backBtnText: { fontSize: 22, color: Colors.textPlaceholder },
 
   iconBtn: {
     width: 36,
     height: 36,
     borderRadius: 18,
-    backgroundColor: Colors.surfaceSubtle,
     alignItems: 'center',
     justifyContent: 'center',
   },
-  iconBtnText: { fontSize: 20, color: Colors.textSecondary, fontWeight: '700' },
+  iconBtnText: { fontSize: 20, color: Colors.textPlaceholder, fontWeight: '700' },
+  iconBtnTextActive: { color: Colors.accent },
 
   menuBackdrop: {
     position: 'absolute',
@@ -316,8 +323,14 @@ const styles = StyleSheet.create({
     shadowRadius: 12,
     elevation: 4,
   },
-  menuItem: { paddingVertical: 10, paddingHorizontal: 14 },
-  menuItemText: { fontSize: 14, fontWeight: '500', color: Colors.textPrimary },
+  menuItem: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 9,
+    paddingVertical: 9,
+    paddingHorizontal: 10,
+  },
+  menuItemText: { fontSize: 13, fontWeight: '500', color: Colors.textPrimary },
   menuItemDanger: { color: Colors.danger },
 
   notFound: { flex: 1, alignItems: 'center', justifyContent: 'center', gap: 16, paddingHorizontal: 24 },
@@ -346,8 +359,8 @@ const styles = StyleSheet.create({
   },
   favoriteBadge: {
     position: 'absolute',
-    top: 10,
-    right: 10,
+    top: 18,
+    right: 18,
     width: 34,
     height: 34,
     borderRadius: 17,
@@ -369,14 +382,8 @@ const styles = StyleSheet.create({
 
   body: { paddingHorizontal: 20, paddingTop: 20, gap: 20 },
 
-  titleRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 10,
-    flexWrap: 'wrap',
-  },
-  name: { fontSize: 22, fontWeight: '700', color: Colors.textPrimary, flex: 1 },
   categoryChip: {
+    alignSelf: 'flex-start',
     backgroundColor: Colors.accentSurface,
     borderRadius: 10,
     paddingHorizontal: 10,
