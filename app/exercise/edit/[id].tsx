@@ -2,6 +2,7 @@ import { ExerciseForm, type ExerciseFormHandle } from '@/components/exercises/ex
 import { PrimaryButton } from '@/components/ui/primary-button';
 import { Colors } from '@/constants/theme';
 import { useExercise, useExercises } from '@/hooks/use-exercises';
+import { parseFormPoints } from '@/lib/exercises/form-points';
 import type { ExerciseFormValues } from '@/lib/exercises/validation';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { useCallback, useRef, useState } from 'react';
@@ -63,6 +64,7 @@ export default function ExerciseEditScreen() {
               category: exercise.category,
               note: exercise.note,
               favorite: exercise.favorite,
+              formPoints: parseFormPoints(exercise.formPoints),
             }}
             onSubmit={handleSubmit}
             onCancel={() => router.back()}

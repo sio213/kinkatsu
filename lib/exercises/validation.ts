@@ -12,6 +12,9 @@ export const exerciseSchema = z.object({
     .transform((v) => v || null)
     .nullable(),
   favorite: z.boolean(),
+  formPoints: z
+    .array(z.string())
+    .transform((points) => points.map((p) => p.trim()).filter((p) => p.length > 0)),
 });
 
 export type ExerciseFormValues = z.infer<typeof exerciseSchema>;
