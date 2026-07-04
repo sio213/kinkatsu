@@ -17,6 +17,10 @@ export const exercises = sqliteTable(
     category: text('category').notNull().default(''),
     favorite: integer('favorite', { mode: 'boolean' }).notNull().default(false),
     note: text('note'),
+    // 使う筋肉。カスタム種目でユーザーが自由入力する解説用フィールド（プリセットはlib/exercises/guides.tsを使用）
+    muscle: text('muscle'),
+    // フォームのポイント。JSON配列文字列 '["ポイント1","ポイント2"]'（カスタム種目のみ）
+    formPoints: text('form_points'),
     source: text('source').notNull().default('custom'), // 'preset' | 'custom'
     createdAt: integer('created_at'),
     updatedAt: integer('updated_at'),

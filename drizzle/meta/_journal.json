@@ -64,6 +64,13 @@
       "when": 1783296000000,
       "tag": "0008_backfill_exercise_slug",
       "breakpoints": true
+    },
+    {
+      "idx": 9,
+      "version": "6",
+      "when": 1783382400000,
+      "tag": "0009_add_exercise_guide_fields",
+      "breakpoints": true
     }
   ]
 }
