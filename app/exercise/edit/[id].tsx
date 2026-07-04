@@ -65,6 +65,7 @@ export default function ExerciseEditScreen() {
               note: exercise.note,
               favorite: exercise.favorite,
               formPoints: parseFormPoints(exercise.formPoints),
+              source: exercise.source,
             }}
             onSubmit={handleSubmit}
             onCancel={() => router.back()}

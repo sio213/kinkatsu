@@ -324,6 +324,36 @@ test('編集モード: initialのformPointsがフォームに反映される', a
   expect(pointInputs[1].props.value).toBe('ポイントB');
 });
 
+test('initial.source=presetのとき、フォームのポイント欄は表示されない（詳細画面でguideしか表示しないため編集不可にする）', async () => {
+  const { root, onSubmit } = await renderForm({
+    initial: {
+      name: 'ベンチプレス',
+      category: 'chest',
+      source: 'preset',
+      formPoints: ['既存のポイント'],
+    },
+    submitLabel: '保存',
+  });
+
+  expect(findButtonByLabel(root, '＋ ポイントを追加')).toBeUndefined();
+  // name(0), note(1) の2つのみ。ポイント入力欄は存在しない
+  expect(getInputs(root)).toHaveLength(2);
+
+  const submitBtn = findButtonByLabel(root, '保存')!;
+  await act(async () => {
+    await submitBtn.props.onPress();
+  });
+
+  // 非表示のままdefaultValuesが維持され、既存のformPointsが壊されず送信される
+  expect(onSubmit.mock.calls[0][0]).toEqual({
+    name: 'ベンチプレス',
+    category: 'chest',
+    note: null,
+    favorite: false,
+    formPoints: ['既存のポイント'],
+  });
+});
+
 test('showFooter=false のとき内蔵のキャンセル/送信ボタンは描画されない', async () => {
   const { root } = await renderForm({ showFooter: false });
 
