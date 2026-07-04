@@ -1,6 +1,7 @@
 import { chipStyles } from '@/components/exercises/chip-styles';
 import { ExerciseCard } from '@/components/exercises/exercise-card';
 import { ExerciseForm } from '@/components/exercises/exercise-form';
+import { IconSymbol } from '@/components/ui/icon-symbol';
 import { ListErrorBoundary } from '@/components/ui/list-error-boundary';
 import { Colors } from '@/constants/theme';
 import type { Exercise } from '@/db/schema';
@@ -14,7 +15,7 @@ import {
 } from '@/lib/exercises/constants';
 import { filterExercises } from '@/lib/exercises/filter';
 import type { ExerciseFormValues } from '@/lib/exercises/validation';
-import { useCallback, useMemo, useRef, useState } from 'react';
+import { useCallback, useMemo, useState } from 'react';
 import {
   Alert,
   FlatList,
@@ -30,13 +31,11 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 const CATEGORY_FILTERS = [CATEGORY_ALL, CATEGORY_FAVORITE, ...EXERCISE_CATEGORIES] as const;
 
 export default function ExercisesScreen() {
-  const { exercises, addExercise, updateExercise, toggleFavorite, removeExercise } =
-    useExercises();
+  const { exercises, addExercise, toggleFavorite } = useExercises();
 
   const [search, setSearch] = useState('');
   const [activeCategory, setActiveCategory] = useState<string>(CATEGORY_ALL);
   const [showForm, setShowForm] = useState(false);
-  const [editTargetId, setEditTargetId] = useState<number | null>(null);
   const [formInitialName, setFormInitialName] = useState('');
   const keyboardInset = useKeyboardInset();
 
@@ -47,78 +46,33 @@ export default function ExercisesScreen() {
 
   const openCreate = useCallback((name = '') => {
     setFormInitialName(name);
-    setEditTargetId(null);
-    setShowForm(true);
-  }, []);
-
-  const openEdit = useCallback((id: number) => {
-    setEditTargetId(id);
     setShowForm(true);
   }, []);
 
   const closeForm = useCallback(() => {
     setShowForm(false);
-    setEditTargetId(null);
   }, []);
-
-  // renderItem/ExerciseCard の props 参照を editTargetId の変化で壊さないよう ref 経由で読む
-  const editTargetIdRef = useRef(editTargetId);
-  editTargetIdRef.current = editTargetId;
 
   const handleSubmit = useCallback(
     async (values: ExerciseFormValues) => {
       try {
-        const targetId = editTargetIdRef.current;
-        if (targetId != null) {
-          await updateExercise(targetId, values);
-        } else {
-          await addExercise(values.name, values.category, values.note ?? undefined);
-        }
+        await addExercise(values.name, values.category, values.note ?? undefined);
         closeForm();
       } catch (e) {
         console.error('[exercise save]', e);
         Alert.alert('エラー', '種目の保存に失敗しました。');
       }
     },
-    [addExercise, updateExercise, closeForm],
-  );
-
-  const handleDelete = useCallback(
-    (id: number, name: string) => {
-      Alert.alert('削除', `「${name}」を削除しますか？`, [
-        { text: 'キャンセル', style: 'cancel' },
-        {
-          text: '削除',
-          style: 'destructive',
-          onPress: async () => {
-            try {
-              await removeExercise(id);
-            } catch (e) {
-              console.error('[exercise delete]', e);
-              Alert.alert('エラー', '削除に失敗しました。');
-            }
-          },
-        },
-      ]);
-    },
-    [removeExercise],
+    [addExercise, closeForm],
   );
 
   const renderItem = useCallback(
     ({ item: e }: { item: Exercise }) => (
       <ListErrorBoundary>
-        <ExerciseCard
-          exercise={e}
-          isEditing={editTargetId === e.id && showForm}
-          onEdit={openEdit}
-          onCloseEdit={closeForm}
-          onDelete={handleDelete}
-          onToggleFavorite={toggleFavorite}
-          onSubmit={handleSubmit}
-        />
+        <ExerciseCard exercise={e} onToggleFavorite={toggleFavorite} />
       </ListErrorBoundary>
     ),
-    [editTargetId, showForm, openEdit, closeForm, handleDelete, toggleFavorite, handleSubmit],
+    [toggleFavorite],
   );
 
   const listHeader = (
@@ -132,14 +86,19 @@ export default function ExercisesScreen() {
         )}
       </View>
 
-      <TextInput
-        style={styles.searchInput}
-        value={search}
-        onChangeText={setSearch}
-        placeholder="種目を検索..."
-        clearButtonMode="while-editing"
-        returnKeyType="search"
-      />
+      <View style={styles.searchWrapper}>
+        <View style={styles.searchIconWrapper}>
+          <IconSymbol name="magnifyingglass" size={18} color={Colors.textPlaceholder} />
+        </View>
+        <TextInput
+          style={styles.searchInput}
+          value={search}
+          onChangeText={setSearch}
+          placeholder="種目を検索..."
+          clearButtonMode="while-editing"
+          returnKeyType="search"
+        />
+      </View>
 
       <ScrollView
         horizontal
@@ -166,7 +125,7 @@ export default function ExercisesScreen() {
         })}
       </ScrollView>
 
-      {showForm && editTargetId == null && (
+      {showForm && (
         <View style={styles.addFormWrapper}>
           <Text style={styles.addFormTitle}>種目を追加</Text>
           <ExerciseForm
@@ -241,13 +200,23 @@ const styles = StyleSheet.create({
   },
   addBtnText: { color: Colors.onAccent, fontWeight: '600', fontSize: 14 },
 
+  searchWrapper: { position: 'relative', justifyContent: 'center' },
+  searchIconWrapper: {
+    position: 'absolute',
+    left: 11,
+    top: 0,
+    bottom: 0,
+    justifyContent: 'center',
+    zIndex: 1,
+  },
   searchInput: {
     borderWidth: 1,
     borderColor: Colors.borderStrong,
-    borderRadius: 10,
-    paddingHorizontal: 12,
-    paddingVertical: 8,
-    fontSize: 15,
+    borderRadius: 8,
+    paddingLeft: 36,
+    paddingRight: 12,
+    paddingVertical: 9,
+    fontSize: 14,
     color: Colors.textPrimary,
     backgroundColor: Colors.surfaceMuted,
   },

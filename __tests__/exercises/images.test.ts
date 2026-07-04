@@ -12,32 +12,36 @@ function make(overrides: Partial<Exercise> = {}): Exercise {
 
 describe('getExerciseImages', () => {
   describe('source が preset 以外', () => {
-    it('custom → undefined', () => {
-      expect(getExerciseImages(make({ source: 'custom' }))).toBeUndefined();
+    it('custom → sourceなし、thumbnailはプレースホルダー', () => {
+      const result = getExerciseImages(make({ source: 'custom' }));
+      expect(result.source).toBeUndefined();
+      expect(result.thumbnail).toBeDefined();
     });
   });
 
   describe('source が preset', () => {
-    it('存在しないslug → undefined', () => {
-      expect(getExerciseImages(make({ slug: 'nonexistent_exercise' }))).toBeUndefined();
+    it('存在しないslug → sourceなし、thumbnailはプレースホルダー', () => {
+      const result = getExerciseImages(make({ slug: 'nonexistent_exercise' }));
+      expect(result.source).toBeUndefined();
+      expect(result.thumbnail).toBeDefined();
     });
 
-    it('slugがnull → undefined', () => {
-      expect(getExerciseImages(make({ slug: null }))).toBeUndefined();
+    it('slugがnull → sourceなし、thumbnailはプレースホルダー', () => {
+      const result = getExerciseImages(make({ slug: null }));
+      expect(result.source).toBeUndefined();
+      expect(result.thumbnail).toBeDefined();
     });
 
-    it('ダンベルカール → source あり、thumbnail なし', () => {
+    it('ダンベルカール → source あり、thumbnail はプレースホルダーで補完', () => {
       const result = getExerciseImages(make({ slug: 'dumbbell_curl', name: 'ダンベルカール' }));
-      expect(result).toBeDefined();
-      expect(result!.source).toBeDefined();
-      expect(result!.thumbnail).toBeUndefined();
+      expect(result.source).toBeDefined();
+      expect(result.thumbnail).toBeDefined();
     });
 
     it('ベンチプレス → source と thumbnail 両方あり', () => {
       const result = getExerciseImages(make({ slug: 'bench_press', name: 'ベンチプレス' }));
-      expect(result).toBeDefined();
-      expect(result!.source).toBeDefined();
-      expect(result!.thumbnail).toBeDefined();
+      expect(result.source).toBeDefined();
+      expect(result.thumbnail).toBeDefined();
     });
   });
 });

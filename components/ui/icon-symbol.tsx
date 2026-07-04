@@ -21,6 +21,7 @@ const MAPPING = {
   'dumbbell.fill': 'fitness-center',
   'list.bullet.clipboard': 'assignment',
   'bell.fill': 'notifications',
+  magnifyingglass: 'search',
 } as IconMapping;
 
 /**
