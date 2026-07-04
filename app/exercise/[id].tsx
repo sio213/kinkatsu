@@ -3,13 +3,16 @@ import { getGuide } from '@/lib/exercises/guides';
 import { getExerciseImages } from '@/lib/exercises/images';
 import { getCategoryLabel } from '@/lib/exercises/constants';
 import { getYoutubeSearchUrl } from '@/lib/exercises/youtube';
-import { useExercise } from '@/hooks/use-exercises';
+import { useExercise, useExercises } from '@/hooks/use-exercises';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { useVideoPlayer, VideoView } from 'expo-video';
+import { Image } from 'expo-image';
 import { openBrowserAsync, WebBrowserPresentationStyle } from 'expo-web-browser';
+import { useEffect, useState } from 'react';
 import {
   Alert,
   Dimensions,
+  Pressable,
   ScrollView,
   StyleSheet,
   Text,
@@ -54,6 +57,54 @@ export default function ExerciseDetailScreen() {
   const router = useRouter();
 
   const { exercise, loaded } = useExercise(Number(id));
+  const { toggleFavorite, removeExercise } = useExercises();
+
+  const [menuOpen, setMenuOpen] = useState(false);
+  const [localFav, setLocalFav] = useState(!!exercise?.favorite);
+
+  useEffect(() => {
+    setLocalFav(!!exercise?.favorite);
+  }, [exercise?.favorite]);
+
+  async function handleFavoritePress() {
+    if (!exercise) return;
+    const next = !localFav;
+    setLocalFav(next);
+    try {
+      await toggleFavorite(exercise.id, next);
+    } catch (err) {
+      console.error('[toggle favorite]', err);
+      setLocalFav(!next);
+      Alert.alert('エラー', 'お気に入りの更新に失敗しました。');
+    }
+  }
+
+  function handleEdit() {
+    if (!exercise) return;
+    setMenuOpen(false);
+    router.push(`/exercise/edit/${exercise.id}`);
+  }
+
+  function handleDelete() {
+    if (!exercise) return;
+    setMenuOpen(false);
+    Alert.alert('削除', `「${exercise.name}」を削除しますか？`, [
+      { text: 'キャンセル', style: 'cancel' },
+      {
+        text: '削除',
+        style: 'destructive',
+        onPress: async () => {
+          try {
+            await removeExercise(exercise.id);
+            router.back();
+          } catch (e) {
+            console.error('[exercise delete]', e);
+            Alert.alert('エラー', '削除に失敗しました。');
+          }
+        },
+      },
+    ]);
+  }
 
   if (!loaded) return null;
 
@@ -61,14 +112,16 @@ export default function ExerciseDetailScreen() {
     return (
       <SafeAreaView style={styles.safe}>
         <View style={styles.header}>
-          <TouchableOpacity
-            style={styles.closeBtn}
-            hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
-            accessibilityLabel="閉じる"
-            onPress={() => router.back()}
-          >
-            <Text style={styles.closeBtnText}>✕</Text>
-          </TouchableOpacity>
+          <View style={styles.headerActions}>
+            <TouchableOpacity
+              style={styles.iconBtn}
+              hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+              accessibilityLabel="閉じる"
+              onPress={() => router.back()}
+            >
+              <Text style={styles.closeBtnText}>✕</Text>
+            </TouchableOpacity>
+          </View>
         </View>
         <View style={styles.notFound}>
           <Text style={styles.notFoundText}>種目が見つかりません</Text>
@@ -87,22 +140,68 @@ export default function ExerciseDetailScreen() {
   return (
     <SafeAreaView style={styles.safe}>
       <View style={styles.header}>
-        <TouchableOpacity
-          style={styles.closeBtn}
-          hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
-          accessibilityLabel="閉じる"
-          onPress={() => router.back()}
-        >
-          <Text style={styles.closeBtnText}>✕</Text>
-        </TouchableOpacity>
+        <View style={styles.headerActions}>
+          <TouchableOpacity
+            style={styles.iconBtn}
+            hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+            accessibilityLabel="メニューを開く"
+            onPress={() => setMenuOpen((v) => !v)}
+          >
+            <Text style={styles.iconBtnText}>⋮</Text>
+          </TouchableOpacity>
+          <TouchableOpacity
+            style={styles.iconBtn}
+            hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+            accessibilityLabel="閉じる"
+            onPress={() => router.back()}
+          >
+            <Text style={styles.closeBtnText}>✕</Text>
+          </TouchableOpacity>
+        </View>
+
+        {menuOpen && (
+          <>
+            <Pressable style={styles.menuBackdrop} onPress={() => setMenuOpen(false)} />
+            <View style={styles.menu}>
+              <TouchableOpacity
+                style={styles.menuItem}
+                onPress={handleEdit}
+                accessibilityLabel="編集"
+              >
+                <Text style={styles.menuItemText}>編集</Text>
+              </TouchableOpacity>
+              {exercise.source === 'custom' && (
+                <TouchableOpacity
+                  style={styles.menuItem}
+                  onPress={handleDelete}
+                  accessibilityLabel="削除"
+                >
+                  <Text style={[styles.menuItemText, styles.menuItemDanger]}>削除</Text>
+                </TouchableOpacity>
+              )}
+            </View>
+          </>
+        )}
       </View>
 
       <ScrollView contentContainerStyle={styles.content}>
-        {images.source != null && (
-          <View style={styles.mediaBox}>
+        <View style={styles.mediaBox}>
+          {images.source != null ? (
             <Mp4Player source={images.source} />
-          </View>
-        )}
+          ) : (
+            <Image source={images.thumbnail} style={styles.mediaThumbnail} contentFit="contain" />
+          )}
+          <TouchableOpacity
+            style={styles.favoriteBadge}
+            onPress={handleFavoritePress}
+            hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+            accessibilityLabel={localFav ? 'お気に入り解除' : 'お気に入りに追加'}
+          >
+            <Text style={[styles.favoriteBadgeText, localFav && styles.favoriteBadgeTextActive]}>
+              {localFav ? '★' : '☆'}
+            </Text>
+          </TouchableOpacity>
+        </View>
 
         <View style={styles.body}>
           <View style={styles.titleRow}>
@@ -170,13 +269,19 @@ const styles = StyleSheet.create({
   safe: { flex: 1, backgroundColor: Colors.background },
 
   header: {
-    flexDirection: 'row',
-    justifyContent: 'flex-end',
+    position: 'relative',
     paddingHorizontal: 16,
     paddingTop: 20,
     paddingBottom: 8,
   },
-  closeBtn: {
+  headerActions: {
+    flexDirection: 'row',
+    justifyContent: 'flex-end',
+    gap: 8,
+  },
+  closeBtnText: { fontSize: 16, color: Colors.textSecondary },
+
+  iconBtn: {
     width: 36,
     height: 36,
     borderRadius: 18,
@@ -184,7 +289,36 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
   },
-  closeBtnText: { fontSize: 16, color: Colors.textSecondary },
+  iconBtnText: { fontSize: 20, color: Colors.textSecondary, fontWeight: '700' },
+
+  menuBackdrop: {
+    position: 'absolute',
+    top: -1000,
+    bottom: -1000,
+    left: -1000,
+    right: -1000,
+    zIndex: 10,
+  },
+  menu: {
+    position: 'absolute',
+    top: 58,
+    right: 16,
+    zIndex: 11,
+    backgroundColor: Colors.surface,
+    borderWidth: 1,
+    borderColor: Colors.border,
+    borderRadius: 10,
+    paddingVertical: 4,
+    minWidth: 140,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.12,
+    shadowRadius: 12,
+    elevation: 4,
+  },
+  menuItem: { paddingVertical: 10, paddingHorizontal: 14 },
+  menuItemText: { fontSize: 14, fontWeight: '500', color: Colors.textPrimary },
+  menuItemDanger: { color: Colors.danger },
 
   notFound: { flex: 1, alignItems: 'center', justifyContent: 'center', gap: 16, paddingHorizontal: 24 },
   notFoundText: { fontSize: 15, color: Colors.textMuted },
@@ -201,8 +335,33 @@ const styles = StyleSheet.create({
   mediaBox: {
     backgroundColor: Colors.surfaceMuted,
     alignItems: 'center',
+    justifyContent: 'center',
     paddingVertical: 16,
+    position: 'relative',
   },
+  mediaThumbnail: {
+    width: '54%',
+    maxWidth: 180,
+    aspectRatio: 1,
+  },
+  favoriteBadge: {
+    position: 'absolute',
+    top: 10,
+    right: 10,
+    width: 34,
+    height: 34,
+    borderRadius: 17,
+    backgroundColor: 'rgba(255,255,255,0.92)',
+    alignItems: 'center',
+    justifyContent: 'center',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.15,
+    shadowRadius: 6,
+    elevation: 2,
+  },
+  favoriteBadgeText: { fontSize: 20, color: Colors.textPlaceholder },
+  favoriteBadgeTextActive: { color: Colors.favorite },
   media: {
     width: SCREEN_WIDTH,
     height: SCREEN_WIDTH * 0.75,
