@@ -1,7 +1,6 @@
 import { Colors } from '@/constants/theme';
 import { DesignIcon } from '@/components/ui/design-icon';
 import { IconSymbol } from '@/components/ui/icon-symbol';
-import { ScreenHeader } from '@/components/ui/screen-header';
 import { SectionHeading } from '@/components/ui/section-heading';
 import { getGuide } from '@/lib/exercises/guides';
 import { getExerciseImages } from '@/lib/exercises/images';
@@ -9,7 +8,8 @@ import { getCategoryLabel } from '@/lib/exercises/constants';
 import { getYoutubeSearchUrl } from '@/lib/exercises/youtube';
 import { useExercise, useExercises } from '@/hooks/use-exercises';
 import { useFavoriteToggle } from '@/hooks/use-favorite-toggle';
-import { useLocalSearchParams, useRouter } from 'expo-router';
+import { useHeaderHeight } from '@react-navigation/elements';
+import { Stack, useLocalSearchParams, useRouter } from 'expo-router';
 import { useVideoPlayer, VideoView } from 'expo-video';
 import { Image } from 'expo-image';
 import { openBrowserAsync, WebBrowserPresentationStyle } from 'expo-web-browser';
@@ -25,11 +25,9 @@ import {
   TouchableOpacity,
   View,
 } from 'react-native';
-import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
+import { SafeAreaView } from 'react-native-safe-area-context';
 
 const SCREEN_WIDTH = Dimensions.get('window').width;
-// ScreenHeaderの実描画高さ（paddingTop 20 + アイコンボタン 36 + paddingBottom 8）。Modal内でのメニュー位置計算に使う
-const HEADER_HEIGHT = 64;
 
 function Mp4Player({ source }: { source: number }) {
   const player = useVideoPlayer(source, (p) => {
@@ -63,7 +61,7 @@ async function handleYoutubeSearch(exerciseName: string) {
 export default function ExerciseDetailScreen() {
   const { id } = useLocalSearchParams<{ id: string }>();
   const router = useRouter();
-  const insets = useSafeAreaInsets();
+  const headerHeight = useHeaderHeight();
 
   const { exercise, loaded } = useExercise(Number(id));
   const { toggleFavorite, removeExercise } = useExercises();
@@ -106,8 +104,7 @@ export default function ExerciseDetailScreen() {
 
   if (!exercise) {
     return (
-      <SafeAreaView style={styles.safe}>
-        <ScreenHeader title="" onBack={() => router.back()} />
+      <SafeAreaView style={styles.safe} edges={['bottom']}>
         <View style={styles.notFound}>
           <Text style={styles.notFoundText}>種目が見つかりません</Text>
           <TouchableOpacity style={styles.notFoundBackBtn} onPress={() => router.back()}>
@@ -123,32 +120,33 @@ export default function ExerciseDetailScreen() {
   const hasContent = Boolean(guide) || Boolean(exercise.note);
 
   return (
-    <SafeAreaView style={styles.safe}>
-      <ScreenHeader
-        title={exercise.name}
-        onBack={() => router.back()}
-        right={
-          <TouchableOpacity
-            style={styles.menuTrigger}
-            hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
-            accessibilityLabel="メニューを開く"
-            accessibilityRole="button"
-            accessibilityState={{ expanded: menuOpen }}
-            onPress={() => setMenuOpen((v) => !v)}
-          >
-            <IconSymbol
-              name="ellipsis"
-              size={22}
-              color={menuOpen ? Colors.accent : Colors.textPlaceholder}
-            />
-          </TouchableOpacity>
-        }
+    <SafeAreaView style={styles.safe} edges={['bottom']}>
+      <Stack.Screen
+        options={{
+          title: exercise.name,
+          headerRight: () => (
+            <TouchableOpacity
+              style={styles.menuTrigger}
+              hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+              accessibilityLabel="メニューを開く"
+              accessibilityRole="button"
+              accessibilityState={{ expanded: menuOpen }}
+              onPress={() => setMenuOpen((v) => !v)}
+            >
+              <IconSymbol
+                name="ellipsis"
+                size={22}
+                color={menuOpen ? Colors.accent : Colors.textPlaceholder}
+              />
+            </TouchableOpacity>
+          ),
+        }}
       />
 
       {/* Modalで独立レイヤーに描画することで、ScrollViewとの描画順の衝突を避ける */}
       <Modal visible={menuOpen} transparent animationType="fade" onRequestClose={() => setMenuOpen(false)}>
         <Pressable style={styles.menuBackdrop} onPress={() => setMenuOpen(false)} />
-        <View style={[styles.menu, { top: insets.top + HEADER_HEIGHT, right: 16 }]}>
+        <View style={[styles.menu, { top: headerHeight, right: 16 }]}>
           <TouchableOpacity style={styles.menuItem} onPress={handleEdit} accessibilityLabel="編集">
             <DesignIcon name="edit" size={18} color={Colors.textMuted} />
             <Text style={styles.menuItemText}>編集</Text>

@@ -1,6 +1,5 @@
 import { ExerciseForm, type ExerciseFormHandle } from '@/components/exercises/exercise-form';
 import { PrimaryButton } from '@/components/ui/primary-button';
-import { ScreenHeader } from '@/components/ui/screen-header';
 import { Colors } from '@/constants/theme';
 import { useExercise, useExercises } from '@/hooks/use-exercises';
 import type { ExerciseFormValues } from '@/lib/exercises/validation';
@@ -42,7 +41,7 @@ export default function ExerciseEditScreen() {
 
   if (!exercise) {
     return (
-      <SafeAreaView style={styles.safe}>
+      <SafeAreaView style={styles.safe} edges={['bottom']}>
         <View style={styles.notFound}>
           <Text style={styles.notFoundText}>種目が見つかりません</Text>
         </View>
@@ -51,12 +50,11 @@ export default function ExerciseEditScreen() {
   }
 
   return (
-    <SafeAreaView style={styles.safe}>
+    <SafeAreaView style={styles.safe} edges={['bottom']}>
       <KeyboardAvoidingView
         style={styles.flex}
         behavior={Platform.OS === 'ios' ? 'padding' : undefined}
       >
-        <ScreenHeader title="種目を編集" onBack={() => router.back()} />
         <ScrollView contentContainerStyle={styles.content} keyboardShouldPersistTaps="handled">
           <ExerciseForm
             ref={formRef}

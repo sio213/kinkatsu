@@ -7,6 +7,16 @@ const mockRemoveExercise = jest.fn();
 jest.mock('expo-router', () => ({
   useRouter: () => ({ push: mockPush, back: mockBack }),
   useLocalSearchParams: () => ({ id: '1' }),
+  // Stack.Screen はナビゲーターのoptionsを設定するコンポーネントで本来は見た目を持たないが、
+  // headerRightの中身（⋮ボタン）をテストで検証できるよう、そのレンダー関数だけ実行してやる
+  Stack: {
+    Screen: ({ options }: { options?: { headerRight?: () => unknown } }) =>
+      options?.headerRight ? options.headerRight() : null,
+  },
+}));
+
+jest.mock('@react-navigation/elements', () => ({
+  useHeaderHeight: () => 64,
 }));
 
 jest.mock('@/hooks/use-exercises', () => ({
