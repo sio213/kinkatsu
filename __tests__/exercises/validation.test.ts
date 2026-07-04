@@ -8,6 +8,8 @@ describe('exerciseSchema', () => {
       category: 'chest',
       note: 'メモ',
       favorite: false,
+      muscle: '',
+      formPoints: [],
     });
     expect(r.success).toBe(true);
     if (r.success) {
@@ -16,6 +18,8 @@ describe('exerciseSchema', () => {
         category: 'chest',
         note: 'メモ',
         favorite: false,
+        muscle: null,
+        formPoints: [],
       });
     }
   });
@@ -38,6 +42,8 @@ describe('exerciseSchema', () => {
         category: 'chest',
         note: '',
         favorite: false,
+        muscle: '',
+        formPoints: [],
       });
       expect(r.success).toBe(true);
       if (r.success) expect(r.data.name).toBe('ベンチ');
@@ -79,7 +85,14 @@ describe('exerciseSchema', () => {
 
     test('EXERCISE_CATEGORIESすべての値で成功する', () => {
       for (const cat of EXERCISE_CATEGORIES) {
-        const r = exerciseSchema.safeParse({ name: 'a', category: cat, note: '', favorite: false });
+        const r = exerciseSchema.safeParse({
+          name: 'a',
+          category: cat,
+          note: '',
+          favorite: false,
+          muscle: '',
+          formPoints: [],
+        });
         expect(r.success).toBe(true);
       }
     });
@@ -87,7 +100,14 @@ describe('exerciseSchema', () => {
 
   describe('note', () => {
     test('空文字はnullに変換される', () => {
-      const r = exerciseSchema.safeParse({ name: 'a', category: 'chest', note: '', favorite: false });
+      const r = exerciseSchema.safeParse({
+        name: 'a',
+        category: 'chest',
+        note: '',
+        favorite: false,
+        muscle: '',
+        formPoints: [],
+      });
       expect(r.success && r.data.note).toBeNull();
     });
 
@@ -97,6 +117,8 @@ describe('exerciseSchema', () => {
         category: 'chest',
         note: '   ',
         favorite: false,
+        muscle: '',
+        formPoints: [],
       });
       expect(r.success && r.data.note).toBeNull();
     });
@@ -107,6 +129,8 @@ describe('exerciseSchema', () => {
         category: 'chest',
         note: '  フォーム注意  ',
         favorite: false,
+        muscle: '',
+        formPoints: [],
       });
       expect(r.success && r.data.note).toBe('フォーム注意');
     });
@@ -117,8 +141,50 @@ describe('exerciseSchema', () => {
         category: 'chest',
         note: null,
         favorite: false,
+        muscle: '',
+        formPoints: [],
       });
       expect(r.success && r.data.note).toBeNull();
+    });
+  });
+
+  describe('muscle', () => {
+    test('空文字はnullに変換される', () => {
+      const r = exerciseSchema.safeParse({
+        name: 'a',
+        category: 'chest',
+        note: '',
+        favorite: false,
+        muscle: '',
+        formPoints: [],
+      });
+      expect(r.success && r.data.muscle).toBeNull();
+    });
+
+    test('前後の空白はtrimされる', () => {
+      const r = exerciseSchema.safeParse({
+        name: 'a',
+        category: 'chest',
+        note: '',
+        favorite: false,
+        muscle: '  大胸筋  ',
+        formPoints: [],
+      });
+      expect(r.success && r.data.muscle).toBe('大胸筋');
+    });
+  });
+
+  describe('formPoints', () => {
+    test('空文字・空白のみの要素はtrim・除外される', () => {
+      const r = exerciseSchema.safeParse({
+        name: 'a',
+        category: 'chest',
+        note: '',
+        favorite: false,
+        muscle: '',
+        formPoints: ['  肩甲骨を寄せる  ', '', '   '],
+      });
+      expect(r.success && r.data.formPoints).toEqual(['肩甲骨を寄せる']);
     });
   });
 });

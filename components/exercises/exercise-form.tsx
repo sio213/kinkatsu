@@ -33,7 +33,14 @@ function toExerciseCategory(value: string | undefined): ExerciseCategory | undef
 export type ExerciseFormHandle = { submit: () => void };
 
 type Props = {
-  initial?: { name?: string; category?: string; note?: string | null; favorite?: boolean };
+  initial?: {
+    name?: string;
+    category?: string;
+    note?: string | null;
+    favorite?: boolean;
+    muscle?: string | null;
+    formPoints?: string[] | null;
+  };
   onSubmit: (values: ExerciseFormValues) => void;
   onCancel: () => void;
   submitLabel?: string;
@@ -68,6 +75,8 @@ export const ExerciseForm = forwardRef<ExerciseFormHandle, Props>(function Exerc
       category: toExerciseCategory(initial?.category),
       note: initial?.note ?? '',
       favorite: initial?.favorite ?? false,
+      muscle: initial?.muscle ?? '',
+      formPoints: initial?.formPoints?.length ? initial.formPoints : [''],
     },
   });
   const hasErrors = Object.keys(errors).length > 0;
@@ -132,6 +141,61 @@ export const ExerciseForm = forwardRef<ExerciseFormHandle, Props>(function Exerc
       {errors.category ? (
         <Text style={styles.errorText}>{errors.category.message}</Text>
       ) : null}
+
+      <FormLabel>使う筋肉</FormLabel>
+      <Controller
+        control={control}
+        name="muscle"
+        render={({ field: { value, onChange } }) => (
+          <TextInput
+            style={styles.input}
+            value={value ?? ''}
+            onChangeText={onChange}
+            placeholder="例: 大胸筋・三角筋前部"
+            accessibilityLabel="使う筋肉"
+          />
+        )}
+      />
+
+      <FormLabel>フォームのポイント</FormLabel>
+      <Controller
+        control={control}
+        name="formPoints"
+        render={({ field: { value, onChange } }) => (
+          <View style={styles.pointList}>
+            {value.map((point, index) => (
+              <View key={index} style={styles.pointRow}>
+                <TextInput
+                  style={[styles.input, styles.pointInput]}
+                  value={point}
+                  onChangeText={(text) => {
+                    const next = [...value];
+                    next[index] = text;
+                    onChange(next);
+                  }}
+                  placeholder={`ポイント${index + 1}`}
+                  accessibilityLabel={`フォームのポイント${index + 1}`}
+                />
+                <TouchableOpacity
+                  style={styles.pointRemoveBtn}
+                  onPress={() => onChange(value.filter((_, i) => i !== index))}
+                  hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+                  accessibilityLabel={`ポイント${index + 1}を削除`}
+                >
+                  <Text style={styles.pointRemoveBtnText}>×</Text>
+                </TouchableOpacity>
+              </View>
+            ))}
+            <TouchableOpacity
+              style={styles.pointAddBtn}
+              onPress={() => onChange([...value, ''])}
+              accessibilityLabel="ポイントを追加"
+            >
+              <Text style={styles.pointAddBtnText}>＋ ポイントを追加</Text>
+            </TouchableOpacity>
+          </View>
+        )}
+      />
 
       <FormLabel>メモ</FormLabel>
       <Controller
@@ -209,6 +273,19 @@ const styles = StyleSheet.create({
   errorText: { fontSize: 12, color: Colors.danger, marginTop: -4 },
 
   chipRow: { flexDirection: 'row', flexWrap: 'wrap', gap: 6 },
+
+  pointList: { gap: 8 },
+  pointRow: { flexDirection: 'row', alignItems: 'center', gap: 8 },
+  pointInput: { flex: 1 },
+  pointRemoveBtn: {
+    width: 28,
+    height: 28,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  pointRemoveBtnText: { fontSize: 16, color: Colors.textPlaceholder },
+  pointAddBtn: { alignSelf: 'flex-start', paddingVertical: 4 },
+  pointAddBtnText: { fontSize: 13, fontWeight: '600', color: Colors.accent },
 
   favoriteRow: {
     flexDirection: 'row',
