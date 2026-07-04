@@ -29,7 +29,7 @@ jest.mock('@/db/schema', () => ({
 
 jest.mock('drizzle-orm', () => ({ eq: jest.fn((col, val) => ({ col, val })) }));
 
-import { seed } from '@/db/seed';
+import { seed, PRESET_EXERCISES } from '@/db/seed';
 
 describe('seed', () => {
   beforeEach(() => {
@@ -37,11 +37,11 @@ describe('seed', () => {
     mockSelectResult = [];
   });
 
-  it('既存presetが0件 → 全56件insertし、updateは呼ばれない', async () => {
+  it('既存presetが0件 → 全件insertし、updateは呼ばれない', async () => {
     await seed();
     expect(mockValues).toHaveBeenCalledTimes(1);
     const inserted = mockValues.mock.calls[0][0] as { slug: string; source: string }[];
-    expect(inserted).toHaveLength(56);
+    expect(inserted).toHaveLength(PRESET_EXERCISES.length);
     expect(inserted.every((e) => e.source === 'preset')).toBe(true);
     expect(mockSet).not.toHaveBeenCalled();
   });
@@ -52,7 +52,7 @@ describe('seed', () => {
     ];
     await seed();
     const inserted = mockValues.mock.calls[0][0] as { slug: string }[];
-    expect(inserted).toHaveLength(55);
+    expect(inserted).toHaveLength(PRESET_EXERCISES.length - 1);
     expect(inserted.some((e) => e.slug === 'bench_press')).toBe(false);
     expect(mockSet).not.toHaveBeenCalled();
   });

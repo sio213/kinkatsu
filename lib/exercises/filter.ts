@@ -1,5 +1,7 @@
 import type { Exercise } from '@/db/schema';
 import { CATEGORY_ALL, CATEGORY_FAVORITE, CATEGORY_ORDER } from './constants';
+import { getReading } from './readings';
+import { getAliases } from './aliases';
 
 export function normalizeForSearch(value: string): string {
   return value
@@ -22,7 +24,15 @@ export function filterExercises(
   const trimmedSearch = search.trim();
   if (trimmedSearch) {
     const q = normalizeForSearch(trimmedSearch);
-    list = list.filter((e) => normalizeForSearch(e.name).includes(q));
+    list = list.filter((e) => {
+      if (normalizeForSearch(e.name).includes(q)) return true;
+      const reading = getReading(e);
+      if (reading != null && normalizeForSearch(reading).includes(q)) return true;
+      return getAliases(e).some((alias) => {
+        if (normalizeForSearch(alias.text).includes(q)) return true;
+        return alias.reading != null && normalizeForSearch(alias.reading).includes(q);
+      });
+    });
   }
   return [...list].sort((a, b) => {
     const ai = CATEGORY_ORDER[a.category] ?? 99;
