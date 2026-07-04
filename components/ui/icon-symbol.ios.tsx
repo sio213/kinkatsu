@@ -14,6 +14,9 @@ export function IconSymbol({
   style?: StyleProp<ViewStyle>;
   weight?: SymbolWeight;
 }) {
+  // SF Symbolsに縦向きの三点リーダーが無いため、横向きの ellipsis を回転させて代用する
+  const rotateStyle: StyleProp<ViewStyle> = name === 'ellipsis' ? { transform: [{ rotate: '90deg' }] } : null;
+
   return (
     <SymbolView
       weight={weight}
@@ -25,6 +28,7 @@ export function IconSymbol({
           width: size,
           height: size,
         },
+        rotateStyle,
         style,
       ]}
     />

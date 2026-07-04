@@ -1,4 +1,5 @@
 import { ExerciseForm } from '@/components/exercises/exercise-form';
+import { IconSymbol } from '@/components/ui/icon-symbol';
 import { Colors } from '@/constants/theme';
 import { useExercise, useExercises } from '@/hooks/use-exercises';
 import type { ExerciseFormValues } from '@/lib/exercises/validation';
@@ -11,6 +12,7 @@ import {
   ScrollView,
   StyleSheet,
   Text,
+  TouchableOpacity,
   View,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
@@ -53,15 +55,34 @@ export default function ExerciseEditScreen() {
         behavior={Platform.OS === 'ios' ? 'padding' : undefined}
       >
         <View style={styles.header}>
-          <Text style={styles.title}>種目を編集</Text>
+          <View style={styles.headerRow}>
+            <TouchableOpacity
+              style={styles.iconBtn}
+              hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+              accessibilityLabel="戻る"
+              onPress={() => router.back()}
+            >
+              <IconSymbol name="chevron.left" size={22} color={Colors.textPlaceholder} />
+            </TouchableOpacity>
+            <Text style={styles.headerTitle} numberOfLines={1}>
+              種目を編集
+            </Text>
+            <View style={styles.iconBtn} />
+          </View>
         </View>
         <ScrollView contentContainerStyle={styles.content} keyboardShouldPersistTaps="handled">
           <ExerciseForm
-            initial={{ name: exercise.name, category: exercise.category, note: exercise.note }}
+            initial={{
+              name: exercise.name,
+              category: exercise.category,
+              note: exercise.note,
+              favorite: exercise.favorite,
+            }}
             onSubmit={handleSubmit}
             onCancel={() => router.back()}
             submitLabel="保存"
             autoFocus={false}
+            showCancel={false}
           />
         </ScrollView>
       </KeyboardAvoidingView>
@@ -73,10 +94,24 @@ const styles = StyleSheet.create({
   safe: { flex: 1, backgroundColor: Colors.background },
   flex: { flex: 1 },
 
-  header: { paddingHorizontal: 20, paddingTop: 20, paddingBottom: 12 },
-  title: { fontSize: 18, fontWeight: '700', color: Colors.textPrimary },
+  header: { paddingHorizontal: 16, paddingTop: 20, paddingBottom: 8 },
+  headerRow: { flexDirection: 'row', alignItems: 'center', gap: 10 },
+  headerTitle: {
+    flex: 1,
+    fontSize: 16,
+    fontWeight: '700',
+    color: Colors.textPrimary,
+    textAlign: 'center',
+  },
+  iconBtn: {
+    width: 36,
+    height: 36,
+    borderRadius: 18,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
 
-  content: { paddingHorizontal: 20, paddingBottom: 40 },
+  content: { paddingHorizontal: 20, paddingTop: 12, paddingBottom: 40 },
 
   notFound: { flex: 1, alignItems: 'center', justifyContent: 'center', paddingHorizontal: 24 },
   notFoundText: { fontSize: 15, color: Colors.textMuted },

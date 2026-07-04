@@ -12,14 +12,16 @@ export function FormLabel({ children, required = false, containerStyle }: Props)
     <View
       style={[styles.row, containerStyle]}
       accessible
-      accessibilityLabel={required ? `${children}、必須` : children}
+      accessibilityLabel={required ? `${children}、必須` : `${children}、任意`}
     >
       <Text style={styles.label}>{children}</Text>
       {required ? (
         <View style={styles.badge}>
           <Text style={styles.badgeText}>必須</Text>
         </View>
-      ) : null}
+      ) : (
+        <Text style={styles.optionalText}>任意</Text>
+      )}
     </View>
   );
 }
@@ -34,4 +36,5 @@ const styles = StyleSheet.create({
     paddingVertical: 1,
   },
   badgeText: { fontSize: 10, fontWeight: '700', color: Colors.danger, letterSpacing: 0.3 },
+  optionalText: { fontSize: 11, fontWeight: '500', color: Colors.textPlaceholder },
 });

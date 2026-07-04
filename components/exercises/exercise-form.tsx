@@ -14,6 +14,7 @@ import { zodResolver } from '@hookform/resolvers/zod';
 import { Controller, useForm } from 'react-hook-form';
 import {
   StyleSheet,
+  Switch,
   Text,
   TextInput,
   TouchableOpacity,
@@ -27,11 +28,12 @@ function toExerciseCategory(value: string | undefined): ExerciseCategory | undef
 }
 
 type Props = {
-  initial?: { name?: string; category?: string; note?: string | null };
+  initial?: { name?: string; category?: string; note?: string | null; favorite?: boolean };
   onSubmit: (values: ExerciseFormValues) => void;
   onCancel: () => void;
   submitLabel?: string;
   autoFocus?: boolean;
+  showCancel?: boolean;
 };
 
 export function ExerciseForm({
@@ -40,6 +42,7 @@ export function ExerciseForm({
   onCancel,
   submitLabel = '追加',
   autoFocus = true,
+  showCancel = true,
 }: Props) {
   const {
     control,
@@ -51,6 +54,7 @@ export function ExerciseForm({
       name: initial?.name ?? '',
       category: toExerciseCategory(initial?.category),
       note: initial?.note ?? '',
+      favorite: initial?.favorite ?? false,
     },
   });
   const hasErrors = Object.keys(errors).length > 0;
@@ -124,14 +128,33 @@ export function ExerciseForm({
         )}
       />
 
+      <View style={styles.favoriteRow}>
+        <Text style={styles.favoriteLabel}>お気に入りに追加</Text>
+        <Controller
+          control={control}
+          name="favorite"
+          render={({ field: { value, onChange } }) => (
+            <Switch
+              value={value}
+              onValueChange={onChange}
+              trackColor={{ true: Colors.accent, false: Colors.borderStrong }}
+              thumbColor={Colors.surface}
+              accessibilityLabel="お気に入りに追加"
+            />
+          )}
+        />
+      </View>
+
       <View style={styles.buttons}>
-        <TouchableOpacity
-          style={styles.cancelBtn}
-          onPress={onCancel}
-          accessibilityLabel="キャンセル"
-        >
-          <Text style={styles.cancelBtnText}>キャンセル</Text>
-        </TouchableOpacity>
+        {showCancel && (
+          <TouchableOpacity
+            style={styles.cancelBtn}
+            onPress={onCancel}
+            accessibilityLabel="キャンセル"
+          >
+            <Text style={styles.cancelBtnText}>キャンセル</Text>
+          </TouchableOpacity>
+        )}
         <TouchableOpacity
           style={[styles.submitBtn, submitDisabled && styles.submitBtnDisabled]}
           onPress={handleSubmit(onSubmit)}
@@ -164,6 +187,14 @@ const styles = StyleSheet.create({
 
   chipRow: { flexDirection: 'row', flexWrap: 'wrap', gap: 6 },
 
+  favoriteRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    paddingVertical: 2,
+  },
+  favoriteLabel: { fontSize: 13, fontWeight: '600', color: Colors.textSecondary },
+
   buttons: { flexDirection: 'row', gap: 8, marginTop: 4 },
   cancelBtn: {
     flex: 1,
@@ -176,10 +207,11 @@ const styles = StyleSheet.create({
   submitBtn: {
     flex: 2,
     borderRadius: 8,
-    paddingVertical: 10,
+    paddingVertical: 13,
     backgroundColor: Colors.accent,
     alignItems: 'center',
+    justifyContent: 'center',
   },
   submitBtnDisabled: { backgroundColor: Colors.textPlaceholder },
-  submitBtnText: { fontSize: 14, fontWeight: '600', color: Colors.onAccent },
+  submitBtnText: { fontSize: 15, fontWeight: '600', color: Colors.onAccent },
 });

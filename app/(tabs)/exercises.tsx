@@ -56,7 +56,7 @@ export default function ExercisesScreen() {
   const handleSubmit = useCallback(
     async (values: ExerciseFormValues) => {
       try {
-        await addExercise(values.name, values.category, values.note ?? undefined);
+        await addExercise(values.name, values.category, values.note ?? undefined, values.favorite);
         closeForm();
       } catch (e) {
         console.error('[exercise save]', e);
