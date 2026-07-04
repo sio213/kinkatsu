@@ -4,18 +4,20 @@ import { StyleSheet, Text, View, type StyleProp, type ViewStyle } from 'react-na
 type Props = {
   children: string;
   required?: boolean;
+  hideBadge?: boolean;
   containerStyle?: StyleProp<ViewStyle>;
 };
 
-export function FormLabel({ children, required = false, containerStyle }: Props) {
+export function FormLabel({ children, required = false, hideBadge = false, containerStyle }: Props) {
   return (
     <View
       style={[styles.row, containerStyle]}
       accessible
-      accessibilityLabel={required ? `${children}、必須` : `${children}、任意`}
+      accessibilityLabel={hideBadge ? children : required ? `${children}、必須` : `${children}、任意`}
     >
+      <View style={styles.bar} />
       <Text style={styles.label}>{children}</Text>
-      {required ? (
+      {hideBadge ? null : required ? (
         <View style={styles.badge}>
           <Text style={styles.badgeText}>必須</Text>
         </View>
@@ -27,8 +29,9 @@ export function FormLabel({ children, required = false, containerStyle }: Props)
 }
 
 const styles = StyleSheet.create({
-  row: { flexDirection: 'row', alignItems: 'center', gap: 6 },
-  label: { fontSize: 13, fontWeight: '600', color: Colors.textSecondary },
+  row: { flexDirection: 'row', alignItems: 'center', gap: 7 },
+  bar: { width: 3, height: 14, borderRadius: 2, backgroundColor: Colors.accent },
+  label: { fontSize: 13, fontWeight: '700', color: Colors.textBody, letterSpacing: 0.2 },
   badge: {
     backgroundColor: Colors.dangerSurface,
     borderRadius: 4,

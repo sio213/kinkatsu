@@ -129,7 +129,7 @@ export function ExerciseForm({
       />
 
       <View style={styles.favoriteRow}>
-        <Text style={styles.favoriteLabel}>お気に入りに追加</Text>
+        <FormLabel hideBadge>お気に入りに追加</FormLabel>
         <Controller
           control={control}
           name="favorite"
@@ -193,7 +193,6 @@ const styles = StyleSheet.create({
     justifyContent: 'space-between',
     paddingVertical: 2,
   },
-  favoriteLabel: { fontSize: 13, fontWeight: '600', color: Colors.textSecondary },
 
   buttons: { flexDirection: 'row', gap: 8, marginTop: 4 },
   cancelBtn: {

@@ -1,5 +1,7 @@
 import { Colors } from '@/constants/theme';
 import { IconSymbol } from '@/components/ui/icon-symbol';
+import { DesignIcon } from '@/components/ui/design-icon';
+import { FormLabel } from '@/components/ui/form-label';
 import { getGuide } from '@/lib/exercises/guides';
 import { getExerciseImages } from '@/lib/exercises/images';
 import { getCategoryLabel } from '@/lib/exercises/constants';
@@ -38,15 +40,6 @@ function Mp4Player({ source }: { source: number }) {
       contentFit="contain"
       nativeControls={false}
     />
-  );
-}
-
-function SectionHeading({ title }: { title: string }) {
-  return (
-    <View style={styles.sectionHeadingRow}>
-      <View style={styles.sectionHeadingBar} />
-      <Text style={styles.sectionTitle}>{title}</Text>
-    </View>
   );
 }
 
@@ -185,7 +178,7 @@ export default function ExerciseDetailScreen() {
                 onPress={handleEdit}
                 accessibilityLabel="編集"
               >
-                <IconSymbol name="pencil" size={18} color={Colors.textMuted} />
+                <DesignIcon name="edit" size={18} color={Colors.textMuted} />
                 <Text style={styles.menuItemText}>編集</Text>
               </TouchableOpacity>
               {exercise.source === 'custom' && (
@@ -194,7 +187,7 @@ export default function ExerciseDetailScreen() {
                   onPress={handleDelete}
                   accessibilityLabel="削除"
                 >
-                  <IconSymbol name="trash" size={18} color={Colors.danger} />
+                  <DesignIcon name="delete-outline" size={18} color={Colors.danger} />
                   <Text style={[styles.menuItemText, styles.menuItemDanger]}>削除</Text>
                 </TouchableOpacity>
               )}
@@ -224,7 +217,7 @@ export default function ExerciseDetailScreen() {
 
         <View style={styles.body}>
           <View style={styles.section}>
-            <SectionHeading title="カテゴリ" />
+            <FormLabel hideBadge>カテゴリ</FormLabel>
             <View style={styles.categoryChip}>
               <Text style={styles.categoryText}>{getCategoryLabel(exercise.category)}</Text>
             </View>
@@ -233,12 +226,12 @@ export default function ExerciseDetailScreen() {
           {guide ? (
             <>
               <View style={styles.section}>
-                <SectionHeading title="使う筋肉" />
+                <FormLabel hideBadge>使う筋肉</FormLabel>
                 <Text style={styles.sectionBody}>{guide.muscle}</Text>
               </View>
 
               <View style={styles.section}>
-                <SectionHeading title="フォームのポイント" />
+                <FormLabel hideBadge>フォームのポイント</FormLabel>
                 {guide.points.map((p, i) => (
                   <View key={i} style={styles.pointRow}>
                     <Text style={styles.pointNumber}>{i + 1}</Text>
@@ -248,20 +241,20 @@ export default function ExerciseDetailScreen() {
               </View>
 
               <View style={styles.section}>
-                <SectionHeading title="よくあるミス" />
+                <FormLabel hideBadge>よくあるミス</FormLabel>
                 <View style={styles.cautionBox}>
                   <Text style={styles.cautionText}>⚠️ {guide.caution}</Text>
                 </View>
               </View>
 
               <View style={styles.section}>
-                <SectionHeading title="呼吸法" />
+                <FormLabel hideBadge>呼吸法</FormLabel>
                 <Text style={styles.sectionBody}>{guide.breath}</Text>
               </View>
             </>
           ) : exercise.note ? (
             <View style={styles.section}>
-              <SectionHeading title="メモ" />
+              <FormLabel hideBadge>メモ</FormLabel>
               <Text style={styles.sectionBody}>{exercise.note}</Text>
             </View>
           ) : (
@@ -374,8 +367,8 @@ const styles = StyleSheet.create({
   },
   favoriteBadge: {
     position: 'absolute',
-    top: 18,
-    right: 18,
+    top: 28,
+    right: 28,
     width: 34,
     height: 34,
     borderRadius: 17,
@@ -430,14 +423,6 @@ const styles = StyleSheet.create({
   youtubeBtnText: { fontSize: 13, fontWeight: '600', color: Colors.accent },
 
   section: { gap: 8 },
-  sectionHeadingRow: { flexDirection: 'row', alignItems: 'center', gap: 7 },
-  sectionHeadingBar: { width: 3, height: 14, borderRadius: 2, backgroundColor: Colors.accent },
-  sectionTitle: {
-    fontSize: 13,
-    fontWeight: '700',
-    color: Colors.textBody,
-    letterSpacing: 0.2,
-  },
   sectionBody: { fontSize: 15, color: Colors.textBody, lineHeight: 22 },
 
   pointRow: { flexDirection: 'row', gap: 10, alignItems: 'flex-start' },
