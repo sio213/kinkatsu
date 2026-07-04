@@ -43,9 +43,7 @@ export const ExerciseCard = memo(function ExerciseCard({
       onPress={() => router.push(`/exercise/${e.id}`)}
       accessibilityLabel={`${e.name}の詳細を見る`}
     >
-      {images?.thumbnail != null && (
-        <Image source={images.thumbnail} style={styles.thumbnail} contentFit="cover" />
-      )}
+      <Image source={images.thumbnail} style={styles.thumbnail} contentFit="cover" />
       <View style={styles.info}>
         <Text style={styles.name}>{e.name}</Text>
         <View style={styles.meta}>
@@ -77,7 +75,7 @@ const styles = StyleSheet.create({
   card: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 8,
+    gap: 10,
     backgroundColor: Colors.surfaceMuted,
     borderRadius: 10,
     padding: 12,
@@ -100,5 +98,5 @@ const styles = StyleSheet.create({
   star: { fontSize: 20, color: Colors.borderStrong },
   starActive: { color: Colors.favorite },
 
-  chevron: { fontSize: 20, color: Colors.borderStrong, fontWeight: '600' },
+  chevron: { fontSize: 20, color: Colors.textPlaceholder, fontWeight: '600' },
 });

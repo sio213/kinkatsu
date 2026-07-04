@@ -98,7 +98,7 @@ export default function ExerciseDetailScreen() {
       </View>
 
       <ScrollView contentContainerStyle={styles.content}>
-        {images && (
+        {images.source != null && (
           <View style={styles.mediaBox}>
             <Mp4Player source={images.source} />
           </View>
