@@ -1,10 +1,10 @@
-import { ExerciseForm } from '@/components/exercises/exercise-form';
+import { ExerciseForm, type ExerciseFormHandle } from '@/components/exercises/exercise-form';
 import { IconSymbol } from '@/components/ui/icon-symbol';
 import { Colors } from '@/constants/theme';
 import { useExercise, useExercises } from '@/hooks/use-exercises';
 import type { ExerciseFormValues } from '@/lib/exercises/validation';
 import { useLocalSearchParams, useRouter } from 'expo-router';
-import { useCallback } from 'react';
+import { useCallback, useRef, useState } from 'react';
 import {
   Alert,
   KeyboardAvoidingView,
@@ -22,6 +22,8 @@ export default function ExerciseEditScreen() {
   const router = useRouter();
   const { exercise, loaded } = useExercise(Number(id));
   const { updateExercise } = useExercises();
+  const formRef = useRef<ExerciseFormHandle>(null);
+  const [submitDisabled, setSubmitDisabled] = useState(false);
 
   const handleSubmit = useCallback(
     async (values: ExerciseFormValues) => {
@@ -72,6 +74,7 @@ export default function ExerciseEditScreen() {
         </View>
         <ScrollView contentContainerStyle={styles.content} keyboardShouldPersistTaps="handled">
           <ExerciseForm
+            ref={formRef}
             initial={{
               name: exercise.name,
               category: exercise.category,
@@ -80,11 +83,21 @@ export default function ExerciseEditScreen() {
             }}
             onSubmit={handleSubmit}
             onCancel={() => router.back()}
-            submitLabel="保存"
             autoFocus={false}
-            showCancel={false}
+            showFooter={false}
+            onSubmitDisabledChange={setSubmitDisabled}
           />
         </ScrollView>
+        <View style={styles.footer}>
+          <TouchableOpacity
+            style={[styles.submitBtn, submitDisabled && styles.submitBtnDisabled]}
+            onPress={() => formRef.current?.submit()}
+            disabled={submitDisabled}
+            accessibilityLabel="保存"
+          >
+            <Text style={styles.submitBtnText}>保存</Text>
+          </TouchableOpacity>
+        </View>
       </KeyboardAvoidingView>
     </SafeAreaView>
   );
@@ -111,7 +124,24 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
   },
 
-  content: { paddingHorizontal: 20, paddingTop: 12, paddingBottom: 40 },
+  content: { paddingHorizontal: 20, paddingTop: 12, paddingBottom: 24 },
+
+  footer: {
+    paddingHorizontal: 20,
+    paddingTop: 8,
+    paddingBottom: 12,
+    borderTopWidth: 1,
+    borderTopColor: Colors.border,
+  },
+  submitBtn: {
+    borderRadius: 8,
+    paddingVertical: 13,
+    backgroundColor: Colors.accent,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  submitBtnDisabled: { backgroundColor: Colors.textPlaceholder },
+  submitBtnText: { fontSize: 15, fontWeight: '600', color: Colors.onAccent },
 
   notFound: { flex: 1, alignItems: 'center', justifyContent: 'center', paddingHorizontal: 24 },
   notFoundText: { fontSize: 15, color: Colors.textMuted },

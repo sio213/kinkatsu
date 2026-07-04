@@ -394,10 +394,10 @@ const styles = StyleSheet.create({
     alignSelf: 'flex-start',
     backgroundColor: Colors.accentSurface,
     borderRadius: 10,
-    paddingHorizontal: 10,
-    paddingVertical: 4,
+    paddingHorizontal: 8,
+    paddingVertical: 3,
   },
-  categoryText: { fontSize: 13, color: Colors.accent, fontWeight: '600' },
+  categoryText: { fontSize: 11.5, color: Colors.accent, fontWeight: '600' },
 
   youtubeSection: {
     marginTop: 4,
@@ -423,7 +423,7 @@ const styles = StyleSheet.create({
   youtubeBtnText: { fontSize: 13, fontWeight: '600', color: Colors.accent },
 
   section: { gap: 8 },
-  sectionBody: { fontSize: 15, color: Colors.textBody, lineHeight: 22 },
+  sectionBody: { fontSize: 14, color: Colors.textBody, lineHeight: 22 },
 
   pointRow: { flexDirection: 'row', gap: 10, alignItems: 'flex-start' },
   pointNumber: {
@@ -437,16 +437,16 @@ const styles = StyleSheet.create({
     textAlign: 'center',
     lineHeight: 22,
   },
-  pointText: { flex: 1, fontSize: 15, color: Colors.textBody, lineHeight: 22 },
+  pointText: { flex: 1, fontSize: 14, color: Colors.textBody, lineHeight: 22 },
 
   cautionBox: {
     backgroundColor: Colors.warningSurface,
     borderRadius: 8,
-    padding: 12,
+    padding: 11,
     borderLeftWidth: 3,
     borderLeftColor: Colors.warningAccent,
   },
-  cautionText: { fontSize: 14, color: Colors.warningText, lineHeight: 20 },
+  cautionText: { fontSize: 13, color: Colors.warningText, lineHeight: 19.5 },
 
   noGuide: { fontSize: 14, color: Colors.textPlaceholder, textAlign: 'center', paddingVertical: 24 },
 });

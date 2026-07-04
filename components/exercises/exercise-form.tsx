@@ -11,6 +11,7 @@ import {
   type ExerciseFormValues,
 } from '@/lib/exercises/validation';
 import { zodResolver } from '@hookform/resolvers/zod';
+import { forwardRef, useEffect, useImperativeHandle } from 'react';
 import { Controller, useForm } from 'react-hook-form';
 import {
   StyleSheet,
@@ -27,6 +28,8 @@ function toExerciseCategory(value: string | undefined): ExerciseCategory | undef
     : undefined;
 }
 
+export type ExerciseFormHandle = { submit: () => void };
+
 type Props = {
   initial?: { name?: string; category?: string; note?: string | null; favorite?: boolean };
   onSubmit: (values: ExerciseFormValues) => void;
@@ -34,16 +37,24 @@ type Props = {
   submitLabel?: string;
   autoFocus?: boolean;
   showCancel?: boolean;
+  // 呼び出し側が下部固定ボタンを自前で描画する場合はfalseにする（onSubmitDisabledChangeで無効状態を受け取る）
+  showFooter?: boolean;
+  onSubmitDisabledChange?: (disabled: boolean) => void;
 };
 
-export function ExerciseForm({
-  initial,
-  onSubmit,
-  onCancel,
-  submitLabel = '追加',
-  autoFocus = true,
-  showCancel = true,
-}: Props) {
+export const ExerciseForm = forwardRef<ExerciseFormHandle, Props>(function ExerciseForm(
+  {
+    initial,
+    onSubmit,
+    onCancel,
+    submitLabel = '追加',
+    autoFocus = true,
+    showCancel = true,
+    showFooter = true,
+    onSubmitDisabledChange,
+  },
+  ref,
+) {
   const {
     control,
     handleSubmit,
@@ -60,6 +71,15 @@ export function ExerciseForm({
   const hasErrors = Object.keys(errors).length > 0;
   const submitDisabled = isSubmitting || (isSubmitted && hasErrors);
 
+  useImperativeHandle(ref, () => ({ submit: () => handleSubmit(onSubmit)() }), [
+    handleSubmit,
+    onSubmit,
+  ]);
+
+  useEffect(() => {
+    onSubmitDisabledChange?.(submitDisabled);
+  }, [submitDisabled, onSubmitDisabledChange]);
+
   return (
     <View style={styles.container}>
       <FormLabel required>種目名</FormLabel>
@@ -68,7 +88,7 @@ export function ExerciseForm({
         name="name"
         render={({ field: { value, onChange } }) => (
           <TextInput
-            style={styles.input}
+            style={[styles.input, styles.nameInput]}
             value={value}
             onChangeText={onChange}
             placeholder="例: ベンチプレス"
@@ -145,28 +165,30 @@ export function ExerciseForm({
         />
       </View>
 
-      <View style={styles.buttons}>
-        {showCancel && (
+      {showFooter && (
+        <View style={styles.buttons}>
+          {showCancel && (
+            <TouchableOpacity
+              style={styles.cancelBtn}
+              onPress={onCancel}
+              accessibilityLabel="キャンセル"
+            >
+              <Text style={styles.cancelBtnText}>キャンセル</Text>
+            </TouchableOpacity>
+          )}
           <TouchableOpacity
-            style={styles.cancelBtn}
-            onPress={onCancel}
-            accessibilityLabel="キャンセル"
+            style={[styles.submitBtn, submitDisabled && styles.submitBtnDisabled]}
+            onPress={handleSubmit(onSubmit)}
+            disabled={submitDisabled}
+            accessibilityLabel={submitLabel}
           >
-            <Text style={styles.cancelBtnText}>キャンセル</Text>
+            <Text style={styles.submitBtnText}>{submitLabel}</Text>
           </TouchableOpacity>
-        )}
-        <TouchableOpacity
-          style={[styles.submitBtn, submitDisabled && styles.submitBtnDisabled]}
-          onPress={handleSubmit(onSubmit)}
-          disabled={submitDisabled}
-          accessibilityLabel={submitLabel}
-        >
-          <Text style={styles.submitBtnText}>{submitLabel}</Text>
-        </TouchableOpacity>
-      </View>
+        </View>
+      )}
     </View>
   );
-}
+});
 
 const styles = StyleSheet.create({
   container: { gap: 8 },
@@ -175,12 +197,13 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: Colors.borderStrong,
     borderRadius: 8,
-    paddingHorizontal: 12,
-    paddingVertical: 8,
-    fontSize: 15,
+    paddingHorizontal: 11,
+    paddingVertical: 9,
+    fontSize: 14,
     color: Colors.textPrimary,
     backgroundColor: Colors.surface,
   },
+  nameInput: { fontSize: 15, fontWeight: '600' },
   inputMultiline: { minHeight: 56, textAlignVertical: 'top' },
 
   errorText: { fontSize: 12, color: Colors.danger, marginTop: -4 },
