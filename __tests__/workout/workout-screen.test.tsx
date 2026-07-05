@@ -56,10 +56,14 @@ function render() {
   return instance.root;
 }
 
-const activeSession = { id: 1, startedAt: Date.now(), endedAt: null };
+// 実時刻(Date.now())にすると、CI等の遅い環境でモジュール読み込みからテスト実行までの
+// 間に1秒以上経過し、経過時間表示が「0:00」でなくなりflakyになる。固定時刻に統一する
+const FIXED_NOW = new Date(2026, 6, 5, 12, 0, 0).getTime();
+const activeSession = { id: 1, startedAt: FIXED_NOW, endedAt: null };
 
 beforeEach(() => {
   jest.useFakeTimers();
+  jest.setSystemTime(FIXED_NOW);
   jest.clearAllMocks();
   mockUseLocalSearchParams.mockReturnValue({ id: '1' });
   mockSessionSets = [];
