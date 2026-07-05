@@ -2,7 +2,6 @@ import { Colors } from '@/constants/theme';
 import type { Reminder } from '@/db/schema';
 import { formatKindSummary, formatNextFire } from '@/lib/notifications/format';
 import type { ReminderInput, ReminderKind } from '@/lib/notifications/types';
-import { MONTH_END } from '@/lib/notifications/types';
 import { StyleSheet, Switch, Text, TouchableOpacity, View } from 'react-native';
 import { ReminderForm } from './reminder-form';
 
