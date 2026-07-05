@@ -1,5 +1,10 @@
 import type { Exercise } from '@/db/schema';
-import { filterExercises, normalizeForSearch } from '@/lib/exercises/filter';
+import {
+  __getSearchIndexCacheSizeForTests,
+  __resetSearchIndexCacheForTests,
+  filterExercises,
+  normalizeForSearch,
+} from '@/lib/exercises/filter';
 import { CATEGORY_ALL, CATEGORY_FAVORITE } from '@/lib/exercises/constants';
 
 function make(overrides: Partial<Exercise> & { name: string; category: string }): Exercise {
@@ -8,6 +13,12 @@ function make(overrides: Partial<Exercise> & { name: string; category: string })
     createdAt: 0, updatedAt: 0, ...overrides,
   };
 }
+
+// 検索インデックスは id+updatedAt をキーにキャッシュされるため、テスト間でidを使い回した際に
+// 別テストの結果が混入しないよう毎回クリアする
+beforeEach(() => {
+  __resetSearchIndexCacheForTests();
+});
 
 const CHEST  = make({ id: 1, name: 'ベンチプレス',   category: 'chest' });
 const CHEST2 = make({ id: 2, name: 'ダンベルフライ', category: 'chest' });
@@ -348,6 +359,22 @@ describe('filterExercises', () => {
     it('未知カテゴリは order=99 でソート末尾', () => {
       const result = filterExercises([UNKNOWN, CHEST], CATEGORY_ALL, '');
       expect(result[result.length - 1].category).toBe('未知カテゴリ');
+    });
+  });
+
+  describe('検索インデックスキャッシュの間引き', () => {
+    it('種目が更新されてupdatedAtが変わると、古いキーはキャッシュから間引かれる', () => {
+      // search を空にするとgetSearchIndexが一度も呼ばれないため、検索してインデックスを作らせる
+      const original = make({ id: 30, name: 'テスト種目A', category: 'chest', updatedAt: 0 });
+      filterExercises([original], CATEGORY_ALL, 'テスト種目A');
+      expect(__getSearchIndexCacheSizeForTests()).toBe(1);
+
+      // お気に入りトグルや編集を模して同じidでupdatedAtだけ変える
+      const updated = { ...original, updatedAt: 1 };
+      filterExercises([updated], CATEGORY_ALL, 'テスト種目A');
+
+      // 新しいキーの分だけで、古いキーの残骸は残っていない
+      expect(__getSearchIndexCacheSizeForTests()).toBe(1);
     });
   });
 });

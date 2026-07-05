@@ -19,28 +19,73 @@ export function normalizeForSearch(value: string): string {
     .toLowerCase();
 }
 
-// 種目名・読み仮名・別名を検索対象文字列として集める（あいまい検索でも共用する）
-function nameSearchTexts(e: Exercise): string[] {
-  const texts = [e.name];
+type SearchIndex = {
+  // 完全一致検索の対象（名前・読み・別名・カテゴリ・カテゴリ読み・使う筋肉・筋肉読み）。あらかじめ正規化済み。
+  exactTexts: string[];
+  // あいまい検索（タイプミス許容）の対象。カテゴリ名・筋肉名は短すぎたり範囲が広すぎたりして
+  // 誤爆しやすいため、種目名・読み・別名のみに限定する。
+  fuzzyTexts: string[];
+};
+
+// 種目ごとの検索対象テキストは種目データが変わらない限り不変なので、打鍵のたびに
+// 正規化し直さないようキャッシュする（id + updatedAt をキーにし、編集されたら再計算する）
+const searchIndexCache = new Map<string, SearchIndex>();
+
+function buildSearchIndex(e: Exercise): SearchIndex {
+  const nameTexts = [e.name];
   const reading = getReading(e);
-  if (reading != null) texts.push(reading);
+  if (reading != null) nameTexts.push(reading);
   for (const alias of getAliases(e)) {
-    texts.push(alias.text);
-    if (alias.reading != null) texts.push(alias.reading);
+    nameTexts.push(alias.text);
+    if (alias.reading != null) nameTexts.push(alias.reading);
   }
-  return texts;
+  const normalizedNames = nameTexts.map(normalizeForSearch);
+
+  const exactTexts = [...normalizedNames];
+  exactTexts.push(normalizeForSearch(getCategoryLabel(e.category)));
+  const categoryReading = getCategoryLabelReading(e.category);
+  if (categoryReading != null) exactTexts.push(normalizeForSearch(categoryReading));
+  const guide = getGuide(e);
+  if (guide != null) {
+    exactTexts.push(normalizeForSearch(guide.muscle));
+    exactTexts.push(normalizeForSearch(getMuscleReadingText(guide.muscle)));
+  }
+
+  return { exactTexts, fuzzyTexts: normalizedNames };
 }
 
-function matchesExactly(e: Exercise, q: string): boolean {
-  if (nameSearchTexts(e).some((t) => normalizeForSearch(t).includes(q))) return true;
-  // 検索窓だけを使うユーザーのため、カテゴリ名（「胸」「肩」等）でもそのカテゴリ全体がヒットするようにする
-  if (normalizeForSearch(getCategoryLabel(e.category)).includes(q)) return true;
-  const categoryReading = getCategoryLabelReading(e.category);
-  if (categoryReading != null && normalizeForSearch(categoryReading).includes(q)) return true;
-  const guide = getGuide(e);
-  if (guide == null) return false;
-  if (normalizeForSearch(guide.muscle).includes(q)) return true;
-  return normalizeForSearch(getMuscleReadingText(guide.muscle)).includes(q);
+function searchIndexCacheKey(e: Exercise): string {
+  return `${e.id}:${e.updatedAt ?? 0}`;
+}
+
+function getSearchIndex(e: Exercise): SearchIndex {
+  const key = searchIndexCacheKey(e);
+  const cached = searchIndexCache.get(key);
+  if (cached != null) return cached;
+  const index = buildSearchIndex(e);
+  searchIndexCache.set(key, index);
+  return index;
+}
+
+// お気に入りトグルや編集のたびにupdatedAtが変わり古いキーが残骸として残るため、
+// 呼び出しのたびに「今存在する種目」に無いキーを間引く。キャッシュサイズは常に
+// 現在の種目数以下に保たれ、無制限に肥大化しない。
+function pruneSearchIndexCache(exercises: Exercise[]): void {
+  const validKeys = new Set(exercises.map(searchIndexCacheKey));
+  for (const key of searchIndexCache.keys()) {
+    if (!validKeys.has(key)) searchIndexCache.delete(key);
+  }
+}
+
+// テスト専用: キャッシュはid+updatedAtキーなので、テストフィクスチャでidを使い回すと
+// 別のテストの結果が混入しうる。テストのbeforeEachで呼び、都度クリアする。
+export function __resetSearchIndexCacheForTests(): void {
+  searchIndexCache.clear();
+}
+
+// テスト専用: pruneSearchIndexCacheが古いキーを実際に間引いていることを検証するため
+export function __getSearchIndexCacheSizeForTests(): number {
+  return searchIndexCache.size;
 }
 
 export function filterExercises(
@@ -48,6 +93,7 @@ export function filterExercises(
   activeCategory: string,
   search: string,
 ): Exercise[] {
+  pruneSearchIndexCache(exercises);
   let list = exercises;
   if (activeCategory === CATEGORY_FAVORITE) {
     list = list.filter((e) => e.favorite);
@@ -57,12 +103,12 @@ export function filterExercises(
   const trimmedSearch = search.trim();
   if (trimmedSearch) {
     const q = normalizeForSearch(trimmedSearch);
-    const exactMatches = list.filter((e) => matchesExactly(e, q));
+    const exactMatches = list.filter((e) => getSearchIndex(e).exactTexts.some((t) => t.includes(q)));
     // 完全一致が1件もないときだけ、タイプミスを許容するあいまい検索にフォールバックする
     list =
       exactMatches.length > 0
         ? exactMatches
-        : list.filter((e) => nameSearchTexts(e).some((t) => isFuzzyMatch(q, normalizeForSearch(t))));
+        : list.filter((e) => getSearchIndex(e).fuzzyTexts.some((t) => isFuzzyMatch(q, t)));
   }
   return [...list].sort((a, b) => {
     const ai = CATEGORY_ORDER[a.category] ?? 99;
