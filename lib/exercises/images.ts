@@ -100,6 +100,10 @@ const IMAGES: Record<string, { source: number; thumbnail: number }> = {
     source: require('@/assets/exercise-media/dips.mp4'),
     thumbnail: require('@/assets/exercise-media/dips_thumb.png'),
   },
+  weighted_dips: {
+    source: require('@/assets/exercise-media/weighted_dips.mp4'),
+    thumbnail: require('@/assets/exercise-media/weighted_dips_thumb.png'),
+  },
   side_plank: {
     source: require('@/assets/exercise-media/side_plank.mp4'),
     thumbnail: require('@/assets/exercise-media/side_plank_thumb.png'),
@@ -148,9 +152,17 @@ const IMAGES: Record<string, { source: number; thumbnail: number }> = {
     source: require('@/assets/exercise-media/chin_up.mp4'),
     thumbnail: require('@/assets/exercise-media/chin_up_thumb.png'),
   },
+  weighted_chin_up: {
+    source: require('@/assets/exercise-media/weighted_chin_up.mp4'),
+    thumbnail: require('@/assets/exercise-media/weighted_chin_up_thumb.png'),
+  },
   pull_up: {
     source: require('@/assets/exercise-media/pull_up.mp4'),
     thumbnail: require('@/assets/exercise-media/pull_up_thumb.png'),
+  },
+  weighted_pull_up: {
+    source: require('@/assets/exercise-media/weighted_pull_up.mp4'),
+    thumbnail: require('@/assets/exercise-media/weighted_pull_up_thumb.png'),
   },
   high_row: {
     source: require('@/assets/exercise-media/high_row.mp4'),
@@ -511,6 +523,10 @@ const IMAGES: Record<string, { source: number; thumbnail: number }> = {
   bench_dip: {
     source: require('@/assets/exercise-media/bench_dip.mp4'),
     thumbnail: require('@/assets/exercise-media/bench_dip_thumb.png'),
+  },
+  weighted_bench_dip: {
+    source: require('@/assets/exercise-media/weighted_bench_dip.mp4'),
+    thumbnail: require('@/assets/exercise-media/weighted_bench_dip_thumb.png'),
   },
   wrist_curl: {
     source: require('@/assets/exercise-media/wrist_curl.mp4'),
