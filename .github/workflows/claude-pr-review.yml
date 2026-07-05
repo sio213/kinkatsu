@@ -52,3 +52,4 @@ jobs:
             指摘は 🔴Critical / 🟠Major / 🟡Minor / 🟢Suggestion で重篤度を分類し、
             ファイル名:行番号を明記してください。良い点があれば1つ以上必ず言及してください。
           claude_args: "--max-turns 15"
+          show_full_output: true
