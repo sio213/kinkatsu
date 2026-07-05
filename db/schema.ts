@@ -1,6 +1,7 @@
 import {
   index,
   integer,
+  real,
   sqliteTable,
   text,
   uniqueIndex,
@@ -22,6 +23,10 @@ export const exercises = sqliteTable(
     // フォームのポイント。JSON配列文字列 '["ポイント1","ポイント2"]'（カスタム種目のみ）
     formPoints: text('form_points'),
     source: text('source').notNull().default('custom'), // 'preset' | 'custom'
+    // 計測タイプ: 'weight_reps' | 'reps' | 'time' | 'distance_time' | 'weight_time'（lib/exercises/constants.tsのMeasurementType）。
+    // 既存preset種目の値はdrizzle/0010_recording_feature_m1.sqlのUPDATE文でdb/seed.tsのデータからバックフィル済み。
+    // 以後db/seed.tsの分類を変更した場合はマイグレーションではなくseed()のupdate分岐（差分検知）が自己修復する。
+    measurementType: text('measurement_type').notNull().default('weight_reps'),
     createdAt: integer('created_at'),
     updatedAt: integer('updated_at'),
   },
@@ -31,6 +36,74 @@ export const exercises = sqliteTable(
 );
 
 export type Exercise = typeof exercises.$inferSelect;
+
+// トレーニングセッション（記録の1回分）
+export const workoutSessions = sqliteTable('workout_sessions', {
+  id: integer('id').primaryKey({ autoIncrement: true }),
+  startedAt: integer('started_at').notNull(),
+  // nullなら進行中（中断・再開の判定に使う）
+  endedAt: integer('ended_at'),
+  note: text('note'),
+  createdAt: integer('created_at').notNull(),
+  updatedAt: integer('updated_at').notNull(),
+});
+
+export type WorkoutSession = typeof workoutSessions.$inferSelect;
+export type NewWorkoutSession = typeof workoutSessions.$inferInsert;
+
+// セッションに追加された種目とその並び順（セットが1件も無い状態でも並び順を保持できるようsetsとは独立させる）
+export const workoutSessionExercises = sqliteTable(
+  'workout_session_exercises',
+  {
+    id: integer('id').primaryKey({ autoIncrement: true }),
+    sessionId: integer('session_id')
+      .notNull()
+      .references(() => workoutSessions.id, { onDelete: 'cascade' }),
+    exerciseId: integer('exercise_id')
+      .notNull()
+      .references(() => exercises.id, { onDelete: 'restrict' }),
+    orderIndex: integer('order_index').notNull(),
+    createdAt: integer('created_at').notNull(),
+  },
+  (t) => ({
+    bySession: index('idx_wse_session').on(t.sessionId),
+  }),
+);
+
+export type WorkoutSessionExercise = typeof workoutSessionExercises.$inferSelect;
+export type NewWorkoutSessionExercise = typeof workoutSessionExercises.$inferInsert;
+
+// セット記録。weight/reps/durationSeconds/distanceMetersは全てnullableにして
+// 5種類の計測タイプ(measurementType)を1つのワイドテーブルでカバーする
+export const sets = sqliteTable(
+  'sets',
+  {
+    id: integer('id').primaryKey({ autoIncrement: true }),
+    sessionId: integer('session_id')
+      .notNull()
+      .references(() => workoutSessions.id, { onDelete: 'cascade' }),
+    // custom種目削除時にセットが存在すればブロックするためrestrict（記録履歴を消さない）
+    exerciseId: integer('exercise_id')
+      .notNull()
+      .references(() => exercises.id, { onDelete: 'restrict' }),
+    setNumber: integer('set_number').notNull(),
+    weight: real('weight'),
+    reps: integer('reps'),
+    durationSeconds: integer('duration_seconds'),
+    distanceMeters: real('distance_meters'),
+    // nullなら未完了（✓前）
+    completedAt: integer('completed_at'),
+    createdAt: integer('created_at').notNull(),
+  },
+  (t) => ({
+    bySession: index('idx_sets_session').on(t.sessionId),
+    // 「前回の記録」を種目単位で辿るためのインデックス
+    byExercise: index('idx_sets_exercise').on(t.exerciseId),
+  }),
+);
+
+export type Set = typeof sets.$inferSelect;
+export type NewSet = typeof sets.$inferInsert;
 
 // リマインダー設定
 export const reminders = sqliteTable('reminders', {

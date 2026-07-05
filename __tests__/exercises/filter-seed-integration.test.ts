@@ -19,6 +19,7 @@ function toExercise(preset: (typeof PRESET_EXERCISES)[number], id: number): Exer
     muscle: null,
     formPoints: null,
     source: 'preset',
+    measurementType: preset.measurementType,
     createdAt: 0,
     updatedAt: 0,
   };

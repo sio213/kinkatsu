@@ -60,6 +60,7 @@ function makeExercise(overrides: Partial<Exercise> = {}): Exercise {
     muscle: null,
     formPoints: null,
     source: 'custom',
+    measurementType: 'weight_reps',
     createdAt: 0,
     updatedAt: 0,
     ...overrides,

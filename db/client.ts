@@ -6,4 +6,8 @@ export const expoDb = openDatabaseSync('kinkatsu', {
   enableChangeListener: true,
 });
 
+// SQLiteは既定で外部キー制約が無効なため、sets/workoutSessionExercisesのrestrict/cascadeを
+// 実際に効かせるには接続ごとに明示的に有効化する必要がある
+expoDb.execSync('PRAGMA foreign_keys = ON;');
+
 export const db = drizzle(expoDb, { schema });
