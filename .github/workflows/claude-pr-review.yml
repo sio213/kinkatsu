@@ -1,0 +1,54 @@
+name: Claude PR Review
+
+on:
+  pull_request:
+    types: [opened, synchronize]
+
+jobs:
+  review:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      pull-requests: write
+      issues: write
+      id-token: write
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Claude Code Review
+        uses: anthropics/claude-code-action@v1
+        with:
+          claude_code_oauth_token: ${{ secrets.CLAUDE_CODE_OAUTH_TOKEN }}
+          prompt: |
+            このPRの差分をレビューし、指摘をGitHubのインラインレビューコメントとして投稿してください。
+            差分だけでなく、リポジトリ全体（lib/, components/, hooks/, app/, db/）をRead/Grepし、
+            既存コードとの重複や不整合がないか能動的に確認してください。
+
+            以下3つの観点すべてで確認し、観点ごとに指摘してください。
+
+            ## 1. コード品質
+            - 単一責任の原則（1つの関数・コンポーネントが複数の責務を持っていないか）
+            - 重複コードの排除（同じロジックが他ファイルに既にないか、既存の関数・コンポーネントで代替できないか）
+            - 適切な配置（ビジネスロジックはlib/にあるか、DB操作がlib層に集約されコンポーネント/hooksから直接dbを叩いていないか）
+            - 未使用コード（未使用import・到達しないコード・コメントアウト残骸）
+            - パフォーマンス（N+1クエリ、不要な再レンダリング、useEffectのクリーンアップ漏れ、FlatList/FlashListの使用）
+            - React Native/Expo固有（useEffectの依存配列漏れ、StyleSheetの切り出し、プラットフォーム分岐）
+            - エラーハンドリング（DB書き込みのtry/catch + Alert.alert、Promiseのfire-and-forget禁止）
+
+            ## 2. UI/UXデザイン（UIに影響する変更がある場合のみ）
+            - タップターゲット44×44pt以上か
+            - TextInput使用時にキーボードと重ならないか
+            - 空状態・エラー状態の表示があるか
+            - 同じ種類の要素のスタイル・挙動が一貫しているか
+            - accessibilityLabelが主要要素に付いているか
+
+            ## 3. ユーザー目線（新機能・UI変更を伴う場合のみ）
+            筋トレ歴3年・週4回ジム通いの30代男性ユーザーの一人称視点で、実際にジムや自宅で使うシーンを
+            想定し、この変更が使いやすいか、欲しかった機能か、逆に余計だと感じないかを一言コメントしてください。
+
+            指摘は 🔴Critical / 🟠Major / 🟡Minor / 🟢Suggestion で重篤度を分類し、
+            ファイル名:行番号を明記してください。良い点があれば1つ以上必ず言及してください。
+          claude_args: "--max-turns 15"
