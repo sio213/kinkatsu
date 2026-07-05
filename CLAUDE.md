@@ -87,5 +87,8 @@ kinkatsu用のGoogle Driveフォルダが `仕事 > Webサービス > 🏋️ ki
 - `lib/exercises/guides.ts` の `GUIDES`: 使う筋肉・フォームのポイント・注意点・呼吸法。加重バリエーションは通常版と同じフォームを流用しつつ「どこに加重するか（ベルト/ベスト/プレート等）」を1点目に追記する
 - `lib/exercises/readings.ts` の `READINGS`: 種目名が漢字を含む場合のみ、ひらがな検索用の読みを追加する（純カタカナ名は不要）。加重バリエーションは「かじゅう」+ 元の読みで作る
 - `lib/exercises/aliases.ts` の `ALIASES`: カタカナ表記と競合する和名の俗称があれば追加する（無ければ不要）
-- `lib/exercises/images.ts` の `IMAGES`（動画・サムネイル）: GymVisual素材が未購入の種目は登録しなくてよい（`PLACEHOLDER_THUMBNAIL` にフォールバックする）。素材を追加した時点で登録する
+- `lib/exercises/images.ts` の `IMAGES`（動画・サムネイル）: GymVisualの生素材は `~/Downloads` の展開済みフォルダ（`1201-01 05 26-male1` 等、動画本体とSTEP1/STEP2静止画が別フォルダ）にある。該当クリップ（英語種目名で検索）を探し、以下で変換・登録する
+  - 動画: `ffmpeg -y -i "<raw>.mp4" -vf scale=960:540 -c:v libx264 -crf 18 -pix_fmt yuv420p -movflags +faststart -an assets/exercise-media/<slug>.mp4`
+  - サムネ: STEP2の静止画（ピーク収縮側。STEP1/2は目視で選ぶ）に `ffmpeg -y -nostdin -i "<raw>-STEP2.png" -vf "crop=1080:1080,scale=300:300" assets/exercise-media/<slug>_thumb.png`
+  - 該当クリップが無い/複数候補があって名称的に確信が持てない場合はユーザーに確認する。それでも見つからない種目だけ登録を省略してよい（`PLACEHOLDER_THUMBNAIL` にフォールバックする）
 - 記録機能実装後は `db/schema.ts` の `exercises.measurementType` も分類する
