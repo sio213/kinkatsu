@@ -1,6 +1,7 @@
 import { Colors } from '@/constants/theme';
 import { DesignIcon } from '@/components/ui/design-icon';
 import { IconSymbol } from '@/components/ui/icon-symbol';
+import { NotFoundState } from '@/components/ui/not-found-state';
 import { SectionHeading } from '@/components/ui/section-heading';
 import { getGuide } from '@/lib/exercises/guides';
 import { parseFormPoints } from '@/lib/exercises/form-points';
@@ -121,12 +122,11 @@ export default function ExerciseDetailScreen() {
   if (!exercise) {
     return (
       <SafeAreaView style={styles.safe} edges={['bottom']}>
-        <View style={styles.notFound}>
-          <Text style={styles.notFoundText}>種目が見つかりません</Text>
-          <TouchableOpacity style={styles.notFoundBackBtn} onPress={() => router.back()}>
-            <Text style={styles.notFoundBackBtnText}>一覧に戻る</Text>
-          </TouchableOpacity>
-        </View>
+        <NotFoundState
+          message="種目が見つかりません"
+          actionLabel="一覧に戻る"
+          onPressAction={() => router.back()}
+        />
       </SafeAreaView>
     );
   }
@@ -298,16 +298,6 @@ const styles = StyleSheet.create({
   },
   menuItemText: { fontSize: 13, fontWeight: '500', color: Colors.textPrimary },
   menuItemDanger: { color: Colors.danger },
-
-  notFound: { flex: 1, alignItems: 'center', justifyContent: 'center', gap: 16, paddingHorizontal: 24 },
-  notFoundText: { fontSize: 15, color: Colors.textMuted },
-  notFoundBackBtn: {
-    backgroundColor: Colors.accent,
-    borderRadius: 8,
-    paddingHorizontal: 20,
-    paddingVertical: 10,
-  },
-  notFoundBackBtnText: { color: Colors.onAccent, fontWeight: '600', fontSize: 14 },
 
   content: { paddingBottom: 48 },
 
