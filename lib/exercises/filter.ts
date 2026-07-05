@@ -4,12 +4,33 @@ import { getReading } from './readings';
 import { getAliases } from './aliases';
 import { getGuide } from './guides';
 import { getMuscleReadingText } from './muscle-readings';
+import { isFuzzyMatch } from './fuzzy';
 
 export function normalizeForSearch(value: string): string {
   return value
     .normalize('NFKC')
     .replace(/[ぁ-ゖ]/g, (ch) => String.fromCharCode(ch.charCodeAt(0) + 0x60))
     .toLowerCase();
+}
+
+// 種目名・読み仮名・別名を検索対象文字列として集める（あいまい検索でも共用する）
+function nameSearchTexts(e: Exercise): string[] {
+  const texts = [e.name];
+  const reading = getReading(e);
+  if (reading != null) texts.push(reading);
+  for (const alias of getAliases(e)) {
+    texts.push(alias.text);
+    if (alias.reading != null) texts.push(alias.reading);
+  }
+  return texts;
+}
+
+function matchesExactly(e: Exercise, q: string): boolean {
+  if (nameSearchTexts(e).some((t) => normalizeForSearch(t).includes(q))) return true;
+  const guide = getGuide(e);
+  if (guide == null) return false;
+  if (normalizeForSearch(guide.muscle).includes(q)) return true;
+  return normalizeForSearch(getMuscleReadingText(guide.muscle)).includes(q);
 }
 
 export function filterExercises(
@@ -26,23 +47,12 @@ export function filterExercises(
   const trimmedSearch = search.trim();
   if (trimmedSearch) {
     const q = normalizeForSearch(trimmedSearch);
-    list = list.filter((e) => {
-      if (normalizeForSearch(e.name).includes(q)) return true;
-      const reading = getReading(e);
-      if (reading != null && normalizeForSearch(reading).includes(q)) return true;
-      if (
-        getAliases(e).some((alias) => {
-          if (normalizeForSearch(alias.text).includes(q)) return true;
-          return alias.reading != null && normalizeForSearch(alias.reading).includes(q);
-        })
-      ) {
-        return true;
-      }
-      const guide = getGuide(e);
-      if (guide == null) return false;
-      if (normalizeForSearch(guide.muscle).includes(q)) return true;
-      return normalizeForSearch(getMuscleReadingText(guide.muscle)).includes(q);
-    });
+    const exactMatches = list.filter((e) => matchesExactly(e, q));
+    // 完全一致が1件もないときだけ、タイプミスを許容するあいまい検索にフォールバックする
+    list =
+      exactMatches.length > 0
+        ? exactMatches
+        : list.filter((e) => nameSearchTexts(e).some((t) => isFuzzyMatch(q, normalizeForSearch(t))));
   }
   return [...list].sort((a, b) => {
     const ai = CATEGORY_ORDER[a.category] ?? 99;
