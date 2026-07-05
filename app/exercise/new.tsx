@@ -1,29 +1,21 @@
-import { ExerciseForm, type ExerciseFormHandle } from '@/components/exercises/exercise-form';
-import { PrimaryButton } from '@/components/ui/primary-button';
-import { Colors } from '@/constants/theme';
+import {
+  ExerciseFormScreen,
+  type ExerciseFormScreenHandle,
+} from '@/components/exercises/exercise-form-screen';
 import { useExercises } from '@/hooks/use-exercises';
 import type { ExerciseFormValues } from '@/lib/exercises/validation';
 import type { ParamListBase } from '@react-navigation/native';
 import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { useLocalSearchParams, useNavigation, useRouter } from 'expo-router';
-import { useCallback, useEffect, useRef, useState } from 'react';
-import {
-  Alert,
-  KeyboardAvoidingView,
-  Platform,
-  ScrollView,
-  StyleSheet,
-  View,
-} from 'react-native';
-import { SafeAreaView } from 'react-native-safe-area-context';
+import { useCallback, useEffect, useRef } from 'react';
+import { Alert } from 'react-native';
 
 export default function ExerciseNewScreen() {
   const { name: initialName } = useLocalSearchParams<{ name?: string }>();
   const router = useRouter();
   const navigation = useNavigation<NativeStackNavigationProp<ParamListBase>>();
   const { addExercise } = useExercises();
-  const formRef = useRef<ExerciseFormHandle>(null);
-  const [submitDisabled, setSubmitDisabled] = useState(false);
+  const formRef = useRef<ExerciseFormScreenHandle>(null);
 
   const handleSubmit = useCallback(
     async (values: ExerciseFormValues) => {
@@ -50,42 +42,6 @@ export default function ExerciseNewScreen() {
   }, [navigation]);
 
   return (
-    <SafeAreaView style={styles.safe} edges={['bottom']}>
-      <KeyboardAvoidingView
-        style={styles.flex}
-        behavior={Platform.OS === 'ios' ? 'padding' : undefined}
-      >
-        <ScrollView contentContainerStyle={styles.content} keyboardShouldPersistTaps="handled">
-          <ExerciseForm
-            ref={formRef}
-            initial={{ name: initialName ?? '' }}
-            onSubmit={handleSubmit}
-            onSubmitDisabledChange={setSubmitDisabled}
-          />
-        </ScrollView>
-        <View style={styles.footer}>
-          <PrimaryButton
-            label="保存する"
-            onPress={() => formRef.current?.submit()}
-            disabled={submitDisabled}
-          />
-        </View>
-      </KeyboardAvoidingView>
-    </SafeAreaView>
+    <ExerciseFormScreen ref={formRef} initial={{ name: initialName ?? '' }} onSubmit={handleSubmit} />
   );
 }
-
-const styles = StyleSheet.create({
-  safe: { flex: 1, backgroundColor: Colors.background },
-  flex: { flex: 1 },
-
-  content: { paddingHorizontal: 20, paddingTop: 12, paddingBottom: 24 },
-
-  footer: {
-    paddingHorizontal: 20,
-    paddingTop: 8,
-    paddingBottom: 12,
-    borderTopWidth: 1,
-    borderTopColor: Colors.border,
-  },
-});
