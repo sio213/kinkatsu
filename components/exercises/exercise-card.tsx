@@ -32,7 +32,9 @@ export const ExerciseCard = memo(function ExerciseCard({
       onPress={handlePress}
       accessibilityLabel={`${e.name}の詳細を見る`}
     >
-      <Image source={images.thumbnail} style={styles.thumbnail} contentFit="cover" />
+      <View style={styles.thumbnailFrame}>
+        <Image source={images.thumbnail} style={styles.thumbnail} contentFit="contain" />
+      </View>
       <View style={styles.info}>
         <Text style={styles.name}>{e.name}</Text>
         <View style={styles.meta}>
@@ -64,13 +66,18 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: Colors.border,
   },
-  thumbnail: {
+  thumbnailFrame: {
     width: 46,
     height: 46,
     borderRadius: 7,
     backgroundColor: Colors.surfaceSubtle,
     borderWidth: 1,
     borderColor: Colors.border,
+    overflow: 'hidden',
+  },
+  thumbnail: {
+    flex: 1,
+    margin: 2,
   },
   info: { flex: 1, gap: 4 },
   name: { fontSize: 15, fontWeight: '600', color: Colors.textPrimary },

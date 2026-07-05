@@ -34,7 +34,9 @@ export const PickerExerciseRow = memo(function PickerExerciseRow({
       <View style={[styles.checkbox, selected && styles.checkboxChecked]}>
         {selected && <IconSymbol name="checkmark" size={14} color={Colors.onAccent} />}
       </View>
-      <Image source={images.thumbnail} style={styles.thumbnail} contentFit="cover" />
+      <View style={styles.thumbnailFrame}>
+        <Image source={images.thumbnail} style={styles.thumbnail} contentFit="contain" />
+      </View>
       <View style={styles.info}>
         <Text style={styles.name} numberOfLines={1}>
           {e.name}
@@ -72,13 +74,18 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
   },
   checkboxChecked: { backgroundColor: Colors.accent, borderColor: Colors.accent },
-  thumbnail: {
+  thumbnailFrame: {
     width: 40,
     height: 40,
     borderRadius: 7,
     backgroundColor: Colors.surfaceSubtle,
     borderWidth: 1,
     borderColor: Colors.border,
+    overflow: 'hidden',
+  },
+  thumbnail: {
+    flex: 1,
+    margin: 2,
   },
   info: { flex: 1, gap: 3 },
   name: { fontSize: 14, fontWeight: '600', color: Colors.textPrimary },

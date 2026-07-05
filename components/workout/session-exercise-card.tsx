@@ -90,7 +90,9 @@ export const SessionExerciseCard = memo(function SessionExerciseCard({
   return (
     <View style={styles.card}>
       <View style={styles.header}>
-        <Image source={images.thumbnail} style={styles.thumbnail} contentFit="cover" />
+        <View style={styles.thumbnailFrame}>
+          <Image source={images.thumbnail} style={styles.thumbnail} contentFit="contain" />
+        </View>
         <View style={styles.info}>
           <Text style={styles.name} numberOfLines={1}>
             {exercise.name}
@@ -175,13 +177,18 @@ const styles = StyleSheet.create({
     borderBottomWidth: 1,
     borderBottomColor: Colors.border,
   },
-  thumbnail: {
+  thumbnailFrame: {
     width: 46,
     height: 46,
     borderRadius: 7,
     backgroundColor: Colors.surfaceSubtle,
     borderWidth: 1,
     borderColor: Colors.border,
+    overflow: 'hidden',
+  },
+  thumbnail: {
+    flex: 1,
+    margin: 2,
   },
   info: { flex: 1, gap: 3 },
   name: { fontSize: 14.5, fontWeight: '700', color: Colors.textPrimary },
