@@ -93,6 +93,7 @@ export const PRESET_EXERCISES: PresetExercise[] = [
   { slug: 'triceps_extension', name: 'トライセプスエクステンション', category: 'arm' },
   { slug: 'french_press', name: 'フレンチプレス', category: 'arm' },
   { slug: 'dips', name: 'ディップス', category: 'arm' },
+  { slug: 'weighted_dips', name: '加重ディップス', category: 'arm' },
   { slug: 'ez_bar_curl', name: 'EZバーカール', category: 'arm' },
   { slug: 'cable_curl', name: 'ケーブルカール', category: 'arm' },
   { slug: 'concentration_curl', name: 'コンセントレーションカール', category: 'arm' },
