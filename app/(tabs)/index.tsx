@@ -1,39 +1,48 @@
+import { SessionCard } from '@/components/workout/session-card';
 import { IconSymbol } from '@/components/ui/icon-symbol';
 import { PrimaryButton } from '@/components/ui/primary-button';
 import { Colors } from '@/constants/theme';
-import { useWorkoutSessions } from '@/hooks/use-workout-session';
-import {
-  formatSessionDuration,
-  groupSessionsByDate,
-  summarizeSetsBySession,
-} from '@/lib/workout/summary';
+import type { WorkoutSession } from '@/db/schema';
+import { useSessionStats, useWorkoutSessions } from '@/hooks/use-workout-session';
+import { startWorkoutSession } from '@/lib/workout/session';
+import { groupSessionsByDate } from '@/lib/workout/summary';
 import { useRouter } from 'expo-router';
-import { useCallback } from 'react';
-import { Alert, ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
+import { useCallback, useRef } from 'react';
+import { Alert, SectionList, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 export default function RecordScreen() {
   const router = useRouter();
-  const { sessions, activeSession, sets, startSession } = useWorkoutSessions();
+  const { sessions, activeSession } = useWorkoutSessions();
+  const summaryBySession = useSessionStats();
+  const isStartingRef = useRef(false);
 
   // 進行中セッションは履歴に出さず、開始/再開ボタンから直接遷移する対象にする
   const endedSessions = sessions.filter((s) => s.endedAt != null);
-  const summaryBySession = summarizeSetsBySession(sets);
-  const dateGroups = groupSessionsByDate(endedSessions);
+  const showHistory = !activeSession && endedSessions.length > 0;
+  const sections = groupSessionsByDate(endedSessions).map((group) => ({
+    title: group.dateLabel,
+    data: group.sessions,
+  }));
 
   const handleStart = useCallback(async () => {
     if (activeSession) {
       router.push(`/workout/${activeSession.id}`);
       return;
     }
+    // 連打でstartSessionが二重に呼ばれ、endedAtがnullのセッションが2件できるのを防ぐ
+    if (isStartingRef.current) return;
+    isStartingRef.current = true;
     try {
-      const session = await startSession();
+      const session = await startWorkoutSession();
       router.push(`/workout/${session.id}`);
     } catch (e) {
       console.error('[workout session start]', e);
       Alert.alert('エラー', 'トレーニングを開始できませんでした。');
+    } finally {
+      isStartingRef.current = false;
     }
-  }, [activeSession, router, startSession]);
+  }, [activeSession, router]);
 
   return (
     <SafeAreaView style={styles.safeArea} edges={['top']}>
@@ -46,6 +55,7 @@ export default function RecordScreen() {
               onPress={handleStart}
               accessibilityRole="button"
               accessibilityLabel="トレーニングを開始"
+              hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
             >
               <Text style={styles.addBtnText}>＋ 開始</Text>
             </TouchableOpacity>
@@ -76,40 +86,24 @@ export default function RecordScreen() {
           </View>
         ) : null}
 
-        {!activeSession && endedSessions.length > 0 && (
-          <ScrollView contentContainerStyle={styles.scroll}>
-            {dateGroups.map((group) => (
-              <View key={group.dateLabel} style={styles.dateGroup}>
-                <Text style={styles.dateLabel}>{group.dateLabel}</Text>
-                {group.sessions.map((session) => {
-                  const summary = summaryBySession.get(session.id) ?? {
-                    setCount: 0,
-                    totalVolume: 0,
-                  };
-                  return (
-                    <View key={session.id} style={styles.card}>
-                      <View style={styles.cardRow}>
-                        <Text style={styles.cardTitle}>トレーニング</Text>
-                        <Text style={styles.cardDuration}>
-                          {formatSessionDuration(session.startedAt, session.endedAt)}
-                        </Text>
-                      </View>
-                      <View style={styles.statRow}>
-                        <View style={styles.statChip}>
-                          <Text style={styles.statChipValue}>{summary.totalVolume}</Text>
-                          <Text style={styles.statChipLabel}> kg 総量</Text>
-                        </View>
-                        <View style={styles.statChip}>
-                          <Text style={styles.statChipValue}>{summary.setCount}</Text>
-                          <Text style={styles.statChipLabel}> セット</Text>
-                        </View>
-                      </View>
-                    </View>
-                  );
-                })}
-              </View>
-            ))}
-          </ScrollView>
+        {showHistory && (
+          <SectionList
+            style={styles.list}
+            sections={sections}
+            keyExtractor={(session) => String(session.id)}
+            renderItem={({ item: session }: { item: WorkoutSession }) => (
+              <SessionCard
+                session={session}
+                summary={summaryBySession.get(session.id) ?? { setCount: 0, totalVolume: 0 }}
+              />
+            )}
+            renderSectionHeader={({ section }) => (
+              <Text style={styles.dateLabel}>{section.title}</Text>
+            )}
+            ItemSeparatorComponent={() => <View style={styles.cardSeparator} />}
+            SectionSeparatorComponent={() => <View style={styles.sectionSeparator} />}
+            contentContainerStyle={styles.scroll}
+          />
         )}
       </View>
     </SafeAreaView>
@@ -125,8 +119,8 @@ const styles = StyleSheet.create({
   addBtn: {
     backgroundColor: Colors.accent,
     borderRadius: 8,
-    paddingHorizontal: 14,
-    paddingVertical: 6,
+    paddingHorizontal: 16,
+    paddingVertical: 10,
   },
   addBtnText: { color: Colors.onAccent, fontWeight: '600', fontSize: 14 },
 
@@ -148,29 +142,9 @@ const styles = StyleSheet.create({
     marginTop: 4,
   },
 
-  scroll: { paddingTop: 16, paddingBottom: 40, gap: 16 },
-  dateGroup: { gap: 8 },
-  dateLabel: { fontSize: 12, fontWeight: '700', color: Colors.textMuted },
-  card: {
-    backgroundColor: Colors.surfaceMuted,
-    borderWidth: 1,
-    borderColor: Colors.border,
-    borderRadius: 10,
-    padding: 12,
-    gap: 10,
-  },
-  cardRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'baseline' },
-  cardTitle: { fontSize: 14.5, fontWeight: '700', color: Colors.textPrimary },
-  cardDuration: { fontSize: 11, color: Colors.textPlaceholder },
-  statRow: { flexDirection: 'row', gap: 6 },
-  statChip: {
-    flexDirection: 'row',
-    alignItems: 'baseline',
-    backgroundColor: Colors.surfaceSubtle,
-    borderRadius: 7,
-    paddingHorizontal: 9,
-    paddingVertical: 5,
-  },
-  statChipValue: { fontSize: 12.5, fontWeight: '700', color: Colors.textPrimary },
-  statChipLabel: { fontSize: 11, color: Colors.textMuted },
+  list: { flex: 1, marginTop: 16 },
+  scroll: { paddingBottom: 40 },
+  dateLabel: { fontSize: 12, fontWeight: '700', color: Colors.textMuted, marginBottom: 8 },
+  cardSeparator: { height: 8 },
+  sectionSeparator: { height: 16 },
 });

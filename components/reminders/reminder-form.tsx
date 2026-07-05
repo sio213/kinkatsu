@@ -4,8 +4,9 @@ import {
   DEFAULT_REMINDER_BODY,
   DEFAULT_REMINDER_TITLE,
 } from '@/lib/notifications/messages';
-import { KIND_LABELS, MONTH_LABELS, NTH_WEEK_OPTIONS, REMINDER_PRESETS, WEEKDAY_LABELS } from '@/lib/notifications/format';
+import { KIND_LABELS, MONTH_LABELS, NTH_WEEK_OPTIONS, REMINDER_PRESETS } from '@/lib/notifications/format';
 import { resolveMonthDay } from '@/lib/notifications/scheduler';
+import { WEEKDAY_LABELS } from '@/lib/format';
 import { MONTH_END, type ReminderInput, type ReminderKind } from '@/lib/notifications/types';
 import DateTimePicker from '@react-native-community/datetimepicker';
 import { useState } from 'react';

@@ -2,45 +2,7 @@ import {
   formatSessionDateGroup,
   formatSessionDuration,
   groupSessionsByDate,
-  summarizeSets,
-  summarizeSetsBySession,
 } from '@/lib/workout/summary';
-
-describe('summarizeSets', () => {
-  it('weightとrepsの積を合計し、セット数を数える', () => {
-    const result = summarizeSets([
-      { weight: 60, reps: 10 },
-      { weight: 60, reps: 8 },
-      { weight: 55, reps: 8 },
-    ]);
-    expect(result).toEqual({ setCount: 3, totalVolume: 1520 });
-  });
-
-  it('weight/repsがnull（reps専用・time専用の種目）でも0として扱いクラッシュしない', () => {
-    const result = summarizeSets([
-      { weight: null, reps: 12 },
-      { weight: null, reps: null },
-    ]);
-    expect(result).toEqual({ setCount: 2, totalVolume: 0 });
-  });
-
-  it('空配列 → 0件・0kg', () => {
-    expect(summarizeSets([])).toEqual({ setCount: 0, totalVolume: 0 });
-  });
-});
-
-describe('summarizeSetsBySession', () => {
-  it('sessionIdごとにグルーピングして集計する', () => {
-    const result = summarizeSetsBySession([
-      { sessionId: 1, weight: 60, reps: 10 },
-      { sessionId: 1, weight: 60, reps: 5 },
-      { sessionId: 2, weight: 20, reps: 12 },
-    ]);
-    expect(result.get(1)).toEqual({ setCount: 2, totalVolume: 900 });
-    expect(result.get(2)).toEqual({ setCount: 1, totalVolume: 240 });
-    expect(result.get(3)).toBeUndefined();
-  });
-});
 
 describe('formatSessionDuration', () => {
   it('endedAtがある場合はstartedAtとの差を分単位で返す', () => {

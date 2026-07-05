@@ -1,4 +1,5 @@
 import type { Reminder } from '@/db/schema';
+import { WEEKDAY_LABELS } from '@/lib/format';
 import { MONTH_END, type ReminderKind } from './types';
 
 export const KIND_LABELS: Record<ReminderKind, string> = {
@@ -7,8 +8,6 @@ export const KIND_LABELS: Record<ReminderKind, string> = {
   monthly: '毎月',
   yearly: '毎年',
 };
-
-export const WEEKDAY_LABELS = ['日', '月', '火', '水', '木', '金', '土'];
 
 export const NTH_WEEK_OPTIONS: { label: string; value: number }[] = [
   { label: '第1', value: 1 },

@@ -1,41 +1,34 @@
 // jest.mock はホイストされるため、変数は var で定義してスコープを合わせる
 /* eslint-disable no-var */
-var mockInsertValues: jest.Mock;
-var mockUpdateSet: jest.Mock;
-var mockUpdateWhere: jest.Mock;
-var mockReturning: jest.Mock;
-// useLiveQuery はhook呼び出し順に消費するキュー。useWorkoutSessionsは
-// [セッション一覧, 全セット] の順に2回呼ぶため、この順でpushする
+// useLiveQuery はhook呼び出し順に消費するキュー
 var mockLiveQueryQueue: { data: unknown }[];
 
 jest.mock('@/db/client', () => {
-  mockReturning = jest.fn().mockResolvedValue([{ id: 1, startedAt: 0, endedAt: null }]);
-  mockInsertValues = jest.fn().mockReturnValue({ returning: () => mockReturning() });
-  mockUpdateWhere = jest.fn().mockResolvedValue(undefined);
-  mockUpdateSet = jest.fn().mockReturnValue({ where: (...args: unknown[]) => mockUpdateWhere(...args) });
-
-  const mockFrom = jest.fn().mockReturnValue({
+  const chain = {
     orderBy: jest.fn().mockReturnThis(),
-    where: jest.fn().mockReturnValue({ limit: jest.fn() }),
-  });
-
+    where: jest.fn().mockReturnThis(),
+    groupBy: jest.fn().mockReturnThis(),
+    limit: jest.fn().mockReturnThis(),
+  };
   return {
     db: {
-      select: jest.fn().mockReturnValue({ from: mockFrom }),
-      insert: jest.fn().mockReturnValue({ values: (...args: unknown[]) => mockInsertValues(...args) }),
-      update: jest.fn().mockReturnValue({ set: (...args: unknown[]) => mockUpdateSet(...args) }),
+      select: jest.fn().mockReturnValue({ from: jest.fn().mockReturnValue(chain) }),
     },
   };
 });
 
 jest.mock('@/db/schema', () => ({
   workoutSessions: { id: 'id', startedAt: 'startedAt', endedAt: 'endedAt' },
-  sets: { sessionId: 'sessionId' },
+  sets: { sessionId: 'sessionId', weight: 'weight', reps: 'reps' },
 }));
 
 jest.mock('drizzle-orm', () => ({
   eq: jest.fn((col, val) => ({ col, val })),
   desc: jest.fn((col) => ({ col, dir: 'desc' })),
+  sql: Object.assign(
+    jest.fn((strings: TemplateStringsArray, ...values: unknown[]) => ({ strings, values })),
+    { raw: jest.fn() },
+  ),
 }));
 
 jest.mock('drizzle-orm/expo-sqlite', () => ({
@@ -44,36 +37,25 @@ jest.mock('drizzle-orm/expo-sqlite', () => ({
 
 import React from 'react';
 import { act, create } from 'react-test-renderer';
-import { useWorkoutSession, useWorkoutSessions } from '@/hooks/use-workout-session';
+import {
+  useSessionSetCount,
+  useSessionStats,
+  useWorkoutSession,
+  useWorkoutSessions,
+} from '@/hooks/use-workout-session';
 
-type SessionsHookResult = ReturnType<typeof useWorkoutSessions>;
-let captured: SessionsHookResult;
-
-function Harness() {
-  captured = useWorkoutSessions();
-  return null;
-}
-
-function mount() {
-  act(() => {
-    create(React.createElement(Harness));
-  });
-  return captured;
-}
-
-type SingleHookResult = ReturnType<typeof useWorkoutSession>;
-let capturedSingle: SingleHookResult;
-
-function SingleHarness({ id }: { id: number }) {
-  capturedSingle = useWorkoutSession(id);
-  return null;
-}
-
-function mountSingle(id: number) {
-  act(() => {
-    create(React.createElement(SingleHarness, { id }));
-  });
-  return capturedSingle;
+function makeHarness<T>(hook: () => T) {
+  let captured: T;
+  function Harness() {
+    captured = hook();
+    return null;
+  }
+  return () => {
+    act(() => {
+      create(React.createElement(Harness));
+    });
+    return captured!;
+  };
 }
 
 beforeEach(() => {
@@ -82,17 +64,18 @@ beforeEach(() => {
 });
 
 describe('useWorkoutSessions', () => {
-  it('sessions/setsがundefinedのとき空配列を返す', () => {
-    mockLiveQueryQueue = [{ data: undefined }, { data: undefined }];
-    const { sessions, sets } = mount();
+  const mount = makeHarness(useWorkoutSessions);
+
+  it('sessionsがundefinedのとき空配列を返す', () => {
+    mockLiveQueryQueue = [{ data: undefined }];
+    const { sessions } = mount();
     expect(sessions).toEqual([]);
-    expect(sets).toEqual([]);
   });
 
   it('endedAtがnullのセッションをactiveSessionとして検出する', () => {
     const inProgress = { id: 5, startedAt: 100, endedAt: null };
     const finished = { id: 4, startedAt: 0, endedAt: 60_000 };
-    mockLiveQueryQueue = [{ data: [inProgress, finished] }, { data: [] }];
+    mockLiveQueryQueue = [{ data: [inProgress, finished] }];
     const { activeSession } = mount();
     expect(activeSession).toEqual(inProgress);
   });
@@ -100,58 +83,32 @@ describe('useWorkoutSessions', () => {
   it('endedAtがnullのセッションが複数件ある場合、配列先頭（startedAt降順の最新）をactiveSessionとする', () => {
     const newer = { id: 6, startedAt: 200, endedAt: null };
     const older = { id: 5, startedAt: 100, endedAt: null };
-    mockLiveQueryQueue = [{ data: [newer, older] }, { data: [] }];
+    mockLiveQueryQueue = [{ data: [newer, older] }];
     const { activeSession } = mount();
     expect(activeSession).toEqual(newer);
   });
 
   it('進行中セッションが無ければactiveSessionはnull', () => {
     const finished = { id: 4, startedAt: 0, endedAt: 60_000 };
-    mockLiveQueryQueue = [{ data: [finished] }, { data: [] }];
+    mockLiveQueryQueue = [{ data: [finished] }];
     const { activeSession } = mount();
     expect(activeSession).toBeNull();
-  });
-
-  it('startSession: 現在時刻でinsertし、insertされた行を返す', async () => {
-    mockLiveQueryQueue = [{ data: [] }, { data: [] }];
-    const { startSession } = mount();
-    const before = Date.now();
-    let result: Awaited<ReturnType<typeof startSession>>;
-    await act(async () => {
-      result = await startSession();
-    });
-    const after = Date.now();
-    const payload = mockInsertValues.mock.calls[0][0];
-    expect(payload.startedAt).toBeGreaterThanOrEqual(before);
-    expect(payload.startedAt).toBeLessThanOrEqual(after);
-    expect(payload.createdAt).toBe(payload.startedAt);
-    expect(payload.updatedAt).toBe(payload.startedAt);
-    expect(result!).toEqual({ id: 1, startedAt: 0, endedAt: null });
-  });
-
-  it('endSession: endedAtを現在時刻でupdateする', async () => {
-    mockLiveQueryQueue = [{ data: [] }, { data: [] }];
-    const { endSession } = mount();
-    await act(async () => {
-      await endSession(5);
-    });
-    const payload = mockUpdateSet.mock.calls[0][0];
-    expect(typeof payload.endedAt).toBe('number');
-    expect(mockUpdateWhere).toHaveBeenCalledWith({ col: 'id', val: 5 });
   });
 });
 
 describe('useWorkoutSession', () => {
+  const mountSingle = makeHarness(() => useWorkoutSession(1));
+
   it('data=undefined のとき loaded=false', () => {
     mockLiveQueryQueue = [{ data: undefined }];
-    const { session, loaded } = mountSingle(1);
+    const { session, loaded } = mountSingle();
     expect(session).toBeUndefined();
     expect(loaded).toBe(false);
   });
 
   it('data=[] のとき loaded=true・sessionはundefined（見つからない）', () => {
     mockLiveQueryQueue = [{ data: [] }];
-    const { session, loaded } = mountSingle(1);
+    const { session, loaded } = mountSingle();
     expect(session).toBeUndefined();
     expect(loaded).toBe(true);
   });
@@ -159,8 +116,47 @@ describe('useWorkoutSession', () => {
   it('data=[session] のときそのセッションを返す', () => {
     const fake = { id: 1, startedAt: 0, endedAt: null };
     mockLiveQueryQueue = [{ data: [fake] }];
-    const { session, loaded } = mountSingle(1);
+    const { session, loaded } = mountSingle();
     expect(session).toBe(fake);
     expect(loaded).toBe(true);
+  });
+});
+
+describe('useSessionStats', () => {
+  const mount = makeHarness(useSessionStats);
+
+  it('dataがundefinedのとき空のMapを返す', () => {
+    mockLiveQueryQueue = [{ data: undefined }];
+    const result = mount();
+    expect(result.size).toBe(0);
+  });
+
+  it('SQL側で集計済みの行をsessionIdをキーにしたMapに変換する', () => {
+    mockLiveQueryQueue = [
+      {
+        data: [
+          { sessionId: 1, setCount: 3, totalVolume: 1520 },
+          { sessionId: 2, setCount: 1, totalVolume: 240 },
+        ],
+      },
+    ];
+    const result = mount();
+    expect(result.get(1)).toEqual({ setCount: 3, totalVolume: 1520 });
+    expect(result.get(2)).toEqual({ setCount: 1, totalVolume: 240 });
+    expect(result.get(3)).toBeUndefined();
+  });
+});
+
+describe('useSessionSetCount', () => {
+  const mount = makeHarness(() => useSessionSetCount(1));
+
+  it('dataがundefinedのとき0を返す', () => {
+    mockLiveQueryQueue = [{ data: undefined }];
+    expect(mount()).toBe(0);
+  });
+
+  it('集計行のcountをそのまま返す', () => {
+    mockLiveQueryQueue = [{ data: [{ count: 4 }] }];
+    expect(mount()).toBe(4);
   });
 });

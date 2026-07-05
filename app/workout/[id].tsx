@@ -1,13 +1,9 @@
 import { IconSymbol } from '@/components/ui/icon-symbol';
 import { PrimaryButton } from '@/components/ui/primary-button';
 import { Colors } from '@/constants/theme';
-import { db } from '@/db/client';
-import { sets as setsTable } from '@/db/schema';
-import { useWorkoutSession } from '@/hooks/use-workout-session';
+import { useSessionSetCount, useWorkoutSession } from '@/hooks/use-workout-session';
 import { endWorkoutSession } from '@/lib/workout/session';
 import { formatSessionDateGroup } from '@/lib/workout/summary';
-import { eq } from 'drizzle-orm';
-import { useLiveQuery } from 'drizzle-orm/expo-sqlite';
 import { Stack, useLocalSearchParams, useRouter } from 'expo-router';
 import { useEffect, useState } from 'react';
 import { Alert, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
@@ -26,11 +22,7 @@ export default function WorkoutScreen() {
   const parsedId = Number(id);
   const sessionId = Number.isFinite(parsedId) ? parsedId : null;
   const { session, loaded } = useWorkoutSession(sessionId ?? -1);
-  // このセッションのセットだけを購読する（全セッション分は購読しない。セット数が
-  // 増える終了確認の判定にのみ使うため、件数さえ分かればよい）
-  const { data: sessionSets } = useLiveQuery(
-    db.select().from(setsTable).where(eq(setsTable.sessionId, sessionId ?? -1)),
-  );
+  const setCount = useSessionSetCount(sessionId ?? -1);
   const [now, setNow] = useState(() => Date.now());
 
   useEffect(() => {
@@ -51,7 +43,7 @@ export default function WorkoutScreen() {
   };
 
   const handleFinish = () => {
-    if ((sessionSets ?? []).length === 0) {
+    if (setCount === 0) {
       Alert.alert('トレーニングを終了', 'まだ種目を記録していません。終了しますか？', [
         { text: 'キャンセル', style: 'cancel' },
         { text: '終了する', style: 'destructive', onPress: finish },
@@ -61,9 +53,8 @@ export default function WorkoutScreen() {
     finish();
   };
 
-  const handleAddExercise = () => {
-    // T3（種目追加ピッカー）実装後にここから配線する
-  };
+  // 種目追加ピッカーの実装後にここから配線する
+  const handleAddExercise = () => {};
 
   if (sessionId == null || (loaded && !session)) {
     return (
@@ -75,6 +66,7 @@ export default function WorkoutScreen() {
             onPress={() => router.back()}
             accessibilityRole="button"
             accessibilityLabel="戻る"
+            hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
           >
             <Text style={styles.notFoundBackBtnText}>戻る</Text>
           </TouchableOpacity>
@@ -109,6 +101,7 @@ export default function WorkoutScreen() {
           onPress={handleAddExercise}
           accessibilityRole="button"
           accessibilityLabel="種目を追加"
+          hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
         >
           <IconSymbol name="plus" size={18} color={Colors.accent} />
           <Text style={styles.addExerciseBtnText}>種目を追加</Text>

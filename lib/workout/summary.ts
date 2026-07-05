@@ -1,34 +1,9 @@
-import type { Set } from '@/db/schema';
-import { WEEKDAY_LABELS } from '@/lib/notifications/format';
+import { WEEKDAY_LABELS } from '@/lib/format';
 
 export type SessionSummary = {
   setCount: number;
   totalVolume: number;
 };
-
-export function summarizeSets(sets: Pick<Set, 'weight' | 'reps'>[]): SessionSummary {
-  const setCount = sets.length;
-  const totalVolume = sets.reduce((sum, s) => sum + (s.weight ?? 0) * (s.reps ?? 0), 0);
-  return { setCount, totalVolume };
-}
-
-// sessionIdごとにセットをグルーピングして集計する（記録タブの一覧表示用）
-export function summarizeSetsBySession(
-  sets: Pick<Set, 'sessionId' | 'weight' | 'reps'>[],
-): Map<number, SessionSummary> {
-  const bySession = new Map<number, Pick<Set, 'weight' | 'reps'>[]>();
-  for (const s of sets) {
-    const list = bySession.get(s.sessionId);
-    if (list) list.push(s);
-    else bySession.set(s.sessionId, [s]);
-  }
-  return new Map(
-    Array.from(bySession.entries()).map(([sessionId, setsForSession]) => [
-      sessionId,
-      summarizeSets(setsForSession),
-    ]),
-  );
-}
 
 // セッションの経過時間を「N分」表示にする。endedAtが無ければnow基準（進行中）
 export function formatSessionDuration(
