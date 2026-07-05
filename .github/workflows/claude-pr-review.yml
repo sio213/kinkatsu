@@ -51,5 +51,11 @@ jobs:
 
             指摘は 🔴Critical / 🟠Major / 🟡Minor / 🟢Suggestion で重篤度を分類し、
             ファイル名:行番号を明記してください。良い点があれば1つ以上必ず言及してください。
-          claude_args: "--max-turns 15"
+
+            重要: あなたの最終応答テキストはどこにも表示・投稿されません。指摘は必ず
+            `create_inline_comment` ツールを使ってファイル・行番号を指定してインラインコメントとして
+            投稿してください。全体的な所感や良かった点はトップレベルのレビューコメントとして残してください。
+          claude_args: >-
+            --max-turns 40
+            --allowedTools "Read,Grep,Glob,mcp__github_inline_comment__create_inline_comment"
           show_full_output: true
