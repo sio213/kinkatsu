@@ -5,11 +5,13 @@ import {
   workoutSessionExercises,
   workoutSessions,
   type Exercise,
+  type Set,
   type WorkoutSession,
 } from '@/db/schema';
 import type { SessionSummary } from '@/lib/workout/summary';
 import { eq, desc, sql, getTableColumns } from 'drizzle-orm';
 import { useLiveQuery } from 'drizzle-orm/expo-sqlite';
+import { useMemo } from 'react';
 
 // セッションの一覧・進行中判定のみを担う（セット集計は useSessionStats に分離）
 export function useWorkoutSessions() {
@@ -77,4 +79,31 @@ export function useSessionExercises(sessionId: number): SessionExercise[] {
       .orderBy(workoutSessionExercises.orderIndex),
   );
   return data ?? [];
+}
+
+// sessionSets.get(id)がヒットしない種目向けの安定した空配列参照。
+// 呼び出し側で `?? []` すると毎レンダー新しい配列になりSessionExerciseCardのmemoが効かなくなるため、
+// これを使ってもらう
+export const EMPTY_SETS: Set[] = [];
+
+// セット入力画面用。セッション内の全setsを一度だけ購読し、種目IDごとにJS側でグルーピングする
+// （種目カードの数だけlive queryを張ると数が増えるほど無駄が増えるため、useSessionStatsと同じ方針）。
+// トレーニング中画面は経過時間タイマーで毎秒再レンダーされるため、liveQueryのdataが変わらない限り
+// 同じMap参照を返すようuseMemoでグルーピング結果をキャッシュする
+export function useSessionSets(sessionId: number): Map<number, Set[]> {
+  const { data } = useLiveQuery(
+    db.select().from(sets).where(eq(sets.sessionId, sessionId)).orderBy(sets.setNumber),
+  );
+  return useMemo(() => {
+    const map = new Map<number, Set[]>();
+    for (const row of data ?? []) {
+      const list = map.get(row.exerciseId);
+      if (list) {
+        list.push(row);
+      } else {
+        map.set(row.exerciseId, [row]);
+      }
+    }
+    return map;
+  }, [data]);
 }
