@@ -1,6 +1,13 @@
 import { IconSymbol } from '@/components/ui/icon-symbol';
+import { PrimaryButton } from '@/components/ui/primary-button';
 import { Colors } from '@/constants/theme';
-import { useWorkoutSession, useWorkoutSessions } from '@/hooks/use-workout-session';
+import { db } from '@/db/client';
+import { sets as setsTable } from '@/db/schema';
+import { useWorkoutSession } from '@/hooks/use-workout-session';
+import { endWorkoutSession } from '@/lib/workout/session';
+import { formatSessionDateGroup } from '@/lib/workout/summary';
+import { eq } from 'drizzle-orm';
+import { useLiveQuery } from 'drizzle-orm/expo-sqlite';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { useEffect, useState } from 'react';
 import { Alert, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
@@ -16,19 +23,26 @@ function formatElapsed(ms: number): string {
 export default function WorkoutScreen() {
   const { id } = useLocalSearchParams<{ id: string }>();
   const router = useRouter();
-  const sessionId = Number(id);
-  const { session, loaded } = useWorkoutSession(sessionId);
-  const { endSession } = useWorkoutSessions();
+  const parsedId = Number(id);
+  const sessionId = Number.isFinite(parsedId) ? parsedId : null;
+  const { session, loaded } = useWorkoutSession(sessionId ?? -1);
+  // このセッションのセットだけを購読する（全セッション分は購読しない。セット数が
+  // 増える終了確認の判定にのみ使うため、件数さえ分かればよい）
+  const { data: sessionSets } = useLiveQuery(
+    db.select().from(setsTable).where(eq(setsTable.sessionId, sessionId ?? -1)),
+  );
   const [now, setNow] = useState(() => Date.now());
 
   useEffect(() => {
+    if (!session || session.endedAt != null) return;
     const interval = setInterval(() => setNow(Date.now()), 1000);
     return () => clearInterval(interval);
-  }, []);
+  }, [session]);
 
-  const handleFinish = async () => {
+  const finish = async () => {
+    if (sessionId == null) return;
     try {
-      await endSession(sessionId);
+      await endWorkoutSession(sessionId);
       router.back();
     } catch (e) {
       console.error('[workout session finish]', e);
@@ -36,16 +50,32 @@ export default function WorkoutScreen() {
     }
   };
 
+  const handleFinish = () => {
+    if ((sessionSets ?? []).length === 0) {
+      Alert.alert('トレーニングを終了', 'まだ種目を記録していません。終了しますか？', [
+        { text: 'キャンセル', style: 'cancel' },
+        { text: '終了する', style: 'destructive', onPress: finish },
+      ]);
+      return;
+    }
+    finish();
+  };
+
   const handleAddExercise = () => {
     // T3（種目追加ピッカー）実装後にここから配線する
   };
 
-  if (loaded && !session) {
+  if (sessionId == null || (loaded && !session)) {
     return (
       <SafeAreaView style={styles.safeArea} edges={['top', 'bottom']}>
         <View style={styles.notFound}>
           <Text style={styles.notFoundText}>トレーニングが見つかりません</Text>
-          <TouchableOpacity style={styles.notFoundBackBtn} onPress={() => router.back()}>
+          <TouchableOpacity
+            style={styles.notFoundBackBtn}
+            onPress={() => router.back()}
+            accessibilityRole="button"
+            accessibilityLabel="戻る"
+          >
             <Text style={styles.notFoundBackBtnText}>戻る</Text>
           </TouchableOpacity>
         </View>
@@ -55,18 +85,21 @@ export default function WorkoutScreen() {
 
   if (!session) return null;
 
-  const dateLabel = new Date(session.startedAt).toLocaleDateString('ja-JP', {
-    month: 'long',
-    day: 'numeric',
-    weekday: 'short',
-  });
-
   return (
     <SafeAreaView style={styles.safeArea} edges={['top', 'bottom']}>
       <View style={styles.header}>
-        <View>
+        <TouchableOpacity
+          style={styles.closeBtn}
+          onPress={() => router.back()}
+          accessibilityRole="button"
+          accessibilityLabel="トレーニングを中断せず閉じる"
+          hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+        >
+          <IconSymbol name="xmark" size={20} color={Colors.textMuted} />
+        </TouchableOpacity>
+        <View style={styles.headerTitles}>
           <Text style={styles.headerTitle}>トレーニング中</Text>
-          <Text style={styles.headerDate}>{dateLabel}</Text>
+          <Text style={styles.headerDate}>{formatSessionDateGroup(session.startedAt)}</Text>
         </View>
         <View style={styles.timerChip}>
           <IconSymbol name="timer" size={16} color={Colors.accent} />
@@ -76,16 +109,19 @@ export default function WorkoutScreen() {
 
       <View style={styles.body}>
         <Text style={styles.emptyText}>まだ種目がありません</Text>
-        <TouchableOpacity style={styles.addExerciseBtn} onPress={handleAddExercise}>
+        <TouchableOpacity
+          style={styles.addExerciseBtn}
+          onPress={handleAddExercise}
+          accessibilityRole="button"
+          accessibilityLabel="種目を追加"
+        >
           <IconSymbol name="plus" size={18} color={Colors.accent} />
           <Text style={styles.addExerciseBtnText}>種目を追加</Text>
         </TouchableOpacity>
       </View>
 
       <View style={styles.footer}>
-        <TouchableOpacity style={styles.finishBtn} onPress={handleFinish}>
-          <Text style={styles.finishBtnText}>トレーニングを終了</Text>
-        </TouchableOpacity>
+        <PrimaryButton label="トレーニングを終了" onPress={handleFinish} />
       </View>
     </SafeAreaView>
   );
@@ -102,6 +138,8 @@ const styles = StyleSheet.create({
     paddingTop: 16,
     paddingBottom: 6,
   },
+  closeBtn: { paddingRight: 10 },
+  headerTitles: { flex: 1 },
   headerTitle: { fontSize: 18, fontWeight: '700', color: Colors.textPrimary },
   headerDate: { fontSize: 12, color: Colors.textMuted, marginTop: 2 },
   timerChip: {
@@ -134,13 +172,6 @@ const styles = StyleSheet.create({
     borderTopWidth: 1,
     borderTopColor: Colors.border,
   },
-  finishBtn: {
-    backgroundColor: Colors.accent,
-    borderRadius: 8,
-    paddingVertical: 13,
-    alignItems: 'center',
-  },
-  finishBtnText: { color: Colors.onAccent, fontWeight: '600', fontSize: 15 },
 
   notFound: { flex: 1, alignItems: 'center', justifyContent: 'center', gap: 12 },
   notFoundText: { fontSize: 14, color: Colors.textPlaceholder },

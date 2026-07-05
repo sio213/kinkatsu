@@ -1,8 +1,8 @@
 import { db } from '@/db/client';
 import { sets, workoutSessions, type WorkoutSession } from '@/db/schema';
-import { desc, eq } from 'drizzle-orm';
+import { endWorkoutSession, startWorkoutSession } from '@/lib/workout/session';
+import { eq, desc } from 'drizzle-orm';
 import { useLiveQuery } from 'drizzle-orm/expo-sqlite';
-import { useCallback } from 'react';
 
 export function useWorkoutSessions() {
   const { data } = useLiveQuery(
@@ -13,34 +13,22 @@ export function useWorkoutSessions() {
   const { data: allSets } = useLiveQuery(db.select().from(sets));
 
   const sessions: WorkoutSession[] = data ?? [];
-  // endedAtがnullのセッションは常に高々1件（中断・再開の対象）
+  // endedAtがnullのセッションは常に高々1件のはずだが、配列順（startedAt降順）で
+  // 先頭に見つかったもの＝最も新しく開始したものをactiveSessionとする
   const activeSession = sessions.find((s) => s.endedAt == null) ?? null;
-
-  const startSession = useCallback(async () => {
-    const now = Date.now();
-    const [inserted] = await db
-      .insert(workoutSessions)
-      .values({ startedAt: now, createdAt: now, updatedAt: now })
-      .returning();
-    return inserted;
-  }, []);
-
-  const endSession = useCallback(async (id: number) => {
-    await db
-      .update(workoutSessions)
-      .set({ endedAt: Date.now(), updatedAt: Date.now() })
-      .where(eq(workoutSessions.id, id));
-  }, []);
 
   return {
     sessions,
     activeSession,
     sets: allSets ?? [],
-    startSession,
-    endSession,
+    startSession: startWorkoutSession,
+    endSession: endWorkoutSession,
   };
 }
 
+// トレーニング中画面など、単一セッションの購読とendSessionだけが必要な場面用。
+// useWorkoutSessions()と違い全sessions/全setsのlive queryを張らないため、
+// セット書き込みが増えても不要な再レンダーが起きない
 export function useWorkoutSession(id: number) {
   const { data } = useLiveQuery(
     db.select().from(workoutSessions).where(eq(workoutSessions.id, id)).limit(1),

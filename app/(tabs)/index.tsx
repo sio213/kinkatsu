@@ -1,4 +1,5 @@
 import { IconSymbol } from '@/components/ui/icon-symbol';
+import { PrimaryButton } from '@/components/ui/primary-button';
 import { Colors } from '@/constants/theme';
 import { useWorkoutSessions } from '@/hooks/use-workout-session';
 import {
@@ -39,31 +40,43 @@ export default function RecordScreen() {
       <View style={styles.container}>
         <View style={styles.sectionHeader}>
           <Text style={styles.title}>記録</Text>
-          {endedSessions.length > 0 && (
-            <TouchableOpacity style={styles.addBtn} onPress={handleStart}>
-              <Text style={styles.addBtnText}>＋ 追加</Text>
+          {!activeSession && endedSessions.length > 0 && (
+            <TouchableOpacity
+              style={styles.addBtn}
+              onPress={handleStart}
+              accessibilityRole="button"
+              accessibilityLabel="トレーニングを開始"
+            >
+              <Text style={styles.addBtnText}>＋ 開始</Text>
             </TouchableOpacity>
           )}
         </View>
 
-        {activeSession && (
-          <TouchableOpacity style={styles.resumeBanner} onPress={handleStart}>
+        {activeSession ? (
+          <TouchableOpacity
+            style={styles.resumeBanner}
+            onPress={handleStart}
+            accessibilityRole="button"
+            accessibilityLabel="進行中のトレーニングを再開する"
+          >
             <IconSymbol name="timer" size={18} color={Colors.accent} />
             <Text style={styles.resumeBannerText}>進行中のトレーニングを再開する</Text>
           </TouchableOpacity>
-        )}
-
-        {endedSessions.length === 0 ? (
+        ) : sessions.length === 0 ? (
           <View style={styles.empty}>
             <IconSymbol name="list.bullet.clipboard" size={40} color={Colors.borderStrong} />
             <Text style={styles.emptyText}>
               まだ記録がありません{'\n'}今日のトレーニングを記録して{'\n'}成長を積み上げていきましょう。
             </Text>
-            <TouchableOpacity style={styles.startBtn} onPress={handleStart}>
-              <Text style={styles.startBtnText}>＋ トレーニングを始める</Text>
-            </TouchableOpacity>
+            <PrimaryButton
+              label="＋ トレーニングを始める"
+              onPress={handleStart}
+              style={styles.startBtn}
+            />
           </View>
-        ) : (
+        ) : null}
+
+        {!activeSession && endedSessions.length > 0 && (
           <ScrollView contentContainerStyle={styles.scroll}>
             {dateGroups.map((group) => (
               <View key={group.dateLabel} style={styles.dateGroup}>
@@ -131,13 +144,9 @@ const styles = StyleSheet.create({
   empty: { flex: 1, alignItems: 'center', justifyContent: 'center', gap: 12 },
   emptyText: { fontSize: 14, color: Colors.textPlaceholder, textAlign: 'center', lineHeight: 20 },
   startBtn: {
-    backgroundColor: Colors.accent,
-    borderRadius: 8,
     paddingHorizontal: 20,
-    paddingVertical: 11,
     marginTop: 4,
   },
-  startBtnText: { color: Colors.onAccent, fontWeight: '600', fontSize: 14 },
 
   scroll: { paddingTop: 16, paddingBottom: 40, gap: 16 },
   dateGroup: { gap: 8 },

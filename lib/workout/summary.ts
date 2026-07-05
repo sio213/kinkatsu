@@ -47,19 +47,26 @@ export function formatSessionDateGroup(startedAt: number): string {
   return `${d.getMonth() + 1}月${d.getDate()}日（${WEEKDAY_LABELS[d.getDay()]}）`;
 }
 
-// 同じ日付グループのセッションをまとめる。新しい日付が先頭に来る前提（sessionsは降順ソート済み）
+// 年をまたいでも同じ月日を誤って同一グループにしないための内部キー（表示には使わない）
+function dateGroupKey(startedAt: number): string {
+  const d = new Date(startedAt);
+  return `${d.getFullYear()}-${d.getMonth()}-${d.getDate()}`;
+}
+
+// 同じ日付グループのセッションをまとめる。新しい日付が先頭に来る前提（sessionsは降順ソート済み）。
+// 同日のセッションが配列中で非連続（ソート前提が崩れている）場合は別グループに分裂する
 export function groupSessionsByDate<T extends { startedAt: number }>(
   sessions: T[],
 ): { dateLabel: string; sessions: T[] }[] {
-  const groups: { dateLabel: string; sessions: T[] }[] = [];
+  const groups: { key: string; dateLabel: string; sessions: T[] }[] = [];
   for (const session of sessions) {
-    const dateLabel = formatSessionDateGroup(session.startedAt);
+    const key = dateGroupKey(session.startedAt);
     const lastGroup = groups[groups.length - 1];
-    if (lastGroup?.dateLabel === dateLabel) {
+    if (lastGroup?.key === key) {
       lastGroup.sessions.push(session);
     } else {
-      groups.push({ dateLabel, sessions: [session] });
+      groups.push({ key, dateLabel: formatSessionDateGroup(session.startedAt), sessions: [session] });
     }
   }
-  return groups;
+  return groups.map(({ dateLabel, sessions: s }) => ({ dateLabel, sessions: s }));
 }

@@ -26,6 +26,7 @@ const MAPPING = {
   'xmark.circle.fill': 'cancel',
   timer: 'timer',
   plus: 'add',
+  xmark: 'close',
 } as IconMapping;
 
 /**

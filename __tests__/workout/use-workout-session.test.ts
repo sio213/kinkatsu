@@ -97,6 +97,14 @@ describe('useWorkoutSessions', () => {
     expect(activeSession).toEqual(inProgress);
   });
 
+  it('endedAtがnullのセッションが複数件ある場合、配列先頭（startedAt降順の最新）をactiveSessionとする', () => {
+    const newer = { id: 6, startedAt: 200, endedAt: null };
+    const older = { id: 5, startedAt: 100, endedAt: null };
+    mockLiveQueryQueue = [{ data: [newer, older] }, { data: [] }];
+    const { activeSession } = mount();
+    expect(activeSession).toEqual(newer);
+  });
+
   it('進行中セッションが無ければactiveSessionはnull', () => {
     const finished = { id: 4, startedAt: 0, endedAt: 60_000 };
     mockLiveQueryQueue = [{ data: [finished] }, { data: [] }];
