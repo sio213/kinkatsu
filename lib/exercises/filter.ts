@@ -2,6 +2,8 @@ import type { Exercise } from '@/db/schema';
 import { CATEGORY_ALL, CATEGORY_FAVORITE, CATEGORY_ORDER } from './constants';
 import { getReading } from './readings';
 import { getAliases } from './aliases';
+import { getGuide } from './guides';
+import { getMuscleReadingText } from './muscle-readings';
 
 export function normalizeForSearch(value: string): string {
   return value
@@ -28,10 +30,18 @@ export function filterExercises(
       if (normalizeForSearch(e.name).includes(q)) return true;
       const reading = getReading(e);
       if (reading != null && normalizeForSearch(reading).includes(q)) return true;
-      return getAliases(e).some((alias) => {
-        if (normalizeForSearch(alias.text).includes(q)) return true;
-        return alias.reading != null && normalizeForSearch(alias.reading).includes(q);
-      });
+      if (
+        getAliases(e).some((alias) => {
+          if (normalizeForSearch(alias.text).includes(q)) return true;
+          return alias.reading != null && normalizeForSearch(alias.reading).includes(q);
+        })
+      ) {
+        return true;
+      }
+      const guide = getGuide(e);
+      if (guide == null) return false;
+      if (normalizeForSearch(guide.muscle).includes(q)) return true;
+      return normalizeForSearch(getMuscleReadingText(guide.muscle)).includes(q);
     });
   }
   return [...list].sort((a, b) => {
