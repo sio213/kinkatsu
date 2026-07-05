@@ -1,3 +1,4 @@
+import { CategoryChip } from '@/components/exercises/category-chip';
 import { IconSymbol } from '@/components/ui/icon-symbol';
 import { Colors } from '@/constants/theme';
 import type { Exercise } from '@/db/schema';
@@ -28,7 +29,7 @@ export const PickerExerciseRow = memo(function PickerExerciseRow({
       onPress={() => onToggle(e.id)}
       accessibilityRole="checkbox"
       accessibilityState={{ checked: selected }}
-      accessibilityLabel={e.name}
+      accessibilityLabel={`${e.name}、${getCategoryLabel(e.category)}`}
     >
       <View style={[styles.checkbox, selected && styles.checkboxChecked]}>
         {selected && <IconSymbol name="checkmark" size={14} color={Colors.onAccent} />}
@@ -38,13 +39,11 @@ export const PickerExerciseRow = memo(function PickerExerciseRow({
         <Text style={styles.name} numberOfLines={1}>
           {e.name}
         </Text>
-        <View style={styles.categoryChip}>
-          <Text style={styles.categoryText}>{getCategoryLabel(e.category)}</Text>
-        </View>
+        <CategoryChip category={e.category} />
       </View>
       <TouchableOpacity
         onPress={() => onPressInfo(e.id)}
-        hitSlop={{ top: 12, bottom: 12, left: 12, right: 12 }}
+        hitSlop={{ top: 14, bottom: 14, left: 14, right: 14 }}
         accessibilityRole="button"
         accessibilityLabel={`${e.name}の詳細を見る`}
       >
@@ -76,12 +75,4 @@ const styles = StyleSheet.create({
   },
   info: { flex: 1, gap: 3 },
   name: { fontSize: 14, fontWeight: '600', color: Colors.textPrimary },
-  categoryChip: {
-    alignSelf: 'flex-start',
-    backgroundColor: Colors.accentSurface,
-    borderRadius: 10,
-    paddingHorizontal: 8,
-    paddingVertical: 2,
-  },
-  categoryText: { fontSize: 11, color: Colors.accent, fontWeight: '600' },
 });

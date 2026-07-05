@@ -53,6 +53,13 @@ export function getCategoryLabelReading(category: string): string | undefined {
 export const CATEGORY_ALL = '全て' as const;
 export const CATEGORY_FAVORITE = '★' as const;
 
+// 検索画面・種目追加ピッカーで共通のカテゴリチップ絞り込み一覧
+export const CATEGORY_FILTER_LIST = [
+  CATEGORY_ALL,
+  CATEGORY_FAVORITE,
+  ...EXERCISE_CATEGORIES,
+] as const;
+
 export const CATEGORY_ORDER: Record<string, number> = Object.fromEntries(
   EXERCISE_CATEGORIES.map((c, i) => [c, i]),
 );

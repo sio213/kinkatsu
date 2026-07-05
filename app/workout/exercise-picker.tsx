@@ -1,41 +1,26 @@
-import { chipStyles } from '@/components/exercises/chip-styles';
-import { IconSymbol } from '@/components/ui/icon-symbol';
+import { CategoryFilterChips } from '@/components/exercises/category-filter-chips';
+import { ExerciseSearchBar } from '@/components/exercises/exercise-search-bar';
 import { PrimaryButton } from '@/components/ui/primary-button';
 import { PickerExerciseRow } from '@/components/workout/picker-exercise-row';
 import { Colors } from '@/constants/theme';
 import type { Exercise } from '@/db/schema';
+import { useDebouncedPush } from '@/hooks/use-debounced-push';
 import { useExercises } from '@/hooks/use-exercises';
 import { useKeyboardInset } from '@/hooks/use-keyboard-inset';
 import { useSessionExercises } from '@/hooks/use-workout-session';
-import {
-  CATEGORY_ALL,
-  CATEGORY_FAVORITE,
-  EXERCISE_CATEGORIES,
-  getCategoryLabel,
-} from '@/lib/exercises/constants';
+import { CATEGORY_ALL } from '@/lib/exercises/constants';
 import { filterExercises } from '@/lib/exercises/filter';
 import { addExercisesToSession } from '@/lib/workout/session';
-import { useLocalSearchParams, useRouter } from 'expo-router';
+import { useFocusEffect, useLocalSearchParams, useRouter } from 'expo-router';
 import { useCallback, useMemo, useRef, useState } from 'react';
-import {
-  Alert,
-  FlatList,
-  Platform,
-  ScrollView,
-  StyleSheet,
-  Text,
-  TextInput,
-  TouchableOpacity,
-  View,
-} from 'react-native';
+import { Alert, FlatList, Keyboard, StyleSheet, Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-
-const CATEGORY_FILTERS = [CATEGORY_ALL, CATEGORY_FAVORITE, ...EXERCISE_CATEGORIES] as const;
 
 export default function ExercisePickerScreen() {
   const { sessionId: sessionIdParam } = useLocalSearchParams<{ sessionId: string }>();
   const sessionId = Number(sessionIdParam);
   const router = useRouter();
+  const pushDebounced = useDebouncedPush();
   const { exercises } = useExercises();
   const sessionExercises = useSessionExercises(sessionId);
 
@@ -45,6 +30,14 @@ export default function ExercisePickerScreen() {
   const [selectedIds, setSelectedIds] = useState<number[]>([]);
   const isAddingRef = useRef(false);
   const keyboardInset = useKeyboardInset();
+
+  // 種目詳細等へ遷移してこの画面がフォーカスを失うタイミングでキーボードを閉じる。
+  // 開いたままだと戻ってきたときに一覧が狭いままになってしまうため（exercises.tsxと同じ対応）
+  useFocusEffect(
+    useCallback(() => {
+      return () => Keyboard.dismiss();
+    }, []),
+  );
 
   // 既にセッションへ追加済みの種目は選び直せないよう候補から除く（二重追加防止）
   const addedIds = useMemo(() => new Set(sessionExercises.map((e) => e.id)), [sessionExercises]);
@@ -59,6 +52,8 @@ export default function ExercisePickerScreen() {
   );
 
   const handleToggle = useCallback((id: number) => {
+    // 選択したら検索キーボードを閉じ、画面下部の「追加」ボタンを隠れさせない
+    Keyboard.dismiss();
     setSelectedIds((prev) =>
       prev.includes(id) ? prev.filter((existingId) => existingId !== id) : [...prev, id],
     );
@@ -66,9 +61,9 @@ export default function ExercisePickerScreen() {
 
   const handlePressInfo = useCallback(
     (id: number) => {
-      router.push(`/exercise/${id}`);
+      pushDebounced(`/exercise/${id}`);
     },
-    [router],
+    [pushDebounced],
   );
 
   const handleAdd = useCallback(async () => {
@@ -100,55 +95,8 @@ export default function ExercisePickerScreen() {
 
   const listHeader = (
     <View style={styles.headerArea}>
-      <View style={styles.searchWrapper}>
-        <View style={styles.searchIconWrapper}>
-          <IconSymbol name="magnifyingglass" size={18} color={Colors.textPlaceholder} />
-        </View>
-        <TextInput
-          style={styles.searchInput}
-          value={search}
-          onChangeText={setSearch}
-          placeholder="種目を検索..."
-          clearButtonMode="while-editing"
-          returnKeyType="search"
-        />
-        {Platform.OS !== 'ios' && search.length > 0 && (
-          <TouchableOpacity
-            style={styles.searchClearBtn}
-            onPress={() => setSearch('')}
-            hitSlop={{ top: 12, bottom: 12, left: 12, right: 12 }}
-            accessibilityRole="button"
-            accessibilityLabel="検索文字をクリア"
-          >
-            <IconSymbol name="xmark.circle.fill" size={18} color={Colors.textPlaceholder} />
-          </TouchableOpacity>
-        )}
-      </View>
-
-      <ScrollView
-        horizontal
-        showsHorizontalScrollIndicator={false}
-        contentContainerStyle={styles.categoryScroll}
-      >
-        {CATEGORY_FILTERS.map((cat) => {
-          const isActive = activeCategory === cat;
-          const label = getCategoryLabel(cat);
-          return (
-            <TouchableOpacity
-              key={cat}
-              style={[chipStyles.chip, isActive && chipStyles.chipActive]}
-              onPress={() => setActiveCategory(cat)}
-              accessibilityRole="radio"
-              accessibilityState={{ checked: isActive }}
-              accessibilityLabel={label}
-            >
-              <Text style={[chipStyles.chipText, isActive && chipStyles.chipTextActive]}>
-                {label}
-              </Text>
-            </TouchableOpacity>
-          );
-        })}
-      </ScrollView>
+      <ExerciseSearchBar value={search} onChangeText={setSearch} onSubmitEditing={Keyboard.dismiss} />
+      <CategoryFilterChips activeCategory={activeCategory} onChange={setActiveCategory} />
     </View>
   );
 
@@ -168,6 +116,7 @@ export default function ExercisePickerScreen() {
         data={filtered}
         keyExtractor={(item) => String(item.id)}
         renderItem={renderItem}
+        ItemSeparatorComponent={() => <View style={styles.separator} />}
         ListHeaderComponent={listHeader}
         ListEmptyComponent={emptyComponent}
         contentContainerStyle={styles.content}
@@ -193,36 +142,7 @@ const styles = StyleSheet.create({
 
   headerArea: { paddingTop: 12, gap: 8, marginBottom: 4 },
 
-  searchWrapper: { position: 'relative', justifyContent: 'center' },
-  searchIconWrapper: {
-    position: 'absolute',
-    left: 11,
-    top: 0,
-    bottom: 0,
-    justifyContent: 'center',
-    zIndex: 1,
-  },
-  searchClearBtn: {
-    position: 'absolute',
-    right: 11,
-    top: 0,
-    bottom: 0,
-    justifyContent: 'center',
-    zIndex: 1,
-  },
-  searchInput: {
-    borderWidth: 1,
-    borderColor: Colors.borderStrong,
-    borderRadius: 8,
-    paddingLeft: 36,
-    paddingRight: 36,
-    paddingVertical: 9,
-    fontSize: 14,
-    color: Colors.textPrimary,
-    backgroundColor: Colors.surfaceMuted,
-  },
-
-  categoryScroll: { gap: 6 },
+  separator: { height: 4 },
 
   emptyWrapper: { alignItems: 'center', paddingVertical: 32 },
   empty: { color: Colors.textPlaceholder, fontSize: 14 },

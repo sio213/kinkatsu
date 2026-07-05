@@ -1,6 +1,6 @@
+import { CategoryChip } from '@/components/exercises/category-chip';
 import { Colors } from '@/constants/theme';
 import type { SessionExercise } from '@/hooks/use-workout-session';
-import { getCategoryLabel } from '@/lib/exercises/constants';
 import { getExerciseImages } from '@/lib/exercises/images';
 import { Image } from 'expo-image';
 import { memo } from 'react';
@@ -18,9 +18,7 @@ export const SessionExerciseCard = memo(function SessionExerciseCard({ exercise 
         <Text style={styles.name} numberOfLines={1}>
           {exercise.name}
         </Text>
-        <View style={styles.categoryChip}>
-          <Text style={styles.categoryText}>{getCategoryLabel(exercise.category)}</Text>
-        </View>
+        <CategoryChip category={exercise.category} />
       </View>
     </View>
   );
@@ -41,16 +39,10 @@ const styles = StyleSheet.create({
     width: 44,
     height: 44,
     borderRadius: 8,
-    backgroundColor: Colors.surfaceMuted,
+    backgroundColor: Colors.surfaceSubtle,
+    borderWidth: 1,
+    borderColor: Colors.border,
   },
   info: { flex: 1, gap: 3 },
   name: { fontSize: 14, fontWeight: '600', color: Colors.textPrimary },
-  categoryChip: {
-    alignSelf: 'flex-start',
-    backgroundColor: Colors.accentSurface,
-    borderRadius: 10,
-    paddingHorizontal: 8,
-    paddingVertical: 2,
-  },
-  categoryText: { fontSize: 11, color: Colors.accent, fontWeight: '600' },
 });

@@ -1,10 +1,10 @@
+import { CategoryChip } from '@/components/exercises/category-chip';
 import { Colors } from '@/constants/theme';
 import type { Exercise } from '@/db/schema';
 import { Image } from 'expo-image';
 import { memo, useCallback } from 'react';
 import { StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import { getExerciseImages } from '@/lib/exercises/images';
-import { getCategoryLabel } from '@/lib/exercises/constants';
 import { useFavoriteToggle } from '@/hooks/use-favorite-toggle';
 import { useDebouncedPush } from '@/hooks/use-debounced-push';
 
@@ -36,9 +36,7 @@ export const ExerciseCard = memo(function ExerciseCard({
       <View style={styles.info}>
         <Text style={styles.name}>{e.name}</Text>
         <View style={styles.meta}>
-          <View style={styles.categoryChip}>
-            <Text style={styles.categoryText}>{getCategoryLabel(e.category)}</Text>
-          </View>
+          <CategoryChip category={e.category} />
         </View>
       </View>
       <TouchableOpacity
@@ -77,13 +75,6 @@ const styles = StyleSheet.create({
   info: { flex: 1, gap: 4 },
   name: { fontSize: 15, fontWeight: '600', color: Colors.textPrimary },
   meta: { flexDirection: 'row', alignItems: 'center', gap: 6 },
-  categoryChip: {
-    backgroundColor: Colors.accentSurface,
-    borderRadius: 10,
-    paddingHorizontal: 8,
-    paddingVertical: 3,
-  },
-  categoryText: { fontSize: 11.5, color: Colors.accent, fontWeight: '600' },
 
   star: { fontSize: 20, color: Colors.borderStrong },
   starActive: { color: Colors.favorite },
