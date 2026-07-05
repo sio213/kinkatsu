@@ -1,4 +1,5 @@
 import { IconSymbol } from '@/components/ui/icon-symbol';
+import { ListErrorBoundary } from '@/components/ui/list-error-boundary';
 import { NotFoundState } from '@/components/ui/not-found-state';
 import { PrimaryButton } from '@/components/ui/primary-button';
 import { AddExerciseButton } from '@/components/workout/add-exercise-button';
@@ -114,7 +115,11 @@ export default function WorkoutScreen() {
           contentContainerStyle={styles.exerciseListContent}
           data={sessionExercises}
           keyExtractor={(item) => String(item.id)}
-          renderItem={({ item }) => <SessionExerciseCard exercise={item} />}
+          renderItem={({ item }) => (
+            <ListErrorBoundary>
+              <SessionExerciseCard exercise={item} />
+            </ListErrorBoundary>
+          )}
           ListFooterComponent={
             <AddExerciseButton onPress={handleAddExercise} style={styles.addExerciseBtnInline} />
           }

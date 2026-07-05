@@ -1,5 +1,7 @@
 import { CategoryFilterChips } from '@/components/exercises/category-filter-chips';
 import { ExerciseSearchBar } from '@/components/exercises/exercise-search-bar';
+import { ListErrorBoundary } from '@/components/ui/list-error-boundary';
+import { NotFoundState } from '@/components/ui/not-found-state';
 import { PrimaryButton } from '@/components/ui/primary-button';
 import { PickerExerciseRow } from '@/components/workout/picker-exercise-row';
 import { Colors } from '@/constants/theme';
@@ -83,12 +85,14 @@ export default function ExercisePickerScreen() {
 
   const renderItem = useCallback(
     ({ item: e }: { item: Exercise }) => (
-      <PickerExerciseRow
-        exercise={e}
-        selected={selectedIds.includes(e.id)}
-        onToggle={handleToggle}
-        onPressInfo={handlePressInfo}
-      />
+      <ListErrorBoundary>
+        <PickerExerciseRow
+          exercise={e}
+          selected={selectedIds.includes(e.id)}
+          onToggle={handleToggle}
+          onPressInfo={handlePressInfo}
+        />
+      </ListErrorBoundary>
     ),
     [selectedIds, handleToggle, handlePressInfo],
   );
@@ -108,6 +112,18 @@ export default function ExercisePickerScreen() {
       </Text>
     </View>
   );
+
+  if (!Number.isFinite(sessionId)) {
+    return (
+      <SafeAreaView style={styles.safeArea} edges={['bottom']}>
+        <NotFoundState
+          message="トレーニングが見つかりません"
+          actionLabel="戻る"
+          onPressAction={() => router.back()}
+        />
+      </SafeAreaView>
+    );
+  }
 
   return (
     <SafeAreaView style={styles.safeArea} edges={['bottom']}>

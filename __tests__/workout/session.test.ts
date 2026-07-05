@@ -13,6 +13,13 @@ jest.mock('@/db/client', () => {
   mockUpdateSet = jest.fn().mockReturnValue({ where: (...args: unknown[]) => mockUpdateWhere(...args) });
   mockSelectWhere = jest.fn().mockResolvedValue([]);
 
+  const tx = {
+    insert: jest.fn().mockReturnValue({ values: (...args: unknown[]) => mockInsertValues(...args) }),
+    select: jest.fn().mockReturnValue({
+      from: jest.fn().mockReturnValue({ where: (...args: unknown[]) => mockSelectWhere(...args) }),
+    }),
+  };
+
   return {
     db: {
       insert: jest.fn().mockReturnValue({ values: (...args: unknown[]) => mockInsertValues(...args) }),
@@ -20,6 +27,8 @@ jest.mock('@/db/client', () => {
       select: jest.fn().mockReturnValue({
         from: jest.fn().mockReturnValue({ where: (...args: unknown[]) => mockSelectWhere(...args) }),
       }),
+      // addExercisesToSessionのトランザクション化に伴い、txにも同じselect/insertモックを渡す
+      transaction: jest.fn((callback: (tx: unknown) => unknown) => callback(tx)),
     },
   };
 });
