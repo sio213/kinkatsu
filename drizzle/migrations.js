@@ -12,6 +12,7 @@ import m0007 from './0007_exercise_category_slug.sql';
 import m0008 from './0008_backfill_exercise_slug.sql';
 import m0009 from './0009_add_exercise_guide_fields.sql';
 import m0010 from './0010_recording_feature_m1.sql';
+import m0011 from './0011_amused_night_nurse.sql';
 
   export default {
     journal,
@@ -26,7 +27,8 @@ m0006,
 m0007,
 m0008,
 m0009,
-m0010
+m0010,
+m0011
     }
   }
   
