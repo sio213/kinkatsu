@@ -9,6 +9,7 @@ jest.mock('@/db/client', () => {
     where: jest.fn().mockReturnThis(),
     groupBy: jest.fn().mockReturnThis(),
     limit: jest.fn().mockReturnThis(),
+    innerJoin: jest.fn().mockReturnThis(),
   };
   return {
     db: {
@@ -20,6 +21,8 @@ jest.mock('@/db/client', () => {
 jest.mock('@/db/schema', () => ({
   workoutSessions: { id: 'id', startedAt: 'startedAt', endedAt: 'endedAt' },
   sets: { sessionId: 'sessionId', weight: 'weight', reps: 'reps' },
+  exercises: { id: 'id' },
+  workoutSessionExercises: { sessionId: 'sessionId', exerciseId: 'exerciseId', orderIndex: 'orderIndex' },
 }));
 
 jest.mock('drizzle-orm', () => ({
@@ -29,6 +32,7 @@ jest.mock('drizzle-orm', () => ({
     jest.fn((strings: TemplateStringsArray, ...values: unknown[]) => ({ strings, values })),
     { raw: jest.fn() },
   ),
+  getTableColumns: jest.fn(() => ({})),
 }));
 
 jest.mock('drizzle-orm/expo-sqlite', () => ({
@@ -38,6 +42,7 @@ jest.mock('drizzle-orm/expo-sqlite', () => ({
 import React from 'react';
 import { act, create } from 'react-test-renderer';
 import {
+  useSessionExercises,
   useSessionSetCount,
   useSessionStats,
   useWorkoutSession,
@@ -158,5 +163,23 @@ describe('useSessionSetCount', () => {
   it('集計行のcountをそのまま返す', () => {
     mockLiveQueryQueue = [{ data: [{ count: 4 }] }];
     expect(mount()).toBe(4);
+  });
+});
+
+describe('useSessionExercises', () => {
+  const mount = makeHarness(() => useSessionExercises(1));
+
+  it('dataがundefinedのとき空配列を返す', () => {
+    mockLiveQueryQueue = [{ data: undefined }];
+    expect(mount()).toEqual([]);
+  });
+
+  it('orderIndex付きの種目一覧をそのまま返す', () => {
+    const rows = [
+      { id: 10, name: 'ベンチプレス', orderIndex: 0 },
+      { id: 11, name: 'スクワット', orderIndex: 1 },
+    ];
+    mockLiveQueryQueue = [{ data: rows }];
+    expect(mount()).toEqual(rows);
   });
 });

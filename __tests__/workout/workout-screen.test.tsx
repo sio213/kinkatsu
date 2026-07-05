@@ -1,11 +1,13 @@
 const mockBack = jest.fn();
+const mockPush = jest.fn();
 const mockUseLocalSearchParams = jest.fn();
 const mockUseWorkoutSession = jest.fn();
 const mockUseSessionSetCount = jest.fn();
+const mockUseSessionExercises = jest.fn();
 const mockEndWorkoutSession = jest.fn();
 
 jest.mock('expo-router', () => ({
-  useRouter: () => ({ back: mockBack }),
+  useRouter: () => ({ back: mockBack, push: mockPush }),
   useLocalSearchParams: () => mockUseLocalSearchParams(),
   // Stack.Screen はナビゲーターのoptionsを設定するコンポーネントで本来は見た目を持たないが、
   // headerRightの中身（タイマーチップ）をテストで検証できるよう、そのレンダー関数だけ実行してやる
@@ -18,6 +20,7 @@ jest.mock('expo-router', () => ({
 jest.mock('@/hooks/use-workout-session', () => ({
   useWorkoutSession: (...args: unknown[]) => mockUseWorkoutSession(...args),
   useSessionSetCount: (...args: unknown[]) => mockUseSessionSetCount(...args),
+  useSessionExercises: (...args: unknown[]) => mockUseSessionExercises(...args),
 }));
 
 jest.mock('@/lib/workout/session', () => ({
@@ -56,6 +59,7 @@ beforeEach(() => {
   jest.clearAllMocks();
   mockUseLocalSearchParams.mockReturnValue({ id: '1' });
   mockUseSessionSetCount.mockReturnValue(0);
+  mockUseSessionExercises.mockReturnValue([]);
   mockEndWorkoutSession.mockResolvedValue(undefined);
   jest.spyOn(Alert, 'alert').mockImplementation(() => {});
 });
@@ -218,16 +222,31 @@ test('endWorkoutSessionが失敗した場合はエラーAlertが表示され、r
   expect(mockBack).not.toHaveBeenCalled();
 });
 
-test('種目を追加ボタンは押しても何も起きない（種目追加ピッカー実装後に配線予定）', () => {
+test('種目を追加ボタンを押すと種目追加ピッカーへ遷移する', () => {
   mockUseWorkoutSession.mockReturnValue({ session: activeSession, loaded: true });
   const root = render();
 
   const addBtn = findButtonByLabel(root, '種目を追加')!;
-  expect(() => {
-    act(() => {
-      addBtn.props.onPress();
-    });
-  }).not.toThrow();
-  expect(mockEndWorkoutSession).not.toHaveBeenCalled();
-  expect(mockBack).not.toHaveBeenCalled();
+  act(() => {
+    addBtn.props.onPress();
+  });
+
+  expect(mockPush).toHaveBeenCalledWith({
+    pathname: '/workout/exercise-picker',
+    params: { sessionId: '1' },
+  });
+});
+
+test('種目が追加済みの場合は一覧表示になり、空状態は表示されない', () => {
+  mockUseWorkoutSession.mockReturnValue({ session: activeSession, loaded: true });
+  mockUseSessionExercises.mockReturnValue([
+    { id: 10, name: 'ベンチプレス', category: 'chest', orderIndex: 0 },
+    { id: 11, name: 'スクワット', category: 'legs', orderIndex: 1 },
+  ]);
+  const root = render();
+
+  expect(root.findByProps({ children: 'ベンチプレス' })).toBeDefined();
+  expect(root.findByProps({ children: 'スクワット' })).toBeDefined();
+  expect(() => root.findByProps({ children: 'まだ種目がありません' })).toThrow();
+  expect(findButtonByLabel(root, '種目を追加')).toBeDefined();
 });

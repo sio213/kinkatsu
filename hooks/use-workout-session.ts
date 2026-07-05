@@ -1,7 +1,14 @@
 import { db } from '@/db/client';
-import { sets, workoutSessions, type WorkoutSession } from '@/db/schema';
+import {
+  exercises,
+  sets,
+  workoutSessionExercises,
+  workoutSessions,
+  type Exercise,
+  type WorkoutSession,
+} from '@/db/schema';
 import type { SessionSummary } from '@/lib/workout/summary';
-import { eq, desc, sql } from 'drizzle-orm';
+import { eq, desc, sql, getTableColumns } from 'drizzle-orm';
 import { useLiveQuery } from 'drizzle-orm/expo-sqlite';
 
 // セッションの一覧・進行中判定のみを担う（セット集計は useSessionStats に分離）
@@ -55,4 +62,19 @@ export function useSessionSetCount(sessionId: number): number {
       .where(eq(sets.sessionId, sessionId)),
   );
   return data?.[0]?.count ?? 0;
+}
+
+export type SessionExercise = Exercise & { orderIndex: number };
+
+// トレーニング中画面に表示する、このセッションに追加済みの種目一覧（並び順つき）
+export function useSessionExercises(sessionId: number): SessionExercise[] {
+  const { data } = useLiveQuery(
+    db
+      .select({ ...getTableColumns(exercises), orderIndex: workoutSessionExercises.orderIndex })
+      .from(workoutSessionExercises)
+      .innerJoin(exercises, eq(workoutSessionExercises.exerciseId, exercises.id))
+      .where(eq(workoutSessionExercises.sessionId, sessionId))
+      .orderBy(workoutSessionExercises.orderIndex),
+  );
+  return data ?? [];
 }

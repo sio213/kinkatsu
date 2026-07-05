@@ -1,0 +1,236 @@
+import { chipStyles } from '@/components/exercises/chip-styles';
+import { IconSymbol } from '@/components/ui/icon-symbol';
+import { PrimaryButton } from '@/components/ui/primary-button';
+import { PickerExerciseRow } from '@/components/workout/picker-exercise-row';
+import { Colors } from '@/constants/theme';
+import type { Exercise } from '@/db/schema';
+import { useExercises } from '@/hooks/use-exercises';
+import { useKeyboardInset } from '@/hooks/use-keyboard-inset';
+import { useSessionExercises } from '@/hooks/use-workout-session';
+import {
+  CATEGORY_ALL,
+  CATEGORY_FAVORITE,
+  EXERCISE_CATEGORIES,
+  getCategoryLabel,
+} from '@/lib/exercises/constants';
+import { filterExercises } from '@/lib/exercises/filter';
+import { addExercisesToSession } from '@/lib/workout/session';
+import { useLocalSearchParams, useRouter } from 'expo-router';
+import { useCallback, useMemo, useRef, useState } from 'react';
+import {
+  Alert,
+  FlatList,
+  Platform,
+  ScrollView,
+  StyleSheet,
+  Text,
+  TextInput,
+  TouchableOpacity,
+  View,
+} from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
+
+const CATEGORY_FILTERS = [CATEGORY_ALL, CATEGORY_FAVORITE, ...EXERCISE_CATEGORIES] as const;
+
+export default function ExercisePickerScreen() {
+  const { sessionId: sessionIdParam } = useLocalSearchParams<{ sessionId: string }>();
+  const sessionId = Number(sessionIdParam);
+  const router = useRouter();
+  const { exercises } = useExercises();
+  const sessionExercises = useSessionExercises(sessionId);
+
+  const [search, setSearch] = useState('');
+  const [activeCategory, setActiveCategory] = useState<string>(CATEGORY_ALL);
+  // 選択順を保持するため配列で管理する（Setだと挿入順の保証が実装依存になるため避ける）
+  const [selectedIds, setSelectedIds] = useState<number[]>([]);
+  const isAddingRef = useRef(false);
+  const keyboardInset = useKeyboardInset();
+
+  // 既にセッションへ追加済みの種目は選び直せないよう候補から除く（二重追加防止）
+  const addedIds = useMemo(() => new Set(sessionExercises.map((e) => e.id)), [sessionExercises]);
+  const selectable = useMemo(
+    () => exercises.filter((e) => !addedIds.has(e.id)),
+    [exercises, addedIds],
+  );
+
+  const filtered = useMemo(
+    () => filterExercises(selectable, activeCategory, search),
+    [selectable, activeCategory, search],
+  );
+
+  const handleToggle = useCallback((id: number) => {
+    setSelectedIds((prev) =>
+      prev.includes(id) ? prev.filter((existingId) => existingId !== id) : [...prev, id],
+    );
+  }, []);
+
+  const handlePressInfo = useCallback(
+    (id: number) => {
+      router.push(`/exercise/${id}`);
+    },
+    [router],
+  );
+
+  const handleAdd = useCallback(async () => {
+    if (selectedIds.length === 0 || !Number.isFinite(sessionId)) return;
+    if (isAddingRef.current) return;
+    isAddingRef.current = true;
+    try {
+      await addExercisesToSession(sessionId, selectedIds);
+      router.back();
+    } catch (e) {
+      console.error('[add exercises to session]', e);
+      Alert.alert('エラー', '種目を追加できませんでした。');
+    } finally {
+      isAddingRef.current = false;
+    }
+  }, [selectedIds, sessionId, router]);
+
+  const renderItem = useCallback(
+    ({ item: e }: { item: Exercise }) => (
+      <PickerExerciseRow
+        exercise={e}
+        selected={selectedIds.includes(e.id)}
+        onToggle={handleToggle}
+        onPressInfo={handlePressInfo}
+      />
+    ),
+    [selectedIds, handleToggle, handlePressInfo],
+  );
+
+  const listHeader = (
+    <View style={styles.headerArea}>
+      <View style={styles.searchWrapper}>
+        <View style={styles.searchIconWrapper}>
+          <IconSymbol name="magnifyingglass" size={18} color={Colors.textPlaceholder} />
+        </View>
+        <TextInput
+          style={styles.searchInput}
+          value={search}
+          onChangeText={setSearch}
+          placeholder="種目を検索..."
+          clearButtonMode="while-editing"
+          returnKeyType="search"
+        />
+        {Platform.OS !== 'ios' && search.length > 0 && (
+          <TouchableOpacity
+            style={styles.searchClearBtn}
+            onPress={() => setSearch('')}
+            hitSlop={{ top: 12, bottom: 12, left: 12, right: 12 }}
+            accessibilityRole="button"
+            accessibilityLabel="検索文字をクリア"
+          >
+            <IconSymbol name="xmark.circle.fill" size={18} color={Colors.textPlaceholder} />
+          </TouchableOpacity>
+        )}
+      </View>
+
+      <ScrollView
+        horizontal
+        showsHorizontalScrollIndicator={false}
+        contentContainerStyle={styles.categoryScroll}
+      >
+        {CATEGORY_FILTERS.map((cat) => {
+          const isActive = activeCategory === cat;
+          const label = getCategoryLabel(cat);
+          return (
+            <TouchableOpacity
+              key={cat}
+              style={[chipStyles.chip, isActive && chipStyles.chipActive]}
+              onPress={() => setActiveCategory(cat)}
+              accessibilityRole="radio"
+              accessibilityState={{ checked: isActive }}
+              accessibilityLabel={label}
+            >
+              <Text style={[chipStyles.chipText, isActive && chipStyles.chipTextActive]}>
+                {label}
+              </Text>
+            </TouchableOpacity>
+          );
+        })}
+      </ScrollView>
+    </View>
+  );
+
+  const trimmedSearch = search.trim();
+  const emptyComponent = (
+    <View style={styles.emptyWrapper}>
+      <Text style={styles.empty}>
+        {trimmedSearch ? `「${trimmedSearch}」は見つかりません` : '該当する種目がありません'}
+      </Text>
+    </View>
+  );
+
+  return (
+    <SafeAreaView style={styles.safeArea} edges={['bottom']}>
+      <FlatList
+        style={styles.list}
+        data={filtered}
+        keyExtractor={(item) => String(item.id)}
+        renderItem={renderItem}
+        ListHeaderComponent={listHeader}
+        ListEmptyComponent={emptyComponent}
+        contentContainerStyle={styles.content}
+        contentInset={{ bottom: keyboardInset }}
+        scrollIndicatorInsets={{ bottom: keyboardInset }}
+        keyboardShouldPersistTaps="handled"
+      />
+      <View style={styles.footer}>
+        <PrimaryButton
+          label={selectedIds.length > 0 ? `${selectedIds.length}件を追加` : '追加'}
+          onPress={handleAdd}
+          disabled={selectedIds.length === 0}
+        />
+      </View>
+    </SafeAreaView>
+  );
+}
+
+const styles = StyleSheet.create({
+  safeArea: { flex: 1, backgroundColor: Colors.background },
+  list: { flex: 1 },
+  content: { paddingHorizontal: 16, paddingBottom: 16 },
+
+  headerArea: { paddingTop: 12, gap: 8, marginBottom: 4 },
+
+  searchWrapper: { position: 'relative', justifyContent: 'center' },
+  searchIconWrapper: {
+    position: 'absolute',
+    left: 11,
+    top: 0,
+    bottom: 0,
+    justifyContent: 'center',
+    zIndex: 1,
+  },
+  searchClearBtn: {
+    position: 'absolute',
+    right: 11,
+    top: 0,
+    bottom: 0,
+    justifyContent: 'center',
+    zIndex: 1,
+  },
+  searchInput: {
+    borderWidth: 1,
+    borderColor: Colors.borderStrong,
+    borderRadius: 8,
+    paddingLeft: 36,
+    paddingRight: 36,
+    paddingVertical: 9,
+    fontSize: 14,
+    color: Colors.textPrimary,
+    backgroundColor: Colors.surfaceMuted,
+  },
+
+  categoryScroll: { gap: 6 },
+
+  emptyWrapper: { alignItems: 'center', paddingVertical: 32 },
+  empty: { color: Colors.textPlaceholder, fontSize: 14 },
+
+  footer: {
+    padding: 16,
+    paddingTop: 8,
+    borderTopWidth: 1,
+    borderTopColor: Colors.border,
+  },
+});
