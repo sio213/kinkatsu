@@ -439,6 +439,16 @@ const GUIDES: Record<string, ExerciseGuide> = {
     caution: '過度に腰を反らせない・勢いをつけない',
     breath: '起こすときに吐き、下げるときに吸う',
   },
+  weighted_back_extension: {
+    muscle: '脊柱起立筋・ハムストリング・臀筋',
+    points: [
+      'プレートを胸の前で抱える、またはバーベルを担いで負荷を追加する',
+      'バックエクステンション台に足を固定して上体を下げる',
+      '腰を反らせすぎず、背中が一直線になる位置まで起こす',
+    ],
+    caution: '過度に腰を反らせない・無加重でフォームが安定してから重量を追加する',
+    breath: '起こすときに吐き、下げるときに吸う',
+  },
 
   // 有酸素
   running: {
@@ -1733,6 +1743,16 @@ const GUIDES: Record<string, ExerciseGuide> = {
     caution: '勢いをつけて脚を振らない',
     breath: '巻き上げるときに吐き、下ろすときに吸う',
   },
+  decline_crunch: {
+    muscle: '腹直筋',
+    points: [
+      'デクラインベンチに足を固定して仰向けになる',
+      'シットアップと違い上体全体は起こしきらず、丸めるように起こす',
+      '反動を使わずゆっくり下ろす',
+    ],
+    caution: '首に力を入れすぎない・反動をつけない',
+    breath: '起こすときに吐き、下ろすときに吸う',
+  },
   sit_up: {
     muscle: '腹直筋',
     points: [
@@ -1773,6 +1793,16 @@ const GUIDES: Record<string, ExerciseGuide> = {
     caution: '腰を反動で起こさず腹筋の力で行う',
     breath: '起こすときに吐き、下ろすときに吸う',
   },
+  weighted_decline_sit_up: {
+    muscle: '腹直筋',
+    points: [
+      'プレートを胸の前や頭の後ろで保持して負荷を追加する',
+      'デクラインベンチに足を固定し、通常のデクラインシットアップと同じフォームで上体を完全に起こす',
+      'ゆっくり下ろして反動を使わない',
+    ],
+    caution: '重量は安定して保持できる範囲に留める・腰を反動で起こさない',
+    breath: '起こすときに吐き、下ろすときに吸う',
+  },
   hanging_knee_raise: {
     muscle: '腹直筋下部',
     points: [
@@ -1781,6 +1811,16 @@ const GUIDES: Record<string, ExerciseGuide> = {
       'ゆっくり下ろして反動を使わない',
     ],
     caution: '勢いをつけて体を振らない',
+    breath: '上げるときに吐き、下ろすときに吸う',
+  },
+  weighted_hanging_knee_raise: {
+    muscle: '腹直筋下部',
+    points: [
+      '足首にダンベルを挟む、または足でダンベルを保持して負荷を追加する',
+      'バーにぶら下がり、体が揺れないよう静止する',
+      '膝を曲げたまま胸に向かって引き上げる',
+    ],
+    caution: '勢いをつけて体を振らない・重量は無理のない範囲から始める',
     breath: '上げるときに吐き、下ろすときに吸う',
   },
   cable_woodchopper: {
@@ -2501,6 +2541,16 @@ const GUIDES: Record<string, ExerciseGuide> = {
       '太もも前面の力だけで元に戻る',
     ],
     caution: 'バランスを崩しやすいので支えを使いながら行う',
+    breath: '沈むときに吸い、戻るときに吐く',
+  },
+  weighted_sissy_squat: {
+    muscle: '大腿四頭筋',
+    points: [
+      'プレートを胸の前で抱えて負荷を追加する',
+      'かかとを浮かせ、膝を前に出しながら上体を後ろに倒す',
+      '大腿四頭筋のストレッチを感じるところまで沈み、太もも前面の力で戻る',
+    ],
+    caution: 'バランスを崩しやすいので支えを使いながら行う・重量は軽めから始める',
     breath: '沈むときに吸い、戻るときに吐く',
   },
   jump_squat: {
