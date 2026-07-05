@@ -34,7 +34,15 @@ const MUSCLE_SET = [HIP_THRUST, BICYCLE_CRUNCH];
 const PLANK = make({ id: 13, name: 'プランク', category: 'core', slug: 'plank', source: 'preset' });
 const WALL_SIT = make({ id: 14, name: 'ウォールシット', category: 'leg', slug: 'wall_sit', source: 'preset' });
 const CUSTOM_NO_SLUG = make({ id: 15, name: 'カスタム種目', category: 'other', source: 'custom' });
-const ALIAS_SET = [PLANK, WALL_SIT, CUSTOM_NO_SLUG];
+const SHRUG = make({ id: 16, name: 'シュラッグ', category: 'shoulder', slug: 'shrug', source: 'preset' });
+const DUMBBELL_SHRUG = make({
+  id: 17,
+  name: 'ダンベルシュラッグ',
+  category: 'shoulder',
+  slug: 'dumbbell_shrug',
+  source: 'preset',
+});
+const ALIAS_SET = [PLANK, WALL_SIT, CUSTOM_NO_SLUG, SHRUG, DUMBBELL_SHRUG];
 
 describe('filterExercises', () => {
   it('空配列 → []', () => {
@@ -195,6 +203,11 @@ describe('filterExercises', () => {
 
     it('slugを持たないcustom種目は俗称検索でクラッシュしない', () => {
       expect(() => filterExercises(ALIAS_SET, CATEGORY_ALL, 'フロントブリッジ')).not.toThrow();
+    });
+
+    it('器具違いで同じ俗称を共有する種目は両方ヒットする（肩すくめ→シュラッグ/ダンベルシュラッグ）', () => {
+      const result = filterExercises(ALIAS_SET, CATEGORY_ALL, 'かたすくめ');
+      expect(result.map((e) => e.name).sort()).toEqual(['シュラッグ', 'ダンベルシュラッグ'].sort());
     });
   });
 
