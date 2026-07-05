@@ -21,7 +21,11 @@ export function useReminders() {
     const sub = AppState.addEventListener('change', (state) => {
       if (state === 'active') setNow(new Date());
     });
-    return () => sub.remove();
+    const interval = setInterval(() => setNow(new Date()), 60_000);
+    return () => {
+      sub.remove();
+      clearInterval(interval);
+    };
   }, []);
 
   const { data } = useLiveQuery(db.select().from(reminders));

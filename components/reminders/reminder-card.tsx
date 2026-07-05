@@ -66,6 +66,7 @@ export function ReminderCard({
             style={styles.actionBtn}
             onPress={isEditing ? onCloseEdit : onEdit}
             accessibilityLabel={isEditing ? '編集を閉じる' : `${r.title}を編集`}
+            hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
           >
             <Text style={styles.actionBtnText}>{isEditing ? '閉じる' : '編集'}</Text>
           </TouchableOpacity>
@@ -73,6 +74,7 @@ export function ReminderCard({
             style={[styles.actionBtn, styles.actionBtnDanger]}
             onPress={onDelete}
             accessibilityLabel={`${r.title}を削除`}
+            hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
           >
             <Text style={[styles.actionBtnText, styles.actionBtnDangerText]}>削除</Text>
           </TouchableOpacity>

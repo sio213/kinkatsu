@@ -42,7 +42,7 @@ function formatRelativeDay(date: Date, now: Date): string {
   return `${m}/${d}`;
 }
 
-export function formatNextFire(date: Date | null, now: Date = new Date()): string {
+export function formatNextFire(date: Date | null, now: Date): string {
   if (!date) return '—';
   const h = String(date.getHours()).padStart(2, '0');
   const min = String(date.getMinutes()).padStart(2, '0');

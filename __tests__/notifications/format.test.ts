@@ -17,6 +17,11 @@ describe('formatNextFire', () => {
     expect(formatNextFire(tomorrow, now)).toBe('次回: 明日 09:00');
   });
 
+  test('shows the date (not 明日) for the day after tomorrow', () => {
+    const dayAfterTomorrow = new Date(2026, 6, 7, 9, 0);
+    expect(formatNextFire(dayAfterTomorrow, now)).toBe('次回: 7/7 09:00');
+  });
+
   test('shows just the date further out', () => {
     const later = new Date(2026, 6, 10, 9, 0);
     expect(formatNextFire(later, now)).toBe('次回: 7/10 09:00');
