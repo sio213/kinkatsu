@@ -88,6 +88,12 @@ export function __getSearchIndexCacheSizeForTests(): number {
   return searchIndexCache.size;
 }
 
+// トークンの全て（AND）が、texts中のいずれか（OR）に部分一致すればtrue。
+// 各トークンは別々のテキストにマッチしてもよい（例: 「ブルガリアン」は名前、「脚」はカテゴリラベル）。
+function matchesAllTokens(tokens: string[], texts: string[], matches: (token: string, text: string) => boolean): boolean {
+  return tokens.every((token) => texts.some((text) => matches(token, text)));
+}
+
 export function filterExercises(
   exercises: Exercise[],
   activeCategory: string,
@@ -102,13 +108,21 @@ export function filterExercises(
   }
   const trimmedSearch = search.trim();
   if (trimmedSearch) {
-    const q = normalizeForSearch(trimmedSearch);
-    const exactMatches = list.filter((e) => getSearchIndex(e).exactTexts.some((t) => t.includes(q)));
-    // 完全一致が1件もないときだけ、タイプミスを許容するあいまい検索にフォールバックする
+    // スペース区切りでAND検索する（例:「ブルガリアン スクワット」）。各語は名前・カテゴリ・
+    // muscle等どのテキストに一致してもよく、語順も問わない（それぞれ独立にincludes判定するため）
+    const tokens = normalizeForSearch(trimmedSearch).split(/\s+/).filter((t) => t.length > 0);
+    const exactMatches = list.filter((e) =>
+      matchesAllTokens(tokens, getSearchIndex(e).exactTexts, (token, t) => t.includes(token)),
+    );
+    // 完全一致が1件もないときだけ、タイプミスを許容するあいまい検索にフォールバックする。
+    // 複数語のときは語ごとに独立してfuzzy判定するため、実質的にほぼ効かない
+    // （タイプミス吸収は基本的に単語1語のクエリを想定した機能のため許容する）
     list =
       exactMatches.length > 0
         ? exactMatches
-        : list.filter((e) => getSearchIndex(e).fuzzyTexts.some((t) => isFuzzyMatch(q, t)));
+        : list.filter((e) =>
+            matchesAllTokens(tokens, getSearchIndex(e).fuzzyTexts, (token, t) => isFuzzyMatch(token, t)),
+          );
   }
   return [...list].sort((a, b) => {
     const ai = CATEGORY_ORDER[a.category] ?? 99;
