@@ -60,3 +60,13 @@ export const CATEGORY_ORDER: Record<string, number> = Object.fromEntries(
 export function isPresetExercise(exercise: { source: string }): boolean {
   return exercise.source === 'preset';
 }
+
+// 種目の計測方法。sets テーブルでどの列を使うかを決める
+export const MEASUREMENT_TYPES = [
+  'weight_reps',
+  'reps',
+  'time',
+  'distance_time',
+  'weight_time',
+] as const;
+export type MeasurementType = (typeof MEASUREMENT_TYPES)[number];

@@ -3,7 +3,14 @@
 var mockValues: jest.Mock;
 var mockWhere: jest.Mock;
 var mockSet: jest.Mock;
-var mockSelectResult: { id: number; slug: string | null; name: string; category: string; source: string }[];
+var mockSelectResult: {
+  id: number;
+  slug: string | null;
+  name: string;
+  category: string;
+  source: string;
+  measurementType: string;
+}[];
 
 jest.mock('@/db/client', () => {
   mockValues = jest.fn().mockResolvedValue(undefined);
@@ -24,7 +31,14 @@ jest.mock('@/db/client', () => {
 });
 
 jest.mock('@/db/schema', () => ({
-  exercises: { id: 'id', slug: 'slug', name: 'name', category: 'category', source: 'source' },
+  exercises: {
+    id: 'id',
+    slug: 'slug',
+    name: 'name',
+    category: 'category',
+    source: 'source',
+    measurementType: 'measurementType',
+  },
 }));
 
 jest.mock('drizzle-orm', () => ({ eq: jest.fn((col, val) => ({ col, val })) }));
@@ -48,7 +62,14 @@ describe('seed', () => {
 
   it('slugが一致しcategoryも一致 → その種目はinsert/updateどちらの対象にもならない', async () => {
     mockSelectResult = [
-      { id: 1, slug: 'bench_press', name: 'ベンチプレス', category: 'chest', source: 'preset' },
+      {
+        id: 1,
+        slug: 'bench_press',
+        name: 'ベンチプレス',
+        category: 'chest',
+        source: 'preset',
+        measurementType: 'weight_reps',
+      },
     ];
     await seed();
     const inserted = mockValues.mock.calls[0][0] as { slug: string }[];
@@ -59,7 +80,14 @@ describe('seed', () => {
 
   it('slugが一致しcategoryが異なる → insert対象からは除外され、updateでcategoryのみ更新される', async () => {
     mockSelectResult = [
-      { id: 1, slug: 'bench_press', name: 'ベンチプレス', category: 'other', source: 'preset' },
+      {
+        id: 1,
+        slug: 'bench_press',
+        name: 'ベンチプレス',
+        category: 'other',
+        source: 'preset',
+        measurementType: 'weight_reps',
+      },
     ];
     await seed();
     const inserted = mockValues.mock.calls[0][0] as { slug: string }[];
@@ -68,6 +96,27 @@ describe('seed', () => {
     expect(mockSet).toHaveBeenCalledTimes(1);
     expect(mockSet).toHaveBeenCalledWith(
       expect.objectContaining({ category: 'chest' }),
+    );
+  });
+
+  it('slugが一致しmeasurementTypeが異なる → updateでmeasurementTypeのみ更新される', async () => {
+    mockSelectResult = [
+      {
+        id: 1,
+        slug: 'bench_press',
+        name: 'ベンチプレス',
+        category: 'chest',
+        source: 'preset',
+        measurementType: 'reps',
+      },
+    ];
+    await seed();
+    const inserted = mockValues.mock.calls[0][0] as { slug: string }[];
+    expect(inserted.some((e) => e.slug === 'bench_press')).toBe(false);
+
+    expect(mockSet).toHaveBeenCalledTimes(1);
+    expect(mockSet).toHaveBeenCalledWith(
+      expect.objectContaining({ category: 'chest', measurementType: 'weight_reps' }),
     );
   });
 
