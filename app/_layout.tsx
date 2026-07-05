@@ -94,6 +94,7 @@ export default function RootLayout() {
         <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
         <Stack.Screen name="exercise/[id]" options={{ title: '' }} />
         <Stack.Screen name="exercise/edit/[id]" options={{ title: '種目を編集' }} />
+        <Stack.Screen name="exercise/new" options={{ title: '種目を作成' }} />
         <Stack.Screen
           name="modal"
           options={{ presentation: 'modal', title: 'Modal' }}
