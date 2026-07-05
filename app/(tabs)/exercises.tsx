@@ -13,10 +13,11 @@ import {
   getCategoryLabel,
 } from '@/lib/exercises/constants';
 import { filterExercises } from '@/lib/exercises/filter';
-import { useRouter } from 'expo-router';
+import { useFocusEffect, useRouter } from 'expo-router';
 import { useCallback, useMemo, useState } from 'react';
 import {
   FlatList,
+  Keyboard,
   Platform,
   ScrollView,
   StyleSheet,
@@ -36,6 +37,14 @@ export default function ExercisesScreen() {
   const [search, setSearch] = useState('');
   const [activeCategory, setActiveCategory] = useState<string>(CATEGORY_ALL);
   const keyboardInset = useKeyboardInset();
+
+  // 種目詳細等へ遷移してこの画面がフォーカスを失うタイミングでキーボードを閉じる。
+  // 開いたままだと戻ってきたときに一覧が狭いままになってしまうため
+  useFocusEffect(
+    useCallback(() => {
+      return () => Keyboard.dismiss();
+    }, []),
+  );
 
   const filtered = useMemo(
     () => filterExercises(exercises, activeCategory, search),

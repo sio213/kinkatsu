@@ -1,8 +1,15 @@
 const mockPush = jest.fn();
 const mockUseExercises = jest.fn();
+let focusEffectCleanup: (() => void) | undefined;
 
 jest.mock('expo-router', () => ({
   useRouter: () => ({ push: mockPush }),
+  // 実際のuseFocusEffectはナビゲーションのフォーカス/ブラーイベントに紐づくが、
+  // テストではeffectを即実行し、返ってきたクリーンアップ関数（ブラー時の処理）を
+  // 外から手動で呼べるようにして「画面がフォーカスを失った」を模擬する
+  useFocusEffect: (effect: () => (() => void) | void) => {
+    focusEffectCleanup = effect() ?? undefined;
+  },
 }));
 
 jest.mock('@/hooks/use-exercises', () => ({
@@ -15,7 +22,7 @@ jest.mock('@/hooks/use-keyboard-inset', () => ({
 
 import React from 'react';
 import { act, create, type ReactTestInstance } from 'react-test-renderer';
-import { Text, TextInput, TouchableOpacity } from 'react-native';
+import { Keyboard, Text, TextInput, TouchableOpacity } from 'react-native';
 import ExercisesScreen from '@/app/(tabs)/exercises';
 
 function findButtonByLabel(root: ReactTestInstance, label: string) {
@@ -38,6 +45,7 @@ function render() {
 
 beforeEach(() => {
   jest.clearAllMocks();
+  focusEffectCleanup = undefined;
   mockUseExercises.mockReturnValue({ exercises: [], toggleFavorite: jest.fn() });
 });
 
@@ -80,4 +88,19 @@ test('検索語がある状態の空状態CTAは、検索語をnameに載せて/
     pathname: '/exercise/new',
     params: { name: 'スクワット' },
   });
+});
+
+test('画面がフォーカスを失うとキーボードが閉じる（検索欄にフォーカスが残ったまま詳細画面から戻ってくる不具合の対策）', () => {
+  const dismissSpy = jest.spyOn(Keyboard, 'dismiss').mockImplementation(() => {});
+  render();
+
+  expect(focusEffectCleanup).toBeDefined();
+  expect(dismissSpy).not.toHaveBeenCalled();
+
+  // 詳細画面へ遷移する等でこの画面がフォーカスを失ったことを模擬する
+  act(() => {
+    focusEffectCleanup?.();
+  });
+
+  expect(dismissSpy).toHaveBeenCalledTimes(1);
 });
