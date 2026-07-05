@@ -19,6 +19,7 @@ import { useCallback, useMemo, useState } from 'react';
 import {
   Alert,
   FlatList,
+  Platform,
   ScrollView,
   StyleSheet,
   Text,
@@ -98,6 +99,17 @@ export default function ExercisesScreen() {
           clearButtonMode="while-editing"
           returnKeyType="search"
         />
+        {Platform.OS !== 'ios' && search.length > 0 && (
+          <TouchableOpacity
+            style={styles.searchClearBtn}
+            onPress={() => setSearch('')}
+            hitSlop={{ top: 12, bottom: 12, left: 12, right: 12 }}
+            accessibilityRole="button"
+            accessibilityLabel="検索文字をクリア"
+          >
+            <IconSymbol name="xmark.circle.fill" size={18} color={Colors.textPlaceholder} />
+          </TouchableOpacity>
+        )}
       </View>
 
       <ScrollView
@@ -209,12 +221,20 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     zIndex: 1,
   },
+  searchClearBtn: {
+    position: 'absolute',
+    right: 11,
+    top: 0,
+    bottom: 0,
+    justifyContent: 'center',
+    zIndex: 1,
+  },
   searchInput: {
     borderWidth: 1,
     borderColor: Colors.borderStrong,
     borderRadius: 8,
     paddingLeft: 36,
-    paddingRight: 12,
+    paddingRight: 36,
     paddingVertical: 9,
     fontSize: 14,
     color: Colors.textPrimary,
