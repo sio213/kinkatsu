@@ -12,9 +12,10 @@ export async function startWorkoutSession() {
 }
 
 export async function endWorkoutSession(id: number) {
+  const now = Date.now();
   await db
     .update(workoutSessions)
-    .set({ endedAt: Date.now(), updatedAt: Date.now() })
+    .set({ endedAt: now, updatedAt: now })
     .where(eq(workoutSessions.id, id));
 }
 

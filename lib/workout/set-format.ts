@@ -1,0 +1,105 @@
+import type { MeasurementType } from '@/lib/exercises/constants';
+
+// 時間(分:秒)入力を秒数に変換する。"1:30"→90、"45"のような素の数値は秒として扱う。
+// 負数・"1:75"のような不正な秒（60以上）はnull（保存させない）
+export function parseDurationInput(text: string): number | null {
+  const trimmed = text.trim();
+  if (!trimmed) return null;
+  const mmss = trimmed.match(/^(\d+):([0-5]?\d)$/);
+  if (mmss) return Number(mmss[1]) * 60 + Number(mmss[2]);
+  if (/^\d+(\.\d+)?$/.test(trimmed)) {
+    const asSeconds = Number(trimmed);
+    return Number.isFinite(asSeconds) ? Math.round(asSeconds) : null;
+  }
+  return null;
+}
+
+// 秒数を"分:秒"表示にする（例: 90→"1:30"）
+export function formatDurationDisplay(seconds: number | null | undefined): string {
+  if (seconds == null) return '';
+  const m = Math.floor(seconds / 60);
+  const s = seconds % 60;
+  return `${m}:${String(s).padStart(2, '0')}`;
+}
+
+// 距離はUIではkm、DB(distanceMeters)ではmで保持する
+export function parseDistanceKmInput(text: string): number | null {
+  const trimmed = text.trim();
+  if (!trimmed) return null;
+  const km = Number(trimmed);
+  return Number.isFinite(km) ? km * 1000 : null;
+}
+
+export function formatDistanceKmDisplay(meters: number | null | undefined): string {
+  if (meters == null) return '';
+  const km = Math.round((meters / 1000) * 100) / 100;
+  // 5 → "5.0" のように小数第1位は必ず表示する（2.55のような詳細な値はそのまま保持）
+  return Number.isInteger(km) ? km.toFixed(1) : String(km);
+}
+
+export function parseNumberInput(text: string): number | null {
+  const trimmed = text.trim();
+  if (!trimmed) return null;
+  const n = Number(trimmed);
+  return Number.isFinite(n) ? n : null;
+}
+
+export function parseIntInput(text: string): number | null {
+  const trimmed = text.trim();
+  if (!trimmed) return null;
+  const n = Number.parseInt(trimmed, 10);
+  return Number.isFinite(n) ? n : null;
+}
+
+export type SetFieldKey = 'weight' | 'reps' | 'durationSeconds' | 'distanceMeters';
+
+export type SetColumn = {
+  key: SetFieldKey;
+  label: string;
+  keyboardType: 'decimal-pad' | 'number-pad' | 'default';
+  toDisplay: (value: number | null | undefined) => string;
+  fromDisplay: (text: string) => number | null;
+};
+
+const WEIGHT_COLUMN: SetColumn = {
+  key: 'weight',
+  label: '重量(kg)',
+  keyboardType: 'decimal-pad',
+  toDisplay: (v) => (v == null ? '' : String(v)),
+  fromDisplay: parseNumberInput,
+};
+
+const REPS_COLUMN: SetColumn = {
+  key: 'reps',
+  label: '回数',
+  keyboardType: 'number-pad',
+  toDisplay: (v) => (v == null ? '' : String(v)),
+  fromDisplay: parseIntInput,
+};
+
+const DURATION_COLUMN: SetColumn = {
+  key: 'durationSeconds',
+  label: '時間(分:秒)',
+  keyboardType: 'default',
+  toDisplay: formatDurationDisplay,
+  fromDisplay: parseDurationInput,
+};
+
+const DURATION_COLUMN_SHORT: SetColumn = { ...DURATION_COLUMN, label: '時間' };
+
+const DISTANCE_COLUMN: SetColumn = {
+  key: 'distanceMeters',
+  label: '距離(km)',
+  keyboardType: 'decimal-pad',
+  toDisplay: formatDistanceKmDisplay,
+  fromDisplay: parseDistanceKmInput,
+};
+
+// 計測タイプごとに、セット行へ表示・入力する列（順序どおり）
+export const MEASUREMENT_COLUMNS: Record<MeasurementType, SetColumn[]> = {
+  weight_reps: [WEIGHT_COLUMN, REPS_COLUMN],
+  reps: [REPS_COLUMN],
+  time: [DURATION_COLUMN],
+  distance_time: [DISTANCE_COLUMN, DURATION_COLUMN_SHORT],
+  weight_time: [WEIGHT_COLUMN, DURATION_COLUMN_SHORT],
+};

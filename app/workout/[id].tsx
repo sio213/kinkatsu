@@ -5,9 +5,12 @@ import { PrimaryButton } from '@/components/ui/primary-button';
 import { AddExerciseButton } from '@/components/workout/add-exercise-button';
 import { SessionExerciseCard } from '@/components/workout/session-exercise-card';
 import { Colors } from '@/constants/theme';
+import { useKeyboardInset } from '@/hooks/use-keyboard-inset';
 import {
+  EMPTY_SETS,
   useSessionExercises,
   useSessionSetCount,
+  useSessionSets,
   useWorkoutSession,
 } from '@/hooks/use-workout-session';
 import { endWorkoutSession } from '@/lib/workout/session';
@@ -32,8 +35,10 @@ export default function WorkoutScreen() {
   const { session, loaded } = useWorkoutSession(sessionId ?? -1);
   const setCount = useSessionSetCount(sessionId ?? -1);
   const sessionExercises = useSessionExercises(sessionId ?? -1);
+  const sessionSets = useSessionSets(sessionId ?? -1);
   const [now, setNow] = useState(() => Date.now());
   const isFinishingRef = useRef(false);
+  const keyboardInset = useKeyboardInset();
 
   useEffect(() => {
     if (!session || session.endedAt != null) return;
@@ -117,12 +122,19 @@ export default function WorkoutScreen() {
           keyExtractor={(item) => String(item.id)}
           renderItem={({ item }) => (
             <ListErrorBoundary>
-              <SessionExerciseCard exercise={item} />
+              <SessionExerciseCard
+                exercise={item}
+                sessionId={sessionId}
+                sets={sessionSets.get(item.id) ?? EMPTY_SETS}
+              />
             </ListErrorBoundary>
           )}
           ListFooterComponent={
             <AddExerciseButton onPress={handleAddExercise} style={styles.addExerciseBtnInline} />
           }
+          contentInset={{ bottom: keyboardInset }}
+          scrollIndicatorInsets={{ bottom: keyboardInset }}
+          keyboardShouldPersistTaps="handled"
         />
       )}
 
