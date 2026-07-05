@@ -7,8 +7,9 @@ export type AliasEntry = {
   reading?: string;
 };
 
-// カタカナ表記の正式名と日本語の俗称・和名が競合する種目のみ登録する。
-// バーベル・ダンベル・マシン系の種目は和名の競合がないため対象外。
+// 正式名（カタカナ表記）とは別に実際に検索されうる語のみ登録する。
+// - 日本語の俗称・和名: カタカナ表記と競合する種目のみ（バーベル・ダンベル・マシン系は和名の競合がないため対象外）
+// - 英字の略称・イニシャル: パワーリフティング/SNS界隈で定着しているもののみ（読み仮名は不要）
 const ALIASES: Record<string, AliasEntry[]> = {
   push_up: [
     { text: '腕立て伏せ', reading: 'うでたてふせ' },
@@ -37,6 +38,13 @@ const ALIASES: Record<string, AliasEntry[]> = {
   dumbbell_shrug: [{ text: '肩すくめ', reading: 'かたすくめ' }],
   walking: [{ text: '散歩', reading: 'さんぽ' }],
   cycling: [{ text: '自転車', reading: 'じてんしゃ' }],
+  bench_press: [{ text: 'BP' }],
+  squat: [{ text: 'SQ' }],
+  deadlift: [{ text: 'DL' }],
+  romanian_deadlift: [{ text: 'RDL' }],
+  overhead_squat: [{ text: 'OHS' }],
+  // OHPは立位のバーベルショルダープレスを指す用語のため、座位のバリエーション（seated_barbell_shoulder_press）には登録しない
+  barbell_shoulder_press: [{ text: 'OHP' }],
 };
 
 export function getAliases(exercise: Exercise): AliasEntry[] {
