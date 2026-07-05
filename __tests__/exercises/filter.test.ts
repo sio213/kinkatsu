@@ -25,6 +25,11 @@ const CUSTOM_HIRA  = make({ id: 10, name: 'なわとび', category: 'cardio' });
 
 const EXT = [...ALL, CUSTOM_ALNUM, CUSTOM_PAREN, CUSTOM_CHOON, CUSTOM_KANJI, CUSTOM_HIRA];
 
+// guides.ts に実データがある preset slug を使い、使う筋肉での検索を確認する
+const HIP_THRUST = make({ id: 11, name: 'ヒップスラスト', category: 'glute', slug: 'hip_thrust', source: 'preset' });
+const BICYCLE_CRUNCH = make({ id: 12, name: 'バイシクルクランチ', category: 'abs', slug: 'bicycle_crunch', source: 'preset' });
+const MUSCLE_SET = [HIP_THRUST, BICYCLE_CRUNCH];
+
 describe('filterExercises', () => {
   it('空配列 → []', () => {
     expect(filterExercises([], CATEGORY_ALL, '')).toEqual([]);
@@ -146,6 +151,28 @@ describe('filterExercises', () => {
       expect(normalizeForSearch('')).toBe('');
       expect(normalizeForSearch('（）!?')).toBe('()!?');
       expect(() => normalizeForSearch('💪スクワット')).not.toThrow();
+    });
+  });
+
+  describe('使う筋肉での検索', () => {
+    it('漢字クエリでmuscleにマッチする', () => {
+      expect(filterExercises(MUSCLE_SET, CATEGORY_ALL, '大臀筋').map((e) => e.name)).toContain(
+        'ヒップスラスト',
+      );
+    });
+
+    it('ひらがなクエリでもmuscleの読みにマッチする', () => {
+      expect(filterExercises(MUSCLE_SET, CATEGORY_ALL, 'ふくしゃきん').map((e) => e.name)).toContain(
+        'バイシクルクランチ',
+      );
+    });
+
+    it('名前・muscleどちらにも該当しなければマッチしない', () => {
+      expect(filterExercises(MUSCLE_SET, CATEGORY_ALL, '大胸筋')).toEqual([]);
+    });
+
+    it('guideを持たない種目（slugなし）はmuscle検索の対象にならずクラッシュしない', () => {
+      expect(() => filterExercises([...MUSCLE_SET, CHEST], CATEGORY_ALL, '大臀筋')).not.toThrow();
     });
   });
 
