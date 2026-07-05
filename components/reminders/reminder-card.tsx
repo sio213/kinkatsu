@@ -53,18 +53,24 @@ export function ReminderCard({
             <Text style={styles.summary}>{formatKindSummary(r)}</Text>
             <Text style={styles.next}>{formatNextFire(getNextFire(r))}</Text>
           </View>
-          <Switch value={r.enabled} onValueChange={onToggle} />
+          <Switch
+            value={r.enabled}
+            onValueChange={onToggle}
+            accessibilityLabel={`${r.title}を${r.enabled ? '無効' : '有効'}にする`}
+          />
         </View>
         <View style={styles.actions}>
           <TouchableOpacity
             style={styles.actionBtn}
             onPress={isEditing ? onCloseEdit : onEdit}
+            accessibilityLabel={isEditing ? '編集を閉じる' : `${r.title}を編集`}
           >
             <Text style={styles.actionBtnText}>{isEditing ? '閉じる' : '編集'}</Text>
           </TouchableOpacity>
           <TouchableOpacity
             style={[styles.actionBtn, styles.actionBtnDanger]}
             onPress={onDelete}
+            accessibilityLabel={`${r.title}を削除`}
           >
             <Text style={[styles.actionBtnText, styles.actionBtnDangerText]}>削除</Text>
           </TouchableOpacity>
