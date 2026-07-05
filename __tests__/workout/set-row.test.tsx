@@ -48,6 +48,43 @@ test('✓を押すと入力値をパースしてonSaveが呼ばれる', async ()
   expect(onSave).toHaveBeenCalledWith(1, { weight: 60, reps: 10 });
 });
 
+test('パースできない不正な入力があると保存せずエラーAlertを表示する', async () => {
+  const onSave = jest.fn().mockResolvedValue(undefined);
+  const set = { id: 1, setNumber: 1, weight: null, reps: null, completedAt: null } as any;
+  const root = render({ set, measurementType: 'weight_reps', onSave, onReopen: jest.fn() });
+
+  const inputs = root.findAllByType(TextInput);
+  act(() => {
+    inputs[0].props.onChangeText('六十'); // 数値として解釈できない不正な入力
+    inputs[1].props.onChangeText('10');
+  });
+
+  await act(async () => {
+    getCheck(root).props.onPress();
+  });
+
+  expect(onSave).not.toHaveBeenCalled();
+  expect(Alert.alert).toHaveBeenCalledWith('入力エラー', '重量(kg)の値を確認してください。');
+});
+
+test('空欄のまま✓を押すのは許容され、nullとして保存される', async () => {
+  const onSave = jest.fn().mockResolvedValue(undefined);
+  const set = { id: 1, setNumber: 1, weight: null, reps: null, completedAt: null } as any;
+  const root = render({ set, measurementType: 'weight_reps', onSave, onReopen: jest.fn() });
+
+  const inputs = root.findAllByType(TextInput);
+  act(() => {
+    inputs[0].props.onChangeText('60');
+    // reps欄は空欄のまま
+  });
+
+  await act(async () => {
+    getCheck(root).props.onPress();
+  });
+
+  expect(onSave).toHaveBeenCalledWith(1, { weight: 60, reps: null });
+});
+
 test('完了済みのセットはセルが編集不可になりチェックはオン表示', () => {
   const set = { id: 1, setNumber: 1, weight: 60, reps: 10, completedAt: 123 } as any;
   const root = render({ set, measurementType: 'weight_reps', onSave: jest.fn(), onReopen: jest.fn() });

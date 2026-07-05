@@ -6,12 +6,24 @@ var mockUpdateWhere: jest.Mock;
 var mockDeleteWhere: jest.Mock;
 var mockSelectWhere: jest.Mock;
 
+// addSetは`await tx.select()...where(...)`を直接await、deleteLastSetは
+// `.where(...).orderBy(...).limit(...)`を経由してawaitするため、
+// where()の戻り値はthenable（直接await可）かつ.orderBy().limit()も持たせる
+function mockMakeSelectChain(rows: unknown[]) {
+  const resolved = Promise.resolve(rows);
+  return {
+    orderBy: jest.fn().mockReturnValue({ limit: jest.fn().mockReturnValue(resolved) }),
+    then: resolved.then.bind(resolved),
+    catch: resolved.catch.bind(resolved),
+  };
+}
+
 jest.mock('@/db/client', () => {
   mockInsertValues = jest.fn().mockResolvedValue(undefined);
   mockUpdateWhere = jest.fn().mockResolvedValue(undefined);
   mockUpdateSet = jest.fn().mockReturnValue({ where: (...args: unknown[]) => mockUpdateWhere(...args) });
   mockDeleteWhere = jest.fn().mockResolvedValue(undefined);
-  mockSelectWhere = jest.fn().mockResolvedValue([]);
+  mockSelectWhere = jest.fn().mockReturnValue(mockMakeSelectChain([]));
 
   const tx = {
     insert: jest.fn().mockReturnValue({ values: (...args: unknown[]) => mockInsertValues(...args) }),
@@ -42,6 +54,11 @@ jest.mock('@/db/schema', () => ({
 jest.mock('drizzle-orm', () => ({
   eq: jest.fn((col, val) => ({ col, val })),
   and: jest.fn((...conds) => ({ and: conds })),
+  desc: jest.fn((col) => ({ col, dir: 'desc' })),
+  sql: Object.assign(
+    jest.fn((strings: TemplateStringsArray, ...values: unknown[]) => ({ strings, values })),
+    { raw: jest.fn() },
+  ),
 }));
 
 import { addSet, deleteLastSet, reopenSet, saveSet } from '@/lib/workout/sets';
@@ -51,12 +68,12 @@ beforeEach(() => {
   mockInsertValues.mockResolvedValue(undefined);
   mockUpdateWhere.mockResolvedValue(undefined);
   mockDeleteWhere.mockResolvedValue(undefined);
-  mockSelectWhere.mockResolvedValue([]);
+  mockSelectWhere.mockReturnValue(mockMakeSelectChain([]));
 });
 
 describe('addSet', () => {
   it('既存セットが無い種目ではsetNumberを1から振る', async () => {
-    mockSelectWhere.mockResolvedValueOnce([]);
+    mockSelectWhere.mockReturnValueOnce(mockMakeSelectChain([{ maxSetNumber: null }]));
     await addSet(1, 10);
 
     const payload = mockInsertValues.mock.calls[0][0];
@@ -70,7 +87,7 @@ describe('addSet', () => {
   });
 
   it('既存セットがある種目では最大setNumberの続きから振る', async () => {
-    mockSelectWhere.mockResolvedValueOnce([{ setNumber: 1 }, { setNumber: 2 }]);
+    mockSelectWhere.mockReturnValueOnce(mockMakeSelectChain([{ maxSetNumber: 2 }]));
     await addSet(1, 10);
 
     const payload = mockInsertValues.mock.calls[0][0];
@@ -78,6 +95,7 @@ describe('addSet', () => {
   });
 
   it('insertが失敗した場合はエラーを握りつぶさずthrowする（呼び出し側でAlertを出すため）', async () => {
+    mockSelectWhere.mockReturnValueOnce(mockMakeSelectChain([{ maxSetNumber: null }]));
     mockInsertValues.mockRejectedValueOnce(new Error('db error'));
     await expect(addSet(1, 10)).rejects.toThrow('db error');
   });
@@ -85,23 +103,19 @@ describe('addSet', () => {
 
 describe('deleteLastSet', () => {
   it('セットが0件のときは何もしない', async () => {
-    mockSelectWhere.mockResolvedValueOnce([]);
+    mockSelectWhere.mockReturnValueOnce(mockMakeSelectChain([]));
     await deleteLastSet(1, 10);
     expect(mockDeleteWhere).not.toHaveBeenCalled();
   });
 
-  it('setNumberが最大のセットを削除する', async () => {
-    mockSelectWhere.mockResolvedValueOnce([
-      { id: 101, setNumber: 1 },
-      { id: 103, setNumber: 3 },
-      { id: 102, setNumber: 2 },
-    ]);
+  it('setNumberが最大のセットを削除する（DESC+LIMIT1で先頭行を取得）', async () => {
+    mockSelectWhere.mockReturnValueOnce(mockMakeSelectChain([{ id: 103 }]));
     await deleteLastSet(1, 10);
     expect(mockDeleteWhere).toHaveBeenCalledWith({ col: 'id', val: 103 });
   });
 
   it('deleteが失敗した場合はエラーを握りつぶさずthrowする', async () => {
-    mockSelectWhere.mockResolvedValueOnce([{ id: 101, setNumber: 1 }]);
+    mockSelectWhere.mockReturnValueOnce(mockMakeSelectChain([{ id: 101 }]));
     mockDeleteWhere.mockRejectedValueOnce(new Error('db error'));
     await expect(deleteLastSet(1, 10)).rejects.toThrow('db error');
   });

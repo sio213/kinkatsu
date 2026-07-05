@@ -77,6 +77,10 @@ describe('distance km<->meters conversion', () => {
     expect(formatDistanceKmDisplay(null)).toBe('');
     expect(parseDistanceKmInput('')).toBeNull();
   });
+
+  it('負の距離はnullを返す', () => {
+    expect(parseDistanceKmInput('-5')).toBeNull();
+  });
 });
 
 describe('parseNumberInput / parseIntInput', () => {
@@ -85,8 +89,23 @@ describe('parseNumberInput / parseIntInput', () => {
     expect(parseIntInput('abc')).toBeNull();
   });
 
-  it('parseIntInputは小数点以下を切り捨てる', () => {
-    expect(parseIntInput('10.9')).toBe(10);
+  it('負の値はnullを返す', () => {
+    expect(parseNumberInput('-60')).toBeNull();
+    expect(parseIntInput('-10')).toBeNull();
+  });
+
+  it('末尾に不正な文字が付く入力（"12abc"等）はnullを返す', () => {
+    expect(parseNumberInput('12abc')).toBeNull();
+    expect(parseIntInput('12abc')).toBeNull();
+  });
+
+  it('parseIntInputは整数のみ許可し、小数はnullを返す', () => {
+    expect(parseIntInput('10.9')).toBeNull();
+    expect(parseIntInput('10')).toBe(10);
+  });
+
+  it('parseNumberInputは小数を許可する', () => {
+    expect(parseNumberInput('60.5')).toBe(60.5);
   });
 });
 

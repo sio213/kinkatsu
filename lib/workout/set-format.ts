@@ -22,10 +22,10 @@ export function formatDurationDisplay(seconds: number | null | undefined): strin
   return `${m}:${String(s).padStart(2, '0')}`;
 }
 
-// 距離はUIではkm、DB(distanceMeters)ではmで保持する
+// 距離はUIではkm、DB(distanceMeters)ではmで保持する。負の距離は物理的にありえないため拒否する
 export function parseDistanceKmInput(text: string): number | null {
   const trimmed = text.trim();
-  if (!trimmed) return null;
+  if (!/^\d+(\.\d+)?$/.test(trimmed)) return null;
   const km = Number(trimmed);
   return Number.isFinite(km) ? km * 1000 : null;
 }
@@ -37,16 +37,18 @@ export function formatDistanceKmDisplay(meters: number | null | undefined): stri
   return Number.isInteger(km) ? km.toFixed(1) : String(km);
 }
 
+// 重量は負の値を入れる実運用が無いため拒否する（"12abc"のような末尾ゴミ文字も拒否）
 export function parseNumberInput(text: string): number | null {
   const trimmed = text.trim();
-  if (!trimmed) return null;
+  if (!/^\d+(\.\d+)?$/.test(trimmed)) return null;
   const n = Number(trimmed);
   return Number.isFinite(n) ? n : null;
 }
 
+// 回数も同様に負の値・末尾ゴミ文字（"12abc"等）を拒否する。parseNumberInputと違い整数のみ許可する
 export function parseIntInput(text: string): number | null {
   const trimmed = text.trim();
-  if (!trimmed) return null;
+  if (!/^\d+$/.test(trimmed)) return null;
   const n = Number.parseInt(trimmed, 10);
   return Number.isFinite(n) ? n : null;
 }

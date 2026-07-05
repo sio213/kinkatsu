@@ -1,6 +1,6 @@
 import { db } from '@/db/client';
 import { sets } from '@/db/schema';
-import { and, eq } from 'drizzle-orm';
+import { and, desc, eq, sql } from 'drizzle-orm';
 
 // 種目カードの「セット追加」。setNumberは既存件数の続きから振る（並び順を保持するため）。
 // 既存件数の取得とinsertをトランザクションでまとめている。ただしこのアプリはローカル単一クライアントで
@@ -8,12 +8,11 @@ import { and, eq } from 'drizzle-orm';
 export async function addSet(sessionId: number, exerciseId: number) {
   const now = Date.now();
   await db.transaction(async (tx) => {
-    const existing = await tx
-      .select({ setNumber: sets.setNumber })
+    const [{ maxSetNumber }] = await tx
+      .select({ maxSetNumber: sql<number | null>`max(${sets.setNumber})` })
       .from(sets)
       .where(and(eq(sets.sessionId, sessionId), eq(sets.exerciseId, exerciseId)));
-    const nextNumber =
-      existing.length > 0 ? Math.max(...existing.map((s) => s.setNumber)) + 1 : 1;
+    const nextNumber = (maxSetNumber ?? 0) + 1;
     await tx.insert(sets).values({
       sessionId,
       exerciseId,
@@ -27,12 +26,13 @@ export async function addSet(sessionId: number, exerciseId: number) {
 // 種目カードの「セット削除」。setNumberが最も大きい（最後に追加された）セットを1件削除する
 export async function deleteLastSet(sessionId: number, exerciseId: number) {
   await db.transaction(async (tx) => {
-    const existing = await tx
-      .select({ id: sets.id, setNumber: sets.setNumber })
+    const [last] = await tx
+      .select({ id: sets.id })
       .from(sets)
-      .where(and(eq(sets.sessionId, sessionId), eq(sets.exerciseId, exerciseId)));
-    if (existing.length === 0) return;
-    const last = existing.reduce((a, b) => (b.setNumber > a.setNumber ? b : a));
+      .where(and(eq(sets.sessionId, sessionId), eq(sets.exerciseId, exerciseId)))
+      .orderBy(desc(sets.setNumber))
+      .limit(1);
+    if (!last) return;
     await tx.delete(sets).where(eq(sets.id, last.id));
   });
 }

@@ -41,6 +41,16 @@ export const SetRow = memo(function SetRow({
         await onReopen(set.id);
         setValues(toDisplayValues(columns, set));
       } else {
+        // 空欄はnull保存でよいが、非空の入力がパースに失敗した場合（不正な貼り付け等）は
+        // 気づかれずに値が消えたまま完了扱いにならないよう、保存せず気づかせる
+        const invalidColumn = columns.find((c) => {
+          const text = (values[c.key] ?? '').trim();
+          return text !== '' && c.fromDisplay(text) == null;
+        });
+        if (invalidColumn) {
+          Alert.alert('入力エラー', `${invalidColumn.label}の値を確認してください。`);
+          return;
+        }
         const parsed = Object.fromEntries(
           columns.map((c) => [c.key, c.fromDisplay(values[c.key] ?? '')]),
         );
@@ -110,7 +120,7 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: Colors.borderStrong,
     borderRadius: 7,
-    paddingVertical: 7,
+    paddingVertical: 11,
     paddingHorizontal: 10,
     fontSize: 14,
     fontWeight: '600',

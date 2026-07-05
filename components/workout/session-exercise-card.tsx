@@ -123,16 +123,16 @@ export const SessionExerciseCard = memo(function SessionExerciseCard({
 
         <View style={styles.actions}>
           <TouchableOpacity
-            style={styles.actionAdd}
+            style={styles.actionButton}
             onPress={handleAddSet}
             accessibilityRole="button"
             accessibilityLabel="セット追加"
           >
             <IconSymbol name="plus" size={17} color={Colors.accent} />
-            <Text style={styles.actionAddText}>セット追加</Text>
+            <Text style={[styles.actionText, { color: Colors.accent }]}>セット追加</Text>
           </TouchableOpacity>
           <TouchableOpacity
-            style={styles.actionDelete}
+            style={styles.actionButton}
             onPress={handleDeleteSet}
             disabled={sets.length === 0}
             accessibilityRole="button"
@@ -145,7 +145,10 @@ export const SessionExerciseCard = memo(function SessionExerciseCard({
               color={sets.length === 0 ? Colors.textPlaceholder : Colors.danger}
             />
             <Text
-              style={[styles.actionDeleteText, sets.length === 0 && styles.actionTextDisabled]}
+              style={[
+                styles.actionText,
+                { color: sets.length === 0 ? Colors.textPlaceholder : Colors.danger },
+              ]}
             >
               セット削除
             </Text>
@@ -202,7 +205,7 @@ const styles = StyleSheet.create({
   },
 
   actions: { flexDirection: 'row', gap: 8, marginTop: 6 },
-  actionAdd: {
+  actionButton: {
     flex: 1,
     flexDirection: 'row',
     alignItems: 'center',
@@ -212,17 +215,5 @@ const styles = StyleSheet.create({
     borderRadius: 8,
     paddingVertical: 12,
   },
-  actionAddText: { color: Colors.accent, fontWeight: '600', fontSize: 12.5 },
-  actionDelete: {
-    flex: 1,
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    gap: 5,
-    backgroundColor: Colors.surfaceSubtle,
-    borderRadius: 8,
-    paddingVertical: 12,
-  },
-  actionDeleteText: { color: Colors.danger, fontWeight: '600', fontSize: 12.5 },
-  actionTextDisabled: { color: Colors.textPlaceholder },
+  actionText: { fontWeight: '600', fontSize: 12.5 },
 });
