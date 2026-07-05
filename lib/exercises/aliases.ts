@@ -23,6 +23,15 @@ const ALIASES: Record<string, AliasEntry[]> = {
   ],
   jump_rope: [{ text: 'ジャンプロープ' }],
   swimming: [{ text: 'スイミング' }],
+  plank: [{ text: 'フロントブリッジ' }],
+  wall_sit: [
+    { text: '空気椅子', reading: 'くうきいす' },
+    { text: '空気イス', reading: 'くうきいす' },
+  ],
+  high_knees: [{ text: '腿上げ', reading: 'ももあげ' }],
+  bear_crawl: [{ text: '熊歩き', reading: 'くまあるき' }],
+  downward_dog: [{ text: '下向き犬のポーズ', reading: 'したむきいぬのぽーず' }],
+  leg_raise: [{ text: '足上げ腹筋', reading: 'あしあげふっきん' }],
 };
 
 export function getAliases(exercise: Exercise): AliasEntry[] {
