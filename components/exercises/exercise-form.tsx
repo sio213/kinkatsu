@@ -1,6 +1,5 @@
 import { chipStyles } from '@/components/exercises/chip-styles';
 import { FormLabel } from '@/components/ui/form-label';
-import { PrimaryButton } from '@/components/ui/primary-button';
 import { SectionHeading } from '@/components/ui/section-heading';
 import { Colors } from '@/constants/theme';
 import {
@@ -13,7 +12,7 @@ import {
   type ExerciseFormValues,
 } from '@/lib/exercises/validation';
 import { zodResolver } from '@hookform/resolvers/zod';
-import { forwardRef, useEffect, useImperativeHandle } from 'react';
+import { forwardRef, useEffect, useImperativeHandle, useRef } from 'react';
 import { Controller, useForm } from 'react-hook-form';
 import {
   StyleSheet,
@@ -30,7 +29,12 @@ function toExerciseCategory(value: string | undefined): ExerciseCategory | undef
     : undefined;
 }
 
-export type ExerciseFormHandle = { submit: () => void };
+export type ExerciseFormHandle = {
+  submit: () => void;
+  // 種目名欄へフォーカスする。画面遷移アニメーション中にキーボードが被さって
+  // 表示が乱れるのを避けるため、呼び出し側が遷移完了後の適切なタイミングで呼ぶ
+  focusName: () => void;
+};
 
 type Props = {
   initial?: {
@@ -42,28 +46,14 @@ type Props = {
     source?: string;
   };
   onSubmit: (values: ExerciseFormValues) => void;
-  onCancel: () => void;
-  submitLabel?: string;
-  autoFocus?: boolean;
-  showCancel?: boolean;
-  // 呼び出し側が下部固定ボタンを自前で描画する場合はfalseにする（onSubmitDisabledChangeで無効状態を受け取る）
-  showFooter?: boolean;
   onSubmitDisabledChange?: (disabled: boolean) => void;
 };
 
 export const ExerciseForm = forwardRef<ExerciseFormHandle, Props>(function ExerciseForm(
-  {
-    initial,
-    onSubmit,
-    onCancel,
-    submitLabel = '追加',
-    autoFocus = true,
-    showCancel = true,
-    showFooter = true,
-    onSubmitDisabledChange,
-  },
+  { initial, onSubmit, onSubmitDisabledChange },
   ref,
 ) {
+  const nameInputRef = useRef<TextInput>(null);
   const {
     control,
     handleSubmit,
@@ -84,10 +74,14 @@ export const ExerciseForm = forwardRef<ExerciseFormHandle, Props>(function Exerc
   // （メモ欄と役割が重複する上、保存しても表示されない「書き込み専用」状態になるのを避ける）
   const isPreset = initial?.source === 'preset';
 
-  useImperativeHandle(ref, () => ({ submit: () => handleSubmit(onSubmit)() }), [
-    handleSubmit,
-    onSubmit,
-  ]);
+  useImperativeHandle(
+    ref,
+    () => ({
+      submit: () => handleSubmit(onSubmit)(),
+      focusName: () => nameInputRef.current?.focus(),
+    }),
+    [handleSubmit, onSubmit],
+  );
 
   useEffect(() => {
     onSubmitDisabledChange?.(submitDisabled);
@@ -101,12 +95,12 @@ export const ExerciseForm = forwardRef<ExerciseFormHandle, Props>(function Exerc
         name="name"
         render={({ field: { value, onChange } }) => (
           <TextInput
-            style={[styles.input, styles.nameInput]}
+            ref={nameInputRef}
+            style={styles.input}
             value={value}
             onChangeText={onChange}
-            placeholder="例: ベンチプレス"
+            placeholder="種目名"
             returnKeyType="done"
-            autoFocus={autoFocus}
             accessibilityLabel="種目名"
           />
         )}
@@ -198,7 +192,7 @@ export const ExerciseForm = forwardRef<ExerciseFormHandle, Props>(function Exerc
             style={[styles.input, styles.inputMultiline]}
             value={value ?? ''}
             onChangeText={onChange}
-            placeholder="フォームのコツなど"
+            placeholder="メモ"
             multiline
             numberOfLines={2}
             accessibilityLabel="メモ"
@@ -222,26 +216,6 @@ export const ExerciseForm = forwardRef<ExerciseFormHandle, Props>(function Exerc
           )}
         />
       </View>
-
-      {showFooter && (
-        <View style={styles.buttons}>
-          {showCancel && (
-            <TouchableOpacity
-              style={styles.cancelBtn}
-              onPress={onCancel}
-              accessibilityLabel="キャンセル"
-            >
-              <Text style={styles.cancelBtnText}>キャンセル</Text>
-            </TouchableOpacity>
-          )}
-          <PrimaryButton
-            label={submitLabel}
-            onPress={handleSubmit(onSubmit)}
-            disabled={submitDisabled}
-            style={styles.submitBtn}
-          />
-        </View>
-      )}
     </View>
   );
 });
@@ -255,11 +229,10 @@ const styles = StyleSheet.create({
     borderRadius: 8,
     paddingHorizontal: 11,
     paddingVertical: 9,
-    fontSize: 14,
+    fontSize: 15,
     color: Colors.textPrimary,
     backgroundColor: Colors.surface,
   },
-  nameInput: { fontSize: 15, fontWeight: '600' },
   inputMultiline: { minHeight: 56, textAlignVertical: 'top' },
 
   errorText: { fontSize: 12, color: Colors.danger, marginTop: -4 },
@@ -302,15 +275,4 @@ const styles = StyleSheet.create({
     justifyContent: 'space-between',
     paddingVertical: 2,
   },
-
-  buttons: { flexDirection: 'row', gap: 8, marginTop: 4 },
-  cancelBtn: {
-    flex: 1,
-    borderRadius: 8,
-    paddingVertical: 10,
-    backgroundColor: Colors.border,
-    alignItems: 'center',
-  },
-  cancelBtnText: { fontSize: 14, fontWeight: '600', color: Colors.textSecondary },
-  submitBtn: { flex: 2 },
 });

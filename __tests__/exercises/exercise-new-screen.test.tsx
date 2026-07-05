@@ -1,10 +1,19 @@
 const mockBack = jest.fn();
 const mockUseLocalSearchParams = jest.fn();
 const mockAddExercise = jest.fn();
+let transitionEndCallback: ((e: { data: { closing: boolean } }) => void) | undefined;
 
 jest.mock('expo-router', () => ({
   useRouter: () => ({ back: mockBack }),
   useLocalSearchParams: () => mockUseLocalSearchParams(),
+  // 遷移完了('transitionEnd')時のフォーカス処理は、コールバックを捕まえて
+  // テストから手動で発火できるようにする（実際のネイティブ遷移は模擬しない）
+  useNavigation: () => ({
+    addListener: (event: string, callback: typeof transitionEndCallback) => {
+      if (event === 'transitionEnd') transitionEndCallback = callback;
+      return () => {};
+    },
+  }),
 }));
 
 jest.mock('@/hooks/use-exercises', () => ({
@@ -38,6 +47,7 @@ function render() {
 
 beforeEach(() => {
   jest.clearAllMocks();
+  transitionEndCallback = undefined;
   mockUseLocalSearchParams.mockReturnValue({ name: undefined });
   mockAddExercise.mockResolvedValue(undefined);
   jest.spyOn(Alert, 'alert').mockImplementation(() => {});
@@ -108,4 +118,29 @@ test('未入力のまま保存を押すと、保存ボタンがdisabledになり
 
   expect(mockAddExercise).not.toHaveBeenCalled();
   expect(findButtonByLabel(root, '保存する')!.props.disabled).toBe(true);
+});
+
+test('pushの遷移アニメーションが完了(transitionEnd, closing:false)すると種目名欄にフォーカスする', () => {
+  const root = render();
+  const [nameInput] = getInputs(root);
+  const focusSpy = jest.spyOn(nameInput.instance, 'focus');
+
+  expect(transitionEndCallback).toBeDefined();
+  act(() => {
+    transitionEndCallback?.({ data: { closing: false } });
+  });
+
+  expect(focusSpy).toHaveBeenCalledTimes(1);
+});
+
+test('画面を閉じる方向のtransitionEnd(closing:true)ではフォーカスしない', () => {
+  const root = render();
+  const [nameInput] = getInputs(root);
+  const focusSpy = jest.spyOn(nameInput.instance, 'focus');
+
+  act(() => {
+    transitionEndCallback?.({ data: { closing: true } });
+  });
+
+  expect(focusSpy).not.toHaveBeenCalled();
 });

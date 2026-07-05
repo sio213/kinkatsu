@@ -68,9 +68,6 @@ export default function ExerciseEditScreen() {
               source: exercise.source,
             }}
             onSubmit={handleSubmit}
-            onCancel={() => router.back()}
-            autoFocus={false}
-            showFooter={false}
             onSubmitDisabledChange={setSubmitDisabled}
           />
         </ScrollView>
