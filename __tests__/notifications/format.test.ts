@@ -17,8 +17,8 @@ describe('formatNextFire', () => {
     expect(formatNextFire(tomorrow, now)).toBe('次回: 明日 09:00');
   });
 
-  test('shows the date and days remaining further out', () => {
+  test('shows just the date further out', () => {
     const later = new Date(2026, 6, 10, 9, 0);
-    expect(formatNextFire(later, now)).toBe('次回: 7/10(あと5日) 09:00');
+    expect(formatNextFire(later, now)).toBe('次回: 7/10 09:00');
   });
 });

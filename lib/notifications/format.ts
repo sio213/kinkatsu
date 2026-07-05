@@ -39,7 +39,7 @@ function formatRelativeDay(date: Date, now: Date): string {
   if (diffDays === 1) return '明日';
   const m = date.getMonth() + 1;
   const d = date.getDate();
-  return diffDays > 0 ? `${m}/${d}(あと${diffDays}日)` : `${m}/${d}`;
+  return `${m}/${d}`;
 }
 
 export function formatNextFire(date: Date | null, now: Date = new Date()): string {

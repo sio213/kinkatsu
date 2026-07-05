@@ -22,7 +22,7 @@ import {
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 export default function RemindersScreen() {
-  const { reminders, createReminder, updateReminder, toggleReminder, removeReminder, getNextFire } =
+  const { reminders, createReminder, updateReminder, toggleReminder, removeReminder, getNextFire, now } =
     useReminders();
 
   const [permState, setPermState] = useState<'granted' | 'denied' | 'undetermined' | null>(null);
@@ -124,6 +124,7 @@ export default function RemindersScreen() {
                 onToggle={(enabled) => toggleReminder(r.id, enabled)}
                 onSubmit={handleSubmit}
                 getNextFire={getNextFire}
+                now={now}
               />
             ))}
           </ListErrorBoundary>

@@ -43,5 +43,6 @@ export function useReminders() {
     removeReminder: (id: number) => deleteReminder(id),
     sendTest: (title: string, body: string) => sendTestNotification(title, body),
     getNextFire,
+    now,
   };
 }

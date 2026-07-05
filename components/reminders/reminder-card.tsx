@@ -14,6 +14,7 @@ type Props = {
   onToggle: (enabled: boolean) => void;
   onSubmit: (input: ReminderInput) => void;
   getNextFire: (r: Reminder) => Date | null;
+  now: Date;
 };
 
 function buildEditInput(r: Reminder): ReminderInput {
@@ -43,6 +44,7 @@ export function ReminderCard({
   onToggle,
   onSubmit,
   getNextFire,
+  now,
 }: Props) {
   return (
     <View>
@@ -51,7 +53,7 @@ export function ReminderCard({
           <View style={styles.info}>
             <Text style={styles.title}>{r.title}</Text>
             <Text style={styles.summary}>{formatKindSummary(r)}</Text>
-            <Text style={styles.next}>{formatNextFire(getNextFire(r))}</Text>
+            <Text style={styles.next}>{formatNextFire(getNextFire(r), now)}</Text>
           </View>
           <Switch
             value={r.enabled}
