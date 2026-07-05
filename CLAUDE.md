@@ -80,3 +80,12 @@ kinkatsu用のGoogle Driveフォルダが `仕事 > Webサービス > 🏋️ ki
 - Promise を fire-and-forget にしない。呼び出し側で `await` して `catch` する
 - `useMigrations` の `error` は必ずハンドリングし、失敗時はクラッシュさせずエラー画面を表示する
 - 楽観的UIを使う場合はエラー時に状態を元に戻す
+
+### プリセット種目を新規追加するとき
+`db/seed.ts` の `PRESET_EXERCISES` に1件足すだけでは不完全。指示がなくても以下を毎回チェックする。
+
+- `lib/exercises/guides.ts` の `GUIDES`: 使う筋肉・フォームのポイント・注意点・呼吸法。加重バリエーションは通常版と同じフォームを流用しつつ「どこに加重するか（ベルト/ベスト/プレート等）」を1点目に追記する
+- `lib/exercises/readings.ts` の `READINGS`: 種目名が漢字を含む場合のみ、ひらがな検索用の読みを追加する（純カタカナ名は不要）。加重バリエーションは「かじゅう」+ 元の読みで作る
+- `lib/exercises/aliases.ts` の `ALIASES`: カタカナ表記と競合する和名の俗称があれば追加する（無ければ不要）
+- `lib/exercises/images.ts` の `IMAGES`（動画・サムネイル）: GymVisual素材が未購入の種目は登録しなくてよい（`PLACEHOLDER_THUMBNAIL` にフォールバックする）。素材を追加した時点で登録する
+- 記録機能実装後は `db/schema.ts` の `exercises.measurementType` も分類する
