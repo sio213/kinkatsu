@@ -132,7 +132,6 @@ export default function ExercisePickerScreen() {
         data={filtered}
         keyExtractor={(item) => String(item.id)}
         renderItem={renderItem}
-        ItemSeparatorComponent={() => <View style={styles.separator} />}
         ListHeaderComponent={listHeader}
         ListEmptyComponent={emptyComponent}
         contentContainerStyle={styles.content}
@@ -157,8 +156,6 @@ const styles = StyleSheet.create({
   content: { paddingHorizontal: 16, paddingBottom: 16 },
 
   headerArea: { paddingTop: 12, gap: 8, marginBottom: 4 },
-
-  separator: { height: 4 },
 
   emptyWrapper: { alignItems: 'center', paddingVertical: 32 },
   empty: { color: Colors.textPlaceholder, fontSize: 14 },
