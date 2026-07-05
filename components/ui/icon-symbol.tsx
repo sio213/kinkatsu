@@ -23,6 +23,7 @@ const MAPPING = {
   'list.bullet.clipboard': 'assignment',
   'bell.fill': 'notifications',
   magnifyingglass: 'search',
+  'xmark.circle.fill': 'cancel',
 } as IconMapping;
 
 /**
