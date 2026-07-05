@@ -100,6 +100,10 @@ const IMAGES: Record<string, { source: number; thumbnail: number }> = {
     source: require('@/assets/exercise-media/dips.mp4'),
     thumbnail: require('@/assets/exercise-media/dips_thumb.png'),
   },
+  weighted_dips: {
+    source: require('@/assets/exercise-media/weighted_dips.mp4'),
+    thumbnail: require('@/assets/exercise-media/weighted_dips_thumb.png'),
+  },
   side_plank: {
     source: require('@/assets/exercise-media/side_plank.mp4'),
     thumbnail: require('@/assets/exercise-media/side_plank_thumb.png'),
@@ -148,9 +152,17 @@ const IMAGES: Record<string, { source: number; thumbnail: number }> = {
     source: require('@/assets/exercise-media/chin_up.mp4'),
     thumbnail: require('@/assets/exercise-media/chin_up_thumb.png'),
   },
+  weighted_chin_up: {
+    source: require('@/assets/exercise-media/weighted_chin_up.mp4'),
+    thumbnail: require('@/assets/exercise-media/weighted_chin_up_thumb.png'),
+  },
   pull_up: {
     source: require('@/assets/exercise-media/pull_up.mp4'),
     thumbnail: require('@/assets/exercise-media/pull_up_thumb.png'),
+  },
+  weighted_pull_up: {
+    source: require('@/assets/exercise-media/weighted_pull_up.mp4'),
+    thumbnail: require('@/assets/exercise-media/weighted_pull_up_thumb.png'),
   },
   high_row: {
     source: require('@/assets/exercise-media/high_row.mp4'),
@@ -159,6 +171,10 @@ const IMAGES: Record<string, { source: number; thumbnail: number }> = {
   back_extension: {
     source: require('@/assets/exercise-media/back_extension.mp4'),
     thumbnail: require('@/assets/exercise-media/back_extension_thumb.png'),
+  },
+  weighted_back_extension: {
+    source: require('@/assets/exercise-media/weighted_back_extension.mp4'),
+    thumbnail: require('@/assets/exercise-media/weighted_back_extension_thumb.png'),
   },
   running: {
     source: require('@/assets/exercise-media/running.mp4'),
@@ -512,6 +528,10 @@ const IMAGES: Record<string, { source: number; thumbnail: number }> = {
     source: require('@/assets/exercise-media/bench_dip.mp4'),
     thumbnail: require('@/assets/exercise-media/bench_dip_thumb.png'),
   },
+  weighted_bench_dip: {
+    source: require('@/assets/exercise-media/weighted_bench_dip.mp4'),
+    thumbnail: require('@/assets/exercise-media/weighted_bench_dip_thumb.png'),
+  },
   wrist_curl: {
     source: require('@/assets/exercise-media/wrist_curl.mp4'),
     thumbnail: require('@/assets/exercise-media/wrist_curl_thumb.png'),
@@ -672,6 +692,10 @@ const IMAGES: Record<string, { source: number; thumbnail: number }> = {
     source: require('@/assets/exercise-media/reverse_crunch.mp4'),
     thumbnail: require('@/assets/exercise-media/reverse_crunch_thumb.png'),
   },
+  decline_crunch: {
+    source: require('@/assets/exercise-media/decline_crunch.mp4'),
+    thumbnail: require('@/assets/exercise-media/decline_crunch_thumb.png'),
+  },
   sit_up: {
     source: require('@/assets/exercise-media/sit_up.mp4'),
     thumbnail: require('@/assets/exercise-media/sit_up_thumb.png'),
@@ -688,9 +712,17 @@ const IMAGES: Record<string, { source: number; thumbnail: number }> = {
     source: require('@/assets/exercise-media/decline_sit_up.mp4'),
     thumbnail: require('@/assets/exercise-media/decline_sit_up_thumb.png'),
   },
+  weighted_decline_sit_up: {
+    source: require('@/assets/exercise-media/weighted_decline_sit_up.mp4'),
+    thumbnail: require('@/assets/exercise-media/weighted_decline_sit_up_thumb.png'),
+  },
   hanging_knee_raise: {
     source: require('@/assets/exercise-media/hanging_knee_raise.mp4'),
     thumbnail: require('@/assets/exercise-media/hanging_knee_raise_thumb.png'),
+  },
+  weighted_hanging_knee_raise: {
+    source: require('@/assets/exercise-media/weighted_hanging_knee_raise.mp4'),
+    thumbnail: require('@/assets/exercise-media/weighted_hanging_knee_raise_thumb.png'),
   },
   cable_woodchopper: {
     source: require('@/assets/exercise-media/cable_woodchopper.mp4'),
@@ -979,6 +1011,10 @@ const IMAGES: Record<string, { source: number; thumbnail: number }> = {
   sissy_squat: {
     source: require('@/assets/exercise-media/sissy_squat.mp4'),
     thumbnail: require('@/assets/exercise-media/sissy_squat_thumb.png'),
+  },
+  weighted_sissy_squat: {
+    source: require('@/assets/exercise-media/weighted_sissy_squat.mp4'),
+    thumbnail: require('@/assets/exercise-media/weighted_sissy_squat_thumb.png'),
   },
   jump_squat: {
     source: require('@/assets/exercise-media/jump_squat.mp4'),

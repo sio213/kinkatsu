@@ -40,7 +40,8 @@ kinkatsu用のGoogle Driveフォルダが `仕事 > Webサービス > 🏋️ ki
 - ソースコード/ — 実体は置かない。ローカルパス（このリポジトリ）を示すREADMEのみ。gitリポジトリ（.git・node_modules・ios/Pods等の大量の小ファイル）をGoogle Drive同期対象に入れると同期破損・不安定化のリスクがあるため、実体は絶対にここに置かないこと
 - デザイン・UI案/ — UI/UXモックアップ、AI生成デザイン案
 - ナレッジ/ — 競合・市場調査の一次資料（サマリーはNotion「競合アプリ」ページ）
-- 画像/ — 購入素材（GymVisual等）、AI生成画像
+- 動画・画像/購入素材（GymVisual等）/ — GymVisualの生素材（動画・サムネイル静止画）。ローカル同期パス: `~/Documents/仕事/Webサービス/🏋️ kinkatsu/動画・画像/購入素材（GymVisual等）`、配下は`動画/male`,`動画/female`,`サムネイル/male`,`サムネイル/female`。ここには購入時のzipがそのまま置かれていることが多く未展開の場合がある。展開済みのものが`~/Downloads`に残っていることがあるので、無ければそちらも確認する（詳細手順は下記「プリセット種目を新規追加するとき」）
+- 画像/ — AI生成画像等その他の画像
 - ストア素材（App Store申請用）/ — ロードマップPhase 3のApp Store申請用
 - 法務・規約（プライバシーポリシー等）/ — App Store申請や機微データを扱う機能（進捗写真機能など）に必要なプライバシーポリシー等の草案置き場
 
@@ -80,3 +81,15 @@ kinkatsu用のGoogle Driveフォルダが `仕事 > Webサービス > 🏋️ ki
 - Promise を fire-and-forget にしない。呼び出し側で `await` して `catch` する
 - `useMigrations` の `error` は必ずハンドリングし、失敗時はクラッシュさせずエラー画面を表示する
 - 楽観的UIを使う場合はエラー時に状態を元に戻す
+
+### プリセット種目を新規追加するとき
+`db/seed.ts` の `PRESET_EXERCISES` に1件足すだけでは不完全。指示がなくても以下を毎回チェックする。
+
+- `lib/exercises/guides.ts` の `GUIDES`: 使う筋肉・フォームのポイント・注意点・呼吸法。加重バリエーションは通常版と同じフォームを流用しつつ「どこに加重するか（ベルト/ベスト/プレート等）」を1点目に追記する
+- `lib/exercises/readings.ts` の `READINGS`: 種目名が漢字を含む場合のみ、ひらがな検索用の読みを追加する（純カタカナ名は不要）。加重バリエーションは「かじゅう」+ 元の読みで作る
+- `lib/exercises/aliases.ts` の `ALIASES`: カタカナ表記と競合する和名の俗称があれば追加する（無ければ不要）
+- `lib/exercises/images.ts` の `IMAGES`（動画・サムネイル）: GymVisualの生素材の場所は上記「Google Drive」節を参照（実際に使うのは大抵`~/Downloads`の展開済みフォルダ、例: `1201-01 05 26-male1` が動画本体、`1201-01 05 26-thumbnails-male1` がSTEP1/STEP2静止画）。該当クリップ（英語種目名で検索）を探し、以下で変換・登録する
+  - 動画: `ffmpeg -y -i "<raw>.mp4" -vf scale=960:540 -c:v libx264 -crf 18 -pix_fmt yuv420p -movflags +faststart -an assets/exercise-media/<slug>.mp4`
+  - サムネ: STEP2の静止画（ピーク収縮側。STEP1/2は目視で選ぶ）に `ffmpeg -y -nostdin -i "<raw>-STEP2.png" -vf "crop=1080:1080,scale=300:300" assets/exercise-media/<slug>_thumb.png`
+  - 該当クリップが無い/複数候補があって名称的に確信が持てない場合はユーザーに確認する。それでも見つからない種目だけ登録を省略してよい（`PLACEHOLDER_THUMBNAIL` にフォールバックする）
+- 記録機能実装後は `db/schema.ts` の `exercises.measurementType` も分類する
