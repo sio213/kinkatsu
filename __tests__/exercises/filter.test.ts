@@ -125,6 +125,46 @@ describe('filterExercises', () => {
     });
   });
 
+  describe('スペース区切りのAND検索', () => {
+    const BULGARIAN = make({
+      id: 23,
+      name: 'ブルガリアンスプリットスクワット',
+      category: 'leg',
+    });
+    const SET = [BULGARIAN, CHEST];
+
+    it('スペース区切りの各語がすべて名前に含まれれば一致する', () => {
+      const result = filterExercises(SET, CATEGORY_ALL, 'ブルガリアン スクワット');
+      expect(result.map((e) => e.name)).toEqual([BULGARIAN.name]);
+    });
+
+    it('語順を入れ替えても一致する（語順非依存）', () => {
+      const result = filterExercises(SET, CATEGORY_ALL, 'スクワット ブルガリアン');
+      expect(result.map((e) => e.name)).toEqual([BULGARIAN.name]);
+    });
+
+    it('全角スペース区切りでも一致する', () => {
+      const result = filterExercises(SET, CATEGORY_ALL, 'ブルガリアン　スクワット');
+      expect(result.map((e) => e.name)).toEqual([BULGARIAN.name]);
+    });
+
+    it('一部の語だけでも一致しない語があればAND不成立で除外される', () => {
+      const result = filterExercises(SET, CATEGORY_ALL, 'ブルガリアン ベンチプレス');
+      expect(result).toEqual([]);
+    });
+
+    it('語ごとに別々のテキストにマッチしてもAND成立する（名前 + カテゴリ名の組み合わせ）', () => {
+      // BULGARIANはcategory=leg（ラベル「脚」）。「ブルガリアン」は名前、「脚」はカテゴリラベルにマッチする
+      const result = filterExercises(SET, CATEGORY_ALL, 'ブルガリアン 脚');
+      expect(result.map((e) => e.name)).toEqual([BULGARIAN.name]);
+    });
+
+    it('前後・語間の余分な空白は無視される', () => {
+      const result = filterExercises(SET, CATEGORY_ALL, '  ブルガリアン   スクワット  ');
+      expect(result.map((e) => e.name)).toEqual([BULGARIAN.name]);
+    });
+  });
+
   describe('かな/カナ表記ゆれ吸収', () => {
     it('ひらがな検索でカタカナ種目名にマッチ（濁点・小書き含む）', () => {
       const result = filterExercises(ALL, CATEGORY_ALL, 'すくわっと');
