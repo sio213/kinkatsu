@@ -1,0 +1,71 @@
+import { IconSymbol } from '@/components/ui/icon-symbol';
+import { Colors } from '@/constants/theme';
+import { Platform, StyleSheet, TextInput, TouchableOpacity, View } from 'react-native';
+
+type Props = {
+  value: string;
+  onChangeText: (value: string) => void;
+  onSubmitEditing?: () => void;
+};
+
+export function ExerciseSearchBar({ value, onChangeText, onSubmitEditing }: Props) {
+  return (
+    <View style={styles.searchWrapper}>
+      <View style={styles.searchIconWrapper}>
+        <IconSymbol name="magnifyingglass" size={18} color={Colors.textPlaceholder} />
+      </View>
+      <TextInput
+        style={styles.searchInput}
+        value={value}
+        onChangeText={onChangeText}
+        onSubmitEditing={onSubmitEditing}
+        placeholder="種目を検索..."
+        accessibilityLabel="種目を検索"
+        clearButtonMode="while-editing"
+        returnKeyType="search"
+      />
+      {Platform.OS !== 'ios' && value.length > 0 && (
+        <TouchableOpacity
+          style={styles.searchClearBtn}
+          onPress={() => onChangeText('')}
+          hitSlop={{ top: 12, bottom: 12, left: 12, right: 12 }}
+          accessibilityRole="button"
+          accessibilityLabel="検索文字をクリア"
+        >
+          <IconSymbol name="xmark.circle.fill" size={18} color={Colors.textPlaceholder} />
+        </TouchableOpacity>
+      )}
+    </View>
+  );
+}
+
+const styles = StyleSheet.create({
+  searchWrapper: { position: 'relative', justifyContent: 'center' },
+  searchIconWrapper: {
+    position: 'absolute',
+    left: 11,
+    top: 0,
+    bottom: 0,
+    justifyContent: 'center',
+    zIndex: 1,
+  },
+  searchClearBtn: {
+    position: 'absolute',
+    right: 11,
+    top: 0,
+    bottom: 0,
+    justifyContent: 'center',
+    zIndex: 1,
+  },
+  searchInput: {
+    borderWidth: 1,
+    borderColor: Colors.borderStrong,
+    borderRadius: 8,
+    paddingLeft: 36,
+    paddingRight: 36,
+    paddingVertical: 9,
+    fontSize: 14,
+    color: Colors.textPrimary,
+    backgroundColor: Colors.surfaceMuted,
+  },
+});

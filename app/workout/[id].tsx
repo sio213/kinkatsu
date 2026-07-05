@@ -1,13 +1,20 @@
 import { IconSymbol } from '@/components/ui/icon-symbol';
+import { ListErrorBoundary } from '@/components/ui/list-error-boundary';
 import { NotFoundState } from '@/components/ui/not-found-state';
 import { PrimaryButton } from '@/components/ui/primary-button';
+import { AddExerciseButton } from '@/components/workout/add-exercise-button';
+import { SessionExerciseCard } from '@/components/workout/session-exercise-card';
 import { Colors } from '@/constants/theme';
-import { useSessionSetCount, useWorkoutSession } from '@/hooks/use-workout-session';
+import {
+  useSessionExercises,
+  useSessionSetCount,
+  useWorkoutSession,
+} from '@/hooks/use-workout-session';
 import { endWorkoutSession } from '@/lib/workout/session';
 import { formatSessionDateGroup } from '@/lib/workout/summary';
 import { Stack, useLocalSearchParams, useRouter } from 'expo-router';
 import { useEffect, useRef, useState } from 'react';
-import { Alert, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
+import { Alert, FlatList, StyleSheet, Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 function formatElapsed(ms: number): string {
@@ -24,6 +31,7 @@ export default function WorkoutScreen() {
   const sessionId = Number.isFinite(parsedId) ? parsedId : null;
   const { session, loaded } = useWorkoutSession(sessionId ?? -1);
   const setCount = useSessionSetCount(sessionId ?? -1);
+  const sessionExercises = useSessionExercises(sessionId ?? -1);
   const [now, setNow] = useState(() => Date.now());
   const isFinishingRef = useRef(false);
 
@@ -60,8 +68,10 @@ export default function WorkoutScreen() {
     finish();
   };
 
-  // 種目追加ピッカーの実装後にここから配線する
-  const handleAddExercise = () => {};
+  const handleAddExercise = () => {
+    if (sessionId == null) return;
+    router.push({ pathname: '/workout/exercise-picker', params: { sessionId: String(sessionId) } });
+  };
 
   if (sessionId == null || (loaded && !session)) {
     return (
@@ -94,19 +104,27 @@ export default function WorkoutScreen() {
         <Text style={styles.headerDate}>{formatSessionDateGroup(session.startedAt)}</Text>
       </View>
 
-      <View style={styles.body}>
-        <Text style={styles.emptyText}>まだ種目がありません</Text>
-        <TouchableOpacity
-          style={styles.addExerciseBtn}
-          onPress={handleAddExercise}
-          accessibilityRole="button"
-          accessibilityLabel="種目を追加"
-          hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
-        >
-          <IconSymbol name="plus" size={18} color={Colors.accent} />
-          <Text style={styles.addExerciseBtnText}>種目を追加</Text>
-        </TouchableOpacity>
-      </View>
+      {sessionExercises.length === 0 ? (
+        <View style={styles.body}>
+          <Text style={styles.emptyText}>まだ種目がありません</Text>
+          <AddExerciseButton onPress={handleAddExercise} />
+        </View>
+      ) : (
+        <FlatList
+          style={styles.exerciseList}
+          contentContainerStyle={styles.exerciseListContent}
+          data={sessionExercises}
+          keyExtractor={(item) => String(item.id)}
+          renderItem={({ item }) => (
+            <ListErrorBoundary>
+              <SessionExerciseCard exercise={item} />
+            </ListErrorBoundary>
+          )}
+          ListFooterComponent={
+            <AddExerciseButton onPress={handleAddExercise} style={styles.addExerciseBtnInline} />
+          }
+        />
+      )}
 
       <View style={styles.footer}>
         <PrimaryButton label="トレーニングを終了" onPress={handleFinish} />
@@ -134,16 +152,10 @@ const styles = StyleSheet.create({
 
   body: { flex: 1, alignItems: 'center', justifyContent: 'center', gap: 16, paddingHorizontal: 16 },
   emptyText: { fontSize: 13.5, color: Colors.textPlaceholder },
-  addExerciseBtn: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 6,
-    backgroundColor: Colors.accentSurface,
-    borderRadius: 8,
-    paddingHorizontal: 16,
-    paddingVertical: 11,
-  },
-  addExerciseBtnText: { color: Colors.accent, fontWeight: '600', fontSize: 14 },
+
+  exerciseList: { flex: 1 },
+  exerciseListContent: { padding: 16, gap: 10 },
+  addExerciseBtnInline: { marginTop: 4 },
 
   footer: {
     padding: 16,

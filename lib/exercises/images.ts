@@ -1245,7 +1245,7 @@ const IMAGES: Record<string, { source: number; thumbnail: number }> = {
 // 種目ごとのサムネイル素材がまだ揃っていないため、未用意の種目はこの画像を仮のサムネイルとして使う
 const PLACEHOLDER_THUMBNAIL = require('@/assets/exercise-media/bench_press_thumb.png');
 
-export function getExerciseImages(exercise: Exercise): ExerciseImages {
+export function getExerciseImages(exercise: Pick<Exercise, 'source' | 'slug'>): ExerciseImages {
   const entry = isPresetExercise(exercise) && exercise.slug ? IMAGES[exercise.slug] : undefined;
   return {
     source: entry?.source,

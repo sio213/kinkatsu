@@ -1,34 +1,17 @@
-import { chipStyles } from '@/components/exercises/chip-styles';
+import { CategoryFilterChips } from '@/components/exercises/category-filter-chips';
 import { ExerciseCard } from '@/components/exercises/exercise-card';
-import { IconSymbol } from '@/components/ui/icon-symbol';
+import { ExerciseSearchBar } from '@/components/exercises/exercise-search-bar';
 import { ListErrorBoundary } from '@/components/ui/list-error-boundary';
 import { Colors } from '@/constants/theme';
 import type { Exercise } from '@/db/schema';
 import { useExercises } from '@/hooks/use-exercises';
 import { useKeyboardInset } from '@/hooks/use-keyboard-inset';
-import {
-  CATEGORY_ALL,
-  CATEGORY_FAVORITE,
-  EXERCISE_CATEGORIES,
-  getCategoryLabel,
-} from '@/lib/exercises/constants';
+import { CATEGORY_ALL } from '@/lib/exercises/constants';
 import { filterExercises } from '@/lib/exercises/filter';
 import { useFocusEffect, useRouter } from 'expo-router';
 import { useCallback, useMemo, useState } from 'react';
-import {
-  FlatList,
-  Keyboard,
-  Platform,
-  ScrollView,
-  StyleSheet,
-  Text,
-  TextInput,
-  TouchableOpacity,
-  View,
-} from 'react-native';
+import { FlatList, Keyboard, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-
-const CATEGORY_FILTERS = [CATEGORY_ALL, CATEGORY_FAVORITE, ...EXERCISE_CATEGORIES] as const;
 
 export default function ExercisesScreen() {
   const { exercises, toggleFavorite } = useExercises();
@@ -76,55 +59,8 @@ export default function ExercisesScreen() {
         </TouchableOpacity>
       </View>
 
-      <View style={styles.searchWrapper}>
-        <View style={styles.searchIconWrapper}>
-          <IconSymbol name="magnifyingglass" size={18} color={Colors.textPlaceholder} />
-        </View>
-        <TextInput
-          style={styles.searchInput}
-          value={search}
-          onChangeText={setSearch}
-          placeholder="種目を検索..."
-          clearButtonMode="while-editing"
-          returnKeyType="search"
-        />
-        {Platform.OS !== 'ios' && search.length > 0 && (
-          <TouchableOpacity
-            style={styles.searchClearBtn}
-            onPress={() => setSearch('')}
-            hitSlop={{ top: 12, bottom: 12, left: 12, right: 12 }}
-            accessibilityRole="button"
-            accessibilityLabel="検索文字をクリア"
-          >
-            <IconSymbol name="xmark.circle.fill" size={18} color={Colors.textPlaceholder} />
-          </TouchableOpacity>
-        )}
-      </View>
-
-      <ScrollView
-        horizontal
-        showsHorizontalScrollIndicator={false}
-        contentContainerStyle={styles.categoryScroll}
-      >
-        {CATEGORY_FILTERS.map((cat) => {
-          const isActive = activeCategory === cat;
-          const label = getCategoryLabel(cat);
-          return (
-            <TouchableOpacity
-              key={cat}
-              style={[chipStyles.chip, isActive && chipStyles.chipActive]}
-              onPress={() => setActiveCategory(cat)}
-              accessibilityRole="radio"
-              accessibilityState={{ checked: isActive }}
-              accessibilityLabel={label}
-            >
-              <Text style={[chipStyles.chipText, isActive && chipStyles.chipTextActive]}>
-                {label}
-              </Text>
-            </TouchableOpacity>
-          );
-        })}
-      </ScrollView>
+      <ExerciseSearchBar value={search} onChangeText={setSearch} />
+      <CategoryFilterChips activeCategory={activeCategory} onChange={setActiveCategory} />
     </View>
   );
 
@@ -188,37 +124,6 @@ const styles = StyleSheet.create({
     paddingVertical: 6,
   },
   addBtnText: { color: Colors.onAccent, fontWeight: '600', fontSize: 14 },
-
-  searchWrapper: { position: 'relative', justifyContent: 'center' },
-  searchIconWrapper: {
-    position: 'absolute',
-    left: 11,
-    top: 0,
-    bottom: 0,
-    justifyContent: 'center',
-    zIndex: 1,
-  },
-  searchClearBtn: {
-    position: 'absolute',
-    right: 11,
-    top: 0,
-    bottom: 0,
-    justifyContent: 'center',
-    zIndex: 1,
-  },
-  searchInput: {
-    borderWidth: 1,
-    borderColor: Colors.borderStrong,
-    borderRadius: 8,
-    paddingLeft: 36,
-    paddingRight: 36,
-    paddingVertical: 9,
-    fontSize: 14,
-    color: Colors.textPrimary,
-    backgroundColor: Colors.surfaceMuted,
-  },
-
-  categoryScroll: { gap: 6 },
 
   separator: { height: 8 },
 
