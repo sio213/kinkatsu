@@ -1,12 +1,12 @@
 import { Colors } from '@/constants/theme';
 import type { Exercise } from '@/db/schema';
 import { Image } from 'expo-image';
-import { useRouter } from 'expo-router';
-import { memo } from 'react';
+import { memo, useCallback } from 'react';
 import { StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import { getExerciseImages } from '@/lib/exercises/images';
 import { getCategoryLabel } from '@/lib/exercises/constants';
 import { useFavoriteToggle } from '@/hooks/use-favorite-toggle';
+import { useDebouncedPush } from '@/hooks/use-debounced-push';
 
 type Props = {
   exercise: Exercise;
@@ -17,15 +17,19 @@ export const ExerciseCard = memo(function ExerciseCard({
   exercise: e,
   onToggleFavorite,
 }: Props) {
-  const router = useRouter();
+  const push = useDebouncedPush();
   const { localFav, toggle: handleFavoritePress } = useFavoriteToggle(e.id, e.favorite, onToggleFavorite);
 
   const images = getExerciseImages(e);
 
+  const handlePress = useCallback(() => {
+    push(`/exercise/${e.id}`);
+  }, [push, e.id]);
+
   return (
     <TouchableOpacity
       style={styles.card}
-      onPress={() => router.push(`/exercise/${e.id}`)}
+      onPress={handlePress}
       accessibilityLabel={`${e.name}の詳細を見る`}
     >
       <Image source={images.thumbnail} style={styles.thumbnail} contentFit="cover" />

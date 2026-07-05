@@ -9,6 +9,7 @@ import { getCategoryLabel } from '@/lib/exercises/constants';
 import { getYoutubeSearchUrl } from '@/lib/exercises/youtube';
 import { useExercise, useExercises } from '@/hooks/use-exercises';
 import { useFavoriteToggle } from '@/hooks/use-favorite-toggle';
+import { useDebouncedPush } from '@/hooks/use-debounced-push';
 import { useHeaderHeight } from '@react-navigation/elements';
 import { Stack, useLocalSearchParams, useRouter } from 'expo-router';
 import { useVideoPlayer, VideoView } from 'expo-video';
@@ -75,6 +76,7 @@ async function handleYoutubeSearch(exerciseName: string) {
 export default function ExerciseDetailScreen() {
   const { id } = useLocalSearchParams<{ id: string }>();
   const router = useRouter();
+  const push = useDebouncedPush();
   const headerHeight = useHeaderHeight();
 
   const { exercise, loaded } = useExercise(Number(id));
@@ -90,7 +92,7 @@ export default function ExerciseDetailScreen() {
   function handleEdit() {
     if (!exercise) return;
     setMenuOpen(false);
-    router.push(`/exercise/edit/${exercise.id}`);
+    push(`/exercise/edit/${exercise.id}`);
   }
 
   function handleDelete() {
