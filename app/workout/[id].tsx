@@ -8,7 +8,7 @@ import { endWorkoutSession } from '@/lib/workout/session';
 import { formatSessionDateGroup } from '@/lib/workout/summary';
 import { eq } from 'drizzle-orm';
 import { useLiveQuery } from 'drizzle-orm/expo-sqlite';
-import { useLocalSearchParams, useRouter } from 'expo-router';
+import { Stack, useLocalSearchParams, useRouter } from 'expo-router';
 import { useEffect, useState } from 'react';
 import { Alert, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
@@ -67,7 +67,7 @@ export default function WorkoutScreen() {
 
   if (sessionId == null || (loaded && !session)) {
     return (
-      <SafeAreaView style={styles.safeArea} edges={['top', 'bottom']}>
+      <SafeAreaView style={styles.safeArea} edges={['bottom']}>
         <View style={styles.notFound}>
           <Text style={styles.notFoundText}>トレーニングが見つかりません</Text>
           <TouchableOpacity
@@ -86,25 +86,20 @@ export default function WorkoutScreen() {
   if (!session) return null;
 
   return (
-    <SafeAreaView style={styles.safeArea} edges={['top', 'bottom']}>
-      <View style={styles.header}>
-        <TouchableOpacity
-          style={styles.closeBtn}
-          onPress={() => router.back()}
-          accessibilityRole="button"
-          accessibilityLabel="トレーニングを中断せず閉じる"
-          hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
-        >
-          <IconSymbol name="xmark" size={20} color={Colors.textMuted} />
-        </TouchableOpacity>
-        <View style={styles.headerTitles}>
-          <Text style={styles.headerTitle}>トレーニング中</Text>
-          <Text style={styles.headerDate}>{formatSessionDateGroup(session.startedAt)}</Text>
-        </View>
-        <View style={styles.timerChip}>
-          <IconSymbol name="timer" size={16} color={Colors.accent} />
-          <Text style={styles.timerText}>{formatElapsed(now - session.startedAt)}</Text>
-        </View>
+    <SafeAreaView style={styles.safeArea} edges={['bottom']}>
+      <Stack.Screen
+        options={{
+          title: 'トレーニング中',
+          headerRight: () => (
+            <View style={styles.timerChip}>
+              <IconSymbol name="timer" size={16} color={Colors.accent} />
+              <Text style={styles.timerText}>{formatElapsed(now - session.startedAt)}</Text>
+            </View>
+          ),
+        }}
+      />
+      <View style={styles.subHeader}>
+        <Text style={styles.headerDate}>{formatSessionDateGroup(session.startedAt)}</Text>
       </View>
 
       <View style={styles.body}>
@@ -130,18 +125,8 @@ export default function WorkoutScreen() {
 const styles = StyleSheet.create({
   safeArea: { flex: 1, backgroundColor: Colors.background },
 
-  header: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    paddingHorizontal: 16,
-    paddingTop: 16,
-    paddingBottom: 6,
-  },
-  closeBtn: { paddingRight: 10 },
-  headerTitles: { flex: 1 },
-  headerTitle: { fontSize: 18, fontWeight: '700', color: Colors.textPrimary },
-  headerDate: { fontSize: 12, color: Colors.textMuted, marginTop: 2 },
+  subHeader: { paddingHorizontal: 16, paddingTop: 8, paddingBottom: 6 },
+  headerDate: { fontSize: 12, color: Colors.textMuted },
   timerChip: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -150,6 +135,7 @@ const styles = StyleSheet.create({
     borderRadius: 999,
     paddingHorizontal: 12,
     paddingVertical: 6,
+    marginRight: 8,
   },
   timerText: { fontSize: 14, fontWeight: '700', color: Colors.textPrimary },
 

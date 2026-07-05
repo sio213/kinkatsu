@@ -7,6 +7,12 @@ let mockSessionSets: unknown[] | undefined;
 jest.mock('expo-router', () => ({
   useRouter: () => ({ back: mockBack }),
   useLocalSearchParams: () => mockUseLocalSearchParams(),
+  // Stack.Screen はナビゲーターのoptionsを設定するコンポーネントで本来は見た目を持たないが、
+  // headerRightの中身（タイマーチップ）をテストで検証できるよう、そのレンダー関数だけ実行してやる
+  Stack: {
+    Screen: ({ options }: { options?: { headerRight?: () => unknown } }) =>
+      options?.headerRight ? options.headerRight() : null,
+  },
 }));
 
 jest.mock('@/hooks/use-workout-session', () => ({
@@ -40,12 +46,6 @@ function findButtonByLabel(root: ReactTestInstance, label: string) {
     .find((btn: ReactTestInstance) =>
       btn.findAllByType(Text).some((t: ReactTestInstance) => [t.props.children].flat().join('') === label),
     );
-}
-
-function findButtonByAccessibilityLabel(root: ReactTestInstance, label: string) {
-  return root
-    .findAllByType(TouchableOpacity)
-    .find((btn: ReactTestInstance) => btn.props.accessibilityLabel === label);
 }
 
 function render() {
@@ -90,26 +90,15 @@ test('セッションが見つからない場合、「戻る」を押すとroute
   expect(mockBack).toHaveBeenCalled();
 });
 
-test('セッションが見つかった場合、通常のトレーニング中画面を表示する', () => {
+test('セッションが見つかった場合、ネイティブヘッダーのタイマーを含む通常のトレーニング中画面を表示する', () => {
   mockUseWorkoutSession.mockReturnValue({ session: activeSession, loaded: true });
   const root = render();
 
-  expect(root.findByProps({ children: 'トレーニング中' })).toBeDefined();
+  // タイトル・戻るボタンはネイティブヘッダー（Stack.Screen options）が担うため、
+  // ここではheaderRightに渡したタイマーが実際にレンダーされることだけを確認する
+  expect(root.findByProps({ children: '0:00' })).toBeDefined();
   expect(findButtonByLabel(root, '種目を追加')).toBeDefined();
   expect(findButtonByLabel(root, 'トレーニングを終了')).toBeDefined();
-});
-
-test('閉じるボタンはendWorkoutSessionを呼ばずrouter.backのみ行う（セッションを終了しない）', () => {
-  mockUseWorkoutSession.mockReturnValue({ session: activeSession, loaded: true });
-  const root = render();
-
-  const closeBtn = findButtonByAccessibilityLabel(root, 'トレーニングを中断せず閉じる')!;
-  act(() => {
-    closeBtn.props.onPress();
-  });
-
-  expect(mockEndWorkoutSession).not.toHaveBeenCalled();
-  expect(mockBack).toHaveBeenCalled();
 });
 
 test('セット0件で終了を押すと確認ダイアログが出て、確定するとendWorkoutSessionが呼ばれる', async () => {
