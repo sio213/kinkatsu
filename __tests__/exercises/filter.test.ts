@@ -30,6 +30,12 @@ const HIP_THRUST = make({ id: 11, name: 'ヒップスラスト', category: 'glut
 const BICYCLE_CRUNCH = make({ id: 12, name: 'バイシクルクランチ', category: 'abs', slug: 'bicycle_crunch', source: 'preset' });
 const MUSCLE_SET = [HIP_THRUST, BICYCLE_CRUNCH];
 
+// aliases.ts に別名が登録されているpreset slugを使い、俗称検索を確認する
+const PLANK = make({ id: 13, name: 'プランク', category: 'core', slug: 'plank', source: 'preset' });
+const WALL_SIT = make({ id: 14, name: 'ウォールシット', category: 'leg', slug: 'wall_sit', source: 'preset' });
+const CUSTOM_NO_SLUG = make({ id: 15, name: 'カスタム種目', category: 'other', source: 'custom' });
+const ALIAS_SET = [PLANK, WALL_SIT, CUSTOM_NO_SLUG];
+
 describe('filterExercises', () => {
   it('空配列 → []', () => {
     expect(filterExercises([], CATEGORY_ALL, '')).toEqual([]);
@@ -173,6 +179,22 @@ describe('filterExercises', () => {
 
     it('guideを持たない種目（slugなし）はmuscle検索の対象にならずクラッシュしない', () => {
       expect(() => filterExercises([...MUSCLE_SET, CHEST], CATEGORY_ALL, '大臀筋')).not.toThrow();
+    });
+  });
+
+  describe('別名（俗称）での検索', () => {
+    it('カタカナ以外の俗称でマッチする（プランク→フロントブリッジ）', () => {
+      const result = filterExercises(ALIAS_SET, CATEGORY_ALL, 'フロントブリッジ');
+      expect(result.map((e) => e.name)).toContain('プランク');
+    });
+
+    it('ひらがな読みで漢字を含む俗称にマッチする（ウォールシット→空気椅子）', () => {
+      const result = filterExercises(ALIAS_SET, CATEGORY_ALL, 'くうきいす');
+      expect(result.map((e) => e.name)).toContain('ウォールシット');
+    });
+
+    it('slugを持たないcustom種目は俗称検索でクラッシュしない', () => {
+      expect(() => filterExercises(ALIAS_SET, CATEGORY_ALL, 'フロントブリッジ')).not.toThrow();
     });
   });
 
