@@ -32,13 +32,21 @@ export const MONTH_LABELS = [
   '7月', '8月', '9月', '10月', '11月', '12月',
 ];
 
-export function formatNextFire(date: Date | null): string {
-  if (!date) return '—';
+function formatRelativeDay(date: Date, now: Date): string {
+  const startOfDay = (d: Date) => new Date(d.getFullYear(), d.getMonth(), d.getDate()).getTime();
+  const diffDays = Math.round((startOfDay(date) - startOfDay(now)) / 86400000);
+  if (diffDays === 0) return '今日';
+  if (diffDays === 1) return '明日';
   const m = date.getMonth() + 1;
   const d = date.getDate();
+  return `${m}/${d}`;
+}
+
+export function formatNextFire(date: Date | null, now: Date): string {
+  if (!date) return '—';
   const h = String(date.getHours()).padStart(2, '0');
   const min = String(date.getMinutes()).padStart(2, '0');
-  return `次回: ${m}/${d} ${h}:${min}`;
+  return `次回: ${formatRelativeDay(date, now)} ${h}:${min}`;
 }
 
 export function formatKindSummary(r: Reminder): string {
