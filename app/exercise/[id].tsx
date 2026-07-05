@@ -13,11 +13,13 @@ import { useFavoriteToggle } from '@/hooks/use-favorite-toggle';
 import { useDebouncedPush } from '@/hooks/use-debounced-push';
 import { useHeaderHeight } from '@react-navigation/elements';
 import { Stack, useLocalSearchParams, useRouter } from 'expo-router';
+import { useEvent } from 'expo';
 import { useVideoPlayer, VideoView } from 'expo-video';
 import { Image } from 'expo-image';
 import { openBrowserAsync, WebBrowserPresentationStyle } from 'expo-web-browser';
 import { useState } from 'react';
 import {
+  ActivityIndicator,
   Alert,
   Dimensions,
   Modal,
@@ -45,20 +47,43 @@ function FormPointsList({ points }: { points: string[] }) {
   );
 }
 
-function Mp4Player({ source }: { source: number }) {
+function Mp4Player({ source, thumbnail }: { source: number; thumbnail: number }) {
   const player = useVideoPlayer(source, (p) => {
     p.loop = true;
     p.muted = true;
     p.play();
   });
 
+  // statusChangeイベントを監視し、動画本体が再生可能になるまではサムネイル+スピナーを重ねて表示する
+  const { status } = useEvent(player, 'statusChange', { status: player.status });
+  const isReady = status === 'readyToPlay';
+  const isError = status === 'error';
+
   return (
-    <VideoView
-      player={player}
-      style={styles.media}
-      contentFit="contain"
-      nativeControls={false}
-    />
+    <View style={styles.media}>
+      <VideoView
+        player={player}
+        style={StyleSheet.absoluteFillObject}
+        contentFit="contain"
+        nativeControls={false}
+      />
+      {!isReady && (
+        <View style={styles.videoOverlay} pointerEvents="none">
+          <Image source={thumbnail} style={styles.mediaThumbnail} contentFit="contain" />
+          {isError ? (
+            <Text style={styles.videoErrorText} accessibilityRole="alert">
+              ⚠️ 動画を読み込めませんでした
+            </Text>
+          ) : (
+            <ActivityIndicator
+              size="small"
+              color={Colors.accent}
+              accessibilityLabel="動画を読み込み中"
+            />
+          )}
+        </View>
+      )}
+    </View>
   );
 }
 
@@ -180,7 +205,7 @@ export default function ExerciseDetailScreen() {
       <ScrollView contentContainerStyle={styles.content}>
         <View style={styles.mediaBox}>
           {images.source != null ? (
-            <Mp4Player source={images.source} />
+            <Mp4Player source={images.source} thumbnail={images.thumbnail} />
           ) : (
             <Image source={images.thumbnail} style={styles.mediaThumbnail} contentFit="contain" />
           )}
@@ -334,6 +359,19 @@ const styles = StyleSheet.create({
   media: {
     width: SCREEN_WIDTH,
     height: SCREEN_WIDTH * 0.75,
+  },
+  videoOverlay: {
+    ...StyleSheet.absoluteFillObject,
+    backgroundColor: Colors.surfaceMuted,
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 12,
+  },
+  videoErrorText: {
+    fontSize: 13,
+    color: Colors.textBody,
+    paddingHorizontal: 24,
+    textAlign: 'center',
   },
 
   body: { paddingHorizontal: 20, paddingTop: 20, gap: 20 },
