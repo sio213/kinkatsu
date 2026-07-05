@@ -44,6 +44,24 @@ const DUMBBELL_SHRUG = make({
 });
 const ALIAS_SET = [PLANK, WALL_SIT, CUSTOM_NO_SLUG, SHRUG, DUMBBELL_SHRUG];
 
+// 略称エイリアスの検索確認用
+const BENCH_PRESS = make({ id: 18, name: 'ベンチプレス', category: 'chest', slug: 'bench_press', source: 'preset' });
+const BARBELL_SHOULDER_PRESS = make({
+  id: 19,
+  name: 'バーベルショルダープレス',
+  category: 'shoulder',
+  slug: 'barbell_shoulder_press',
+  source: 'preset',
+});
+const SEATED_BARBELL_SHOULDER_PRESS = make({
+  id: 20,
+  name: 'シーテッドバーベルショルダープレス',
+  category: 'shoulder',
+  slug: 'seated_barbell_shoulder_press',
+  source: 'preset',
+});
+const ABBREVIATION_SET = [BENCH_PRESS, BARBELL_SHOULDER_PRESS, SEATED_BARBELL_SHOULDER_PRESS];
+
 describe('filterExercises', () => {
   it('空配列 → []', () => {
     expect(filterExercises([], CATEGORY_ALL, '')).toEqual([]);
@@ -208,6 +226,21 @@ describe('filterExercises', () => {
     it('器具違いで同じ俗称を共有する種目は両方ヒットする（肩すくめ→シュラッグ/ダンベルシュラッグ）', () => {
       const result = filterExercises(ALIAS_SET, CATEGORY_ALL, 'かたすくめ');
       expect(result.map((e) => e.name).sort()).toEqual(['シュラッグ', 'ダンベルシュラッグ'].sort());
+    });
+
+    it('英字略称でマッチする（BP→ベンチプレス）', () => {
+      const result = filterExercises(ABBREVIATION_SET, CATEGORY_ALL, 'BP');
+      expect(result.map((e) => e.name)).toContain('ベンチプレス');
+    });
+
+    it('英字略称は大文字小文字を区別しない（bp→ベンチプレス）', () => {
+      const result = filterExercises(ABBREVIATION_SET, CATEGORY_ALL, 'bp');
+      expect(result.map((e) => e.name)).toContain('ベンチプレス');
+    });
+
+    it('OHPは立位のバーベルショルダープレスのみにマッチし、座位バリエーションには誤爆しない', () => {
+      const result = filterExercises(ABBREVIATION_SET, CATEGORY_ALL, 'OHP');
+      expect(result.map((e) => e.name)).toEqual(['バーベルショルダープレス']);
     });
   });
 
