@@ -836,6 +836,10 @@ const IMAGES: Record<string, { source: number; thumbnail: number }> = {
     source: require('@/assets/exercise-media/neutral_grip_pull_up.mp4'),
     thumbnail: require('@/assets/exercise-media/neutral_grip_pull_up_thumb.png'),
   },
+  weighted_neutral_grip_pull_up: {
+    source: require('@/assets/exercise-media/weighted_neutral_grip_pull_up.mp4'),
+    thumbnail: require('@/assets/exercise-media/weighted_neutral_grip_pull_up_thumb.png'),
+  },
   assisted_pull_up: {
     source: require('@/assets/exercise-media/assisted_pull_up.mp4'),
     thumbnail: require('@/assets/exercise-media/assisted_pull_up_thumb.png'),

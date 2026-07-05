@@ -206,6 +206,7 @@ export const PRESET_EXERCISES: PresetExercise[] = [
   { slug: 'wide_grip_pull_up', name: 'ワイドグリップ懸垂', category: 'back' },
   { slug: 'close_grip_pull_up', name: 'クローズグリップ懸垂', category: 'back' },
   { slug: 'neutral_grip_pull_up', name: 'ニュートラルグリップ懸垂', category: 'back' },
+  { slug: 'weighted_neutral_grip_pull_up', name: '加重ニュートラルグリップ懸垂', category: 'back' },
   { slug: 'assisted_pull_up', name: 'アシストプルアップ', category: 'back' },
   { slug: 'negative_pull_up', name: 'ネガティブ懸垂', category: 'back' },
   { slug: 'single_arm_cable_row', name: 'シングルアームケーブルロウ', category: 'back' },
