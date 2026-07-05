@@ -1,3 +1,4 @@
+import { BackButton } from '@/components/ui/back-button';
 import { Colors, headerOptions } from '@/constants/theme';
 import { db, expoDb } from '@/db/client';
 import { seed } from '@/db/seed';
@@ -90,7 +91,12 @@ export default function RootLayout() {
 
   return (
     <ThemeProvider value={colorScheme === 'dark' ? DarkTheme : DefaultTheme}>
-      <Stack screenOptions={headerOptions}>
+      <Stack
+        screenOptions={{
+          ...headerOptions,
+          headerLeft: (props) => <BackButton {...props} />,
+        }}
+      >
         <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
         <Stack.Screen name="exercise/[id]" options={{ title: '' }} />
         <Stack.Screen name="exercise/edit/[id]" options={{ title: '種目を編集' }} />
@@ -99,7 +105,13 @@ export default function RootLayout() {
         <Stack.Screen name="workout/exercise-picker" options={{ title: '種目を追加' }} />
         <Stack.Screen
           name="modal"
-          options={{ presentation: 'modal', title: 'Modal' }}
+          options={{
+            presentation: 'modal',
+            title: 'Modal',
+            // モーダル画面は下スワイプ/クローズ操作で閉じる想定のため、
+            // rootのheaderLeft（BackButton）を戻す
+            headerLeft: () => null,
+          }}
         />
       </Stack>
       <StatusBar style="auto" />

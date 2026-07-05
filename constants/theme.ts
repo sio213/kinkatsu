@@ -70,12 +70,14 @@ export const Colors = {
 };
 
 /**
- * プッシュ画面共通のネイティブヘッダー設定（戻るアイコン最小表示・中央揃えタイトル・影なし）。
+ * プッシュ画面共通のネイティブヘッダー設定（中央揃えタイトル・影なし）。
  * `<Stack screenOptions={headerOptions}>` に一度だけ渡し、各画面はtitle等の差分のみoptionsで指定する。
  * 戻るアイコンの色とタイトルの色を分けるため headerTintColor と headerTitleStyle.color を別々に指定している。
+ *
+ * 戻るボタン自体はネイティブ標準を使わず、`app/_layout.tsx` 側で `headerLeft` を
+ * `components/ui/back-button.tsx` の `BackButton` に差し替えている（理由はそちらのdocstringを参照）。
  */
 export const headerOptions: NativeStackNavigationOptions = {
-  headerBackButtonDisplayMode: 'minimal',
   headerTintColor: Colors.textPlaceholder,
   headerTitleAlign: 'center',
   headerTitleStyle: { fontSize: 16, fontWeight: '700', color: Colors.textPrimary },
