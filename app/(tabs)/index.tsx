@@ -120,7 +120,7 @@ const styles = StyleSheet.create({
     backgroundColor: Colors.accent,
     borderRadius: 8,
     paddingHorizontal: 16,
-    paddingVertical: 10,
+    paddingVertical: 12,
   },
   addBtnText: { color: Colors.onAccent, fontWeight: '600', fontSize: 14 },
 

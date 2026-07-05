@@ -1,11 +1,12 @@
 import { IconSymbol } from '@/components/ui/icon-symbol';
+import { NotFoundState } from '@/components/ui/not-found-state';
 import { PrimaryButton } from '@/components/ui/primary-button';
 import { Colors } from '@/constants/theme';
 import { useSessionSetCount, useWorkoutSession } from '@/hooks/use-workout-session';
 import { endWorkoutSession } from '@/lib/workout/session';
 import { formatSessionDateGroup } from '@/lib/workout/summary';
 import { Stack, useLocalSearchParams, useRouter } from 'expo-router';
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { Alert, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
@@ -24,6 +25,7 @@ export default function WorkoutScreen() {
   const { session, loaded } = useWorkoutSession(sessionId ?? -1);
   const setCount = useSessionSetCount(sessionId ?? -1);
   const [now, setNow] = useState(() => Date.now());
+  const isFinishingRef = useRef(false);
 
   useEffect(() => {
     if (!session || session.endedAt != null) return;
@@ -33,12 +35,17 @@ export default function WorkoutScreen() {
 
   const finish = async () => {
     if (sessionId == null) return;
+    // 連打でendWorkoutSession/router.backが二重に呼ばれるのを防ぐ
+    if (isFinishingRef.current) return;
+    isFinishingRef.current = true;
     try {
       await endWorkoutSession(sessionId);
       router.back();
     } catch (e) {
       console.error('[workout session finish]', e);
       Alert.alert('エラー', 'トレーニングを終了できませんでした。');
+    } finally {
+      isFinishingRef.current = false;
     }
   };
 
@@ -59,18 +66,11 @@ export default function WorkoutScreen() {
   if (sessionId == null || (loaded && !session)) {
     return (
       <SafeAreaView style={styles.safeArea} edges={['bottom']}>
-        <View style={styles.notFound}>
-          <Text style={styles.notFoundText}>トレーニングが見つかりません</Text>
-          <TouchableOpacity
-            style={styles.notFoundBackBtn}
-            onPress={() => router.back()}
-            accessibilityRole="button"
-            accessibilityLabel="戻る"
-            hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
-          >
-            <Text style={styles.notFoundBackBtnText}>戻る</Text>
-          </TouchableOpacity>
-        </View>
+        <NotFoundState
+          message="トレーニングが見つかりません"
+          actionLabel="戻る"
+          onPressAction={() => router.back()}
+        />
       </SafeAreaView>
     );
   }
@@ -151,14 +151,4 @@ const styles = StyleSheet.create({
     borderTopWidth: 1,
     borderTopColor: Colors.border,
   },
-
-  notFound: { flex: 1, alignItems: 'center', justifyContent: 'center', gap: 12 },
-  notFoundText: { fontSize: 14, color: Colors.textPlaceholder },
-  notFoundBackBtn: {
-    backgroundColor: Colors.surfaceSubtle,
-    borderRadius: 8,
-    paddingHorizontal: 16,
-    paddingVertical: 8,
-  },
-  notFoundBackBtnText: { color: Colors.textPrimary, fontWeight: '600', fontSize: 13 },
 });

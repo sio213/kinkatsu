@@ -34,6 +34,19 @@ beforeEach(() => {
 });
 
 describe('startWorkoutSession', () => {
+  it('現在時刻でstartedAt/createdAt/updatedAtを揃えてinsertし、insertされた行を返す', async () => {
+    const before = Date.now();
+    const result = await startWorkoutSession();
+    const after = Date.now();
+
+    const payload = mockInsertValues.mock.calls[0][0];
+    expect(payload.startedAt).toBeGreaterThanOrEqual(before);
+    expect(payload.startedAt).toBeLessThanOrEqual(after);
+    expect(payload.createdAt).toBe(payload.startedAt);
+    expect(payload.updatedAt).toBe(payload.startedAt);
+    expect(result).toEqual({ id: 1, startedAt: 0, endedAt: null });
+  });
+
   it('insertが失敗した場合はエラーを握りつぶさずthrowする（呼び出し側でAlertを出すため）', async () => {
     mockReturning.mockRejectedValueOnce(new Error('db error'));
     await expect(startWorkoutSession()).rejects.toThrow('db error');
@@ -41,6 +54,18 @@ describe('startWorkoutSession', () => {
 });
 
 describe('endWorkoutSession', () => {
+  it('現在時刻でendedAt/updatedAtをセットし、対象のidでupdateする', async () => {
+    const before = Date.now();
+    await endWorkoutSession(5);
+    const after = Date.now();
+
+    const payload = mockUpdateSet.mock.calls[0][0];
+    expect(payload.endedAt).toBeGreaterThanOrEqual(before);
+    expect(payload.endedAt).toBeLessThanOrEqual(after);
+    expect(payload.updatedAt).toBe(payload.endedAt);
+    expect(mockUpdateWhere).toHaveBeenCalledWith({ col: 'id', val: 5 });
+  });
+
   it('updateが失敗した場合はエラーを握りつぶさずthrowする（呼び出し側でAlertを出すため）', async () => {
     mockUpdateWhere.mockRejectedValueOnce(new Error('db error'));
     await expect(endWorkoutSession(1)).rejects.toThrow('db error');
