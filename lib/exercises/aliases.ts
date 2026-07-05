@@ -32,6 +32,11 @@ const ALIASES: Record<string, AliasEntry[]> = {
   bear_crawl: [{ text: '熊歩き', reading: 'くまあるき' }],
   downward_dog: [{ text: '下向き犬のポーズ', reading: 'したむきいぬのぽーず' }],
   leg_raise: [{ text: '足上げ腹筋', reading: 'あしあげふっきん' }],
+  // 「肩すくめ」はバーベル/ダンベルの器具差を区別しない動作の俗称のため、両方のバリエーションに登録する
+  shrug: [{ text: '肩すくめ', reading: 'かたすくめ' }],
+  dumbbell_shrug: [{ text: '肩すくめ', reading: 'かたすくめ' }],
+  walking: [{ text: '散歩', reading: 'さんぽ' }],
+  cycling: [{ text: '自転車', reading: 'じてんしゃ' }],
 };
 
 export function getAliases(exercise: Exercise): AliasEntry[] {
