@@ -1,5 +1,11 @@
 import type { Exercise } from '@/db/schema';
-import { CATEGORY_ALL, CATEGORY_FAVORITE, CATEGORY_ORDER } from './constants';
+import {
+  CATEGORY_ALL,
+  CATEGORY_FAVORITE,
+  CATEGORY_ORDER,
+  getCategoryLabel,
+  getCategoryLabelReading,
+} from './constants';
 import { getReading } from './readings';
 import { getAliases } from './aliases';
 import { getGuide } from './guides';
@@ -27,6 +33,10 @@ function nameSearchTexts(e: Exercise): string[] {
 
 function matchesExactly(e: Exercise, q: string): boolean {
   if (nameSearchTexts(e).some((t) => normalizeForSearch(t).includes(q))) return true;
+  // 検索窓だけを使うユーザーのため、カテゴリ名（「胸」「肩」等）でもそのカテゴリ全体がヒットするようにする
+  if (normalizeForSearch(getCategoryLabel(e.category)).includes(q)) return true;
+  const categoryReading = getCategoryLabelReading(e.category);
+  if (categoryReading != null && normalizeForSearch(categoryReading).includes(q)) return true;
   const guide = getGuide(e);
   if (guide == null) return false;
   if (normalizeForSearch(guide.muscle).includes(q)) return true;

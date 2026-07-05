@@ -208,6 +208,61 @@ describe('filterExercises', () => {
     });
   });
 
+  describe('カテゴリ名そのものでの検索', () => {
+    it('カテゴリラベルで検索するとそのカテゴリの種目が全件ヒットする（「胸」→chestカテゴリ全部）', () => {
+      const result = filterExercises(ALL, CATEGORY_ALL, '胸');
+      expect(result.map((e) => e.name).sort()).toEqual(
+        [CHEST.name, CHEST2.name].sort(),
+      );
+    });
+
+    it('他カテゴリのラベルとは混同しない（「肩」→shoulderのみ）', () => {
+      const result = filterExercises(ALL, CATEGORY_ALL, '肩');
+      expect(result.map((e) => e.name)).toEqual([SHOULDER.name]);
+    });
+
+    it('ひらがな読みでもカテゴリ名にマッチする（「かた」→肩カテゴリ）', () => {
+      const result = filterExercises(ALL, CATEGORY_ALL, 'かた');
+      expect(result.map((e) => e.name)).toEqual([SHOULDER.name]);
+    });
+
+    it('ひらがな読みでもカテゴリ名にマッチする（「むね」→胸カテゴリ）', () => {
+      const result = filterExercises(ALL, CATEGORY_ALL, 'むね');
+      expect(result.map((e) => e.name).sort()).toEqual([CHEST.name, CHEST2.name].sort());
+    });
+
+    it('カテゴリチップ絞り込みと併用すると、絞り込み後の集合内でのみカテゴリ名検索が効く', () => {
+      // activeCategory=leg の中に「胸」カテゴリの種目は無いので該当なし
+      const result = filterExercises(ALL, 'leg', '胸');
+      expect(result).toEqual([]);
+    });
+
+    it('複数文字のカテゴリラベルは部分一致する（名前検索と同じ仕様。「筋」→腹筋カテゴリも含まれる）', () => {
+      const abs = make({ id: 21, name: 'クランチマシン', category: 'abs' });
+      const result = filterExercises([...ALL, abs], CATEGORY_ALL, '筋');
+      expect(result.map((e) => e.name)).toContain('クランチマシン');
+    });
+
+    it('カテゴリ名検索とmuscle検索は独立してORで効く（「肩」→shoulderカテゴリ＋muscleに「肩」を含む他カテゴリの種目も両方ヒット）', () => {
+      // ab_wheel_rolloutはcategory=abs、guide.muscleに「肩」を含む（既存のmuscle検索機能由来）。
+      // カテゴリ名検索を追加してもこの挙動を壊さないことを確認する。
+      const abWheelRollout = make({
+        id: 22,
+        name: 'アブローラー',
+        category: 'abs',
+        slug: 'ab_wheel_rollout',
+        source: 'preset',
+      });
+      const result = filterExercises([...ALL, abWheelRollout], CATEGORY_ALL, '肩');
+      expect(result.map((e) => e.name).sort()).toEqual([SHOULDER.name, 'アブローラー'].sort());
+    });
+
+    it('CATEGORY_LABELSに無い未知カテゴリは、カテゴリ文字列そのものでマッチする', () => {
+      const result = filterExercises(ALL, CATEGORY_ALL, '未知カテゴリ');
+      expect(result.map((e) => e.name)).toContain(UNKNOWN.name);
+    });
+  });
+
   describe('別名（俗称）での検索', () => {
     it('カタカナ以外の俗称でマッチする（プランク→フロントブリッジ）', () => {
       const result = filterExercises(ALIAS_SET, CATEGORY_ALL, 'フロントブリッジ');
