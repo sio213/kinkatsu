@@ -46,6 +46,7 @@ jest.mock('@/db/schema', () => ({
     id: 'id',
     sessionId: 'sessionId',
     exerciseId: 'exerciseId',
+    workoutSessionExerciseId: 'workoutSessionExerciseId',
     setNumber: 'setNumber',
     completedAt: 'completedAt',
   },
@@ -53,7 +54,6 @@ jest.mock('@/db/schema', () => ({
 
 jest.mock('drizzle-orm', () => ({
   eq: jest.fn((col, val) => ({ col, val })),
-  and: jest.fn((...conds) => ({ and: conds })),
   desc: jest.fn((col) => ({ col, dir: 'desc' })),
   sql: Object.assign(
     jest.fn((strings: TemplateStringsArray, ...values: unknown[]) => ({ strings, values })),
@@ -72,23 +72,24 @@ beforeEach(() => {
 });
 
 describe('addSet', () => {
-  it('既存セットが無い種目ではsetNumberを1から振る', async () => {
+  it('既存セットが無いカードではsetNumberを1から振る', async () => {
     mockSelectWhere.mockReturnValueOnce(mockMakeSelectChain([{ maxSetNumber: null }]));
-    await addSet(1, 10);
+    await addSet(1, 10, 100);
 
     const payload = mockInsertValues.mock.calls[0][0];
     expect(payload).toEqual({
       sessionId: 1,
       exerciseId: 10,
+      workoutSessionExerciseId: 100,
       setNumber: 1,
       completedAt: null,
       createdAt: expect.any(Number),
     });
   });
 
-  it('既存セットがある種目では最大setNumberの続きから振る', async () => {
+  it('既存セットがあるカードでは最大setNumberの続きから振る', async () => {
     mockSelectWhere.mockReturnValueOnce(mockMakeSelectChain([{ maxSetNumber: 2 }]));
-    await addSet(1, 10);
+    await addSet(1, 10, 100);
 
     const payload = mockInsertValues.mock.calls[0][0];
     expect(payload.setNumber).toBe(3);
@@ -97,27 +98,27 @@ describe('addSet', () => {
   it('insertが失敗した場合はエラーを握りつぶさずthrowする（呼び出し側でAlertを出すため）', async () => {
     mockSelectWhere.mockReturnValueOnce(mockMakeSelectChain([{ maxSetNumber: null }]));
     mockInsertValues.mockRejectedValueOnce(new Error('db error'));
-    await expect(addSet(1, 10)).rejects.toThrow('db error');
+    await expect(addSet(1, 10, 100)).rejects.toThrow('db error');
   });
 });
 
 describe('deleteLastSet', () => {
   it('セットが0件のときは何もしない', async () => {
     mockSelectWhere.mockReturnValueOnce(mockMakeSelectChain([]));
-    await deleteLastSet(1, 10);
+    await deleteLastSet(100);
     expect(mockDeleteWhere).not.toHaveBeenCalled();
   });
 
   it('setNumberが最大のセットを削除する（DESC+LIMIT1で先頭行を取得）', async () => {
     mockSelectWhere.mockReturnValueOnce(mockMakeSelectChain([{ id: 103 }]));
-    await deleteLastSet(1, 10);
+    await deleteLastSet(100);
     expect(mockDeleteWhere).toHaveBeenCalledWith({ col: 'id', val: 103 });
   });
 
   it('deleteが失敗した場合はエラーを握りつぶさずthrowする', async () => {
     mockSelectWhere.mockReturnValueOnce(mockMakeSelectChain([{ id: 101 }]));
     mockDeleteWhere.mockRejectedValueOnce(new Error('db error'));
-    await expect(deleteLastSet(1, 10)).rejects.toThrow('db error');
+    await expect(deleteLastSet(100)).rejects.toThrow('db error');
   });
 });
 

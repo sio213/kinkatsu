@@ -66,13 +66,19 @@ export function useSessionSetCount(sessionId: number): number {
   return data?.[0]?.count ?? 0;
 }
 
-export type SessionExercise = Exercise & { orderIndex: number };
+// sessionExerciseIdはworkoutSessionExercises行自体のid。同じ種目をセッション内に複数回
+// 追加できるため、exercise.id（種目そのもの）とは別にカード単位の識別子として持つ
+export type SessionExercise = Exercise & { orderIndex: number; sessionExerciseId: number };
 
 // トレーニング中画面に表示する、このセッションに追加済みの種目一覧（並び順つき）
 export function useSessionExercises(sessionId: number): SessionExercise[] {
   const { data } = useLiveQuery(
     db
-      .select({ ...getTableColumns(exercises), orderIndex: workoutSessionExercises.orderIndex })
+      .select({
+        ...getTableColumns(exercises),
+        orderIndex: workoutSessionExercises.orderIndex,
+        sessionExerciseId: workoutSessionExercises.id,
+      })
       .from(workoutSessionExercises)
       .innerJoin(exercises, eq(workoutSessionExercises.exerciseId, exercises.id))
       .where(eq(workoutSessionExercises.sessionId, sessionId))
@@ -86,8 +92,10 @@ export function useSessionExercises(sessionId: number): SessionExercise[] {
 // これを使ってもらう
 export const EMPTY_SETS: Set[] = [];
 
-// セット入力画面用。セッション内の全setsを一度だけ購読し、種目IDごとにJS側でグルーピングする
-// （種目カードの数だけlive queryを張ると数が増えるほど無駄が増えるため、useSessionStatsと同じ方針）。
+// セット入力画面用。セッション内の全setsを一度だけ購読し、sessionExerciseId（カード単位）ごとに
+// JS側でグルーピングする（種目カードの数だけlive queryを張ると数が増えるほど無駄が増えるため、
+// useSessionStatsと同じ方針）。同じ種目をセッション内に複数回追加できるため、グルーピングキーは
+// exerciseIdではなくworkoutSessionExerciseId（カードのid）にする必要がある。
 // トレーニング中画面は経過時間タイマーで毎秒再レンダーされるため、liveQueryのdataが変わらない限り
 // 同じMap参照を返すようuseMemoでグルーピング結果をキャッシュする
 export function useSessionSets(sessionId: number): Map<number, Set[]> {
@@ -97,11 +105,11 @@ export function useSessionSets(sessionId: number): Map<number, Set[]> {
   return useMemo(() => {
     const map = new Map<number, Set[]>();
     for (const row of data ?? []) {
-      const list = map.get(row.exerciseId);
+      const list = map.get(row.workoutSessionExerciseId);
       if (list) {
         list.push(row);
       } else {
-        map.set(row.exerciseId, [row]);
+        map.set(row.workoutSessionExerciseId, [row]);
       }
     }
     return map;

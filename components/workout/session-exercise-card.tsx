@@ -33,27 +33,27 @@ export const SessionExerciseCard = memo(function SessionExerciseCard({
     if (isMutatingRef.current) return;
     isMutatingRef.current = true;
     try {
-      await addSet(sessionId, exercise.id);
+      await addSet(sessionId, exercise.id, exercise.sessionExerciseId);
     } catch (e) {
       console.error('[add set]', e);
       Alert.alert('エラー', 'セットを追加できませんでした。');
     } finally {
       isMutatingRef.current = false;
     }
-  }, [sessionId, exercise.id]);
+  }, [sessionId, exercise.id, exercise.sessionExerciseId]);
 
   const runDeleteLastSet = useCallback(async () => {
     if (isMutatingRef.current) return;
     isMutatingRef.current = true;
     try {
-      await deleteLastSet(sessionId, exercise.id);
+      await deleteLastSet(exercise.sessionExerciseId);
     } catch (e) {
       console.error('[delete set]', e);
       Alert.alert('エラー', 'セットを削除できませんでした。');
     } finally {
       isMutatingRef.current = false;
     }
-  }, [sessionId, exercise.id]);
+  }, [exercise.sessionExerciseId]);
 
   const handleDeleteSet = useCallback(() => {
     const last = sets[sets.length - 1];

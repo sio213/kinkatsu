@@ -43,13 +43,16 @@ function seedMinimalRows(db: Database.Database) {
     `INSERT INTO workout_session_exercises (session_id, exercise_id, order_index, created_at)
      VALUES (?, ?, 0, ?)`,
   ).run(sessionId, exerciseId, now);
+  const workoutSessionExerciseId = (
+    db.prepare('SELECT id FROM workout_session_exercises').get() as { id: number }
+  ).id;
 
   db.prepare(
-    `INSERT INTO sets (session_id, exercise_id, set_number, weight, reps, created_at)
-     VALUES (?, ?, 1, 20, 10, ?)`,
-  ).run(sessionId, exerciseId, now);
+    `INSERT INTO sets (session_id, exercise_id, workout_session_exercise_id, set_number, weight, reps, created_at)
+     VALUES (?, ?, ?, 1, 20, 10, ?)`,
+  ).run(sessionId, exerciseId, workoutSessionExerciseId, now);
 
-  return { exerciseId, sessionId };
+  return { exerciseId, sessionId, workoutSessionExerciseId };
 }
 
 describe('recording feature M1 スキーマ - 実SQLite上でのFK挙動', () => {
@@ -110,10 +113,11 @@ describe('recording feature M1 スキーマ - 実SQLite上でのFK挙動', () =>
     db.pragma('foreign_keys = ON');
 
     // 0009までを適用した「アップグレード前の既存インストール」を再現し、
-    // measurement_typeカラムが無い状態で手元のexercisesデータを先に入れておく
+    // measurement_typeカラムが無い状態で手元のexercisesデータを先に入れておく。
+    // 0010より後のマイグレーション（sets等に依存するもの）はこの時点でまだ適用してはいけない
     const files = migrationFiles();
-    const upToPrevious = files.filter((f) => !f.startsWith('0010_'));
     const migration0010 = files.find((f) => f.startsWith('0010_'))!;
+    const upToPrevious = files.filter((f) => f < migration0010);
     for (const file of upToPrevious) applyMigration(db, file);
 
     const now = Date.now();

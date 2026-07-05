@@ -1,21 +1,24 @@
 import { db } from '@/db/client';
 import { sets } from '@/db/schema';
-import { and, desc, eq, sql } from 'drizzle-orm';
+import { desc, eq, sql } from 'drizzle-orm';
 
 // 種目カードの「セット追加」。setNumberは既存件数の続きから振る（並び順を保持するため）。
+// sessionExerciseId（workoutSessionExercises行のid）単位でスコープする。同じ種目を
+// セッション内に複数回追加した場合でも、カードごとに別々にセットが積み上がる。
 // 既存件数の取得とinsertをトランザクションでまとめている。ただしこのアプリはローカル単一クライアントで
 // UI側にも連打防止ガード（isMutatingRef）があるため、真の同時実行下でのレース防止まではしていない
-export async function addSet(sessionId: number, exerciseId: number) {
+export async function addSet(sessionId: number, exerciseId: number, sessionExerciseId: number) {
   const now = Date.now();
   await db.transaction(async (tx) => {
     const [{ maxSetNumber }] = await tx
       .select({ maxSetNumber: sql<number | null>`max(${sets.setNumber})` })
       .from(sets)
-      .where(and(eq(sets.sessionId, sessionId), eq(sets.exerciseId, exerciseId)));
+      .where(eq(sets.workoutSessionExerciseId, sessionExerciseId));
     const nextNumber = (maxSetNumber ?? 0) + 1;
     await tx.insert(sets).values({
       sessionId,
       exerciseId,
+      workoutSessionExerciseId: sessionExerciseId,
       setNumber: nextNumber,
       completedAt: null,
       createdAt: now,
@@ -24,12 +27,12 @@ export async function addSet(sessionId: number, exerciseId: number) {
 }
 
 // 種目カードの「セット削除」。setNumberが最も大きい（最後に追加された）セットを1件削除する
-export async function deleteLastSet(sessionId: number, exerciseId: number) {
+export async function deleteLastSet(sessionExerciseId: number) {
   await db.transaction(async (tx) => {
     const [last] = await tx
       .select({ id: sets.id })
       .from(sets)
-      .where(and(eq(sets.sessionId, sessionId), eq(sets.exerciseId, exerciseId)))
+      .where(eq(sets.workoutSessionExerciseId, sessionExerciseId))
       .orderBy(desc(sets.setNumber))
       .limit(1);
     if (!last) return;

@@ -119,13 +119,13 @@ export default function WorkoutScreen() {
           style={styles.exerciseList}
           contentContainerStyle={styles.exerciseListContent}
           data={sessionExercises}
-          keyExtractor={(item) => String(item.id)}
+          keyExtractor={(item) => String(item.sessionExerciseId)}
           renderItem={({ item }) => (
             <ListErrorBoundary>
               <SessionExerciseCard
                 exercise={item}
                 sessionId={sessionId}
-                sets={sessionSets.get(item.id) ?? EMPTY_SETS}
+                sets={sessionSets.get(item.sessionExerciseId) ?? EMPTY_SETS}
               />
             </ListErrorBoundary>
           )}
