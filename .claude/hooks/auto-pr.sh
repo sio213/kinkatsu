@@ -27,7 +27,15 @@ else
 fi
 
 if ! gh pr view "$branch" >/dev/null 2>&1; then
-  if gh pr create --fill --head "$branch" --base main >/dev/null 2>&1; then
+  # フォールバック作成(Claude側でPR未作成のまま停止した場合のみ発火)。
+  # titleはコミット件名からの自動生成(--fill)のため英語のままになりうる。
+  # bodyだけでもPRテンプレートの構成に合わせる。
+  template=".github/PULL_REQUEST_TEMPLATE.md"
+  body_arg=()
+  if [ -f "$template" ]; then
+    body_arg=(--body-file "$template")
+  fi
+  if gh pr create --fill "${body_arg[@]}" --head "$branch" --base main >/dev/null 2>&1; then
     pr_url=$(gh pr view "$branch" --json url -q .url 2>/dev/null)
     echo "{\"systemMessage\": \"ブランチ '$branch' のPRを自動作成しました: $pr_url\"}"
   fi
