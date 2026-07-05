@@ -25,6 +25,8 @@ type SearchIndex = {
   // あいまい検索（タイプミス許容）の対象。カテゴリ名・筋肉名は短すぎたり範囲が広すぎたりして
   // 誤爆しやすいため、種目名・読み・別名のみに限定する。
   fuzzyTexts: string[];
+  // 種目名（e.name）だけを正規化したもの。関連度ランク判定（nameMatchRank）専用。
+  normalizedName: string;
 };
 
 // 種目ごとの検索対象テキストは種目データが変わらない限り不変なので、打鍵のたびに
@@ -32,6 +34,7 @@ type SearchIndex = {
 const searchIndexCache = new Map<string, SearchIndex>();
 
 function buildSearchIndex(e: Exercise): SearchIndex {
+  const normalizedName = normalizeForSearch(e.name);
   const nameTexts = [e.name];
   const reading = getReading(e);
   if (reading != null) nameTexts.push(reading);
@@ -51,7 +54,7 @@ function buildSearchIndex(e: Exercise): SearchIndex {
     exactTexts.push(normalizeForSearch(getMuscleReadingText(guide.muscle)));
   }
 
-  return { exactTexts, fuzzyTexts: normalizedNames };
+  return { exactTexts, fuzzyTexts: normalizedNames, normalizedName };
 }
 
 function searchIndexCacheKey(e: Exercise): string {
@@ -94,6 +97,38 @@ function matchesAllTokens(tokens: string[], texts: string[], matches: (token: st
   return tokens.every((token) => texts.some((text) => matches(token, text)));
 }
 
+// カテゴリ順→名前順（既存のデフォルトソート）。検索語なしのときはこれをそのまま使う。
+function compareByCategoryThenName(a: Exercise, b: Exercise): number {
+  const ai = CATEGORY_ORDER[a.category] ?? 99;
+  const bi = CATEGORY_ORDER[b.category] ?? 99;
+  return ai !== bi ? ai - bi : a.name.localeCompare(b.name, 'ja');
+}
+
+// キャッシュ済みの正規化済み種目名（searchIndex.normalizedName）と検索語の一致の強さを4段階で表す。
+// 数値が小さいほど強い一致。別名・カテゴリ・筋肉名などでのみ一致したものは最下位（3）になる。
+// 注意: normalizedSearchはスペース区切りの複数トークン検索時、トークンを結合しないスペース込みの
+// 文字列のまま渡される。種目名自体にスペースは含まれないため、複数語クエリは基本的に完全一致・
+// 前方一致・部分一致のいずれにも該当せず一律3（その他）になり、カテゴリ順→名前順にフォールバック
+// する。関連度ソートは単語1語クエリを主眼にした機能のため、この挙動は許容する。
+function nameMatchRank(normalizedName: string, normalizedSearch: string): number {
+  if (normalizedName === normalizedSearch) return 0; // 完全一致
+  if (normalizedName.startsWith(normalizedSearch)) return 1; // 前方一致
+  if (normalizedName.includes(normalizedSearch)) return 2; // 部分一致
+  return 3; // それ以外（別名・カテゴリ・筋肉名などでのみ一致）
+}
+
+// 検索語ありのときのソート: まず一致の強さ（関連度）、同順位内はカテゴリ順→名前順。
+// ランクはソート比較のたびではなく要素ごとに一度だけ計算する（decorate-sort-undecorate）ため、
+// O(n log n)回ではなくO(n)回のnameMatchRank呼び出しで済む。
+function sortByRelevanceThenDefault(list: Exercise[], normalizedSearch: string): Exercise[] {
+  const decorated = list.map((e) => ({
+    e,
+    rank: nameMatchRank(getSearchIndex(e).normalizedName, normalizedSearch),
+  }));
+  decorated.sort((a, b) => (a.rank !== b.rank ? a.rank - b.rank : compareByCategoryThenName(a.e, b.e)));
+  return decorated.map((d) => d.e);
+}
+
 export function filterExercises(
   exercises: Exercise[],
   activeCategory: string,
@@ -110,7 +145,8 @@ export function filterExercises(
   if (trimmedSearch) {
     // スペース区切りでAND検索する（例:「ブルガリアン スクワット」）。各語は名前・カテゴリ・
     // muscle等どのテキストに一致してもよく、語順も問わない（それぞれ独立にincludes判定するため）
-    const tokens = normalizeForSearch(trimmedSearch).split(/\s+/).filter((t) => t.length > 0);
+    const normalizedSearch = normalizeForSearch(trimmedSearch);
+    const tokens = normalizedSearch.split(/\s+/).filter((t) => t.length > 0);
     const exactMatches = list.filter((e) =>
       matchesAllTokens(tokens, getSearchIndex(e).exactTexts, (token, t) => t.includes(token)),
     );
@@ -123,10 +159,7 @@ export function filterExercises(
         : list.filter((e) =>
             matchesAllTokens(tokens, getSearchIndex(e).fuzzyTexts, (token, t) => isFuzzyMatch(token, t)),
           );
+    return sortByRelevanceThenDefault(list, normalizedSearch);
   }
-  return [...list].sort((a, b) => {
-    const ai = CATEGORY_ORDER[a.category] ?? 99;
-    const bi = CATEGORY_ORDER[b.category] ?? 99;
-    return ai !== bi ? ai - bi : a.name.localeCompare(b.name, 'ja');
-  });
+  return [...list].sort(compareByCategoryThenName);
 }

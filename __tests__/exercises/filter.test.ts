@@ -403,6 +403,98 @@ describe('filterExercises', () => {
     });
   });
 
+  describe('検索語ありのときの関連度順ソート', () => {
+    // 「肩」を検索語にし、名前との一致の強さが異なる4件を用意する。
+    // RELEVANCE_* はいずれも category を shoulder 以外にして、カテゴリラベル一致で
+    // 誤ってヒットしないようにする（category label一致はSHOULDERフィクスチャ側で確認する）。
+    const RELEVANCE_EXACT = make({ id: 60, name: '肩', category: 'other' });
+    const RELEVANCE_PREFIX = make({ id: 61, name: '肩甲骨引き寄せ', category: 'other' });
+    const RELEVANCE_SUBSTRING = make({ id: 62, name: 'ダンベル肩トレーニング', category: 'other' });
+    // SHOULDER（'サイドレイズ'、category: shoulder）は名前に「肩」を含まず、
+    // カテゴリラベル「肩」でのみ一致する＝最下位（その他）想定
+    const RELEVANCE_SET = [RELEVANCE_SUBSTRING, SHOULDER, RELEVANCE_PREFIX, RELEVANCE_EXACT];
+
+    it('完全一致 > 前方一致 > 部分一致 > その他（別名・カテゴリ等のみ一致）の順で並ぶ', () => {
+      const result = filterExercises(RELEVANCE_SET, CATEGORY_ALL, '肩');
+      expect(result.map((e) => e.name)).toEqual([
+        RELEVANCE_EXACT.name,
+        RELEVANCE_PREFIX.name,
+        RELEVANCE_SUBSTRING.name,
+        SHOULDER.name,
+      ]);
+    });
+
+    it('ひらがな検索でもnormalizeForSearchによるかな正規化を介して名前と関連度比較される', () => {
+      // 種目名はいずれもカタカナ。検索語をひらがなで入力しても、normalizeForSearchで
+      // カタカナ化されてから比較されるため、完全一致・前方一致・部分一致の順位判定が機能する。
+      const exact = make({ id: 63, name: 'スクワット', category: 'other' });
+      const prefix = make({ id: 64, name: 'スクワットジャンプ', category: 'other' });
+      const substring = make({ id: 65, name: 'ブルガリアンスプリットスクワット', category: 'other' });
+      const result = filterExercises([substring, prefix, exact], CATEGORY_ALL, 'すくわっと');
+      expect(result.map((e) => e.name)).toEqual([exact.name, prefix.name, substring.name]);
+    });
+
+    it('同じ関連度ランク内では（検索語ありでも）カテゴリ順→名前順でタイブレークされる', () => {
+      // SHOULDER（サイドレイズ、category: shoulder）はカテゴリラベル「肩」でのみ一致し、
+      // アブローラー（category: abs）はguide.muscleに「肩」を含むことでのみ一致する。
+      // どちらも名前自体には「肩」を含まないため同ランク（3=その他）になり、
+      // CATEGORY_ORDER（shoulder=1 < abs=5）でタイブレークされるはず
+      const abWheelRollout = make({
+        id: 66,
+        name: 'アブローラー',
+        category: 'abs',
+        slug: 'ab_wheel_rollout',
+        source: 'preset',
+      });
+      const result = filterExercises([abWheelRollout, SHOULDER], CATEGORY_ALL, '肩');
+      expect(result.map((e) => e.name)).toEqual([SHOULDER.name, abWheelRollout.name]);
+    });
+
+    it('全角/半角・大文字小文字の違いを吸収して名前一致の関連度ランクが判定される', () => {
+      const exact = make({ id: 67, name: 'EZ', category: 'other' });
+      const prefix = make({ id: 68, name: 'EZバーカール', category: 'other' });
+      const substring = make({ id: 69, name: 'ダンベルEZバー', category: 'other' });
+      // 全角クエリ「ＥＺ」はnormalizeForSearchのNFKC正規化で半角小文字'ez'に変換されて比較される
+      const result = filterExercises([substring, prefix, exact], CATEGORY_ALL, 'ＥＺ');
+      expect(result.map((e) => e.name)).toEqual([exact.name, prefix.name, substring.name]);
+    });
+
+    it('別名（俗称）と完全一致しても、名前ベースの関連度ランクでは別名一致は最下位（その他）扱いになる', () => {
+      // BENCH_PRESSは別名'BP'を持つが、名前自体（'ベンチプレス'）は'bp'を含まないためrank3。
+      // 名前に'bp'を含む種目があれば、そちらが部分一致(rank2)として優先されるべき
+      const bpInName = make({ id: 71, name: 'ダンベルBPトレーニング', category: 'other' });
+      const result = filterExercises([BENCH_PRESS, bpInName], CATEGORY_ALL, 'BP');
+      expect(result.map((e) => e.name)).toEqual([bpInName.name, BENCH_PRESS.name]);
+    });
+
+    it('スペース区切り複数トークン検索では関連度ランクが一律その他扱いになり、カテゴリ順→名前順にフォールバックする（仕様として許容）', () => {
+      // nameMatchRankは検索語全体（スペース込み）と名前を比較するため、複数語クエリでは
+      // 名前自体にスペースが含まれない限り完全一致・前方一致・部分一致のいずれにも該当しない。
+      // AND検索自体はトークン単位で判定されるため結果集合には両方とも含まれる。
+      const bulgarianA = make({ id: 72, name: 'ブルガリアンスプリットスクワット', category: 'leg' });
+      const bulgarianB = make({ id: 73, name: 'ブルガリアンランジ', category: 'leg' });
+      const result = filterExercises([bulgarianA, bulgarianB], CATEGORY_ALL, 'ブルガリアン 脚');
+      const expectedOrder = [bulgarianA, bulgarianB]
+        .map((e) => e.name)
+        .sort((a, b) => a.localeCompare(b, 'ja'));
+      expect(result.map((e) => e.name)).toEqual(expectedOrder);
+    });
+
+    it('検索語が空/空白のみのときは関連度ソートを行わず、従来のカテゴリ順→名前順のまま', () => {
+      const result = filterExercises([RELEVANCE_SUBSTRING, RELEVANCE_EXACT], CATEGORY_ALL, '');
+      // 両方とも category: 'other' なので名前のlocaleCompare('ja')順になる
+      const expected = [RELEVANCE_SUBSTRING, RELEVANCE_EXACT]
+        .map((e) => e.name)
+        .sort((a, b) => a.localeCompare(b, 'ja'));
+      expect(result.map((e) => e.name)).toEqual(expected);
+    });
+
+    it('既存のAND検索・あいまい検索フォールバックの結果集合は変わらない（ソートのみ変更）', () => {
+      const result = filterExercises(ALL, CATEGORY_ALL, 'すくわっと');
+      expect(result.map((e) => e.name)).toEqual(['スクワット']);
+    });
+  });
+
   describe('検索インデックスキャッシュの間引き', () => {
     it('種目が更新されてupdatedAtが変わると、古いキーはキャッシュから間引かれる', () => {
       // search を空にするとgetSearchIndexが一度も呼ばれないため、検索してインデックスを作らせる
