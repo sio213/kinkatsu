@@ -22,6 +22,7 @@ const READINGS: Record<string, string> = {
   wide_grip_pull_up: 'わいどぐりっぷけんすい',
   close_grip_pull_up: 'くろーずぐりっぷけんすい',
   neutral_grip_pull_up: 'にゅーとらるぐりっぷけんすい',
+  weighted_neutral_grip_pull_up: 'かじゅうにゅーとらるぐりっぷけんすい',
   negative_pull_up: 'ねがてぃぶけんすい',
   jump_rope: 'なわとび',
   swimming: 'すいえい',

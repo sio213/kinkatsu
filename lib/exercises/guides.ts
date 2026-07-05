@@ -2103,6 +2103,16 @@ const GUIDES: Record<string, ExerciseGuide> = {
     caution: '体を振って反動を使わない',
     breath: '引き上げるときに吐き、下ろすときに吸う',
   },
+  weighted_neutral_grip_pull_up: {
+    muscle: '広背筋',
+    points: [
+      'ディップスベルトでプレートを吊り下げる、または足でダンベルを保持して負荷を追加する',
+      '手のひらを向かい合わせにして握り（パラレルグリップ）、引き上げる',
+      'ゆっくり下ろしてストレッチをかける',
+    ],
+    caution: '体を振って反動を使わない・無加重でフォームが安定してから重量を追加する',
+    breath: '引き上げるときに吐き、下ろすときに吸う',
+  },
   assisted_pull_up: {
     muscle: '広背筋・大円筋・上腕二頭筋',
     points: [

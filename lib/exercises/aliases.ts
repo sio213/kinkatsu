@@ -45,6 +45,8 @@ const ALIASES: Record<string, AliasEntry[]> = {
   overhead_squat: [{ text: 'OHS' }],
   // OHPは立位のバーベルショルダープレスを指す用語のため、座位のバリエーション（seated_barbell_shoulder_press）には登録しない
   barbell_shoulder_press: [{ text: 'OHP' }],
+  // 「パラレルグリップ」は器具（平行なハンドル）を主語にした呼び方で、ニュートラルグリップと同一の握りを指す別名
+  neutral_grip_pull_up: [{ text: 'パラレルグリッププルアップ' }],
 };
 
 export function getAliases(exercise: Exercise): AliasEntry[] {
