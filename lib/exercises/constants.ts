@@ -30,6 +30,26 @@ export function getCategoryLabel(category: string): string {
   return CATEGORY_LABELS[category as ExerciseCategory] ?? category;
 }
 
+// カテゴリラベルはすべて漢字を含むため、ひらがな入力でも検索できるよう読み仮名を持たせる
+// （種目名の readings.ts と同じ理由。normalizeForSearch のひらがな→カタカナ変換だけでは
+// 漢字は変換されないため、素の読み仮名を別途持つ必要がある）
+const CATEGORY_LABEL_READINGS: Record<ExerciseCategory, string> = {
+  chest: 'むね',
+  shoulder: 'かた',
+  arm: 'うで',
+  back: 'せなか',
+  core: 'たいかん',
+  abs: 'ふっきん',
+  leg: 'あし',
+  glute: 'おしり',
+  cardio: 'ゆうさんそ',
+  other: 'そのた',
+};
+
+export function getCategoryLabelReading(category: string): string | undefined {
+  return CATEGORY_LABEL_READINGS[category as ExerciseCategory];
+}
+
 export const CATEGORY_ALL = '全て' as const;
 export const CATEGORY_FAVORITE = '★' as const;
 

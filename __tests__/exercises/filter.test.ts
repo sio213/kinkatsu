@@ -221,6 +221,16 @@ describe('filterExercises', () => {
       expect(result.map((e) => e.name)).toEqual([SHOULDER.name]);
     });
 
+    it('ひらがな読みでもカテゴリ名にマッチする（「かた」→肩カテゴリ）', () => {
+      const result = filterExercises(ALL, CATEGORY_ALL, 'かた');
+      expect(result.map((e) => e.name)).toEqual([SHOULDER.name]);
+    });
+
+    it('ひらがな読みでもカテゴリ名にマッチする（「むね」→胸カテゴリ）', () => {
+      const result = filterExercises(ALL, CATEGORY_ALL, 'むね');
+      expect(result.map((e) => e.name).sort()).toEqual([CHEST.name, CHEST2.name].sort());
+    });
+
     it('カテゴリチップ絞り込みと併用すると、絞り込み後の集合内でのみカテゴリ名検索が効く', () => {
       // activeCategory=leg の中に「胸」カテゴリの種目は無いので該当なし
       const result = filterExercises(ALL, 'leg', '胸');
