@@ -148,4 +148,57 @@ describe('recording feature M1 スキーマ - 実SQLite上でのFK挙動', () =>
     expect(bySlug.running).toBe('distance_time');
     expect(bySlug.farmers_walk).toBe('weight_time');
   });
+
+  it('workout_session_exercise_idのバックフィル: 0012適用前(重複種目非対応)の既存setsを(session_id, exercise_id)一致で正しく紐付ける', () => {
+    db = new Database(':memory:');
+    db.pragma('foreign_keys = ON');
+
+    // 0011までを適用した「重複種目対応前」の既存インストールを再現する。
+    // この時点のsetsはworkout_session_exercise_idカラムを持たない
+    const files = migrationFiles();
+    const migration0012 = files.find((f) => f.startsWith('0012_'))!;
+    const upToPrevious = files.filter((f) => f < migration0012);
+    for (const file of upToPrevious) applyMigration(db, file);
+
+    const now = Date.now();
+    db.prepare(
+      `INSERT INTO exercises (name, category, source, measurement_type, created_at, updated_at)
+       VALUES ('自作種目', 'core', 'custom', 'weight_reps', ?, ?)`,
+    ).run(now, now);
+    const exerciseId = (db.prepare('SELECT id FROM exercises').get() as { id: number }).id;
+
+    db.prepare(
+      `INSERT INTO workout_sessions (started_at, created_at, updated_at) VALUES (?, ?, ?)`,
+    ).run(now, now, now);
+    const sessionId = (db.prepare('SELECT id FROM workout_sessions').get() as { id: number }).id;
+
+    db.prepare(
+      `INSERT INTO workout_session_exercises (session_id, exercise_id, order_index, created_at)
+       VALUES (?, ?, 0, ?)`,
+    ).run(sessionId, exerciseId, now);
+    const workoutSessionExerciseId = (
+      db.prepare('SELECT id FROM workout_session_exercises').get() as { id: number }
+    ).id;
+
+    // 0011時点のsetsにはworkout_session_exercise_idカラムが無いので、旧カラム構成のまま2件挿入する
+    const insertLegacySet = db.prepare(
+      `INSERT INTO sets (session_id, exercise_id, set_number, weight, reps, created_at)
+       VALUES (?, ?, ?, ?, ?, ?)`,
+    );
+    insertLegacySet.run(sessionId, exerciseId, 1, 20, 10, now);
+    insertLegacySet.run(sessionId, exerciseId, 2, 22.5, 8, now);
+
+    // ここで0012を適用し、バックフィルが正しく効くか確認する
+    applyMigration(db, migration0012);
+
+    const rows = db
+      .prepare(
+        'SELECT set_number, workout_session_exercise_id FROM sets ORDER BY set_number',
+      )
+      .all() as { set_number: number; workout_session_exercise_id: number }[];
+
+    expect(rows).toHaveLength(2);
+    expect(rows[0].workout_session_exercise_id).toBe(workoutSessionExerciseId);
+    expect(rows[1].workout_session_exercise_id).toBe(workoutSessionExerciseId);
+  });
 });
