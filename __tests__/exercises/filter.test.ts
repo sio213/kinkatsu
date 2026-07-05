@@ -176,6 +176,31 @@ describe('filterExercises', () => {
     });
   });
 
+  describe('あいまい検索（タイプミス許容フォールバック）', () => {
+    it('完全一致が1件でもあればあいまい検索は発動しない（別種目が紛れ込まない）', () => {
+      const result = filterExercises(ALL, CATEGORY_ALL, 'すくわっと');
+      expect(result.map((e) => e.name)).toEqual(['スクワット']);
+    });
+
+    it('長音符抜けのタイプミスでもフォールバックでマッチする', () => {
+      const result = filterExercises(EXT, CATEGORY_ALL, 'かふれいず');
+      expect(result.map((e) => e.name)).toContain('カーフレイズ');
+    });
+
+    it('促音抜けのタイプミスでもフォールバックでマッチする', () => {
+      const result = filterExercises(ALL, CATEGORY_ALL, 'すくわと');
+      expect(result.map((e) => e.name)).toContain('スクワット');
+    });
+
+    it('短すぎるクエリ（3文字以下）はあいまい検索の対象外', () => {
+      expect(filterExercises(ALL, CATEGORY_ALL, 'ばんち')).toEqual([]);
+    });
+
+    it('無関係な語には誤爆しない', () => {
+      expect(filterExercises(ALL, CATEGORY_ALL, 'ぜんぜんちがうたんご')).toEqual([]);
+    });
+  });
+
   describe('カテゴリ + search の複合', () => {
     it('AND 条件で絞り込む', () => {
       const result = filterExercises(ALL, 'chest', 'ダンベル');
