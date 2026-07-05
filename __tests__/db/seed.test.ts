@@ -54,9 +54,14 @@ describe('seed', () => {
   it('既存presetが0件 → 全件insertし、updateは呼ばれない', async () => {
     await seed();
     expect(mockValues).toHaveBeenCalledTimes(1);
-    const inserted = mockValues.mock.calls[0][0] as { slug: string; source: string }[];
+    const inserted = mockValues.mock.calls[0][0] as { slug: string; source: string; measurementType: string }[];
     expect(inserted).toHaveLength(PRESET_EXERCISES.length);
     expect(inserted.every((e) => e.source === 'preset')).toBe(true);
+    expect(inserted.every((e) => typeof e.measurementType === 'string' && e.measurementType.length > 0)).toBe(
+      true,
+    );
+    const benchPress = inserted.find((e) => e.slug === 'bench_press');
+    expect(benchPress?.measurementType).toBe('weight_reps');
     expect(mockSet).not.toHaveBeenCalled();
   });
 
@@ -78,7 +83,7 @@ describe('seed', () => {
     expect(mockSet).not.toHaveBeenCalled();
   });
 
-  it('slugが一致しcategoryが異なる → insert対象からは除外され、updateでcategoryのみ更新される', async () => {
+  it('slugが一致しcategoryが異なる → insert対象からは除外され、categoryの差分でupdateされる', async () => {
     mockSelectResult = [
       {
         id: 1,
@@ -99,7 +104,7 @@ describe('seed', () => {
     );
   });
 
-  it('slugが一致しmeasurementTypeが異なる → updateでmeasurementTypeのみ更新される', async () => {
+  it('slugが一致しmeasurementTypeが異なる → measurementTypeの差分でupdateされる', async () => {
     mockSelectResult = [
       {
         id: 1,
@@ -120,8 +125,48 @@ describe('seed', () => {
     );
   });
 
+  it('複数種目がそれぞれ異なるフィールドで差分 → 各々のupdateが独立して発火する', async () => {
+    mockSelectResult = [
+      {
+        id: 1,
+        slug: 'bench_press',
+        name: 'ベンチプレス',
+        category: 'other',
+        source: 'preset',
+        measurementType: 'weight_reps',
+      },
+      {
+        id: 2,
+        slug: 'push_up',
+        name: 'プッシュアップ',
+        category: 'chest',
+        source: 'preset',
+        measurementType: 'weight_reps',
+      },
+    ];
+    await seed();
+    expect(mockSet).toHaveBeenCalledTimes(2);
+    expect(mockSet).toHaveBeenCalledWith(expect.objectContaining({ category: 'chest' }));
+    expect(mockSet).toHaveBeenCalledWith(expect.objectContaining({ measurementType: 'reps' }));
+  });
+
   it('insert失敗時、例外を外に投げない（呼び出し元でクラッシュしない）', async () => {
     mockValues.mockRejectedValueOnce(new Error('insert failed'));
+    await expect(seed()).resolves.toBeUndefined();
+  });
+
+  it('update失敗時、例外を外に投げない（呼び出し元でクラッシュしない）', async () => {
+    mockSelectResult = [
+      {
+        id: 1,
+        slug: 'bench_press',
+        name: 'ベンチプレス',
+        category: 'other',
+        source: 'preset',
+        measurementType: 'weight_reps',
+      },
+    ];
+    mockWhere.mockRejectedValueOnce(new Error('update failed'));
     await expect(seed()).resolves.toBeUndefined();
   });
 });

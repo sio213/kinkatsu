@@ -23,7 +23,9 @@ export const exercises = sqliteTable(
     // フォームのポイント。JSON配列文字列 '["ポイント1","ポイント2"]'（カスタム種目のみ）
     formPoints: text('form_points'),
     source: text('source').notNull().default('custom'), // 'preset' | 'custom'
-    // 計測タイプ: 'weight_reps' | 'reps' | 'time' | 'distance_time' | 'weight_time'（lib/exercises/constants.tsのMeasurementType）
+    // 計測タイプ: 'weight_reps' | 'reps' | 'time' | 'distance_time' | 'weight_time'（lib/exercises/constants.tsのMeasurementType）。
+    // 既存preset種目の値はdrizzle/0010_recording_feature_m1.sqlのUPDATE文でdb/seed.tsのデータからバックフィル済み。
+    // 以後db/seed.tsの分類を変更した場合はマイグレーションではなくseed()のupdate分岐（差分検知）が自己修復する。
     measurementType: text('measurement_type').notNull().default('weight_reps'),
     createdAt: integer('created_at'),
     updatedAt: integer('updated_at'),
