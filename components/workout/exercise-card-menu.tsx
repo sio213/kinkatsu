@@ -11,14 +11,14 @@ type Anchor = { x: number; y: number; width: number; height: number };
 type Props = {
   isFirst: boolean;
   isLast: boolean;
+  onSwap: () => void;
   onMoveUp: () => void;
   onMoveDown: () => void;
   onDelete: () => void;
 };
 
-// 種目カードの「⋮」メニュー。種目を入れ替えは見た目のみ用意しており、
-// 押しても閉じるだけで実際の入れ替えはまだ未実装（上へ移動・下へ移動・削除は動作する）
-export function ExerciseCardMenu({ isFirst, isLast, onMoveUp, onMoveDown, onDelete }: Props) {
+// 種目カードの「⋮」メニュー
+export function ExerciseCardMenu({ isFirst, isLast, onSwap, onMoveUp, onMoveDown, onDelete }: Props) {
   const triggerRef = useRef<View>(null);
   const [anchor, setAnchor] = useState<Anchor | null>(null);
   const open = anchor !== null;
@@ -33,6 +33,11 @@ export function ExerciseCardMenu({ isFirst, isLast, onMoveUp, onMoveDown, onDele
   };
 
   const handleClose = () => setAnchor(null);
+
+  const handleSwap = () => {
+    handleClose();
+    onSwap();
+  };
 
   const handleMoveUp = () => {
     handleClose();
@@ -74,7 +79,7 @@ export function ExerciseCardMenu({ isFirst, isLast, onMoveUp, onMoveDown, onDele
               { top: anchor.y + anchor.height + 4, right: SCREEN_WIDTH - (anchor.x + anchor.width) },
             ]}
           >
-            <TouchableOpacity style={styles.menuItem} onPress={handleClose} accessibilityLabel="種目を入れ替え">
+            <TouchableOpacity style={styles.menuItem} onPress={handleSwap} accessibilityLabel="種目を入れ替え">
               <DesignIcon name="swap-horiz" size={18} color={Colors.textMuted} />
               <Text style={styles.menuItemText}>種目を入れ替え</Text>
             </TouchableOpacity>

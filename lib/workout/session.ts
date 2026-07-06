@@ -1,5 +1,5 @@
 import { db } from '@/db/client';
-import { sets, workoutSessionExercises, workoutSessions } from '@/db/schema';
+import { exercises, sets, workoutSessionExercises, workoutSessions } from '@/db/schema';
 import { eq } from 'drizzle-orm';
 
 export async function startWorkoutSession() {
@@ -91,5 +91,52 @@ export async function swapExerciseOrder(sessionExerciseId: number, targetSession
       .update(workoutSessionExercises)
       .set({ orderIndex: a.orderIndex })
       .where(eq(workoutSessionExercises.id, targetSessionExerciseId));
+  });
+}
+
+// 種目カードの「⋮」メニューの「種目を入れ替え」。setsはexerciseId/workoutSessionExerciseIdの
+// 両方を持つ非正規化構造のため、workoutSessionExercises側だけでなくsets.exerciseIdも
+// 揃えておく。計測タイプ（重量×回数/回数のみ/時間 等）が変わる場合、既存の入力値は
+// 新しい列構成と噛み合わなくなるためクリアする（セット数＝行自体は維持し、値だけnullに戻す）。
+// 呼び出し側（入れ替え確認ダイアログの要否判断）と同じ「計測タイプが同じか」の判定をここでも
+// 独立して行い、DB側だけで見ても整合性が保てるようにしている
+export async function swapSessionExercise(sessionExerciseId: number, newExerciseId: number) {
+  await db.transaction(async (tx) => {
+    const [wse] = await tx
+      .select({ exerciseId: workoutSessionExercises.exerciseId })
+      .from(workoutSessionExercises)
+      .where(eq(workoutSessionExercises.id, sessionExerciseId));
+    if (!wse || wse.exerciseId === newExerciseId) return;
+
+    const [oldExercise] = await tx
+      .select({ measurementType: exercises.measurementType })
+      .from(exercises)
+      .where(eq(exercises.id, wse.exerciseId));
+    const [newExercise] = await tx
+      .select({ measurementType: exercises.measurementType })
+      .from(exercises)
+      .where(eq(exercises.id, newExerciseId));
+    const sameMeasurementType = oldExercise?.measurementType === newExercise?.measurementType;
+
+    await tx
+      .update(workoutSessionExercises)
+      .set({ exerciseId: newExerciseId })
+      .where(eq(workoutSessionExercises.id, sessionExerciseId));
+
+    await tx
+      .update(sets)
+      .set(
+        sameMeasurementType
+          ? { exerciseId: newExerciseId }
+          : {
+              exerciseId: newExerciseId,
+              weight: null,
+              reps: null,
+              durationSeconds: null,
+              distanceMeters: null,
+              completedAt: null,
+            },
+      )
+      .where(eq(sets.workoutSessionExerciseId, sessionExerciseId));
   });
 }

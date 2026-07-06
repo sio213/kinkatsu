@@ -692,13 +692,21 @@ test('種目の削除が失敗した場合はエラーAlertを表示する', asy
   expect(Alert.alert).toHaveBeenCalledWith('エラー', '種目を削除できませんでした。');
 });
 
-test('「種目を入れ替え」はタップしてもDB操作を呼ばない（見た目のみ、未実装）', async () => {
+test('「種目を入れ替え」をタップすると、種目入れ替え画面へこのカードの情報を渡して遷移する', () => {
   const root = render({ exercise, sessionId: 1, sets: [] });
   act(() => {
     findMenuTrigger(root)!.props.onPress();
   });
-  await act(async () => {
+  act(() => {
     findMenuItem(root, '種目を入れ替え')!.props.onPress();
+  });
+  expect(mockPush).toHaveBeenCalledWith({
+    pathname: '/workout/exercise-swap',
+    params: {
+      sessionExerciseId: '500',
+      currentExerciseId: '10',
+      currentMeasurementType: 'weight_reps',
+    },
   });
   expect(mockRemoveExerciseFromSession).not.toHaveBeenCalled();
   expect(mockSwapExerciseOrder).not.toHaveBeenCalled();

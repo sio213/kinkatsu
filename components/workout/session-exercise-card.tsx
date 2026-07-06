@@ -73,6 +73,17 @@ export const SessionExerciseCard = memo(function SessionExerciseCard({
     pushDebounced(`/exercise/${exercise.id}`);
   }, [pushDebounced, exercise.id]);
 
+  const handleSwapExercise = useCallback(() => {
+    pushDebounced({
+      pathname: '/workout/exercise-swap',
+      params: {
+        sessionExerciseId: String(exercise.sessionExerciseId),
+        currentExerciseId: String(exercise.id),
+        currentMeasurementType: measurementType,
+      },
+    });
+  }, [pushDebounced, exercise.sessionExerciseId, exercise.id, measurementType]);
+
   const handleToggleExpanded = useCallback(() => {
     LayoutAnimation.configureNext(LayoutAnimation.Presets.easeInEaseOut);
     onToggleCollapsed(exercise.sessionExerciseId);
@@ -224,6 +235,7 @@ export const SessionExerciseCard = memo(function SessionExerciseCard({
             <ExerciseCardMenu
               isFirst={isFirst}
               isLast={isLast}
+              onSwap={handleSwapExercise}
               onMoveUp={handleMoveUp}
               onMoveDown={handleMoveDown}
               onDelete={handleDeleteExercise}
