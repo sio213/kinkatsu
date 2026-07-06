@@ -16,7 +16,7 @@ import {
 import { endWorkoutSession } from '@/lib/workout/session';
 import { formatSessionDateGroup } from '@/lib/workout/summary';
 import { Stack, useLocalSearchParams, useRouter } from 'expo-router';
-import { useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { Alert, FlatList, StyleSheet, Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
@@ -39,6 +39,21 @@ export default function WorkoutScreen() {
   const [now, setNow] = useState(() => Date.now());
   const isFinishingRef = useRef(false);
   const keyboardInset = useKeyboardInset();
+  // 種目カードのアコーディオン開閉状態。カード側のローカルstateにすると、FlatListの
+  // virtualizationでカードがアンマウント→再マウントされた際に開閉状態がリセットされてしまうため、
+  // この画面が生きている間は保持されるようここで持つ（値未保存=展開中がデフォルト）
+  const [collapsedIds, setCollapsedIds] = useState<Set<number>>(() => new Set());
+  const handleToggleCollapsed = useCallback((sessionExerciseId: number) => {
+    setCollapsedIds((prev) => {
+      const next = new Set(prev);
+      if (next.has(sessionExerciseId)) {
+        next.delete(sessionExerciseId);
+      } else {
+        next.add(sessionExerciseId);
+      }
+      return next;
+    });
+  }, []);
 
   useEffect(() => {
     if (!session || session.endedAt != null) return;
@@ -126,6 +141,8 @@ export default function WorkoutScreen() {
                 exercise={item}
                 sessionId={sessionId}
                 sets={sessionSets.get(item.sessionExerciseId) ?? EMPTY_SETS}
+                collapsed={collapsedIds.has(item.sessionExerciseId)}
+                onToggleCollapsed={handleToggleCollapsed}
               />
             </ListErrorBoundary>
           )}
