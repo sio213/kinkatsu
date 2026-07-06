@@ -57,7 +57,6 @@ jest.mock('@/db/schema', () => ({
   workoutSessions: { id: 'id', startedAt: 'startedAt', endedAt: 'endedAt' },
   workoutSessionExercises: { id: 'id', sessionId: 'sessionId', orderIndex: 'orderIndex', exerciseId: 'exerciseId' },
   sets: { sessionId: 'sessionId', workoutSessionExerciseId: 'workoutSessionExerciseId' },
-  exercises: { id: 'id', measurementType: 'measurementType' },
 }));
 
 jest.mock('drizzle-orm', () => ({ eq: jest.fn((col, val) => ({ col, val })) }));

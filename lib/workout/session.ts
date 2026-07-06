@@ -2,6 +2,19 @@ import { db } from '@/db/client';
 import { sets, workoutSessionExercises, workoutSessions } from '@/db/schema';
 import { eq } from 'drizzle-orm';
 
+// 種目カードに最初から入っている、値が空の1セット目。種目の新規追加時・入れ替え後の
+// 初期化時とで同じ形にする必要があるため共通化している
+function freshSetValues(sessionId: number, exerciseId: number, workoutSessionExerciseId: number, now: number) {
+  return {
+    sessionId,
+    exerciseId,
+    workoutSessionExerciseId,
+    setNumber: 1,
+    completedAt: null,
+    createdAt: now,
+  };
+}
+
 export async function startWorkoutSession() {
   const now = Date.now();
   const [inserted] = await db
@@ -45,14 +58,7 @@ export async function addExercisesToSession(sessionId: number, exerciseIds: numb
       .returning();
     // 種目追加直後にセットが1件も無いと入力を始めにくいため、カードごとに値が空のセットを1件自動生成する
     await tx.insert(sets).values(
-      inserted.map((wse) => ({
-        sessionId,
-        exerciseId: wse.exerciseId,
-        workoutSessionExerciseId: wse.id,
-        setNumber: 1,
-        completedAt: null,
-        createdAt: now,
-      })),
+      inserted.map((wse) => freshSetValues(sessionId, wse.exerciseId, wse.id, now)),
     );
   });
 }
@@ -114,13 +120,6 @@ export async function replaceSessionExercise(sessionExerciseId: number, newExerc
       .where(eq(workoutSessionExercises.id, sessionExerciseId));
 
     await tx.delete(sets).where(eq(sets.workoutSessionExerciseId, sessionExerciseId));
-    await tx.insert(sets).values({
-      sessionId: wse.sessionId,
-      exerciseId: newExerciseId,
-      workoutSessionExerciseId: sessionExerciseId,
-      setNumber: 1,
-      completedAt: null,
-      createdAt: now,
-    });
+    await tx.insert(sets).values(freshSetValues(wse.sessionId, newExerciseId, sessionExerciseId, now));
   });
 }
