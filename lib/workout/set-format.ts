@@ -121,20 +121,19 @@ export function toDisplayValues(
 
 // 列定義に沿って、セル表示用の文字列をDB保存用の値にパースする。
 // 空欄・不正な入力は共にnullになる（呼び出し側で不正入力を検知したい場合は
-// 各列のfromDisplayを直接使って個別に判定すること。set-row.tsxの✓保存時が該当）
+// 各列のfromDisplayを直接使って個別に判定すること。set-row.tsxの✓保存時が該当）。
+// fallbackを指定しないparseColumnsWithFallbackの薄いラッパー
 export function parseColumns(
   columns: SetColumn[],
   display: Partial<Record<SetFieldKey, string>>,
 ): Partial<Record<SetFieldKey, number | null>> {
-  return columns.reduce<Partial<Record<SetFieldKey, number | null>>>((acc, c) => {
-    acc[c.key] = c.fromDisplay(display[c.key] ?? '');
-    return acc;
-  }, {});
+  return parseColumnsWithFallback(columns, display, {});
 }
 
-// parseColumnsと同様だが、パースに失敗した非空入力（例:"60kg"のような不正な貼り付け）は
-// nullにせずfallback（通常はDB上の直前セットの値）を使う。「セット追加」時の入力途中値コピーで、
-// タイプミスによって値が黙って消えるのを防ぐためのもの。空欄は従来通りnullになる
+// parseColumnsと同様だが、パースに失敗した非空入力（例:"60kg"のような不正な貼り付け、
+// "82.5"を打つ途中の"82."のような一瞬だけ不正な状態）はnullにせずfallback（通常はDB上の
+// 既存値）を使う。「セット追加」時の入力途中値コピーや自動保存で、タイプミス・入力途中の
+// 一瞬によって値が黙って消えるのを防ぐためのもの。空欄は従来通りnullになる
 export function parseColumnsWithFallback(
   columns: SetColumn[],
   display: Partial<Record<SetFieldKey, string>>,

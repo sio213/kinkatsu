@@ -2,10 +2,15 @@ import { IconSymbol } from '@/components/ui/icon-symbol';
 import { Colors } from '@/constants/theme';
 import type { Set } from '@/db/schema';
 import type { MeasurementType } from '@/lib/exercises/constants';
-import { MEASUREMENT_COLUMNS, parseColumns, toDisplayValues } from '@/lib/workout/set-format';
+import { MEASUREMENT_COLUMNS, parseColumns, parseColumnsWithFallback, toDisplayValues } from '@/lib/workout/set-format';
 import type { SetValues } from '@/lib/workout/sets';
-import { memo, useRef, useState } from 'react';
+import { memo, useEffect, useRef, useState } from 'react';
 import { Alert, Keyboard, StyleSheet, Text, TextInput, TouchableOpacity, View } from 'react-native';
+
+// 自動保存のデバウンス間隔。1文字ごとに即保存すると、セッション全体を1本のlive queryで
+// 購読しているuseSessionSets（hooks/use-workout-session.ts）が打鍵のたびに再発火し、
+// 他の全SessionExerciseCardのmemoが無効化されて余計な再レンダーを招くため間引く
+const AUTO_SAVE_DEBOUNCE_MS = 400;
 
 type Props = {
   set: Set;
@@ -37,16 +42,37 @@ export const SetRow = memo(function SetRow({
   // 連続したonChangeText呼び出し（同一レンダーサイクル内でバッチ処理される場合）でも
   // 常に最新の値を基準にマージするための鏡。setValuesの外で同期的に更新する
   const valuesRef = useRef(values);
+  const autoSaveTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  // デバウンス済みの自動保存本体。parseColumnsWithFallbackを使い、"82.5"を打つ途中の
+  // "82."のような一瞬パース不能な状態でも、DB上の既存値(set)にフォールバックしてnullで
+  // 上書きしないようにする（parseColumnsだと確定済みの値を一瞬の不正状態で消してしまう）
+  const flushAutoSave = () => {
+    onAutoSaveDraft?.(set.id, parseColumnsWithFallback(columns, valuesRef.current, set));
+  };
+
+  useEffect(() => {
+    return () => {
+      // アンマウント直前に保留中のデバウンスがあれば、取りこぼさず即保存する
+      if (autoSaveTimerRef.current) {
+        clearTimeout(autoSaveTimerRef.current);
+        flushAutoSave();
+      }
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   const handleFieldChange = (key: string, text: string) => {
     const next = { ...valuesRef.current, [key]: text };
     valuesRef.current = next;
     setValues(next);
     onDraftChange?.(set.id, next);
-    // 1文字ごとにバックグラウンドで永続化する。ローカルSQLiteへの1行updateなので
-    // デバウンス無しでも十分軽く、タイマーを挟むとアンマウント直前の最後の入力を
-    // 保存し損ねる可能性があるため、あえて即時に呼ぶ
-    onAutoSaveDraft?.(set.id, parseColumns(columns, next));
+
+    if (autoSaveTimerRef.current) clearTimeout(autoSaveTimerRef.current);
+    autoSaveTimerRef.current = setTimeout(() => {
+      autoSaveTimerRef.current = null;
+      flushAutoSave();
+    }, AUTO_SAVE_DEBOUNCE_MS);
   };
 
   const handleTogglePress = async () => {
@@ -59,6 +85,9 @@ export const SetRow = memo(function SetRow({
         const reopened = toDisplayValues(columns, set);
         valuesRef.current = reopened;
         setValues(reopened);
+        // ここで渡す値はDB上の確定値そのものなので、addSet側のoverrideValues省略時の
+        // 既定コピー（DB直前値）と実質同じ結果になる。それでも呼ぶのは、reopen直後に
+        // ユーザーが値を編集した場合にdraftValuesRefが追従できるようにするため
         onDraftChange?.(set.id, reopened);
       } else {
         // 空欄はnull保存でよいが、非空の入力がパースに失敗した場合（不正な貼り付け等）は

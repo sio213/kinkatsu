@@ -64,27 +64,120 @@ test('入力するたびonDraftChangeにマージ後の値が渡る', () => {
   expect(onDraftChange).toHaveBeenLastCalledWith(3, { weight: '60', reps: '10' });
 });
 
-test('入力するたびonAutoSaveDraftにパース済みの値が渡り、✓未タップのまま画面を離れても消えないようにする', () => {
-  const onAutoSaveDraft = jest.fn();
-  const set = { id: 6, setNumber: 1, weight: null, reps: null, completedAt: null } as any;
-  const root = render({
-    set,
-    measurementType: 'weight_reps',
-    onSave: jest.fn(),
-    onReopen: jest.fn(),
-    onAutoSaveDraft,
+describe('onAutoSaveDraft（デバウンス済みの自動保存）', () => {
+  beforeEach(() => {
+    jest.useFakeTimers();
   });
 
-  const inputs = root.findAllByType(TextInput);
-  act(() => {
-    inputs[0].props.onChangeText('60');
+  afterEach(() => {
+    jest.useRealTimers();
   });
-  expect(onAutoSaveDraft).toHaveBeenLastCalledWith(6, { weight: 60, reps: null });
 
-  act(() => {
-    inputs[1].props.onChangeText('10');
+  test('入力後400ms経過するとonAutoSaveDraftにパース済みの値が渡り、✓未タップのまま画面を離れても消えないようにする', () => {
+    const onAutoSaveDraft = jest.fn();
+    const set = { id: 6, setNumber: 1, weight: null, reps: null, completedAt: null } as any;
+    const root = render({
+      set,
+      measurementType: 'weight_reps',
+      onSave: jest.fn(),
+      onReopen: jest.fn(),
+      onAutoSaveDraft,
+    });
+
+    const inputs = root.findAllByType(TextInput);
+    act(() => {
+      inputs[0].props.onChangeText('60');
+    });
+    expect(onAutoSaveDraft).not.toHaveBeenCalled();
+
+    act(() => {
+      jest.advanceTimersByTime(400);
+    });
+    expect(onAutoSaveDraft).toHaveBeenCalledWith(6, { weight: 60, reps: null });
   });
-  expect(onAutoSaveDraft).toHaveBeenLastCalledWith(6, { weight: 60, reps: 10 });
+
+  test('連続して入力してもデバウンスされ、最後の状態で1回だけonAutoSaveDraftが呼ばれる', () => {
+    const onAutoSaveDraft = jest.fn();
+    const set = { id: 6, setNumber: 1, weight: null, reps: null, completedAt: null } as any;
+    const root = render({
+      set,
+      measurementType: 'weight_reps',
+      onSave: jest.fn(),
+      onReopen: jest.fn(),
+      onAutoSaveDraft,
+    });
+
+    const inputs = root.findAllByType(TextInput);
+    act(() => {
+      inputs[0].props.onChangeText('6');
+      jest.advanceTimersByTime(100);
+      inputs[0].props.onChangeText('60');
+      jest.advanceTimersByTime(100);
+      inputs[1].props.onChangeText('10');
+    });
+    act(() => {
+      jest.advanceTimersByTime(400);
+    });
+
+    expect(onAutoSaveDraft).toHaveBeenCalledTimes(1);
+    expect(onAutoSaveDraft).toHaveBeenCalledWith(6, { weight: 60, reps: 10 });
+  });
+
+  test('"82.5"を打つ途中の"82."のような一瞬パース不能な状態でも、DB上の既存値にフォールバックしnullで上書きしない', () => {
+    const onAutoSaveDraft = jest.fn();
+    // reopen直後を想定: DBには確定済みの値(82.5)が残っている
+    const set = { id: 6, setNumber: 1, weight: 82.5, reps: 8, completedAt: null } as any;
+    const root = render({
+      set,
+      measurementType: 'weight_reps',
+      onSave: jest.fn(),
+      onReopen: jest.fn(),
+      onAutoSaveDraft,
+    });
+
+    const inputs = root.findAllByType(TextInput);
+    act(() => {
+      inputs[0].props.onChangeText('82.'); // 入力途中の一瞬だけパース不能な状態
+    });
+    act(() => {
+      jest.advanceTimersByTime(400);
+    });
+
+    // weightはnullにならずDB上の既存値(82.5)にフォールバックする。repsは未編集なので元の8のまま
+    expect(onAutoSaveDraft).toHaveBeenCalledWith(6, { weight: 82.5, reps: 8 });
+  });
+
+  test('デバウンス待機中にアンマウントされても、保留中の最後の入力を取りこぼさず保存する', () => {
+    const onAutoSaveDraft = jest.fn();
+    const set = { id: 6, setNumber: 1, weight: null, reps: null, completedAt: null } as any;
+    let instance!: ReturnType<typeof create>;
+    act(() => {
+      instance = create(
+        <SetRow
+          exerciseName="ベンチプレス"
+          set={set}
+          measurementType="weight_reps"
+          onSave={jest.fn()}
+          onReopen={jest.fn()}
+          onAutoSaveDraft={onAutoSaveDraft}
+        />,
+      );
+    });
+    const root = instance.root;
+
+    const inputs = root.findAllByType(TextInput);
+    act(() => {
+      inputs[0].props.onChangeText('60');
+    });
+    expect(onAutoSaveDraft).not.toHaveBeenCalled();
+
+    // 400ms経過する前にアンマウント（画面遷移相当）
+    act(() => {
+      instance.unmount();
+    });
+
+    expect(onAutoSaveDraft).toHaveBeenCalledWith(6, { weight: 60, reps: null });
+  });
 });
 
 test('onAutoSaveDraftが指定されていなくてもクラッシュしない（optional prop）', () => {
