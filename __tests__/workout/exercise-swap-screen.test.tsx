@@ -54,6 +54,9 @@ const running = {
   measurementType: 'distance_time',
 };
 
+const inclineBenchPressLabel = 'インクラインベンチプレス、胸';
+const runningLabel = 'ランニング、有酸素';
+
 function findButtonByLabel(root: ReactTestInstance, label: string) {
   return root
     .findAllByType(TouchableOpacity)
@@ -84,16 +87,55 @@ beforeEach(() => {
 
 test('現在の種目（currentExerciseId）は候補一覧から除外される', () => {
   const root = render();
-  expect(() => root.findByProps({ accessibilityLabel: 'ベンチプレスに入れ替える' })).toThrow();
-  expect(root.findByProps({ accessibilityLabel: 'インクラインベンチプレスに入れ替える' })).toBeDefined();
-  expect(root.findByProps({ accessibilityLabel: 'ランニングに入れ替える' })).toBeDefined();
+  expect(() => root.findByProps({ accessibilityLabel: 'ベンチプレス、胸' })).toThrow();
+  expect(root.findByProps({ accessibilityLabel: inclineBenchPressLabel })).toBeDefined();
+  expect(root.findByProps({ accessibilityLabel: runningLabel })).toBeDefined();
 });
 
-test('計測タイプが同じ種目をタップすると確認なしですぐswapSessionExerciseが呼ばれ、router.backする', async () => {
+test('初期状態は未選択で「入れ替える」ボタンは無効', () => {
   const root = render();
-  const row = root.findByProps({ accessibilityLabel: 'インクラインベンチプレスに入れ替える' });
-  await act(async () => {
+  const submitBtn = findButtonByLabel(root, '入れ替える')!;
+  expect(submitBtn.props.disabled).toBe(true);
+});
+
+test('種目をタップするとラジオボタンが選択状態になり、「入れ替える」ボタンが有効になる', () => {
+  const root = render();
+  const row = root.findByProps({ accessibilityLabel: inclineBenchPressLabel });
+  act(() => {
     row.props.onPress();
+  });
+
+  expect(root.findByProps({ accessibilityLabel: inclineBenchPressLabel }).props.accessibilityState).toEqual({
+    checked: true,
+  });
+  expect(findButtonByLabel(root, '入れ替える')!.props.disabled).toBe(false);
+});
+
+test('別の種目をタップすると選択が移る（単一選択）', () => {
+  const root = render();
+  act(() => {
+    root.findByProps({ accessibilityLabel: inclineBenchPressLabel }).props.onPress();
+  });
+  act(() => {
+    root.findByProps({ accessibilityLabel: runningLabel }).props.onPress();
+  });
+
+  expect(root.findByProps({ accessibilityLabel: inclineBenchPressLabel }).props.accessibilityState).toEqual({
+    checked: false,
+  });
+  expect(root.findByProps({ accessibilityLabel: runningLabel }).props.accessibilityState).toEqual({
+    checked: true,
+  });
+});
+
+test('計測タイプが同じ種目を選んで送信すると、確認なしですぐswapSessionExerciseが呼ばれ、router.backする', async () => {
+  const root = render();
+  act(() => {
+    root.findByProps({ accessibilityLabel: inclineBenchPressLabel }).props.onPress();
+  });
+  const submitBtn = findButtonByLabel(root, '入れ替える')!;
+  await act(async () => {
+    submitBtn.props.onPress();
   });
 
   expect(Alert.alert).not.toHaveBeenCalled();
@@ -101,15 +143,18 @@ test('計測タイプが同じ種目をタップすると確認なしですぐsw
   expect(mockBack).toHaveBeenCalled();
 });
 
-test('計測タイプが異なる種目をタップすると確認ダイアログを出し、確定するとswapSessionExerciseが呼ばれる', async () => {
+test('計測タイプが異なる種目を選んで送信すると確認ダイアログを出し、確定するとswapSessionExerciseが呼ばれる', async () => {
   (Alert.alert as jest.Mock).mockImplementation((_title, _msg, buttons) => {
     const confirmBtn = buttons?.find((b: { text: string }) => b.text === '入れ替える');
     confirmBtn?.onPress?.();
   });
   const root = render();
-  const row = root.findByProps({ accessibilityLabel: 'ランニングに入れ替える' });
+  act(() => {
+    root.findByProps({ accessibilityLabel: runningLabel }).props.onPress();
+  });
+  const submitBtn = findButtonByLabel(root, '入れ替える')!;
   await act(async () => {
-    row.props.onPress();
+    submitBtn.props.onPress();
   });
 
   expect(Alert.alert).toHaveBeenCalledWith(
@@ -126,9 +171,12 @@ test('計測タイプが異なる種目の確認をキャンセルするとswapS
     // キャンセル: どのボタンも押さない
   });
   const root = render();
-  const row = root.findByProps({ accessibilityLabel: 'ランニングに入れ替える' });
+  act(() => {
+    root.findByProps({ accessibilityLabel: runningLabel }).props.onPress();
+  });
+  const submitBtn = findButtonByLabel(root, '入れ替える')!;
   await act(async () => {
-    row.props.onPress();
+    submitBtn.props.onPress();
   });
 
   expect(mockSwapSessionExercise).not.toHaveBeenCalled();
@@ -139,9 +187,12 @@ test('入れ替えが失敗した場合はエラーAlertを表示し、router.ba
   mockSwapSessionExercise.mockRejectedValueOnce(new Error('fail'));
   jest.spyOn(console, 'error').mockImplementation(() => {});
   const root = render();
-  const row = root.findByProps({ accessibilityLabel: 'インクラインベンチプレスに入れ替える' });
+  act(() => {
+    root.findByProps({ accessibilityLabel: inclineBenchPressLabel }).props.onPress();
+  });
+  const submitBtn = findButtonByLabel(root, '入れ替える')!;
   await act(async () => {
-    row.props.onPress();
+    submitBtn.props.onPress();
   });
 
   expect(Alert.alert).toHaveBeenCalledWith('エラー', '種目を入れ替えられませんでした。');
@@ -156,10 +207,13 @@ test('連打してもswapSessionExerciseは1回しか呼ばれない', async () 
     }),
   );
   const root = render();
-  const row = root.findByProps({ accessibilityLabel: 'インクラインベンチプレスに入れ替える' });
   act(() => {
-    row.props.onPress();
-    row.props.onPress();
+    root.findByProps({ accessibilityLabel: inclineBenchPressLabel }).props.onPress();
+  });
+  const submitBtn = findButtonByLabel(root, '入れ替える')!;
+  act(() => {
+    submitBtn.props.onPress();
+    submitBtn.props.onPress();
   });
 
   expect(mockSwapSessionExercise).toHaveBeenCalledTimes(1);

@@ -2,6 +2,7 @@ import { CategoryFilterChips } from '@/components/exercises/category-filter-chip
 import { ExerciseSearchBar } from '@/components/exercises/exercise-search-bar';
 import { ListErrorBoundary } from '@/components/ui/list-error-boundary';
 import { NotFoundState } from '@/components/ui/not-found-state';
+import { PrimaryButton } from '@/components/ui/primary-button';
 import { SwapExerciseRow } from '@/components/workout/swap-exercise-row';
 import { Colors } from '@/constants/theme';
 import type { Exercise } from '@/db/schema';
@@ -34,6 +35,8 @@ export default function ExerciseSwapScreen() {
 
   const [search, setSearch] = useState('');
   const [activeCategory, setActiveCategory] = useState<string>(CATEGORY_ALL);
+  // 種目追加ピッカーと違い単一選択（1件だけ）のため、選択idはSetではなく単一の値で持つ
+  const [selectedId, setSelectedId] = useState<number | null>(null);
   const isSwappingRef = useRef(false);
   const keyboardInset = useKeyboardInset();
 
@@ -49,6 +52,11 @@ export default function ExerciseSwapScreen() {
     () => filterExercises(exercises, activeCategory, search).filter((e) => e.id !== currentExerciseId),
     [exercises, activeCategory, search, currentExerciseId],
   );
+
+  const handleSelect = useCallback((id: number) => {
+    Keyboard.dismiss();
+    setSelectedId(id);
+  }, []);
 
   const handlePressInfo = useCallback(
     (id: number) => {
@@ -74,30 +82,28 @@ export default function ExerciseSwapScreen() {
     [sessionExerciseId, router],
   );
 
-  const handleSelect = useCallback(
-    (exercise: Exercise) => {
-      Keyboard.dismiss();
-      // 計測タイプが同じなら入力済みの値をそのまま引き継げるため確認なしで即入れ替える。
-      // 異なる場合は値がクリアされる（swapSessionExercise側の挙動）ため、事前に確認する
-      if (exercise.measurementType === currentMeasurementType) {
-        runSwap(exercise.id);
-        return;
-      }
-      Alert.alert('この種目に入れ替えますか？', '入力済みの記録は失われます。', [
-        { text: 'キャンセル', style: 'cancel' },
-        { text: '入れ替える', style: 'destructive', onPress: () => runSwap(exercise.id) },
-      ]);
-    },
-    [currentMeasurementType, runSwap],
-  );
+  const handleSubmit = useCallback(() => {
+    const selected = candidates.find((e) => e.id === selectedId);
+    if (!selected) return;
+    // 計測タイプが同じなら入力済みの値をそのまま引き継げるため確認なしで即入れ替える。
+    // 異なる場合は値がクリアされる（swapSessionExercise側の挙動）ため、事前に確認する
+    if (selected.measurementType === currentMeasurementType) {
+      runSwap(selected.id);
+      return;
+    }
+    Alert.alert('この種目に入れ替えますか？', '入力済みの記録は失われます。', [
+      { text: 'キャンセル', style: 'cancel' },
+      { text: '入れ替える', style: 'destructive', onPress: () => runSwap(selected.id) },
+    ]);
+  }, [candidates, selectedId, currentMeasurementType, runSwap]);
 
   const renderItem = useCallback(
     ({ item: e }: { item: Exercise }) => (
       <ListErrorBoundary>
-        <SwapExerciseRow exercise={e} onPress={handleSelect} onPressInfo={handlePressInfo} />
+        <SwapExerciseRow exercise={e} selected={e.id === selectedId} onSelect={handleSelect} onPressInfo={handlePressInfo} />
       </ListErrorBoundary>
     ),
-    [handleSelect, handlePressInfo],
+    [selectedId, handleSelect, handlePressInfo],
   );
 
   const listHeader = (
@@ -142,6 +148,9 @@ export default function ExerciseSwapScreen() {
         scrollIndicatorInsets={{ bottom: keyboardInset }}
         keyboardShouldPersistTaps="handled"
       />
+      <View style={styles.footer}>
+        <PrimaryButton label="入れ替える" onPress={handleSubmit} disabled={selectedId == null} />
+      </View>
     </SafeAreaView>
   );
 }
@@ -155,4 +164,11 @@ const styles = StyleSheet.create({
 
   emptyWrapper: { alignItems: 'center', paddingVertical: 32 },
   empty: { color: Colors.textPlaceholder, fontSize: 14 },
+
+  footer: {
+    padding: 16,
+    paddingTop: 8,
+    borderTopWidth: 1,
+    borderTopColor: Colors.border,
+  },
 });
