@@ -1,114 +1,12 @@
+import { DurationInput } from '@/components/workout/duration-input';
 import { IconSymbol } from '@/components/ui/icon-symbol';
 import { Colors } from '@/constants/theme';
 import type { Set } from '@/db/schema';
 import type { MeasurementType } from '@/lib/exercises/constants';
-import {
-  combineDurationDisplay,
-  MEASUREMENT_COLUMNS,
-  parseColumns,
-  parseColumnsWithFallback,
-  splitDurationDisplay,
-  toDisplayValues,
-} from '@/lib/workout/set-format';
+import { MEASUREMENT_COLUMNS, parseColumns, parseColumnsWithFallback, toDisplayValues } from '@/lib/workout/set-format';
 import type { SetValues } from '@/lib/workout/sets';
 import { memo, useEffect, useRef, useState } from 'react';
 import { Alert, Keyboard, StyleSheet, Text, TextInput, TouchableOpacity, View } from 'react-native';
-
-type DurationInputProps = {
-  initialValue: string;
-  onChange: (combined: string) => void;
-  exerciseName: string;
-  setNumber: number;
-};
-
-// 分・秒を数値専用キーボードの別入力として扱い、任意の文字が打てないようにする。
-// 秒は入力時点で60以上になる変更を無視することで、そもそも不正な状態に到達させない。
-// ラベルは列のlabel（time型は「時間(分:秒)」）をそのまま使うと"時間(分:秒) 分"のように
-// 読み上げが重複するため、計測タイプによらず固定の「時間」を基準にする
-function DurationInput({ initialValue, onChange, exerciseName, setNumber }: DurationInputProps) {
-  const initial = splitDurationDisplay(initialValue);
-  const [min, setMin] = useState(initial.min);
-  const [sec, setSec] = useState(initial.sec);
-  // 同一レンダーサイクル内で分→秒と連続してonChangeTextが呼ばれても、setStateはバッチ処理され
-  // 直後のハンドラからはまだ更新前の値しか見えない（stale closure）。setStateの外で同期的に
-  // 更新する鏡を経由することで、常に最新の値を基準にonChangeへ渡す（set-row.tsx側のvaluesRefと同じ対策）
-  const minRef = useRef(min);
-  const secRef = useRef(sec);
-  const minInputRef = useRef<TextInput>(null);
-  const secInputRef = useRef<TextInput>(null);
-
-  const handleMinChange = (text: string) => {
-    const digits = text.replace(/\D/g, '').slice(0, 3);
-    minRef.current = digits;
-    setMin(digits);
-    onChange(combineDurationDisplay(digits, secRef.current));
-    // 分を2桁打った時点で秒欄へ自動遷移する（3桁以上の分は稀なため、必要なら手動で分欄をタップし直す）
-    if (digits.length >= 2) secInputRef.current?.focus();
-  };
-
-  const handleSecChange = (text: string) => {
-    const digits = text.replace(/\D/g, '').slice(0, 2);
-    if (digits !== '' && Number(digits) > 59) return;
-    secRef.current = digits;
-    setSec(digits);
-    onChange(combineDurationDisplay(minRef.current, digits));
-  };
-
-  return (
-    <View style={styles.durationCell}>
-      {/* 分・秒を固定幅にして中央へ寄せた結果、枠の左右に生まれる余白がタップに反応しなく
-          なってしまうため、両端をそれぞれ隣接する分・秒欄へフォーカスするタップ領域にする */}
-      <TouchableOpacity
-        style={styles.durationSpacer}
-        activeOpacity={1}
-        onPress={() => minInputRef.current?.focus()}
-        accessibilityElementsHidden
-        importantForAccessibility="no-hide-descendants"
-      />
-      <TextInput
-        ref={minInputRef}
-        style={[styles.durationPart, styles.durationMinPart]}
-        value={min}
-        onChangeText={handleMinChange}
-        keyboardType="number-pad"
-        maxLength={3}
-        textAlign="center"
-        placeholder="分"
-        placeholderTextColor={Colors.textPlaceholder}
-        accessibilityLabel={`${exerciseName} セット${setNumber} 時間 分`}
-      />
-      {/* 分が1桁のケース（プランク等の短時間種目で多い）では自動フォーカス移動が発火しないため、
-          コロンをタップしても秒欄へ移動できるようにして手動タップの手間を減らす */}
-      <TouchableOpacity
-        onPress={() => secInputRef.current?.focus()}
-        hitSlop={{ top: 12, bottom: 12, left: 8, right: 8 }}
-        accessibilityElementsHidden
-        importantForAccessibility="no-hide-descendants"
-      >
-        <Text style={styles.durationColon}>:</Text>
-      </TouchableOpacity>
-      <TextInput
-        ref={secInputRef}
-        style={[styles.durationPart, styles.durationSecPart]}
-        value={sec}
-        onChangeText={handleSecChange}
-        keyboardType="number-pad"
-        maxLength={2}
-        textAlign="center"
-        placeholder="秒"
-        placeholderTextColor={Colors.textPlaceholder}
-        accessibilityLabel={`${exerciseName} セット${setNumber} 時間 秒`}
-      />
-      <TouchableOpacity
-        style={styles.durationSpacer}
-        activeOpacity={1}
-        onPress={() => secInputRef.current?.focus()}
-        accessibilityElementsHidden
-        importantForAccessibility="no-hide-descendants"
-      />
-    </View>
-  );
-}
 
 // 自動保存のデバウンス間隔。1文字ごとに即保存すると、セッション全体を1本のlive queryで
 // 購読しているuseSessionSets（hooks/use-workout-session.ts）が打鍵のたびに再発火し、
@@ -288,42 +186,6 @@ const styles = StyleSheet.create({
     backgroundColor: Colors.surfaceSubtle,
     borderColor: Colors.border,
     color: Colors.textMuted,
-  },
-  durationCell: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    backgroundColor: Colors.surface,
-    borderWidth: 1,
-    borderColor: Colors.borderStrong,
-    borderRadius: 7,
-    paddingVertical: 11,
-    paddingHorizontal: 6,
-  },
-  // flex:1にすると、time単独のように列幅が広い場合に分・秒それぞれが独立してその半分の
-  // 幅の中央に寄ってしまい、間が間延びして見える。固定幅にして「分:秒」をひとまとまりの
-  // 塊にし、左右のdurationSpacer（flex:1の余白）で挟むことで中央寄せしつつ、その余白
-  // 部分もタップで隣接する入力欄へフォーカスできるようにする
-  durationPart: {
-    padding: 0,
-    fontSize: 14,
-    fontWeight: '600',
-    color: Colors.textPrimary,
-  },
-  durationSpacer: {
-    flex: 1,
-    alignSelf: 'stretch',
-  },
-  durationMinPart: {
-    width: 30,
-  },
-  durationSecPart: {
-    width: 24,
-  },
-  durationColon: {
-    fontSize: 14,
-    fontWeight: '600',
-    color: Colors.textMuted,
-    marginHorizontal: 2,
   },
   check: {
     width: 24,
