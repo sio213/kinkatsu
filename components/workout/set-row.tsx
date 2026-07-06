@@ -119,11 +119,10 @@ export const SetRow = memo(function SetRow({
             onChange={(text) => handleFieldChange(c.key, text)}
             exerciseName={exerciseName}
             setNumber={set.setNumber}
-            done={done}
           />
         ) : (
           <TextInput
-            style={[styles.cell, done && styles.cellDone]}
+            style={styles.cell}
             value={values[c.key]}
             onChangeText={(text) => handleFieldChange(c.key, text)}
             keyboardType={c.keyboardType}
@@ -167,11 +166,6 @@ const styles = StyleSheet.create({
     fontSize: 14,
     fontWeight: '600',
     color: Colors.textPrimary,
-  },
-  // ✓済みでも編集可能なため、グレーアウトではなく枠線色だけで「確定済み」を示す
-  cellDone: {
-    borderColor: Colors.accent,
-    borderWidth: 1.5,
   },
   check: {
     width: 24,

@@ -8,15 +8,13 @@ type DurationInputProps = {
   onChange: (combined: string) => void;
   exerciseName: string;
   setNumber: number;
-  // ✓済みでも編集可能なため、set-row.tsxのTextInput同様に枠線色で「確定済み」を示す
-  done?: boolean;
 };
 
 // 分・秒を数値専用キーボードの別入力として扱い、任意の文字が打てないようにする。
 // 秒は入力時点で60以上になる変更を無視することで、そもそも不正な状態に到達させない。
 // ラベルは列のlabel（time型は「時間(分:秒)」）をそのまま使うと"時間(分:秒) 分"のように
 // 読み上げが重複するため、計測タイプによらず固定の「時間」を基準にする
-export function DurationInput({ initialValue, onChange, exerciseName, setNumber, done }: DurationInputProps) {
+export function DurationInput({ initialValue, onChange, exerciseName, setNumber }: DurationInputProps) {
   const initial = splitDurationDisplay(initialValue);
   const [min, setMin] = useState(initial.min);
   const [sec, setSec] = useState(initial.sec);
@@ -46,7 +44,7 @@ export function DurationInput({ initialValue, onChange, exerciseName, setNumber,
   };
 
   return (
-    <View style={[styles.durationCell, done && styles.durationCellDone]}>
+    <View style={styles.durationCell}>
       {/* 分・秒を固定幅にして中央へ寄せた結果、枠の左右に生まれる余白がタップに反応しなく
           なってしまうため、両端をそれぞれ隣接する分・秒欄へフォーカスするタップ領域にする */}
       <TouchableOpacity
@@ -111,11 +109,6 @@ const styles = StyleSheet.create({
     borderRadius: 7,
     paddingVertical: 11,
     paddingHorizontal: 6,
-  },
-  // ✓済みでも編集可能なため、set-row.tsxのcellDone同様に枠線色だけで「確定済み」を示す
-  durationCellDone: {
-    borderColor: Colors.accent,
-    borderWidth: 1.5,
   },
   // flex:1にすると、time単独のように列幅が広い場合に分・秒それぞれが独立してその半分の
   // 幅の中央に寄ってしまい、間が間延びして見える。固定幅にして「分:秒」をひとまとまりの
