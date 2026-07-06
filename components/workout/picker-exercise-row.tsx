@@ -13,6 +13,9 @@ type Props = {
   selected: boolean;
   onToggle: (id: number) => void;
   onPressInfo: (id: number) => void;
+  // 種目追加ピッカー(複数選択)はチェックボックス、種目入れ替え(単一選択)はラジオボタンで
+  // 選択方式が違うだけでレイアウトは共通のため、見た目の出し分けだけをpropsで持つ
+  selectionMode?: 'checkbox' | 'radio';
 };
 
 export const PickerExerciseRow = memo(function PickerExerciseRow({
@@ -20,19 +23,31 @@ export const PickerExerciseRow = memo(function PickerExerciseRow({
   selected,
   onToggle,
   onPressInfo,
+  selectionMode = 'checkbox',
 }: Props) {
   const images = getExerciseImages(e);
+  const isRadio = selectionMode === 'radio';
 
   return (
     <TouchableOpacity
       style={styles.row}
       onPress={() => onToggle(e.id)}
-      accessibilityRole="checkbox"
+      accessibilityRole={isRadio ? 'radio' : 'checkbox'}
       accessibilityState={{ checked: selected }}
       accessibilityLabel={`${e.name}、${getCategoryLabel(e.category)}`}
     >
-      <View style={[styles.checkbox, selected && styles.checkboxChecked]}>
-        {selected && <IconSymbol name="checkmark" size={14} color={Colors.onAccent} />}
+      <View
+        style={[
+          isRadio ? styles.radio : styles.checkbox,
+          selected && (isRadio ? styles.radioSelected : styles.checkboxChecked),
+        ]}
+      >
+        {selected &&
+          (isRadio ? (
+            <View style={styles.radioDot} />
+          ) : (
+            <IconSymbol name="checkmark" size={14} color={Colors.onAccent} />
+          ))}
       </View>
       <View style={styles.thumbnailFrame}>
         <Image source={images.thumbnail} style={styles.thumbnail} contentFit="contain" />
@@ -74,6 +89,22 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
   },
   checkboxChecked: { backgroundColor: Colors.accent, borderColor: Colors.accent },
+  radio: {
+    width: 22,
+    height: 22,
+    borderRadius: 11,
+    borderWidth: 1.5,
+    borderColor: Colors.borderStrong,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  radioSelected: { borderColor: Colors.accent },
+  radioDot: {
+    width: 11,
+    height: 11,
+    borderRadius: 5.5,
+    backgroundColor: Colors.accent,
+  },
   thumbnailFrame: {
     width: 40,
     height: 40,

@@ -9,7 +9,6 @@ import type { Exercise } from '@/db/schema';
 import { useDebouncedPush } from '@/hooks/use-debounced-push';
 import { useExercises } from '@/hooks/use-exercises';
 import { useKeyboardInset } from '@/hooks/use-keyboard-inset';
-import { useSessionExercises } from '@/hooks/use-workout-session';
 import { CATEGORY_ALL } from '@/lib/exercises/constants';
 import { filterExercises } from '@/lib/exercises/filter';
 import { addExercisesToSession } from '@/lib/workout/session';
@@ -24,7 +23,6 @@ export default function ExercisePickerScreen() {
   const router = useRouter();
   const pushDebounced = useDebouncedPush();
   const { exercises } = useExercises();
-  const sessionExercises = useSessionExercises(sessionId);
 
   const [search, setSearch] = useState('');
   const [activeCategory, setActiveCategory] = useState<string>(CATEGORY_ALL);
@@ -41,16 +39,11 @@ export default function ExercisePickerScreen() {
     }, []),
   );
 
-  // 既にセッションへ追加済みの種目は選び直せないよう候補から除く（二重追加防止）
-  const addedIds = useMemo(() => new Set(sessionExercises.map((e) => e.id)), [sessionExercises]);
-  const selectable = useMemo(
-    () => exercises.filter((e) => !addedIds.has(e.id)),
-    [exercises, addedIds],
-  );
-
+  // 同じ種目をセッション内に複数回追加できるため（ウォームアップ→本セットを別カードで記録する等）、
+  // 既に追加済みの種目でも候補から除外しない
   const filtered = useMemo(
-    () => filterExercises(selectable, activeCategory, search),
-    [selectable, activeCategory, search],
+    () => filterExercises(exercises, activeCategory, search),
+    [exercises, activeCategory, search],
   );
 
   const handleToggle = useCallback((id: number) => {
