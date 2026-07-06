@@ -126,25 +126,27 @@ export const SessionExerciseCard = memo(function SessionExerciseCard({
           </Text>
           <CategoryChip category={exercise.category} />
         </View>
-        {!expanded && (
-          <View style={styles.collapsedSummary}>
-            <Text style={styles.collapsedSummaryText}>{sets.length}セット</Text>
-            <IconSymbol
-              name="chevron.right"
-              size={16}
-              color={Colors.textPlaceholder}
-              style={styles.collapsedChevron}
-            />
-          </View>
-        )}
-        <TouchableOpacity
-          onPress={handlePressInfo}
-          hitSlop={{ top: 14, bottom: 14, left: 14, right: 14 }}
-          accessibilityRole="button"
-          accessibilityLabel={`${exercise.name}の詳細を見る`}
-        >
-          <IconSymbol name="info.circle" size={20} color={Colors.textPlaceholder} />
-        </TouchableOpacity>
+        <View style={styles.trailing}>
+          <TouchableOpacity
+            onPress={handlePressInfo}
+            hitSlop={{ top: 14, bottom: 14, left: 14, right: 14 }}
+            accessibilityRole="button"
+            accessibilityLabel={`${exercise.name}の詳細を見る`}
+          >
+            <IconSymbol name="info.circle" size={20} color={Colors.textPlaceholder} />
+          </TouchableOpacity>
+          {!expanded && (
+            <View style={styles.collapsedSummary}>
+              <Text style={styles.collapsedSummaryText}>{sets.length}セット</Text>
+              <IconSymbol
+                name="chevron.right"
+                size={14}
+                color={Colors.textPlaceholder}
+                style={styles.collapsedChevron}
+              />
+            </View>
+          )}
+        </View>
       </TouchableOpacity>
 
       {/* 折りたたみ時もアンマウントせずdisplay:noneで隠す。SetRowはローカルstateに未保存の入力値を
@@ -226,8 +228,10 @@ const styles = StyleSheet.create({
     borderBottomColor: Colors.border,
   },
   headerCollapsed: { borderBottomWidth: 0 },
-  // marginRightはⓘボタンのhitSlop(14pt)分の当たり判定と視覚的に重ならないようにするための余白
-  collapsedSummary: { flexDirection: 'row', alignItems: 'center', gap: 4, marginRight: 10 },
+  // 「Nセットのサマリー」と「ⓘボタン」を1つのグループにまとめ、gapで一定の余白を確保する。
+  // header全体のgap(10)だけに頼ると、ⓘのhitSlop(14pt)と視覚的に密集して見えるため
+  trailing: { flexDirection: 'row', alignItems: 'center', gap: 14 },
+  collapsedSummary: { flexDirection: 'row', alignItems: 'center', gap: 4 },
   collapsedSummaryText: { fontSize: 12.5, fontWeight: '600', color: Colors.textPlaceholder },
   collapsedChevron: { transform: [{ rotate: '90deg' }] },
   thumbnail: {
