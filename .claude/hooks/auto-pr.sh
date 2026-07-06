@@ -1,8 +1,12 @@
 #!/bin/bash
-# Stop hook: 作業ブランチ(main以外)にmainより先のコミットがあり、
+# Stop hook: 作業ブランチ(main以外)がmainと内容差分を持ち、
 # 作業ツリーがクリーンなら push し、そのブランチのPRがまだ無ければ作成する。
 # 既にPRがあれば push だけで内容は自動的に更新される（gh pr create は呼ばない）。
 # コミット自体はこのフックでは行わない（コミットメッセージの判断はClaude側の責務のため）。
+#
+# 差分判定はコミット祖先(git rev-list main..branch)ではなく内容diffで行う。
+# squash mergeされたブランチはmainの祖先にならず「ahead」判定が誤検知するため
+# （元PRがclose済みで見つからず、フォールバックが重複PRを作成してしまう）。
 set -o pipefail
 
 branch=$(git rev-parse --abbrev-ref HEAD 2>/dev/null)
@@ -11,8 +15,13 @@ if [ "$branch" = "main" ] || [ -z "$branch" ]; then
   exit 0
 fi
 
-ahead=$(git rev-list --count main.."$branch" 2>/dev/null || echo 0)
-if [ "$ahead" -eq 0 ]; then
+git fetch origin main --quiet 2>/dev/null
+
+if ! git rev-parse --verify origin/main >/dev/null 2>&1; then
+  exit 0
+fi
+
+if git diff --quiet origin/main "$branch" -- 2>/dev/null; then
   exit 0
 fi
 
