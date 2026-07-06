@@ -2,6 +2,10 @@
 -- 必要なため、新テーブルへ既存データをコピーしながら (session_id, exercise_id) の一致で
 -- workout_session_exercise_id をバックフィルする。旧仕様では同一セッション内で種目が重複しない
 -- 前提だったため、この一致は一意に定まる。
+-- 注意: 対応するworkout_session_exercises行が1件も無い「孤児」setsが存在すると、
+-- サブクエリがNULLを返しNOT NULL制約違反でこのマイグレーション自体が失敗する
+-- （＝アプリが起動不能になる）。addSetは常にsessionExerciseId経由でwse行作成後にのみ
+-- setsを作るため、実運用でこの状態のデータが作られることはない。
 CREATE TABLE `__new_sets` (
 	`id` integer PRIMARY KEY AUTOINCREMENT NOT NULL,
 	`session_id` integer NOT NULL,

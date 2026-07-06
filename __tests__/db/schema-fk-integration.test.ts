@@ -161,44 +161,90 @@ describe('recording feature M1 スキーマ - 実SQLite上でのFK挙動', () =>
     for (const file of upToPrevious) applyMigration(db, file);
 
     const now = Date.now();
-    db.prepare(
+    const insertExercise = db.prepare(
       `INSERT INTO exercises (name, category, source, measurement_type, created_at, updated_at)
-       VALUES ('自作種目', 'core', 'custom', 'weight_reps', ?, ?)`,
-    ).run(now, now);
-    const exerciseId = (db.prepare('SELECT id FROM exercises').get() as { id: number }).id;
+       VALUES (?, 'core', 'custom', 'weight_reps', ?, ?)`,
+    );
+    insertExercise.run('種目A', now, now);
+    insertExercise.run('種目B', now, now);
+    const exercises = db.prepare('SELECT id, name FROM exercises ORDER BY id').all() as {
+      id: number;
+      name: string;
+    }[];
+    const exerciseAId = exercises[0].id;
+    const exerciseBId = exercises[1].id;
 
-    db.prepare(
+    const insertSession = db.prepare(
       `INSERT INTO workout_sessions (started_at, created_at, updated_at) VALUES (?, ?, ?)`,
-    ).run(now, now, now);
-    const sessionId = (db.prepare('SELECT id FROM workout_sessions').get() as { id: number }).id;
+    );
+    insertSession.run(now, now, now);
+    insertSession.run(now, now, now);
+    const sessions = db.prepare('SELECT id FROM workout_sessions ORDER BY id').all() as {
+      id: number;
+    }[];
+    const session1Id = sessions[0].id;
+    const session2Id = sessions[1].id;
 
-    db.prepare(
+    // session1には種目A・種目Bの2枚のカード、session2には種目Aのカードのみを作る。
+    // 「同じexercise_idでもセッションが違えば別カード」「同じセッション内でも種目が違えば別カード」の
+    // 両方を混在させ、(session_id, exercise_id)のAND条件が正しく効くことを検証する
+    const insertWse = db.prepare(
       `INSERT INTO workout_session_exercises (session_id, exercise_id, order_index, created_at)
-       VALUES (?, ?, 0, ?)`,
-    ).run(sessionId, exerciseId, now);
-    const workoutSessionExerciseId = (
-      db.prepare('SELECT id FROM workout_session_exercises').get() as { id: number }
-    ).id;
+       VALUES (?, ?, ?, ?)`,
+    );
+    insertWse.run(session1Id, exerciseAId, 0, now);
+    insertWse.run(session1Id, exerciseBId, 1, now);
+    insertWse.run(session2Id, exerciseAId, 0, now);
+    const wseRows = db
+      .prepare(
+        'SELECT id, session_id, exercise_id FROM workout_session_exercises ORDER BY id',
+      )
+      .all() as { id: number; session_id: number; exercise_id: number }[];
+    const wseSession1ExerciseA = wseRows[0].id;
+    const wseSession1ExerciseB = wseRows[1].id;
+    const wseSession2ExerciseA = wseRows[2].id;
 
-    // 0011時点のsetsにはworkout_session_exercise_idカラムが無いので、旧カラム構成のまま2件挿入する
+    // 0011時点のsetsにはworkout_session_exercise_idカラムが無いので、旧カラム構成のまま挿入する
     const insertLegacySet = db.prepare(
       `INSERT INTO sets (session_id, exercise_id, set_number, weight, reps, created_at)
        VALUES (?, ?, ?, ?, ?, ?)`,
     );
-    insertLegacySet.run(sessionId, exerciseId, 1, 20, 10, now);
-    insertLegacySet.run(sessionId, exerciseId, 2, 22.5, 8, now);
+    insertLegacySet.run(session1Id, exerciseAId, 1, 20, 10, now); // → wseSession1ExerciseA
+    insertLegacySet.run(session1Id, exerciseAId, 2, 22.5, 8, now); // → wseSession1ExerciseA
+    insertLegacySet.run(session1Id, exerciseBId, 1, 0, 12, now); // → wseSession1ExerciseB (exercise_idで区別できるか)
+    insertLegacySet.run(session2Id, exerciseAId, 1, 30, 5, now); // → wseSession2ExerciseA (session_idで区別できるか)
 
     // ここで0012を適用し、バックフィルが正しく効くか確認する
     applyMigration(db, migration0012);
 
     const rows = db
       .prepare(
-        'SELECT set_number, workout_session_exercise_id FROM sets ORDER BY set_number',
+        `SELECT session_id, exercise_id, set_number, workout_session_exercise_id
+         FROM sets ORDER BY session_id, exercise_id, set_number`,
       )
-      .all() as { set_number: number; workout_session_exercise_id: number }[];
+      .all() as {
+      session_id: number;
+      exercise_id: number;
+      set_number: number;
+      workout_session_exercise_id: number;
+    }[];
 
-    expect(rows).toHaveLength(2);
-    expect(rows[0].workout_session_exercise_id).toBe(workoutSessionExerciseId);
-    expect(rows[1].workout_session_exercise_id).toBe(workoutSessionExerciseId);
+    expect(rows).toHaveLength(4);
+    const session1ExerciseASets = rows.filter(
+      (r) => r.session_id === session1Id && r.exercise_id === exerciseAId,
+    );
+    const session1ExerciseBSets = rows.filter(
+      (r) => r.session_id === session1Id && r.exercise_id === exerciseBId,
+    );
+    const session2ExerciseASets = rows.filter(
+      (r) => r.session_id === session2Id && r.exercise_id === exerciseAId,
+    );
+
+    expect(session1ExerciseASets).toHaveLength(2);
+    expect(session1ExerciseASets.every((r) => r.workout_session_exercise_id === wseSession1ExerciseA)).toBe(true);
+    expect(session1ExerciseBSets).toHaveLength(1);
+    expect(session1ExerciseBSets[0].workout_session_exercise_id).toBe(wseSession1ExerciseB);
+    expect(session2ExerciseASets).toHaveLength(1);
+    expect(session2ExerciseASets[0].workout_session_exercise_id).toBe(wseSession2ExerciseA);
   });
 });
