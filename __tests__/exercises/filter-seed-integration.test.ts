@@ -16,7 +16,6 @@ function toExercise(preset: (typeof PRESET_EXERCISES)[number], id: number): Exer
     category: preset.category,
     favorite: false,
     note: null,
-    muscle: null,
     formPoints: null,
     source: 'preset',
     measurementType: preset.measurementType,

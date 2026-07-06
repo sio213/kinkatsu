@@ -22,6 +22,21 @@ export function formatDurationDisplay(seconds: number | null | undefined): strin
   return `${m}:${String(s).padStart(2, '0')}`;
 }
 
+// formatDurationDisplay由来の"mm:ss"文字列を、分・秒を別々の数値入力欄に分けて
+// 表示するためのペアに分解する（set-row.tsxのDurationInputが使う）
+export function splitDurationDisplay(value: string): { min: string; sec: string } {
+  const match = value.trim().match(/^(\d+):(\d{1,2})$/);
+  if (!match) return { min: '', sec: '' };
+  return { min: match[1], sec: match[2] };
+}
+
+// splitDurationDisplayの逆変換。分・秒どちらか一方が空欄でも、parseDurationInputが
+// パースできる"mm:ss"形式に補完する（空欄は0扱い。両方空欄なら空文字＝未入力のまま）
+export function combineDurationDisplay(min: string, sec: string): string {
+  if (min === '' && sec === '') return '';
+  return `${min || '0'}:${sec || '0'}`;
+}
+
 // 距離はUIではkm、DB(distanceMeters)ではmで保持する。負の距離は物理的にありえないため拒否する
 export function parseDistanceKmInput(text: string): number | null {
   const trimmed = text.trim();
@@ -105,3 +120,44 @@ export const MEASUREMENT_COLUMNS: Record<MeasurementType, SetColumn[]> = {
   distance_time: [DISTANCE_COLUMN, DURATION_COLUMN_SHORT],
   weight_time: [WEIGHT_COLUMN, DURATION_COLUMN_SHORT],
 };
+
+// 列定義に沿って、DB値（weight/reps等）をセル表示用の文字列に変換する。
+// Object.fromEntriesは配列の要素型からタプルを推論できず戻り値がanyになるため、
+// reduceで組み立てて戻り値の型注釈が実際に効くようにする
+export function toDisplayValues(
+  columns: SetColumn[],
+  values: Partial<Record<SetFieldKey, number | null | undefined>>,
+): Partial<Record<SetFieldKey, string>> {
+  return columns.reduce<Partial<Record<SetFieldKey, string>>>((acc, c) => {
+    acc[c.key] = c.toDisplay(values[c.key]);
+    return acc;
+  }, {});
+}
+
+// 列定義に沿って、セル表示用の文字列をDB保存用の値にパースする。
+// 空欄・不正な入力は共にnullになる（呼び出し側で不正入力を検知したい場合は
+// 各列のfromDisplayを直接使って個別に判定すること。set-row.tsxの✓保存時が該当）。
+// fallbackを指定しないparseColumnsWithFallbackの薄いラッパー
+export function parseColumns(
+  columns: SetColumn[],
+  display: Partial<Record<SetFieldKey, string>>,
+): Partial<Record<SetFieldKey, number | null>> {
+  return parseColumnsWithFallback(columns, display, {});
+}
+
+// parseColumnsと同様だが、パースに失敗した非空入力（例:"60kg"のような不正な貼り付け、
+// "82.5"を打つ途中の"82."のような一瞬だけ不正な状態）はnullにせずfallback（通常はDB上の
+// 既存値）を使う。「セット追加」時の入力途中値コピーや自動保存で、タイプミス・入力途中の
+// 一瞬によって値が黙って消えるのを防ぐためのもの。空欄は従来通りnullになる
+export function parseColumnsWithFallback(
+  columns: SetColumn[],
+  display: Partial<Record<SetFieldKey, string>>,
+  fallback: Partial<Record<SetFieldKey, number | null | undefined>>,
+): Partial<Record<SetFieldKey, number | null>> {
+  return columns.reduce<Partial<Record<SetFieldKey, number | null>>>((acc, c) => {
+    const text = (display[c.key] ?? '').trim();
+    const parsed = c.fromDisplay(text);
+    acc[c.key] = parsed == null && text !== '' ? (fallback[c.key] ?? null) : parsed;
+    return acc;
+  }, {});
+}
