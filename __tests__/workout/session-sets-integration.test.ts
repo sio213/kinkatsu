@@ -38,6 +38,40 @@ function seedExerciseAndSession(db: Database.Database) {
   return { exerciseId, sessionId, now };
 }
 
+// lib/workout/sets.ts の addSet() が実際に発行するSQLをそのまま再現したもの。
+// db/client.ts(expo-sqlite)依存でaddSet自体はjestから呼べないため、ロジックを直接ミラーして
+// 実SQLite上での「直前セットの値コピー」「workoutSessionExerciseIdによるスコープ」を検証する
+function addSetSql(
+  db: Database.Database,
+  sessionId: number,
+  exerciseId: number,
+  workoutSessionExerciseId: number,
+) {
+  const last = db
+    .prepare(
+      `SELECT set_number, weight, reps, duration_seconds, distance_meters
+       FROM sets WHERE workout_session_exercise_id = ? ORDER BY set_number DESC LIMIT 1`,
+    )
+    .get(workoutSessionExerciseId) as
+    | { set_number: number; weight: number | null; reps: number | null; duration_seconds: number | null; distance_meters: number | null }
+    | undefined;
+  const nextNumber = (last?.set_number ?? 0) + 1;
+  db.prepare(
+    `INSERT INTO sets (session_id, exercise_id, workout_session_exercise_id, set_number, weight, reps, duration_seconds, distance_meters, completed_at, created_at)
+     VALUES (?, ?, ?, ?, ?, ?, ?, ?, NULL, ?)`,
+  ).run(
+    sessionId,
+    exerciseId,
+    workoutSessionExerciseId,
+    nextNumber,
+    last?.weight ?? null,
+    last?.reps ?? null,
+    last?.duration_seconds ?? null,
+    last?.distance_meters ?? null,
+    Date.now(),
+  );
+}
+
 describe('種目追加時の自動セット生成 と addSet の整合性（実SQLite）', () => {
   let db: Database.Database;
 
@@ -120,5 +154,72 @@ describe('種目追加時の自動セット生成 と addSet の整合性（実S
         .get(sessionId) as { c: number }
     ).c;
     expect(wseCount).toBe(0);
+  });
+
+  it('addSet相当のSQLは直前セット（setNumber最大）の重量・回数をそのままコピーする', () => {
+    db = new Database(':memory:');
+    db.pragma('foreign_keys = ON');
+    applyAllMigrations(db);
+    const { exerciseId, sessionId, now } = seedExerciseAndSession(db);
+
+    db.prepare(
+      `INSERT INTO workout_session_exercises (session_id, exercise_id, order_index, created_at)
+       VALUES (?, ?, 0, ?)`,
+    ).run(sessionId, exerciseId, now);
+    const wseId = (
+      db.prepare('SELECT id FROM workout_session_exercises').get() as { id: number }
+    ).id;
+    db.prepare(
+      `INSERT INTO sets (session_id, exercise_id, workout_session_exercise_id, set_number, weight, reps, completed_at, created_at)
+       VALUES (?, ?, ?, 1, 62.5, 8, ?, ?)`,
+    ).run(sessionId, exerciseId, wseId, now, now);
+
+    addSetSql(db, sessionId, exerciseId, wseId);
+
+    const rows = db
+      .prepare(
+        'SELECT set_number, weight, reps FROM sets WHERE workout_session_exercise_id = ? ORDER BY set_number',
+      )
+      .all(wseId) as { set_number: number; weight: number; reps: number }[];
+    expect(rows).toEqual([
+      { set_number: 1, weight: 62.5, reps: 8 },
+      { set_number: 2, weight: 62.5, reps: 8 },
+    ]);
+  });
+
+  it('同一セッション内で同じ種目を2枚カード化した場合、addSet相当のSQLは自カードの直前セットのみコピーする', () => {
+    db = new Database(':memory:');
+    db.pragma('foreign_keys = ON');
+    applyAllMigrations(db);
+    const { exerciseId, sessionId, now } = seedExerciseAndSession(db);
+
+    // 同じexercise_idで2枚のカード(wse)を作る（ウォームアップ→本セットのような構成）
+    db.prepare(
+      `INSERT INTO workout_session_exercises (session_id, exercise_id, order_index, created_at)
+       VALUES (?, ?, 0, ?)`,
+    ).run(sessionId, exerciseId, now);
+    db.prepare(
+      `INSERT INTO workout_session_exercises (session_id, exercise_id, order_index, created_at)
+       VALUES (?, ?, 1, ?)`,
+    ).run(sessionId, exerciseId, now);
+    const wseRows = db
+      .prepare('SELECT id FROM workout_session_exercises ORDER BY id')
+      .all() as { id: number }[];
+    const wseA = wseRows[0].id;
+    const wseB = wseRows[1].id;
+
+    // カードAには値ありのセットを入れておく
+    db.prepare(
+      `INSERT INTO sets (session_id, exercise_id, workout_session_exercise_id, set_number, weight, reps, completed_at, created_at)
+       VALUES (?, ?, ?, 1, 100, 5, ?, ?)`,
+    ).run(sessionId, exerciseId, wseA, now, now);
+
+    // カードBはまだセットが無い状態でaddSet相当を呼ぶ。カードAの値(100/5)を拾ってはいけない
+    addSetSql(db, sessionId, exerciseId, wseB);
+
+    const wseBSet = db
+      .prepare('SELECT set_number, weight, reps FROM sets WHERE workout_session_exercise_id = ?')
+      .get(wseB) as { set_number: number; weight: number | null; reps: number | null };
+    expect(wseBSet).toEqual({ set_number: 1, weight: null, reps: null });
   });
 });
