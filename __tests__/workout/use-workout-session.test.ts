@@ -20,9 +20,20 @@ jest.mock('@/db/client', () => {
 
 jest.mock('@/db/schema', () => ({
   workoutSessions: { id: 'id', startedAt: 'startedAt', endedAt: 'endedAt' },
-  sets: { sessionId: 'sessionId', weight: 'weight', reps: 'reps' },
+  sets: {
+    sessionId: 'sessionId',
+    weight: 'weight',
+    reps: 'reps',
+    workoutSessionExerciseId: 'workoutSessionExerciseId',
+    setNumber: 'setNumber',
+  },
   exercises: { id: 'id' },
-  workoutSessionExercises: { sessionId: 'sessionId', exerciseId: 'exerciseId', orderIndex: 'orderIndex' },
+  workoutSessionExercises: {
+    id: 'id',
+    sessionId: 'sessionId',
+    exerciseId: 'exerciseId',
+    orderIndex: 'orderIndex',
+  },
 }));
 
 jest.mock('drizzle-orm', () => ({
@@ -44,6 +55,7 @@ import { act, create } from 'react-test-renderer';
 import {
   useSessionExercises,
   useSessionSetCount,
+  useSessionSets,
   useSessionStats,
   useWorkoutSession,
   useWorkoutSessions,
@@ -181,5 +193,52 @@ describe('useSessionExercises', () => {
     ];
     mockLiveQueryQueue = [{ data: rows }];
     expect(mount()).toEqual(rows);
+  });
+});
+
+describe('useSessionSets', () => {
+  const mount = makeHarness(() => useSessionSets(1));
+
+  it('dataがundefinedのとき空のMapを返す', () => {
+    mockLiveQueryQueue = [{ data: undefined }];
+    const result = mount();
+    expect(result.size).toBe(0);
+  });
+
+  it('workoutSessionExerciseId（カード単位）ごとにグルーピングする', () => {
+    // 同じ種目(exerciseId:10)を2枚のカードとして追加した場合でも、
+    // workoutSessionExerciseIdが違えばセットは混ざらない
+    const setA1 = { id: 1, exerciseId: 10, workoutSessionExerciseId: 100, setNumber: 1 };
+    const setA2 = { id: 2, exerciseId: 10, workoutSessionExerciseId: 100, setNumber: 2 };
+    const setB1 = { id: 3, exerciseId: 10, workoutSessionExerciseId: 200, setNumber: 1 };
+    mockLiveQueryQueue = [{ data: [setA1, setA2, setB1] }];
+    const result = mount();
+    expect(result.get(100)).toEqual([setA1, setA2]);
+    expect(result.get(200)).toEqual([setB1]);
+    expect(result.get(300)).toBeUndefined();
+  });
+
+  it('liveQueryのdataの参照が変わらなければ、再レンダーしても同じMap参照を返す（SessionExerciseCardのmemoが毎秒の経過時間更新で無効化されないため）', () => {
+    const rows = [{ id: 1, exerciseId: 10, workoutSessionExerciseId: 100, setNumber: 1 }];
+    const captured: Map<number, unknown>[] = [];
+    let triggerRerender!: () => void;
+
+    function Harness() {
+      const [, forceUpdate] = React.useReducer((c: number) => c + 1, 0);
+      triggerRerender = () => forceUpdate();
+      captured.push(useSessionSets(1));
+      return null;
+    }
+
+    mockLiveQueryQueue = [{ data: rows }, { data: rows }];
+    act(() => {
+      create(React.createElement(Harness));
+    });
+    act(() => {
+      triggerRerender();
+    });
+
+    expect(captured).toHaveLength(2);
+    expect(captured[0]).toBe(captured[1]);
   });
 });

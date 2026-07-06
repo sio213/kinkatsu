@@ -28,6 +28,7 @@ const MAPPING = {
   plus: 'add',
   'info.circle': 'info',
   checkmark: 'check',
+  xmark: 'close',
 } as IconMapping;
 
 /**
