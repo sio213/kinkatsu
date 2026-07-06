@@ -84,14 +84,17 @@ export const SessionExerciseCard = memo(function SessionExerciseCard({
     if (isMutatingRef.current) return;
     isMutatingRef.current = true;
     try {
+      const last = sets[sets.length - 1];
       await deleteLastSet(exercise.sessionExerciseId);
+      // 削除したセットのdraftは二度と参照されないため、Mapに積み上がらないよう掃除しておく
+      if (last) draftValuesRef.current.delete(last.id);
     } catch (e) {
       console.error('[delete set]', e);
       Alert.alert('エラー', 'セットを削除できませんでした。');
     } finally {
       isMutatingRef.current = false;
     }
-  }, [exercise.sessionExerciseId]);
+  }, [exercise.sessionExerciseId, sets]);
 
   const handleDeleteSet = useCallback(() => {
     const last = sets[sets.length - 1];

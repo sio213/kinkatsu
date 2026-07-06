@@ -40,7 +40,9 @@ function seedExerciseAndSession(db: Database.Database) {
 
 // lib/workout/sets.ts の addSet() が実際に発行するSQLをそのまま再現したもの。
 // db/client.ts(expo-sqlite)依存でaddSet自体はjestから呼べないため、ロジックを直接ミラーして
-// 実SQLite上での「直前セットの値コピー」「workoutSessionExerciseIdによるスコープ」を検証する
+// 実SQLite上での「直前セットの値コピー」「workoutSessionExerciseIdによるスコープ」を検証する。
+// 注意: addSet()のoverrideValues引数（✓未タップの入力途中値を使うパス）はここではミラーしていない。
+// addSet側のSQL/カラムを変更した場合はこのヘルパーも合わせて更新すること（自動追従はしない）
 function addSetSql(
   db: Database.Database,
   sessionId: number,

@@ -110,13 +110,16 @@ export const MEASUREMENT_COLUMNS: Record<MeasurementType, SetColumn[]> = {
 export function toDisplayValues(
   columns: SetColumn[],
   values: Partial<Record<SetFieldKey, number | null | undefined>>,
-): Record<string, string> {
+): Partial<Record<SetFieldKey, string>> {
   return Object.fromEntries(columns.map((c) => [c.key, c.toDisplay(values[c.key])]));
 }
 
 // 列定義に沿って、セル表示用の文字列をDB保存用の値にパースする。
 // 空欄・不正な入力は共にnullになる（呼び出し側で不正入力を検知したい場合は
 // 各列のfromDisplayを直接使って個別に判定すること。set-row.tsxの✓保存時が該当）
-export function parseColumns(columns: SetColumn[], display: Record<string, string>): Record<string, number | null> {
+export function parseColumns(
+  columns: SetColumn[],
+  display: Partial<Record<SetFieldKey, string>>,
+): Partial<Record<SetFieldKey, number | null>> {
   return Object.fromEntries(columns.map((c) => [c.key, c.fromDisplay(display[c.key] ?? '')]));
 }

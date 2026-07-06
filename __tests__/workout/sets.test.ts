@@ -190,6 +190,19 @@ describe('addSet', () => {
     expect(payload.distanceMeters).toBeNull();
   });
 
+  it('overrideValuesが空オブジェクト{}（全欄を空にした状態）の場合、DB上の直前セットへフォールバックせず全てnullにする', async () => {
+    mockSelectWhere.mockReturnValueOnce(
+      mockMakeSelectChain([{ setNumber: 1, weight: 999, reps: 999, durationSeconds: 999, distanceMeters: 999 }]),
+    );
+    await addSet(1, 10, 100, {});
+
+    const payload = mockInsertValues.mock.calls[0][0];
+    expect(payload.weight).toBeNull();
+    expect(payload.reps).toBeNull();
+    expect(payload.durationSeconds).toBeNull();
+    expect(payload.distanceMeters).toBeNull();
+  });
+
   it('overrideValuesが省略された場合はDB上の直前セットの値をコピーする（既定動作）', async () => {
     mockSelectWhere.mockReturnValueOnce(
       mockMakeSelectChain([{ setNumber: 1, weight: 62.5, reps: 8, durationSeconds: null, distanceMeters: null }]),
