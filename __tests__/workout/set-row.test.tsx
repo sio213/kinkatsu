@@ -64,6 +64,41 @@ test('入力するたびonDraftChangeにマージ後の値が渡る', () => {
   expect(onDraftChange).toHaveBeenLastCalledWith(3, { weight: '60', reps: '10' });
 });
 
+test('入力するたびonAutoSaveDraftにパース済みの値が渡り、✓未タップのまま画面を離れても消えないようにする', () => {
+  const onAutoSaveDraft = jest.fn();
+  const set = { id: 6, setNumber: 1, weight: null, reps: null, completedAt: null } as any;
+  const root = render({
+    set,
+    measurementType: 'weight_reps',
+    onSave: jest.fn(),
+    onReopen: jest.fn(),
+    onAutoSaveDraft,
+  });
+
+  const inputs = root.findAllByType(TextInput);
+  act(() => {
+    inputs[0].props.onChangeText('60');
+  });
+  expect(onAutoSaveDraft).toHaveBeenLastCalledWith(6, { weight: 60, reps: null });
+
+  act(() => {
+    inputs[1].props.onChangeText('10');
+  });
+  expect(onAutoSaveDraft).toHaveBeenLastCalledWith(6, { weight: 60, reps: 10 });
+});
+
+test('onAutoSaveDraftが指定されていなくてもクラッシュしない（optional prop）', () => {
+  const set = { id: 7, setNumber: 1, weight: null, reps: null, completedAt: null } as any;
+  const root = render({ set, measurementType: 'weight_reps', onSave: jest.fn(), onReopen: jest.fn() });
+
+  const inputs = root.findAllByType(TextInput);
+  expect(() => {
+    act(() => {
+      inputs[0].props.onChangeText('60');
+    });
+  }).not.toThrow();
+});
+
 test('同一レンダーサイクル内で複数フィールドを連続変更しても、onDraftChangeには両方の値がマージされて渡る（stale closure回帰防止）', () => {
   const onDraftChange = jest.fn();
   const set = { id: 4, setNumber: 1, weight: null, reps: null, completedAt: null } as any;

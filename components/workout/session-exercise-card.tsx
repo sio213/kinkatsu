@@ -7,7 +7,7 @@ import type { SessionExercise } from '@/hooks/use-workout-session';
 import { MEASUREMENT_TYPES, type MeasurementType } from '@/lib/exercises/constants';
 import { getExerciseImages } from '@/lib/exercises/images';
 import { MEASUREMENT_COLUMNS, parseColumnsWithFallback } from '@/lib/workout/set-format';
-import { addSet, deleteLastSet, reopenSet, saveSet, type SetValues } from '@/lib/workout/sets';
+import { addSet, deleteLastSet, reopenSet, saveDraft, saveSet, type SetValues } from '@/lib/workout/sets';
 import { Image } from 'expo-image';
 import { memo, useCallback, useRef } from 'react';
 import { Alert, LayoutAnimation, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
@@ -45,6 +45,17 @@ export const SessionExerciseCard = memo(function SessionExerciseCard({
 
   const handleDraftChange = useCallback((setId: number, values: Record<string, string>) => {
     draftValuesRef.current.set(setId, values);
+  }, []);
+
+  // 1文字入力するたびに呼ばれるバックグラウンド保存。ここでAlertを出すと入力中に
+  // 何度もポップアップが出てしまうため、失敗時はログのみに留める（最終的な保存は
+  // ✓タップ時のhandleSaveSetがAlert付きで担保する）
+  const handleAutoSaveDraft = useCallback(async (setId: number, values: SetValues) => {
+    try {
+      await saveDraft(setId, values);
+    } catch (e) {
+      console.error('[auto save draft]', e);
+    }
   }, []);
 
   const handlePressInfo = useCallback(() => {
@@ -196,6 +207,7 @@ export const SessionExerciseCard = memo(function SessionExerciseCard({
             onSave={handleSaveSet}
             onReopen={handleReopenSet}
             onDraftChange={handleDraftChange}
+            onAutoSaveDraft={handleAutoSaveDraft}
           />
         ))}
 

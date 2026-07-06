@@ -71,6 +71,13 @@ export async function saveSet(setId: number, values: SetValues) {
     .where(eq(sets.id, setId));
 }
 
+// ✓未タップのまま入力中の値をcompletedAtは変えずに保存する。SetRowのローカルstateだけに
+// 値があると、画面を離れて戻った（アンマウント→再マウントされた）際に入力が消えてしまうため、
+// 1文字入力するたびにバックグラウンドで永続化しておく
+export async function saveDraft(setId: number, values: SetValues) {
+  await db.update(sets).set(values).where(eq(sets.id, setId));
+}
+
 // 完了済みセットを再度編集可能にする（✓の再タップ）。入力値はそのまま残す
 export async function reopenSet(setId: number) {
   await db.update(sets).set({ completedAt: null }).where(eq(sets.id, setId));

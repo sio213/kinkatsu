@@ -61,7 +61,7 @@ jest.mock('drizzle-orm', () => ({
   desc: jest.fn((col) => ({ col, dir: 'desc' })),
 }));
 
-import { addSet, deleteLastSet, reopenSet, saveSet } from '@/lib/workout/sets';
+import { addSet, deleteLastSet, reopenSet, saveDraft, saveSet } from '@/lib/workout/sets';
 
 beforeEach(() => {
   jest.clearAllMocks();
@@ -258,6 +258,22 @@ describe('saveSet', () => {
   it('updateが失敗した場合はエラーを握りつぶさずthrowする', async () => {
     mockUpdateWhere.mockRejectedValueOnce(new Error('db error'));
     await expect(saveSet(5, { weight: 60 })).rejects.toThrow('db error');
+  });
+});
+
+describe('saveDraft', () => {
+  it('completedAtには触れず入力値だけをupdateする', async () => {
+    await saveDraft(5, { weight: 60, reps: 10 });
+
+    const payload = mockUpdateSet.mock.calls[0][0];
+    expect(payload).toEqual({ weight: 60, reps: 10 });
+    expect(payload.completedAt).toBeUndefined();
+    expect(mockUpdateWhere).toHaveBeenCalledWith({ col: 'id', val: 5 });
+  });
+
+  it('updateが失敗した場合はエラーを握りつぶさずthrowする', async () => {
+    mockUpdateWhere.mockRejectedValueOnce(new Error('db error'));
+    await expect(saveDraft(5, { weight: 60 })).rejects.toThrow('db error');
   });
 });
 

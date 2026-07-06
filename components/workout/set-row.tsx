@@ -13,9 +13,11 @@ type Props = {
   measurementType: MeasurementType;
   onSave: (setId: number, values: SetValues) => Promise<void>;
   onReopen: (setId: number) => Promise<void>;
-  // ✓未タップのまま入力中の値を親に伝える。DBにはまだ保存されていないため、
+  // ✓未タップのまま入力中の値を親に伝える。DBの保存とは別に、
   // 「セット追加」時にこの入力途中の値もコピー対象にできるようにするためのもの
   onDraftChange?: (setId: number, values: Record<string, string>) => void;
+  // ✓未タップのまま画面を離れても入力が消えないよう、completedAtを変えずにDBへ保存する
+  onAutoSaveDraft?: (setId: number, values: SetValues) => Promise<void>;
 };
 
 export const SetRow = memo(function SetRow({
@@ -25,6 +27,7 @@ export const SetRow = memo(function SetRow({
   onSave,
   onReopen,
   onDraftChange,
+  onAutoSaveDraft,
 }: Props) {
   const columns = MEASUREMENT_COLUMNS[measurementType];
   const done = set.completedAt != null;
@@ -40,6 +43,10 @@ export const SetRow = memo(function SetRow({
     valuesRef.current = next;
     setValues(next);
     onDraftChange?.(set.id, next);
+    // 1文字ごとにバックグラウンドで永続化する。ローカルSQLiteへの1行updateなので
+    // デバウンス無しでも十分軽く、タイマーを挟むとアンマウント直前の最後の入力を
+    // 保存し損ねる可能性があるため、あえて即時に呼ぶ
+    onAutoSaveDraft?.(set.id, parseColumns(columns, next));
   };
 
   const handleTogglePress = async () => {
