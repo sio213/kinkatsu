@@ -1,29 +1,17 @@
 import { db } from '@/db/client';
 import { sets } from '@/db/schema';
+import type { SetFieldKey } from '@/lib/workout/set-format';
 import { desc, eq } from 'drizzle-orm';
 
-export type SetValues = {
-  weight?: number | null;
-  reps?: number | null;
-  durationSeconds?: number | null;
-  distanceMeters?: number | null;
-};
+export type SetValues = Partial<Record<SetFieldKey, number | null>>;
 
-// 種目カードの「セット追加」。setNumberは既存件数の続きから振る（並び順を保持するため）。
-// sessionExerciseId（workoutSessionExercises行のid）単位でスコープする。同じ種目を
-// セッション内に複数回追加した場合でも、カードごとに別々にセットが積み上がる。
-// 直前のセット（setNumber最大の行）の重量・回数・時間・距離をそのままコピーする。
-// 同じ重量で複数セット組むことが多いため、毎回入力し直さずに済むようにする配慮。
-// completedAtはコピーしない（新しいセットは常に未確定から始まる）
-//
-// overrideValuesは、直前セットがまだ✓未タップ（completedAt: null）で、画面上には値が
-// 入力されているがDBにはまだ保存されていない場合に使う。呼び出し側(SessionExerciseCard)が
-// SetRowの入力途中の値を渡すことで、確定前の入力でもコピー対象にできる。省略時はDB上の
-// 直前セット行（＝確定済みの値）をそのままコピーする
-// 直前セット行の取得とinsertをトランザクションでまとめている。ただしこのアプリはローカル単一クライアントで
-// UI側にも連打防止ガード（isMutatingRef）があるため、真の同時実行下でのレース防止まではしていない
-// sessionId/exerciseIdはsessionExerciseIdから引ければ本来不要だが、呼び出し側(SessionExercise)が
-// 両方持っているため素直に受け取っている。3つの整合性は呼び出し側の責任
+// 種目カードの「セット追加」。setNumberは既存件数の続きから振り、直前セットの重量・回数・
+// 時間・距離をコピーする（同じ重量で複数セット組むことが多いため）。overrideValuesを渡すと、
+// DB上の直前セット行の代わりにそちらをコピー元にする（✓未タップの入力途中の値をコピーしたい場合用。
+// 呼び出し側のSessionExerciseCard参照）。
+// sessionId/exerciseIdはsessionExerciseIdから引ければ本来不要だが、呼び出し側が両方持っているため
+// 素直に受け取っている（3つの整合性は呼び出し側の責任）。取得とinsertはトランザクションでまとめているが、
+// ローカル単一クライアント+UI側の連打防止ガードが前提で、真の同時実行下でのレース防止はしていない
 export async function addSet(
   sessionId: number,
   exerciseId: number,

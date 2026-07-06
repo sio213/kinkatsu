@@ -328,6 +328,55 @@ test('削除確認をキャンセルするとdeleteLastSetは呼ばれない', a
   expect(mockDeleteLastSet).not.toHaveBeenCalled();
 });
 
+test('セット削除後に別idの新しいセットが同じ位置に来ても、削除済みセットの古いdraftは使われない', async () => {
+  const initialSets = [{ id: 9, setNumber: 1, weight: null, reps: null, completedAt: null }] as any;
+  let instance!: ReturnType<typeof create>;
+  act(() => {
+    instance = create(
+      <SessionExerciseCard
+        exercise={exercise}
+        sessionId={1}
+        sets={initialSets}
+        collapsed={false}
+        onToggleCollapsed={mockOnToggleCollapsed}
+      />,
+    );
+  });
+  const root = instance.root;
+
+  const inputs = root.findAllByType(TextInput);
+  act(() => {
+    inputs[0].props.onChangeText('999');
+  });
+
+  const deleteBtn = findButtonByLabel(root, 'セット削除')!;
+  await act(async () => {
+    deleteBtn.props.onPress();
+  });
+  expect(mockDeleteLastSet).toHaveBeenCalledWith(500);
+
+  // 削除後、別id(20)の新しいセットが同じ位置に来た状態を再現（idは使い回されない前提）
+  const newSets = [{ id: 20, setNumber: 1, weight: null, reps: null, completedAt: null }] as any;
+  act(() => {
+    instance.update(
+      <SessionExerciseCard
+        exercise={exercise}
+        sessionId={1}
+        sets={newSets}
+        collapsed={false}
+        onToggleCollapsed={mockOnToggleCollapsed}
+      />,
+    );
+  });
+
+  const addBtn = findButtonByLabel(root, 'セット追加')!;
+  await act(async () => {
+    addBtn.props.onPress();
+  });
+  // 旧id(9)の"999"が誤って使われず、addSet側の既定コピーに委ねられる（overrideValues省略）
+  expect(mockAddSet).toHaveBeenCalledWith(1, 10, 500, undefined);
+});
+
 test('セット追加が失敗した場合はエラーAlertを表示する', async () => {
   mockAddSet.mockRejectedValueOnce(new Error('fail'));
   jest.spyOn(console, 'error').mockImplementation(() => {});

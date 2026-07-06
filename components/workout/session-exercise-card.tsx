@@ -115,6 +115,8 @@ export const SessionExerciseCard = memo(function SessionExerciseCard({
   const handleSaveSet = useCallback(async (setId: number, values: SetValues) => {
     try {
       await saveSet(setId, values);
+      // 確定後はhandleAddSetがこのセットのdraftを参照しなくなるため、Mapに積み上がらないよう掃除する
+      draftValuesRef.current.delete(setId);
     } catch (e) {
       console.error('[save set]', e);
       Alert.alert('エラー', 'セットを保存できませんでした。');
