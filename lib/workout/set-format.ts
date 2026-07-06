@@ -22,6 +22,21 @@ export function formatDurationDisplay(seconds: number | null | undefined): strin
   return `${m}:${String(s).padStart(2, '0')}`;
 }
 
+// formatDurationDisplay由来の"mm:ss"文字列を、分・秒を別々の数値入力欄に分けて
+// 表示するためのペアに分解する（set-row.tsxのDurationInputが使う）
+export function splitDurationDisplay(value: string): { min: string; sec: string } {
+  const match = value.trim().match(/^(\d+):(\d{1,2})$/);
+  if (!match) return { min: '', sec: '' };
+  return { min: match[1], sec: match[2] };
+}
+
+// splitDurationDisplayの逆変換。分・秒どちらか一方が空欄でも、parseDurationInputが
+// パースできる"mm:ss"形式に補完する（空欄は0扱い。両方空欄なら空文字＝未入力のまま）
+export function combineDurationDisplay(min: string, sec: string): string {
+  if (min === '' && sec === '') return '';
+  return `${min || '0'}:${sec || '0'}`;
+}
+
 // 距離はUIではkm、DB(distanceMeters)ではmで保持する。負の距離は物理的にありえないため拒否する
 export function parseDistanceKmInput(text: string): number | null {
   const trimmed = text.trim();

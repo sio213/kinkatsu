@@ -2,10 +2,95 @@ import { IconSymbol } from '@/components/ui/icon-symbol';
 import { Colors } from '@/constants/theme';
 import type { Set } from '@/db/schema';
 import type { MeasurementType } from '@/lib/exercises/constants';
-import { MEASUREMENT_COLUMNS, parseColumns, parseColumnsWithFallback, toDisplayValues } from '@/lib/workout/set-format';
+import {
+  combineDurationDisplay,
+  MEASUREMENT_COLUMNS,
+  parseColumns,
+  parseColumnsWithFallback,
+  splitDurationDisplay,
+  toDisplayValues,
+} from '@/lib/workout/set-format';
 import type { SetValues } from '@/lib/workout/sets';
 import { memo, useEffect, useRef, useState } from 'react';
 import { Alert, Keyboard, StyleSheet, Text, TextInput, TouchableOpacity, View } from 'react-native';
+
+type DurationInputProps = {
+  initialValue: string;
+  onChange: (combined: string) => void;
+  exerciseName: string;
+  setNumber: number;
+};
+
+// 分・秒を数値専用キーボードの別入力として扱い、任意の文字が打てないようにする。
+// 秒は入力時点で60以上になる変更を無視することで、そもそも不正な状態に到達させない。
+// ラベルは列のlabel（time型は「時間(分:秒)」）をそのまま使うと"時間(分:秒) 分"のように
+// 読み上げが重複するため、計測タイプによらず固定の「時間」を基準にする
+function DurationInput({ initialValue, onChange, exerciseName, setNumber }: DurationInputProps) {
+  const initial = splitDurationDisplay(initialValue);
+  const [min, setMin] = useState(initial.min);
+  const [sec, setSec] = useState(initial.sec);
+  // 同一レンダーサイクル内で分→秒と連続してonChangeTextが呼ばれても、setStateはバッチ処理され
+  // 直後のハンドラからはまだ更新前の値しか見えない（stale closure）。setStateの外で同期的に
+  // 更新する鏡を経由することで、常に最新の値を基準にonChangeへ渡す（set-row.tsx側のvaluesRefと同じ対策）
+  const minRef = useRef(min);
+  const secRef = useRef(sec);
+  const secInputRef = useRef<TextInput>(null);
+
+  const handleMinChange = (text: string) => {
+    const digits = text.replace(/\D/g, '').slice(0, 3);
+    minRef.current = digits;
+    setMin(digits);
+    onChange(combineDurationDisplay(digits, secRef.current));
+    // 分を2桁打った時点で秒欄へ自動遷移する（3桁以上の分は稀なため、必要なら手動で分欄をタップし直す）
+    if (digits.length >= 2) secInputRef.current?.focus();
+  };
+
+  const handleSecChange = (text: string) => {
+    const digits = text.replace(/\D/g, '').slice(0, 2);
+    if (digits !== '' && Number(digits) > 59) return;
+    secRef.current = digits;
+    setSec(digits);
+    onChange(combineDurationDisplay(minRef.current, digits));
+  };
+
+  return (
+    <View style={styles.durationCell}>
+      <TextInput
+        style={[styles.durationPart, styles.durationMinPart]}
+        value={min}
+        onChangeText={handleMinChange}
+        keyboardType="number-pad"
+        maxLength={3}
+        textAlign="center"
+        placeholder="分"
+        placeholderTextColor={Colors.textPlaceholder}
+        accessibilityLabel={`${exerciseName} セット${setNumber} 時間 分`}
+      />
+      {/* 分が1桁のケース（プランク等の短時間種目で多い）では自動フォーカス移動が発火しないため、
+          コロンをタップしても秒欄へ移動できるようにして手動タップの手間を減らす */}
+      <TouchableOpacity
+        onPress={() => secInputRef.current?.focus()}
+        hitSlop={{ top: 12, bottom: 12, left: 8, right: 8 }}
+        accessibilityElementsHidden
+        importantForAccessibility="no-hide-descendants"
+      >
+        <Text style={styles.durationColon}>:</Text>
+      </TouchableOpacity>
+      <TextInput
+        ref={secInputRef}
+        style={[styles.durationPart, styles.durationSecPart]}
+        value={sec}
+        onChangeText={handleSecChange}
+        keyboardType="number-pad"
+        maxLength={2}
+        textAlign="center"
+        placeholder="秒"
+        placeholderTextColor={Colors.textPlaceholder}
+        accessibilityLabel={`${exerciseName} セット${setNumber} 時間 秒`}
+      />
+    </View>
+  );
+}
 
 // 自動保存のデバウンス間隔。1文字ごとに即保存すると、セッション全体を1本のlive queryで
 // 購読しているuseSessionSets（hooks/use-workout-session.ts）が打鍵のたびに再発火し、
@@ -114,20 +199,29 @@ export const SetRow = memo(function SetRow({
     <View style={styles.row}>
       <Text style={styles.number}>{set.setNumber}</Text>
       {columns.map((c) => {
-        const input = (
-          <TextInput
-            style={[styles.cell, done && styles.cellDone]}
-            value={done ? c.toDisplay(set[c.key]) : values[c.key]}
-            onChangeText={(text) => handleFieldChange(c.key, text)}
-            editable={!done}
-            pointerEvents={done ? 'none' : 'auto'}
-            keyboardType={c.keyboardType}
-            textAlign="center"
-            placeholder="-"
-            placeholderTextColor={Colors.textPlaceholder}
-            accessibilityLabel={`${exerciseName} セット${set.setNumber} ${c.label}`}
-          />
-        );
+        const isDuration = c.key === 'durationSeconds';
+        const input =
+          isDuration && !done ? (
+            <DurationInput
+              initialValue={values[c.key] ?? ''}
+              onChange={(text) => handleFieldChange(c.key, text)}
+              exerciseName={exerciseName}
+              setNumber={set.setNumber}
+            />
+          ) : (
+            <TextInput
+              style={[styles.cell, done && styles.cellDone]}
+              value={done ? c.toDisplay(set[c.key]) : values[c.key]}
+              onChangeText={(text) => handleFieldChange(c.key, text)}
+              editable={!done}
+              pointerEvents={done ? 'none' : 'auto'}
+              keyboardType={c.keyboardType}
+              textAlign="center"
+              placeholder="-"
+              placeholderTextColor={Colors.textPlaceholder}
+              accessibilityLabel={`${exerciseName} セット${set.setNumber} ${c.label}`}
+            />
+          );
         // 完了済みセルはロックされ見た目だけでは編集し直せることが伝わりにくいため、
         // タップでも✓と同じ「編集に戻す」操作を呼べるようにする
         if (!done) return <View key={c.key} style={styles.cellWrapper}>{input}</View>;
@@ -176,6 +270,39 @@ const styles = StyleSheet.create({
     backgroundColor: Colors.surfaceSubtle,
     borderColor: Colors.border,
     color: Colors.textMuted,
+  },
+  durationCell: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: Colors.surface,
+    borderWidth: 1,
+    borderColor: Colors.borderStrong,
+    borderRadius: 7,
+    paddingVertical: 11,
+    paddingHorizontal: 6,
+  },
+  // flex:1にすると、time単独のように列幅が広い場合に分・秒それぞれが独立してその半分の
+  // 幅の中央に寄ってしまい、間が間延びして見える。固定幅にして「分:秒」をひとまとまりの
+  // 塊としてdurationCell側のjustifyContent:'center'で中央寄せすることで、列幅によらず
+  // 見た目の間隔を一定に保つ
+  durationPart: {
+    padding: 0,
+    fontSize: 14,
+    fontWeight: '600',
+    color: Colors.textPrimary,
+  },
+  durationMinPart: {
+    width: 30,
+  },
+  durationSecPart: {
+    width: 24,
+  },
+  durationColon: {
+    fontSize: 14,
+    fontWeight: '600',
+    color: Colors.textMuted,
+    marginHorizontal: 2,
   },
   check: {
     width: 24,
