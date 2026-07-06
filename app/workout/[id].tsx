@@ -14,7 +14,7 @@ import {
   useWorkoutSession,
 } from '@/hooks/use-workout-session';
 import { endWorkoutSession } from '@/lib/workout/session';
-import { formatSessionDateGroup } from '@/lib/workout/summary';
+import { formatSessionDateGroup, formatSessionDuration } from '@/lib/workout/summary';
 import { Stack, useLocalSearchParams, useRouter } from 'expo-router';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { Alert, FlatList, StyleSheet, Text, View } from 'react-native';
@@ -107,15 +107,23 @@ export default function WorkoutScreen() {
 
   if (!session) return null;
 
+  // endedAtがあれば終了済み＝過去の記録を開いている（見た目は共用しつつ、進行中固有の
+  // UI（リアルタイムタイマー・「トレーニングを終了」ボタン）だけを出し分ける）
+  const isActive = session.endedAt == null;
+
   return (
     <SafeAreaView style={styles.safeArea} edges={['bottom']}>
       <Stack.Screen
         options={{
-          title: 'トレーニング中',
+          title: isActive ? 'トレーニング中' : '記録の編集',
           headerRight: () => (
             <View style={styles.timerChip}>
               <IconSymbol name="timer" size={16} color={Colors.accent} />
-              <Text style={styles.timerText}>{formatElapsed(now - session.startedAt)}</Text>
+              <Text style={styles.timerText}>
+                {isActive
+                  ? formatElapsed(now - session.startedAt)
+                  : formatSessionDuration(session.startedAt, session.endedAt)}
+              </Text>
             </View>
           ),
         }}
@@ -157,9 +165,11 @@ export default function WorkoutScreen() {
         />
       )}
 
-      <View style={styles.footer}>
-        <PrimaryButton label="トレーニングを終了" onPress={handleFinish} />
-      </View>
+      {isActive && (
+        <View style={styles.footer}>
+          <PrimaryButton label="トレーニングを終了" onPress={handleFinish} />
+        </View>
+      )}
     </SafeAreaView>
   );
 }
