@@ -11,12 +11,14 @@ type Anchor = { x: number; y: number; width: number; height: number };
 type Props = {
   isFirst: boolean;
   isLast: boolean;
+  onMoveUp: () => void;
+  onMoveDown: () => void;
   onDelete: () => void;
 };
 
-// 種目カードの「⋮」メニュー。種目を入れ替え・上へ移動・下へ移動は見た目のみ用意しており、
-// 押しても閉じるだけで実際の並び替えはまだ未実装（削除のみ動作する）
-export function ExerciseCardMenu({ isFirst, isLast, onDelete }: Props) {
+// 種目カードの「⋮」メニュー。種目を入れ替えは見た目のみ用意しており、
+// 押しても閉じるだけで実際の入れ替えはまだ未実装（上へ移動・下へ移動・削除は動作する）
+export function ExerciseCardMenu({ isFirst, isLast, onMoveUp, onMoveDown, onDelete }: Props) {
   const triggerRef = useRef<View>(null);
   const [anchor, setAnchor] = useState<Anchor | null>(null);
   const open = anchor !== null;
@@ -31,6 +33,16 @@ export function ExerciseCardMenu({ isFirst, isLast, onDelete }: Props) {
   };
 
   const handleClose = () => setAnchor(null);
+
+  const handleMoveUp = () => {
+    handleClose();
+    onMoveUp();
+  };
+
+  const handleMoveDown = () => {
+    handleClose();
+    onMoveDown();
+  };
 
   const handleDelete = () => {
     handleClose();
@@ -68,7 +80,7 @@ export function ExerciseCardMenu({ isFirst, isLast, onDelete }: Props) {
             </TouchableOpacity>
             <TouchableOpacity
               style={styles.menuItem}
-              onPress={handleClose}
+              onPress={handleMoveUp}
               disabled={isFirst}
               accessibilityLabel="上へ移動"
               accessibilityState={{ disabled: isFirst }}
@@ -82,7 +94,7 @@ export function ExerciseCardMenu({ isFirst, isLast, onDelete }: Props) {
             </TouchableOpacity>
             <TouchableOpacity
               style={styles.menuItem}
-              onPress={handleClose}
+              onPress={handleMoveDown}
               disabled={isLast}
               accessibilityLabel="下へ移動"
               accessibilityState={{ disabled: isLast }}

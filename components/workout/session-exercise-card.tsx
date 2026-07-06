@@ -6,7 +6,7 @@ import { useDebouncedPush } from '@/hooks/use-debounced-push';
 import type { SessionExercise } from '@/hooks/use-workout-session';
 import { MEASUREMENT_TYPES, type MeasurementType } from '@/lib/exercises/constants';
 import { getExerciseImages } from '@/lib/exercises/images';
-import { removeExerciseFromSession } from '@/lib/workout/session';
+import { removeExerciseFromSession, swapExerciseOrder } from '@/lib/workout/session';
 import { MEASUREMENT_COLUMNS, parseColumnsWithFallback } from '@/lib/workout/set-format';
 import { addSet, deleteLastSet, reopenSet, saveDraft, saveSet, type SetValues } from '@/lib/workout/sets';
 import { Image } from 'expo-image';
@@ -22,6 +22,9 @@ type Props = {
   collapsed: boolean;
   isFirst: boolean;
   isLast: boolean;
+  // 隣接するworkoutSessionExercises行のid。上へ移動/下へ移動でorderIndexを入れ替える相手
+  previousSessionExerciseId: number | null;
+  nextSessionExerciseId: number | null;
   onToggleCollapsed: (sessionExerciseId: number) => void;
 };
 
@@ -32,6 +35,8 @@ export const SessionExerciseCard = memo(function SessionExerciseCard({
   collapsed,
   isFirst,
   isLast,
+  previousSessionExerciseId,
+  nextSessionExerciseId,
   onToggleCollapsed,
 }: Props) {
   const images = getExerciseImages(exercise);
@@ -149,6 +154,26 @@ export const SessionExerciseCard = memo(function SessionExerciseCard({
     }
   }, []);
 
+  const handleMoveUp = useCallback(async () => {
+    if (previousSessionExerciseId == null) return;
+    try {
+      await swapExerciseOrder(exercise.sessionExerciseId, previousSessionExerciseId);
+    } catch (e) {
+      console.error('[move exercise up]', e);
+      Alert.alert('エラー', '種目を並び替えられませんでした。');
+    }
+  }, [exercise.sessionExerciseId, previousSessionExerciseId]);
+
+  const handleMoveDown = useCallback(async () => {
+    if (nextSessionExerciseId == null) return;
+    try {
+      await swapExerciseOrder(exercise.sessionExerciseId, nextSessionExerciseId);
+    } catch (e) {
+      console.error('[move exercise down]', e);
+      Alert.alert('エラー', '種目を並び替えられませんでした。');
+    }
+  }, [exercise.sessionExerciseId, nextSessionExerciseId]);
+
   const handleDeleteExercise = useCallback(() => {
     Alert.alert('この種目を削除しますか？', '記録した内容も削除されます。', [
       { text: 'キャンセル', style: 'cancel' },
@@ -196,7 +221,13 @@ export const SessionExerciseCard = memo(function SessionExerciseCard({
             <IconSymbol name="info.circle" size={20} color={Colors.textPlaceholder} />
           </TouchableOpacity>
           {expanded && (
-            <ExerciseCardMenu isFirst={isFirst} isLast={isLast} onDelete={handleDeleteExercise} />
+            <ExerciseCardMenu
+              isFirst={isFirst}
+              isLast={isLast}
+              onMoveUp={handleMoveUp}
+              onMoveDown={handleMoveDown}
+              onDelete={handleDeleteExercise}
+            />
           )}
           {!expanded && (
             <View style={styles.collapsedSummary}>

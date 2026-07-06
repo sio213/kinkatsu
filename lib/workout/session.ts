@@ -69,3 +69,27 @@ export async function removeExerciseFromSession(sessionExerciseId: number) {
 export async function deleteSession(sessionId: number) {
   await db.delete(workoutSessions).where(eq(workoutSessions.id, sessionId));
 }
+
+// 種目カードの「⋮」メニューの「上へ移動」「下へ移動」。orderIndexにユニーク制約は無いため、
+// 隣接する2行のorderIndexを単純に入れ替えるだけで並び順を反映できる
+export async function swapExerciseOrder(sessionExerciseId: number, targetSessionExerciseId: number) {
+  await db.transaction(async (tx) => {
+    const [a] = await tx
+      .select({ orderIndex: workoutSessionExercises.orderIndex })
+      .from(workoutSessionExercises)
+      .where(eq(workoutSessionExercises.id, sessionExerciseId));
+    const [b] = await tx
+      .select({ orderIndex: workoutSessionExercises.orderIndex })
+      .from(workoutSessionExercises)
+      .where(eq(workoutSessionExercises.id, targetSessionExerciseId));
+    if (!a || !b) return;
+    await tx
+      .update(workoutSessionExercises)
+      .set({ orderIndex: b.orderIndex })
+      .where(eq(workoutSessionExercises.id, sessionExerciseId));
+    await tx
+      .update(workoutSessionExercises)
+      .set({ orderIndex: a.orderIndex })
+      .where(eq(workoutSessionExercises.id, targetSessionExerciseId));
+  });
+}
