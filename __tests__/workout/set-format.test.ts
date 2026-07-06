@@ -2,10 +2,12 @@ import {
   formatDistanceKmDisplay,
   formatDurationDisplay,
   MEASUREMENT_COLUMNS,
+  parseColumns,
   parseDistanceKmInput,
   parseDurationInput,
   parseIntInput,
   parseNumberInput,
+  toDisplayValues,
 } from '@/lib/workout/set-format';
 
 describe('parseDurationInput', () => {
@@ -134,5 +136,50 @@ describe('MEASUREMENT_COLUMNS', () => {
       'weight',
       'durationSeconds',
     ]);
+  });
+});
+
+describe('toDisplayValues', () => {
+  it('DB値を列定義に沿って表示用文字列に変換する', () => {
+    const result = toDisplayValues(MEASUREMENT_COLUMNS.weight_reps, { weight: 62.5, reps: 8 });
+    expect(result).toEqual({ weight: '62.5', reps: '8' });
+  });
+
+  it('nullは空文字になる', () => {
+    const result = toDisplayValues(MEASUREMENT_COLUMNS.weight_reps, { weight: null, reps: null });
+    expect(result).toEqual({ weight: '', reps: '' });
+  });
+
+  it('未使用の列（この計測タイプに無いキー）は無視される', () => {
+    const result = toDisplayValues(MEASUREMENT_COLUMNS.reps, {
+      weight: 60,
+      reps: 10,
+    } as any);
+    expect(result).toEqual({ reps: '10' });
+  });
+});
+
+describe('parseColumns', () => {
+  it('表示用文字列を列定義に沿ってDB保存用の値にパースする', () => {
+    const result = parseColumns(MEASUREMENT_COLUMNS.weight_reps, { weight: '62.5', reps: '8' });
+    expect(result).toEqual({ weight: 62.5, reps: 8 });
+  });
+
+  it('空欄はnullになる', () => {
+    const result = parseColumns(MEASUREMENT_COLUMNS.weight_reps, { weight: '', reps: '' });
+    expect(result).toEqual({ weight: null, reps: null });
+  });
+
+  it('不正な入力（パース不可）はnullになる（呼び出し側での不正検知が必要な場合は各列のfromDisplayを直接使う）', () => {
+    const result = parseColumns(MEASUREMENT_COLUMNS.weight_reps, { weight: '60kg', reps: '10' });
+    expect(result).toEqual({ weight: null, reps: 10 });
+  });
+
+  it('一部の列だけ値がある場合、残りはnullになる', () => {
+    const result = parseColumns(MEASUREMENT_COLUMNS.distance_time, {
+      distanceMeters: '5',
+      durationSeconds: '',
+    });
+    expect(result).toEqual({ distanceMeters: 5000, durationSeconds: null });
   });
 });

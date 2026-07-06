@@ -6,7 +6,7 @@ import { useDebouncedPush } from '@/hooks/use-debounced-push';
 import type { SessionExercise } from '@/hooks/use-workout-session';
 import { MEASUREMENT_TYPES, type MeasurementType } from '@/lib/exercises/constants';
 import { getExerciseImages } from '@/lib/exercises/images';
-import { MEASUREMENT_COLUMNS } from '@/lib/workout/set-format';
+import { MEASUREMENT_COLUMNS, parseColumns } from '@/lib/workout/set-format';
 import { addSet, deleteLastSet, reopenSet, saveSet, type SetValues } from '@/lib/workout/sets';
 import { Image } from 'expo-image';
 import { memo, useCallback, useRef } from 'react';
@@ -39,6 +39,13 @@ export const SessionExerciseCard = memo(function SessionExerciseCard({
   const isMutatingRef = useRef(false);
   const pushDebounced = useDebouncedPush();
   const expanded = !collapsed;
+  // ✓未タップのまま入力中のセット値（setId→表示文字列）。DBにはまだ保存されていないため、
+  // 「セット追加」時にこれをコピー元として使えるようにする。re-renderは不要なのでrefで持つ
+  const draftValuesRef = useRef<Map<number, Record<string, string>>>(new Map());
+
+  const handleDraftChange = useCallback((setId: number, values: Record<string, string>) => {
+    draftValuesRef.current.set(setId, values);
+  }, []);
 
   const handlePressInfo = useCallback(() => {
     pushDebounced(`/exercise/${exercise.id}`);
@@ -53,14 +60,25 @@ export const SessionExerciseCard = memo(function SessionExerciseCard({
     if (isMutatingRef.current) return;
     isMutatingRef.current = true;
     try {
-      await addSet(sessionId, exercise.id, exercise.sessionExerciseId);
+      // 直前のセットが✓未タップ（completedAt: null）の場合、DBにはまだ値が保存されていないため、
+      // 画面上の入力途中の値（draft）があればそれをコピー元にする。✓タップ済みならDB上の
+      // 確定値がそのままコピー元になるので、addSet側の既定動作（overrideValues省略）に任せる
+      const last = sets[sets.length - 1];
+      let overrideValues: SetValues | undefined;
+      if (last && last.completedAt == null) {
+        const draft = draftValuesRef.current.get(last.id);
+        if (draft) {
+          overrideValues = parseColumns(columns, draft);
+        }
+      }
+      await addSet(sessionId, exercise.id, exercise.sessionExerciseId, overrideValues);
     } catch (e) {
       console.error('[add set]', e);
       Alert.alert('エラー', 'セットを追加できませんでした。');
     } finally {
       isMutatingRef.current = false;
     }
-  }, [sessionId, exercise.id, exercise.sessionExerciseId]);
+  }, [sessionId, exercise.id, exercise.sessionExerciseId, sets, columns]);
 
   const runDeleteLastSet = useCallback(async () => {
     if (isMutatingRef.current) return;
@@ -170,6 +188,7 @@ export const SessionExerciseCard = memo(function SessionExerciseCard({
             measurementType={measurementType}
             onSave={handleSaveSet}
             onReopen={handleReopenSet}
+            onDraftChange={handleDraftChange}
           />
         ))}
 

@@ -2,7 +2,7 @@ import { IconSymbol } from '@/components/ui/icon-symbol';
 import { Colors } from '@/constants/theme';
 import type { Set } from '@/db/schema';
 import type { MeasurementType } from '@/lib/exercises/constants';
-import { MEASUREMENT_COLUMNS, type SetColumn } from '@/lib/workout/set-format';
+import { MEASUREMENT_COLUMNS, parseColumns, toDisplayValues } from '@/lib/workout/set-format';
 import type { SetValues } from '@/lib/workout/sets';
 import { memo, useRef, useState } from 'react';
 import { Alert, Keyboard, StyleSheet, Text, TextInput, TouchableOpacity, View } from 'react-native';
@@ -13,11 +13,10 @@ type Props = {
   measurementType: MeasurementType;
   onSave: (setId: number, values: SetValues) => Promise<void>;
   onReopen: (setId: number) => Promise<void>;
+  // ✓未タップのまま入力中の値を親に伝える。DBにはまだ保存されていないため、
+  // 「セット追加」時にこの入力途中の値もコピー対象にできるようにするためのもの
+  onDraftChange?: (setId: number, values: Record<string, string>) => void;
 };
-
-function toDisplayValues(columns: SetColumn[], set: Set): Record<string, string> {
-  return Object.fromEntries(columns.map((c) => [c.key, c.toDisplay(set[c.key])]));
-}
 
 export const SetRow = memo(function SetRow({
   set,
@@ -25,12 +24,23 @@ export const SetRow = memo(function SetRow({
   measurementType,
   onSave,
   onReopen,
+  onDraftChange,
 }: Props) {
   const columns = MEASUREMENT_COLUMNS[measurementType];
   const done = set.completedAt != null;
   const isBusyRef = useRef(false);
 
   const [values, setValues] = useState<Record<string, string>>(() => toDisplayValues(columns, set));
+  // 連続したonChangeText呼び出し（同一レンダーサイクル内でバッチ処理される場合）でも
+  // 常に最新の値を基準にマージするための鏡。setValuesの外で同期的に更新する
+  const valuesRef = useRef(values);
+
+  const handleFieldChange = (key: string, text: string) => {
+    const next = { ...valuesRef.current, [key]: text };
+    valuesRef.current = next;
+    setValues(next);
+    onDraftChange?.(set.id, next);
+  };
 
   const handleTogglePress = async () => {
     if (isBusyRef.current) return;
@@ -39,7 +49,10 @@ export const SetRow = memo(function SetRow({
     try {
       if (done) {
         await onReopen(set.id);
-        setValues(toDisplayValues(columns, set));
+        const reopened = toDisplayValues(columns, set);
+        valuesRef.current = reopened;
+        setValues(reopened);
+        onDraftChange?.(set.id, reopened);
       } else {
         // 空欄はnull保存でよいが、非空の入力がパースに失敗した場合（不正な貼り付け等）は
         // 気づかれずに値が消えたまま完了扱いにならないよう、保存せず気づかせる
@@ -51,10 +64,7 @@ export const SetRow = memo(function SetRow({
           Alert.alert('入力エラー', `${invalidColumn.label}の値を確認してください。`);
           return;
         }
-        const parsed = Object.fromEntries(
-          columns.map((c) => [c.key, c.fromDisplay(values[c.key] ?? '')]),
-        );
-        await onSave(set.id, parsed);
+        await onSave(set.id, parseColumns(columns, values));
       }
     } catch (e) {
       console.error('[set toggle]', e);
@@ -72,7 +82,7 @@ export const SetRow = memo(function SetRow({
           <TextInput
             style={[styles.cell, done && styles.cellDone]}
             value={done ? c.toDisplay(set[c.key]) : values[c.key]}
-            onChangeText={(text) => setValues((prev) => ({ ...prev, [c.key]: text }))}
+            onChangeText={(text) => handleFieldChange(c.key, text)}
             editable={!done}
             pointerEvents={done ? 'none' : 'auto'}
             keyboardType={c.keyboardType}

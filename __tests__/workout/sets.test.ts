@@ -176,6 +176,31 @@ describe('addSet', () => {
     expect(mockSelectWhere).toHaveBeenCalledWith({ col: 'workoutSessionExerciseId', val: 100 });
   });
 
+  it('overrideValuesを渡すと、DB上の直前セットの値ではなくoverrideValuesをコピー元にする（✓未タップの入力途中の値用）', async () => {
+    mockSelectWhere.mockReturnValueOnce(
+      mockMakeSelectChain([{ setNumber: 1, weight: 999, reps: 999, durationSeconds: 999, distanceMeters: 999 }]),
+    );
+    await addSet(1, 10, 100, { weight: 60, reps: 10 });
+
+    const payload = mockInsertValues.mock.calls[0][0];
+    expect(payload.setNumber).toBe(2);
+    expect(payload.weight).toBe(60);
+    expect(payload.reps).toBe(10);
+    expect(payload.durationSeconds).toBeNull();
+    expect(payload.distanceMeters).toBeNull();
+  });
+
+  it('overrideValuesが省略された場合はDB上の直前セットの値をコピーする（既定動作）', async () => {
+    mockSelectWhere.mockReturnValueOnce(
+      mockMakeSelectChain([{ setNumber: 1, weight: 62.5, reps: 8, durationSeconds: null, distanceMeters: null }]),
+    );
+    await addSet(1, 10, 100, undefined);
+
+    const payload = mockInsertValues.mock.calls[0][0];
+    expect(payload.weight).toBe(62.5);
+    expect(payload.reps).toBe(8);
+  });
+
   it('insertが失敗した場合はエラーを握りつぶさずthrowする（呼び出し側でAlertを出すため）', async () => {
     mockSelectWhere.mockReturnValueOnce(mockMakeSelectChain([]));
     mockInsertValues.mockRejectedValueOnce(new Error('db error'));
