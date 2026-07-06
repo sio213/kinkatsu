@@ -3,6 +3,7 @@ const mockDeleteLastSet = jest.fn();
 const mockSaveSet = jest.fn();
 const mockReopenSet = jest.fn();
 const mockPush = jest.fn();
+const mockOnToggleCollapsed = jest.fn();
 
 jest.mock('@/lib/workout/sets', () => ({
   addSet: (...args: unknown[]) => mockAddSet(...args),
@@ -20,10 +21,14 @@ import { act, create, type ReactTestInstance } from 'react-test-renderer';
 import { Alert, Text, TextInput, TouchableOpacity } from 'react-native';
 import { SessionExerciseCard } from '@/components/workout/session-exercise-card';
 
-function render(props: Parameters<typeof SessionExerciseCard>[0]) {
+function render(
+  props: Partial<Parameters<typeof SessionExerciseCard>[0]> &
+    Pick<Parameters<typeof SessionExerciseCard>[0], 'exercise' | 'sessionId' | 'sets'>,
+) {
+  const merged = { collapsed: false, onToggleCollapsed: mockOnToggleCollapsed, ...props };
   let instance!: ReturnType<typeof create>;
   act(() => {
-    instance = create(<SessionExerciseCard {...props} />);
+    instance = create(<SessionExerciseCard {...merged} />);
   });
   return instance.root;
 }
@@ -34,6 +39,20 @@ function findButtonByLabel(root: ReactTestInstance, label: string) {
     .find((btn: ReactTestInstance) =>
       btn.findAllByType(Text).some((t: ReactTestInstance) => [t.props.children].flat().join('') === label),
     );
+}
+
+function findHeaderToggle(root: ReactTestInstance) {
+  return root
+    .findAllByType(TouchableOpacity)
+    .find(
+      (t) =>
+        typeof t.props.accessibilityLabel === 'string' &&
+        (t.props.accessibilityLabel.includes('折りたたむ') || t.props.accessibilityLabel.includes('展開する')),
+    )!;
+}
+
+function findCardBody(root: ReactTestInstance) {
+  return root.findByProps({ testID: 'card-body' }) as ReactTestInstance;
 }
 
 const exercise = {
@@ -211,4 +230,63 @@ test('ⓘアイコンの連打でもpushは1回しか呼ばれない（useDeboun
     infoBtn.props.onPress();
   });
   expect(mockPush).toHaveBeenCalledTimes(1);
+});
+
+test('デフォルト(collapsed=false)では展開されており、セット一覧・セット追加/削除ボタンが表示される', () => {
+  const sets = [{ id: 1, setNumber: 1, weight: null, reps: null, completedAt: null }] as any;
+  const root = render({ exercise, sessionId: 1, sets });
+  const header = findHeaderToggle(root);
+  expect(header.props.accessibilityLabel).toBe('ベンチプレスを折りたたむ');
+  expect(header.props.accessibilityState).toEqual({ expanded: true });
+  expect(findButtonByLabel(root, 'セット追加')).toBeDefined();
+  const body = findCardBody(root);
+  expect(body.props.style).toEqual([expect.anything(), false]);
+});
+
+test('collapsed=trueのときは折りたたみ表示になり、セット数のサマリーが出てbodyは非表示スタイルになる', () => {
+  const sets = [
+    { id: 1, setNumber: 1, weight: 60, reps: 10, completedAt: 1 },
+    { id: 2, setNumber: 2, weight: null, reps: null, completedAt: null },
+  ] as any;
+  const root = render({ exercise, sessionId: 1, sets, collapsed: true });
+
+  const header = findHeaderToggle(root);
+  expect(header.props.accessibilityLabel).toBe('ベンチプレス、2セット、展開する');
+  expect(header.props.accessibilityState).toEqual({ expanded: false });
+  const summaryText = root
+    .findAllByType(Text)
+    .find((t) => [t.props.children].flat().join('') === '2セット');
+  expect(summaryText).toBeDefined();
+
+  const body = findCardBody(root);
+  const flattenedStyle = [body.props.style].flat(2);
+  expect(flattenedStyle).toEqual(expect.arrayContaining([{ display: 'none' }]));
+});
+
+test('ヘッダーをタップするとonToggleCollapsedがsessionExerciseId付きで呼ばれる（開閉の実体は親が持つ）', () => {
+  const root = render({ exercise, sessionId: 1, sets: [] });
+  act(() => {
+    findHeaderToggle(root).props.onPress();
+  });
+  expect(mockOnToggleCollapsed).toHaveBeenCalledWith(500);
+});
+
+test('ⓘアイコンをタップしてもonToggleCollapsedは呼ばれない（ネストしたTouchableで独立して処理される）', () => {
+  const root = render({ exercise, sessionId: 1, sets: [] });
+  const infoBtn = root
+    .findAllByType(TouchableOpacity)
+    .find((t) => t.props.accessibilityLabel === 'ベンチプレスの詳細を見る')!;
+
+  act(() => {
+    infoBtn.props.onPress();
+  });
+
+  expect(mockOnToggleCollapsed).not.toHaveBeenCalled();
+});
+
+test('折りたたんでいても値未入力でない既存のTextInput(SetRow)はアンマウントされず残っている', () => {
+  const sets = [{ id: 1, setNumber: 1, weight: 60, reps: 10, completedAt: null }] as any;
+  const root = render({ exercise, sessionId: 1, sets, collapsed: true });
+  // bodyがdisplay:noneで隠れていてもSetRowのTextInputはツリーに残り続ける（アンマウントされない）
+  expect(root.findAllByType(TextInput)).toHaveLength(2);
 });

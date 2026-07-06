@@ -10,15 +10,23 @@ import { MEASUREMENT_COLUMNS } from '@/lib/workout/set-format';
 import { addSet, deleteLastSet, reopenSet, saveSet, type SetValues } from '@/lib/workout/sets';
 import { Image } from 'expo-image';
 import { memo, useCallback, useRef } from 'react';
-import { Alert, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
+import { Alert, LayoutAnimation, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import { SetRow } from './set-row';
 
-type Props = { exercise: SessionExercise; sessionId: number; sets: Set[] };
+type Props = {
+  exercise: SessionExercise;
+  sessionId: number;
+  sets: Set[];
+  collapsed: boolean;
+  onToggleCollapsed: (sessionExerciseId: number) => void;
+};
 
 export const SessionExerciseCard = memo(function SessionExerciseCard({
   exercise,
   sessionId,
   sets,
+  collapsed,
+  onToggleCollapsed,
 }: Props) {
   const images = getExerciseImages(exercise);
   // 未知のmeasurementType（想定外のDB値）でも画面ごとクラッシュさせず標準の重量×回数にフォールバックする
@@ -30,10 +38,16 @@ export const SessionExerciseCard = memo(function SessionExerciseCard({
   const columns = MEASUREMENT_COLUMNS[measurementType];
   const isMutatingRef = useRef(false);
   const pushDebounced = useDebouncedPush();
+  const expanded = !collapsed;
 
   const handlePressInfo = useCallback(() => {
     pushDebounced(`/exercise/${exercise.id}`);
   }, [pushDebounced, exercise.id]);
+
+  const handleToggleExpanded = useCallback(() => {
+    LayoutAnimation.configureNext(LayoutAnimation.Presets.easeInEaseOut);
+    onToggleCollapsed(exercise.sessionExerciseId);
+  }, [onToggleCollapsed, exercise.sessionExerciseId]);
 
   const handleAddSet = useCallback(async () => {
     if (isMutatingRef.current) return;
@@ -95,7 +109,16 @@ export const SessionExerciseCard = memo(function SessionExerciseCard({
 
   return (
     <View style={styles.card}>
-      <View style={styles.header}>
+      <TouchableOpacity
+        style={[styles.header, !expanded && styles.headerCollapsed]}
+        onPress={handleToggleExpanded}
+        activeOpacity={0.7}
+        accessibilityRole="button"
+        accessibilityLabel={
+          expanded ? `${exercise.name}を折りたたむ` : `${exercise.name}、${sets.length}セット、展開する`
+        }
+        accessibilityState={{ expanded }}
+      >
         <Image source={images.thumbnail} style={styles.thumbnail} contentFit="cover" />
         <View style={styles.info}>
           <Text style={styles.name} numberOfLines={1}>
@@ -103,17 +126,32 @@ export const SessionExerciseCard = memo(function SessionExerciseCard({
           </Text>
           <CategoryChip category={exercise.category} />
         </View>
-        <TouchableOpacity
-          onPress={handlePressInfo}
-          hitSlop={{ top: 14, bottom: 14, left: 14, right: 14 }}
-          accessibilityRole="button"
-          accessibilityLabel={`${exercise.name}の詳細を見る`}
-        >
-          <IconSymbol name="info.circle" size={20} color={Colors.textPlaceholder} />
-        </TouchableOpacity>
-      </View>
+        <View style={styles.trailing}>
+          <TouchableOpacity
+            onPress={handlePressInfo}
+            hitSlop={{ top: 14, bottom: 14, left: 14, right: 14 }}
+            accessibilityRole="button"
+            accessibilityLabel={`${exercise.name}の詳細を見る`}
+          >
+            <IconSymbol name="info.circle" size={20} color={Colors.textPlaceholder} />
+          </TouchableOpacity>
+          {!expanded && (
+            <View style={styles.collapsedSummary}>
+              <Text style={styles.collapsedSummaryText}>{sets.length}セット</Text>
+              <IconSymbol
+                name="chevron.right"
+                size={14}
+                color={Colors.textPlaceholder}
+                style={styles.collapsedChevron}
+              />
+            </View>
+          )}
+        </View>
+      </TouchableOpacity>
 
-      <View style={styles.body}>
+      {/* 折りたたみ時もアンマウントせずdisplay:noneで隠す。SetRowはローカルstateに未保存の入力値を
+          持つため、アンマウントすると✓未タップの入力が消えてしまう */}
+      <View testID="card-body" style={[styles.body, !expanded && styles.bodyHidden]}>
         <View style={styles.columnHeader}>
           <Text style={styles.numberLabel}>セット</Text>
           {columns.map((c) => (
@@ -189,6 +227,13 @@ const styles = StyleSheet.create({
     borderBottomWidth: 1,
     borderBottomColor: Colors.border,
   },
+  headerCollapsed: { borderBottomWidth: 0 },
+  // 「Nセットのサマリー」と「ⓘボタン」を1つのグループにまとめ、gapで一定の余白を確保する。
+  // header全体のgap(10)だけに頼ると、ⓘのhitSlop(14pt)と視覚的に密集して見えるため
+  trailing: { flexDirection: 'row', alignItems: 'center', gap: 14 },
+  collapsedSummary: { flexDirection: 'row', alignItems: 'center', gap: 4 },
+  collapsedSummaryText: { fontSize: 12.5, fontWeight: '600', color: Colors.textPlaceholder },
+  collapsedChevron: { transform: [{ rotate: '90deg' }] },
   thumbnail: {
     width: 46,
     height: 46,
@@ -201,6 +246,7 @@ const styles = StyleSheet.create({
   name: { fontSize: 14.5, fontWeight: '700', color: Colors.textPrimary },
 
   body: { padding: 10 },
+  bodyHidden: { display: 'none' },
   columnHeader: { flexDirection: 'row', alignItems: 'center', gap: 7, paddingBottom: 6 },
   numberLabel: {
     width: 32,
