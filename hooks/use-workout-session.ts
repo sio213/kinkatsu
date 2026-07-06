@@ -38,14 +38,17 @@ export function useWorkoutSession(id: number) {
 }
 
 // 記録タブの履歴一覧用。setsは記録の度に増え続ける実データなので、
-// 全件をJSへ引き上げてから集計するのではなくSQL側でセッションごとにSUM/COUNTする
+// 全件をJSへ引き上げてから集計するのではなくSQL側でセッションごとにSUM/COUNTする。
+// setCount/totalVolumeとも、✓未タップの自動保存中の値（completedAtがnull。種目追加直後の
+// 空セットや、入力途中でアプリを離れた場合の下書き）を含めず、実際に✓で確定したセットのみを
+// 集計する（そうしないと種目を追加・入力しただけで記録件数・総重量が水増しされる）
 export function useSessionStats(): Map<number, SessionSummary> {
   const { data } = useLiveQuery(
     db
       .select({
         sessionId: sets.sessionId,
-        setCount: sql<number>`count(*)`,
-        totalVolume: sql<number>`coalesce(sum(${sets.weight} * ${sets.reps}), 0)`,
+        setCount: sql<number>`sum(case when ${sets.completedAt} is not null then 1 else 0 end)`,
+        totalVolume: sql<number>`coalesce(sum(case when ${sets.completedAt} is not null then ${sets.weight} * ${sets.reps} else 0 end), 0)`,
       })
       .from(sets)
       .groupBy(sets.sessionId),
@@ -55,24 +58,32 @@ export function useSessionStats(): Map<number, SessionSummary> {
   );
 }
 
-// トレーニング中画面の終了確認（セット0件かどうか）用。行の中身は使わないため件数のみ取得する
+// トレーニング中画面の終了確認（何かセットを記録済みかどうか）用。行の中身は使わないため件数のみ取得する。
+// 種目追加直後の自動生成セット（completedAtがnull）は「まだ記録していない」に含めるため、
+// ✓で確定したセットのみを数える
 export function useSessionSetCount(sessionId: number): number {
   const { data } = useLiveQuery(
     db
-      .select({ count: sql<number>`count(*)` })
+      .select({ count: sql<number>`sum(case when ${sets.completedAt} is not null then 1 else 0 end)` })
       .from(sets)
       .where(eq(sets.sessionId, sessionId)),
   );
   return data?.[0]?.count ?? 0;
 }
 
-export type SessionExercise = Exercise & { orderIndex: number };
+// sessionExerciseIdはworkoutSessionExercises行自体のid。同じ種目をセッション内に複数回
+// 追加できるため、exercise.id（種目そのもの）とは別にカード単位の識別子として持つ
+export type SessionExercise = Exercise & { orderIndex: number; sessionExerciseId: number };
 
 // トレーニング中画面に表示する、このセッションに追加済みの種目一覧（並び順つき）
 export function useSessionExercises(sessionId: number): SessionExercise[] {
   const { data } = useLiveQuery(
     db
-      .select({ ...getTableColumns(exercises), orderIndex: workoutSessionExercises.orderIndex })
+      .select({
+        ...getTableColumns(exercises),
+        orderIndex: workoutSessionExercises.orderIndex,
+        sessionExerciseId: workoutSessionExercises.id,
+      })
       .from(workoutSessionExercises)
       .innerJoin(exercises, eq(workoutSessionExercises.exerciseId, exercises.id))
       .where(eq(workoutSessionExercises.sessionId, sessionId))
@@ -86,8 +97,10 @@ export function useSessionExercises(sessionId: number): SessionExercise[] {
 // これを使ってもらう
 export const EMPTY_SETS: Set[] = [];
 
-// セット入力画面用。セッション内の全setsを一度だけ購読し、種目IDごとにJS側でグルーピングする
-// （種目カードの数だけlive queryを張ると数が増えるほど無駄が増えるため、useSessionStatsと同じ方針）。
+// セット入力画面用。セッション内の全setsを一度だけ購読し、sessionExerciseId（カード単位）ごとに
+// JS側でグルーピングする（種目カードの数だけlive queryを張ると数が増えるほど無駄が増えるため、
+// useSessionStatsと同じ方針）。同じ種目をセッション内に複数回追加できるため、グルーピングキーは
+// exerciseIdではなくworkoutSessionExerciseId（カードのid）にする必要がある。
 // トレーニング中画面は経過時間タイマーで毎秒再レンダーされるため、liveQueryのdataが変わらない限り
 // 同じMap参照を返すようuseMemoでグルーピング結果をキャッシュする
 export function useSessionSets(sessionId: number): Map<number, Set[]> {
@@ -97,11 +110,11 @@ export function useSessionSets(sessionId: number): Map<number, Set[]> {
   return useMemo(() => {
     const map = new Map<number, Set[]>();
     for (const row of data ?? []) {
-      const list = map.get(row.exerciseId);
+      const list = map.get(row.workoutSessionExerciseId);
       if (list) {
         list.push(row);
       } else {
-        map.set(row.exerciseId, [row]);
+        map.set(row.workoutSessionExerciseId, [row]);
       }
     }
     return map;

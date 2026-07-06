@@ -57,7 +57,6 @@ function makeExercise(overrides: Partial<Exercise> = {}): Exercise {
     category: 'chest',
     favorite: false,
     note: null,
-    muscle: null,
     formPoints: null,
     source: 'custom',
     measurementType: 'weight_reps',

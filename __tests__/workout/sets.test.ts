@@ -46,22 +46,22 @@ jest.mock('@/db/schema', () => ({
     id: 'id',
     sessionId: 'sessionId',
     exerciseId: 'exerciseId',
+    workoutSessionExerciseId: 'workoutSessionExerciseId',
     setNumber: 'setNumber',
+    weight: 'weight',
+    reps: 'reps',
+    durationSeconds: 'durationSeconds',
+    distanceMeters: 'distanceMeters',
     completedAt: 'completedAt',
   },
 }));
 
 jest.mock('drizzle-orm', () => ({
   eq: jest.fn((col, val) => ({ col, val })),
-  and: jest.fn((...conds) => ({ and: conds })),
   desc: jest.fn((col) => ({ col, dir: 'desc' })),
-  sql: Object.assign(
-    jest.fn((strings: TemplateStringsArray, ...values: unknown[]) => ({ strings, values })),
-    { raw: jest.fn() },
-  ),
 }));
 
-import { addSet, deleteLastSet, reopenSet, saveSet } from '@/lib/workout/sets';
+import { addSet, deleteLastSet, reopenSet, saveDraft, saveSet } from '@/lib/workout/sets';
 
 beforeEach(() => {
   jest.clearAllMocks();
@@ -72,52 +72,172 @@ beforeEach(() => {
 });
 
 describe('addSet', () => {
-  it('既存セットが無い種目ではsetNumberを1から振る', async () => {
-    mockSelectWhere.mockReturnValueOnce(mockMakeSelectChain([{ maxSetNumber: null }]));
-    await addSet(1, 10);
+  it('既存セットが無いカードではsetNumber=1・値は全てnullで作る', async () => {
+    mockSelectWhere.mockReturnValueOnce(mockMakeSelectChain([]));
+    await addSet(1, 10, 100);
 
     const payload = mockInsertValues.mock.calls[0][0];
     expect(payload).toEqual({
       sessionId: 1,
       exerciseId: 10,
+      workoutSessionExerciseId: 100,
       setNumber: 1,
+      weight: null,
+      reps: null,
+      durationSeconds: null,
+      distanceMeters: null,
       completedAt: null,
       createdAt: expect.any(Number),
     });
   });
 
-  it('既存セットがある種目では最大setNumberの続きから振る', async () => {
-    mockSelectWhere.mockReturnValueOnce(mockMakeSelectChain([{ maxSetNumber: 2 }]));
-    await addSet(1, 10);
+  it('既存セットがあるカードでは最大setNumberの続きから振る', async () => {
+    mockSelectWhere.mockReturnValueOnce(
+      mockMakeSelectChain([
+        { setNumber: 2, weight: 60, reps: 10, durationSeconds: null, distanceMeters: null },
+      ]),
+    );
+    await addSet(1, 10, 100);
 
     const payload = mockInsertValues.mock.calls[0][0];
     expect(payload.setNumber).toBe(3);
   });
 
+  it('直前のセット（setNumber最大）の重量・回数・時間・距離をコピーする', async () => {
+    mockSelectWhere.mockReturnValueOnce(
+      mockMakeSelectChain([
+        { setNumber: 1, weight: 62.5, reps: 8, durationSeconds: 30, distanceMeters: 1.5 },
+      ]),
+    );
+    await addSet(1, 10, 100);
+
+    const payload = mockInsertValues.mock.calls[0][0];
+    expect(payload).toEqual({
+      sessionId: 1,
+      exerciseId: 10,
+      workoutSessionExerciseId: 100,
+      setNumber: 2,
+      weight: 62.5,
+      reps: 8,
+      durationSeconds: 30,
+      distanceMeters: 1.5,
+      completedAt: null,
+      createdAt: expect.any(Number),
+    });
+  });
+
+  it('直前セットの一部カラムだけnullの場合、null/値それぞれ個別にコピーする', async () => {
+    mockSelectWhere.mockReturnValueOnce(
+      mockMakeSelectChain([
+        { setNumber: 1, weight: 60, reps: null, durationSeconds: null, distanceMeters: 1.2 },
+      ]),
+    );
+    await addSet(1, 10, 100);
+
+    const payload = mockInsertValues.mock.calls[0][0];
+    expect(payload.weight).toBe(60);
+    expect(payload.reps).toBeNull();
+    expect(payload.durationSeconds).toBeNull();
+    expect(payload.distanceMeters).toBe(1.2);
+  });
+
+  it('直前セットの値が0の場合、nullにフォールバックせず0のままコピーする（??の境界値）', async () => {
+    mockSelectWhere.mockReturnValueOnce(
+      mockMakeSelectChain([{ setNumber: 1, weight: 0, reps: 0, durationSeconds: 0, distanceMeters: 0 }]),
+    );
+    await addSet(1, 10, 100);
+
+    const payload = mockInsertValues.mock.calls[0][0];
+    expect(payload.weight).toBe(0);
+    expect(payload.reps).toBe(0);
+    expect(payload.durationSeconds).toBe(0);
+    expect(payload.distanceMeters).toBe(0);
+  });
+
+  it('直前セットが未確定（completedAt: null）でも値そのものはコピー対象になる（仕様の固定化）', async () => {
+    mockSelectWhere.mockReturnValueOnce(
+      mockMakeSelectChain([
+        { setNumber: 1, weight: 40, reps: 12, durationSeconds: null, distanceMeters: null, completedAt: null },
+      ]),
+    );
+    await addSet(1, 10, 100);
+
+    const payload = mockInsertValues.mock.calls[0][0];
+    expect(payload.weight).toBe(40);
+    expect(payload.reps).toBe(12);
+  });
+
+  it('直前セットの取得はworkoutSessionExerciseIdでスコープされる（重複カード対策の回帰防止）', async () => {
+    mockSelectWhere.mockReturnValueOnce(
+      mockMakeSelectChain([{ setNumber: 1, weight: 62.5, reps: 8, durationSeconds: null, distanceMeters: null }]),
+    );
+    await addSet(1, 10, 100);
+
+    expect(mockSelectWhere).toHaveBeenCalledWith({ col: 'workoutSessionExerciseId', val: 100 });
+  });
+
+  it('overrideValuesを渡すと、DB上の直前セットの値ではなくoverrideValuesをコピー元にする（✓未タップの入力途中の値用）', async () => {
+    mockSelectWhere.mockReturnValueOnce(
+      mockMakeSelectChain([{ setNumber: 1, weight: 999, reps: 999, durationSeconds: 999, distanceMeters: 999 }]),
+    );
+    await addSet(1, 10, 100, { weight: 60, reps: 10 });
+
+    const payload = mockInsertValues.mock.calls[0][0];
+    expect(payload.setNumber).toBe(2);
+    expect(payload.weight).toBe(60);
+    expect(payload.reps).toBe(10);
+    expect(payload.durationSeconds).toBeNull();
+    expect(payload.distanceMeters).toBeNull();
+  });
+
+  it('overrideValuesが空オブジェクト{}（全欄を空にした状態）の場合、DB上の直前セットへフォールバックせず全てnullにする', async () => {
+    mockSelectWhere.mockReturnValueOnce(
+      mockMakeSelectChain([{ setNumber: 1, weight: 999, reps: 999, durationSeconds: 999, distanceMeters: 999 }]),
+    );
+    await addSet(1, 10, 100, {});
+
+    const payload = mockInsertValues.mock.calls[0][0];
+    expect(payload.weight).toBeNull();
+    expect(payload.reps).toBeNull();
+    expect(payload.durationSeconds).toBeNull();
+    expect(payload.distanceMeters).toBeNull();
+  });
+
+  it('overrideValuesが省略された場合はDB上の直前セットの値をコピーする（既定動作）', async () => {
+    mockSelectWhere.mockReturnValueOnce(
+      mockMakeSelectChain([{ setNumber: 1, weight: 62.5, reps: 8, durationSeconds: null, distanceMeters: null }]),
+    );
+    await addSet(1, 10, 100, undefined);
+
+    const payload = mockInsertValues.mock.calls[0][0];
+    expect(payload.weight).toBe(62.5);
+    expect(payload.reps).toBe(8);
+  });
+
   it('insertが失敗した場合はエラーを握りつぶさずthrowする（呼び出し側でAlertを出すため）', async () => {
-    mockSelectWhere.mockReturnValueOnce(mockMakeSelectChain([{ maxSetNumber: null }]));
+    mockSelectWhere.mockReturnValueOnce(mockMakeSelectChain([]));
     mockInsertValues.mockRejectedValueOnce(new Error('db error'));
-    await expect(addSet(1, 10)).rejects.toThrow('db error');
+    await expect(addSet(1, 10, 100)).rejects.toThrow('db error');
   });
 });
 
 describe('deleteLastSet', () => {
   it('セットが0件のときは何もしない', async () => {
     mockSelectWhere.mockReturnValueOnce(mockMakeSelectChain([]));
-    await deleteLastSet(1, 10);
+    await deleteLastSet(100);
     expect(mockDeleteWhere).not.toHaveBeenCalled();
   });
 
   it('setNumberが最大のセットを削除する（DESC+LIMIT1で先頭行を取得）', async () => {
     mockSelectWhere.mockReturnValueOnce(mockMakeSelectChain([{ id: 103 }]));
-    await deleteLastSet(1, 10);
+    await deleteLastSet(100);
     expect(mockDeleteWhere).toHaveBeenCalledWith({ col: 'id', val: 103 });
   });
 
   it('deleteが失敗した場合はエラーを握りつぶさずthrowする', async () => {
     mockSelectWhere.mockReturnValueOnce(mockMakeSelectChain([{ id: 101 }]));
     mockDeleteWhere.mockRejectedValueOnce(new Error('db error'));
-    await expect(deleteLastSet(1, 10)).rejects.toThrow('db error');
+    await expect(deleteLastSet(100)).rejects.toThrow('db error');
   });
 });
 
@@ -138,6 +258,22 @@ describe('saveSet', () => {
   it('updateが失敗した場合はエラーを握りつぶさずthrowする', async () => {
     mockUpdateWhere.mockRejectedValueOnce(new Error('db error'));
     await expect(saveSet(5, { weight: 60 })).rejects.toThrow('db error');
+  });
+});
+
+describe('saveDraft', () => {
+  it('completedAtには触れず入力値だけをupdateする', async () => {
+    await saveDraft(5, { weight: 60, reps: 10 });
+
+    const payload = mockUpdateSet.mock.calls[0][0];
+    expect(payload).toEqual({ weight: 60, reps: 10 });
+    expect(payload.completedAt).toBeUndefined();
+    expect(mockUpdateWhere).toHaveBeenCalledWith({ col: 'id', val: 5 });
+  });
+
+  it('updateが失敗した場合はエラーを握りつぶさずthrowする', async () => {
+    mockUpdateWhere.mockRejectedValueOnce(new Error('db error'));
+    await expect(saveDraft(5, { weight: 60 })).rejects.toThrow('db error');
   });
 });
 
