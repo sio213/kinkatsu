@@ -202,6 +202,8 @@ export default function WorkoutScreen() {
                 collapsed={collapsedIds.has(item.sessionExerciseId)}
                 isFirst={index === 0}
                 isLast={index === sessionExercises.length - 1}
+                previousSessionExerciseId={sessionExercises[index - 1]?.sessionExerciseId ?? null}
+                nextSessionExerciseId={sessionExercises[index + 1]?.sessionExerciseId ?? null}
                 onToggleCollapsed={handleToggleCollapsed}
               />
             </ListErrorBoundary>

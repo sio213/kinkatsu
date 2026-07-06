@@ -6,7 +6,7 @@ import { useDebouncedPush } from '@/hooks/use-debounced-push';
 import type { SessionExercise } from '@/hooks/use-workout-session';
 import { MEASUREMENT_TYPES, type MeasurementType } from '@/lib/exercises/constants';
 import { getExerciseImages } from '@/lib/exercises/images';
-import { removeExerciseFromSession } from '@/lib/workout/session';
+import { removeExerciseFromSession, swapExerciseOrder } from '@/lib/workout/session';
 import { MEASUREMENT_COLUMNS, parseColumnsWithFallback } from '@/lib/workout/set-format';
 import { addSet, deleteLastSet, reopenSet, saveDraft, saveSet, type SetValues } from '@/lib/workout/sets';
 import { Image } from 'expo-image';
@@ -22,6 +22,9 @@ type Props = {
   collapsed: boolean;
   isFirst: boolean;
   isLast: boolean;
+  // 隣接するworkoutSessionExercises行のid。上へ移動/下へ移動でorderIndexを入れ替える相手
+  previousSessionExerciseId: number | null;
+  nextSessionExerciseId: number | null;
   onToggleCollapsed: (sessionExerciseId: number) => void;
 };
 
@@ -32,6 +35,8 @@ export const SessionExerciseCard = memo(function SessionExerciseCard({
   collapsed,
   isFirst,
   isLast,
+  previousSessionExerciseId,
+  nextSessionExerciseId,
   onToggleCollapsed,
 }: Props) {
   const images = getExerciseImages(exercise);
@@ -67,6 +72,31 @@ export const SessionExerciseCard = memo(function SessionExerciseCard({
   const handlePressInfo = useCallback(() => {
     pushDebounced(`/exercise/${exercise.id}`);
   }, [pushDebounced, exercise.id]);
+
+  const handleSwapExercise = useCallback(() => {
+    // 確認ダイアログの要否をexercise-swap画面側で判断できるよう、既に何か記録済みか
+    // （✓確定済みだけでなく、✓未タップの入力途中の値も含めて）を渡しておく
+    const hasRecordedData = sets.some(
+      (s) =>
+        s.completedAt != null ||
+        s.weight != null ||
+        s.reps != null ||
+        s.durationSeconds != null ||
+        s.distanceMeters != null,
+    );
+    pushDebounced({
+      pathname: '/workout/exercise-swap',
+      params: {
+        sessionExerciseId: String(exercise.sessionExerciseId),
+        currentExerciseId: String(exercise.id),
+        currentExerciseName: exercise.name,
+        // 入れ替え先画面での計測タイプ比較はexercises.measurementTypeの生値同士で行うため、
+        // このカードでの未知値フォールバック(measurementType変数)ではなく生値を渡す
+        currentMeasurementType: exercise.measurementType,
+        hasRecordedData: hasRecordedData ? 'true' : 'false',
+      },
+    });
+  }, [pushDebounced, exercise.sessionExerciseId, exercise.id, exercise.name, exercise.measurementType, sets]);
 
   const handleToggleExpanded = useCallback(() => {
     LayoutAnimation.configureNext(LayoutAnimation.Presets.easeInEaseOut);
@@ -149,6 +179,26 @@ export const SessionExerciseCard = memo(function SessionExerciseCard({
     }
   }, []);
 
+  const handleMoveUp = useCallback(async () => {
+    if (previousSessionExerciseId == null) return;
+    try {
+      await swapExerciseOrder(exercise.sessionExerciseId, previousSessionExerciseId);
+    } catch (e) {
+      console.error('[move exercise up]', e);
+      Alert.alert('エラー', '種目を並び替えられませんでした。');
+    }
+  }, [exercise.sessionExerciseId, previousSessionExerciseId]);
+
+  const handleMoveDown = useCallback(async () => {
+    if (nextSessionExerciseId == null) return;
+    try {
+      await swapExerciseOrder(exercise.sessionExerciseId, nextSessionExerciseId);
+    } catch (e) {
+      console.error('[move exercise down]', e);
+      Alert.alert('エラー', '種目を並び替えられませんでした。');
+    }
+  }, [exercise.sessionExerciseId, nextSessionExerciseId]);
+
   const handleDeleteExercise = useCallback(() => {
     Alert.alert('この種目を削除しますか？', '記録した内容も削除されます。', [
       { text: 'キャンセル', style: 'cancel' },
@@ -196,7 +246,14 @@ export const SessionExerciseCard = memo(function SessionExerciseCard({
             <IconSymbol name="info.circle" size={20} color={Colors.textPlaceholder} />
           </TouchableOpacity>
           {expanded && (
-            <ExerciseCardMenu isFirst={isFirst} isLast={isLast} onDelete={handleDeleteExercise} />
+            <ExerciseCardMenu
+              isFirst={isFirst}
+              isLast={isLast}
+              onSwap={handleSwapExercise}
+              onMoveUp={handleMoveUp}
+              onMoveDown={handleMoveDown}
+              onDelete={handleDeleteExercise}
+            />
           )}
           {!expanded && (
             <View style={styles.collapsedSummary}>
