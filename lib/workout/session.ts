@@ -62,3 +62,10 @@ export async function addExercisesToSession(sessionId: number, exerciseIds: numb
 export async function removeExerciseFromSession(sessionExerciseId: number) {
   await db.delete(workoutSessionExercises).where(eq(workoutSessionExercises.id, sessionExerciseId));
 }
+
+// 記録編集画面「⋮」メニューの「削除」。workoutSessionExercises/setsとも
+// sessionIdにonDelete cascadeが張られているため、このセッション行を消せば
+// 種目・セットもすべて連動して消える
+export async function deleteSession(sessionId: number) {
+  await db.delete(workoutSessions).where(eq(workoutSessions.id, sessionId));
+}
