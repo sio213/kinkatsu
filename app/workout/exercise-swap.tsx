@@ -22,13 +22,11 @@ export default function ExerciseSwapScreen() {
     sessionExerciseId: sessionExerciseIdParam,
     currentExerciseId: currentExerciseIdParam,
     currentExerciseName,
-    currentMeasurementType,
     hasRecordedData: hasRecordedDataParam,
   } = useLocalSearchParams<{
     sessionExerciseId: string;
     currentExerciseId: string;
     currentExerciseName: string;
-    currentMeasurementType: string;
     hasRecordedData: string;
   }>();
   const sessionExerciseId = Number(sessionExerciseIdParam);
@@ -92,10 +90,10 @@ export default function ExerciseSwapScreen() {
     // 絞り込み前の全種目一覧から探す（絞り込み後のリストだと無言で何も起きなくなるバグを避ける）
     const selected = exercises.find((e) => e.id === selectedId);
     if (!selected) return;
-    const sameMeasurementType = selected.measurementType === currentMeasurementType;
-    // 計測タイプが同じなら値をそのまま引き継げる。異なっていても、まだ何も記録していなければ
-    // 失われるものが無いため、確認なしで入れ替えてよい（セット削除の確認要否と同じ考え方）
-    if (sameMeasurementType || !hasRecordedData) {
+    // 入れ替え後は種目追加時と同じ状態（値が空の1セットのみ）にリセットされるため、
+    // まだ何も記録していなければ失われるものが無く、確認なしで入れ替えてよい
+    // （セット削除の確認要否と同じ考え方）
+    if (!hasRecordedData) {
       runSwap(selected.id);
       return;
     }
@@ -103,7 +101,7 @@ export default function ExerciseSwapScreen() {
       { text: 'キャンセル', style: 'cancel' },
       { text: '入れ替える', style: 'destructive', onPress: () => runSwap(selected.id) },
     ]);
-  }, [exercises, selectedId, currentMeasurementType, hasRecordedData, runSwap]);
+  }, [exercises, selectedId, hasRecordedData, runSwap]);
 
   const renderItem = useCallback(
     ({ item: e }: { item: Exercise }) => (

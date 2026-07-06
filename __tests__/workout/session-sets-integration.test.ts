@@ -225,3 +225,135 @@ describe('種目追加時の自動セット生成 と addSet の整合性（実S
     expect(wseBSet).toEqual({ set_number: 1, weight: null, reps: null });
   });
 });
+
+// session.test.tsのモックはdb.delete().where()の呼び出し引数しか検証できず、実際に何行
+// 削除され何行残るかは証明できない。lib/workout/session.tsのreplaceSessionExerciseが発行する
+// SQL（update→delete→insert）を実SQLiteで再現し、複数セットが1件にリセットされることを検証する
+describe('種目入れ替え時のセットリセット（実SQLite）', () => {
+  let db: Database.Database;
+
+  afterEach(() => {
+    db.close();
+  });
+
+  function seedTwoExercisesAndSession(database: Database.Database) {
+    const now = Date.now();
+    database
+      .prepare(
+        `INSERT INTO exercises (name, category, source, measurement_type, created_at, updated_at)
+         VALUES ('種目A', 'core', 'custom', 'weight_reps', ?, ?)`,
+      )
+      .run(now, now);
+    database
+      .prepare(
+        `INSERT INTO exercises (name, category, source, measurement_type, created_at, updated_at)
+         VALUES ('種目B', 'core', 'custom', 'weight_reps', ?, ?)`,
+      )
+      .run(now, now);
+    const [exerciseA, exerciseB] = database
+      .prepare('SELECT id FROM exercises ORDER BY id')
+      .all() as { id: number }[];
+
+    database
+      .prepare(`INSERT INTO workout_sessions (started_at, created_at, updated_at) VALUES (?, ?, ?)`)
+      .run(now, now, now);
+    const sessionId = (database.prepare('SELECT id FROM workout_sessions').get() as { id: number }).id;
+
+    return { exerciseAId: exerciseA.id, exerciseBId: exerciseB.id, sessionId, now };
+  }
+
+  // lib/workout/session.tsのreplaceSessionExerciseが実際に発行するSQLをそのままミラーしたもの。
+  // 関数側のSQL/カラムを変更した場合はこのヘルパーも合わせて更新すること(自動追従はしない)
+  function replaceSessionExerciseSql(
+    database: Database.Database,
+    sessionExerciseId: number,
+    newExerciseId: number,
+  ) {
+    const wse = database
+      .prepare('SELECT session_id AS sessionId FROM workout_session_exercises WHERE id = ?')
+      .get(sessionExerciseId) as { sessionId: number };
+    const now = Date.now();
+    const run = database.transaction(() => {
+      database
+        .prepare('UPDATE workout_session_exercises SET exercise_id = ? WHERE id = ?')
+        .run(newExerciseId, sessionExerciseId);
+      database.prepare('DELETE FROM sets WHERE workout_session_exercise_id = ?').run(sessionExerciseId);
+      database
+        .prepare(
+          `INSERT INTO sets (session_id, exercise_id, workout_session_exercise_id, set_number, completed_at, created_at)
+           VALUES (?, ?, ?, 1, NULL, ?)`,
+        )
+        .run(wse.sessionId, newExerciseId, sessionExerciseId, now);
+    });
+    run();
+  }
+
+  it('setNumber=1,2,3の3件があるカードを入れ替えると、全部消えて値が空の1件だけになる', () => {
+    db = new Database(':memory:');
+    db.pragma('foreign_keys = ON');
+    applyAllMigrations(db);
+    const { exerciseAId, exerciseBId, sessionId, now } = seedTwoExercisesAndSession(db);
+
+    db.prepare(
+      `INSERT INTO workout_session_exercises (session_id, exercise_id, order_index, created_at)
+       VALUES (?, ?, 0, ?)`,
+    ).run(sessionId, exerciseAId, now);
+    const wseId = (
+      db.prepare('SELECT id FROM workout_session_exercises WHERE exercise_id = ?').get(exerciseAId) as {
+        id: number;
+      }
+    ).id;
+    for (const [setNumber, weight, reps] of [
+      [1, 40, 10],
+      [2, 42.5, 8],
+      [3, 45, 6],
+    ]) {
+      db.prepare(
+        `INSERT INTO sets (session_id, exercise_id, workout_session_exercise_id, set_number, weight, reps, completed_at, created_at)
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
+      ).run(sessionId, exerciseAId, wseId, setNumber, weight, reps, now, now);
+    }
+
+    replaceSessionExerciseSql(db, wseId, exerciseBId);
+
+    const rows = db
+      .prepare(
+        'SELECT set_number, weight, reps, exercise_id AS exerciseId FROM sets WHERE workout_session_exercise_id = ?',
+      )
+      .all(wseId) as { set_number: number; weight: number | null; reps: number | null; exerciseId: number }[];
+    expect(rows).toEqual([{ set_number: 1, weight: null, reps: null, exerciseId: exerciseBId }]);
+  });
+
+  it('同一セッション内の別カードのセットは、入れ替え対象カードのリセットの影響を受けない', () => {
+    db = new Database(':memory:');
+    db.pragma('foreign_keys = ON');
+    applyAllMigrations(db);
+    const { exerciseAId, exerciseBId, sessionId, now } = seedTwoExercisesAndSession(db);
+
+    db.prepare(
+      `INSERT INTO workout_session_exercises (session_id, exercise_id, order_index, created_at)
+       VALUES (?, ?, 0, ?)`,
+    ).run(sessionId, exerciseAId, now);
+    db.prepare(
+      `INSERT INTO workout_session_exercises (session_id, exercise_id, order_index, created_at)
+       VALUES (?, ?, 1, ?)`,
+    ).run(sessionId, exerciseBId, now);
+    const wseRows = db
+      .prepare('SELECT id, exercise_id AS exerciseId FROM workout_session_exercises ORDER BY id')
+      .all() as { id: number; exerciseId: number }[];
+    const wseToReplace = wseRows.find((r) => r.exerciseId === exerciseAId)!;
+    const otherWse = wseRows.find((r) => r.exerciseId === exerciseBId)!;
+
+    db.prepare(
+      `INSERT INTO sets (session_id, exercise_id, workout_session_exercise_id, set_number, weight, reps, completed_at, created_at)
+       VALUES (?, ?, ?, 1, 100, 5, ?, ?)`,
+    ).run(sessionId, exerciseBId, otherWse.id, now, now);
+
+    replaceSessionExerciseSql(db, wseToReplace.id, exerciseBId);
+
+    const otherRows = db
+      .prepare('SELECT set_number, weight, reps FROM sets WHERE workout_session_exercise_id = ?')
+      .all(otherWse.id) as { set_number: number; weight: number; reps: number }[];
+    expect(otherRows).toEqual([{ set_number: 1, weight: 100, reps: 5 }]);
+  });
+});

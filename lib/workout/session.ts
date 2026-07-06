@@ -1,6 +1,19 @@
 import { db } from '@/db/client';
-import { exercises, sets, workoutSessionExercises, workoutSessions } from '@/db/schema';
+import { sets, workoutSessionExercises, workoutSessions } from '@/db/schema';
 import { eq } from 'drizzle-orm';
+
+// 種目カードに最初から入っている、値が空の1セット目。種目の新規追加時・入れ替え後の
+// 初期化時とで同じ形にする必要があるため共通化している
+function freshSetValues(sessionId: number, exerciseId: number, workoutSessionExerciseId: number, now: number) {
+  return {
+    sessionId,
+    exerciseId,
+    workoutSessionExerciseId,
+    setNumber: 1,
+    completedAt: null,
+    createdAt: now,
+  };
+}
 
 export async function startWorkoutSession() {
   const now = Date.now();
@@ -45,14 +58,7 @@ export async function addExercisesToSession(sessionId: number, exerciseIds: numb
       .returning();
     // 種目追加直後にセットが1件も無いと入力を始めにくいため、カードごとに値が空のセットを1件自動生成する
     await tx.insert(sets).values(
-      inserted.map((wse) => ({
-        sessionId,
-        exerciseId: wse.exerciseId,
-        workoutSessionExerciseId: wse.id,
-        setNumber: 1,
-        completedAt: null,
-        createdAt: now,
-      })),
+      inserted.map((wse) => freshSetValues(sessionId, wse.exerciseId, wse.id, now)),
     );
   });
 }
@@ -96,49 +102,24 @@ export async function swapExerciseOrder(sessionExerciseId: number, targetSession
 
 // 種目カードの「⋮」メニューの「種目を入れ替え」。既存のswapExerciseOrder（並び順の入れ替え）と
 // 名前が紛らわしくならないよう、こちらは種目そのものの置換であることが分かる名前にしている。
-// setsはexerciseId/workoutSessionExerciseIdの両方を持つ非正規化構造のため、
-// workoutSessionExercises側だけでなくsets.exerciseIdも揃えておく。計測タイプ（重量×回数/
-// 回数のみ/時間 等）が変わる場合、既存の入力値は新しい列構成と噛み合わなくなるためクリアする
-// （セット数＝行自体は維持し、値だけnullに戻す）。呼び出し側（入れ替え確認ダイアログの要否判断）
-// でも同じ「計測タイプが同じか」の判定を行うが、呼び出し側はexercises.measurementTypeの生値を
-// そのまま渡す前提とし、ここでの判定と基準を揃えている
+// 入れ替え後は種目追加ピッカーで新規に種目を追加した直後と同じ状態にする方針のため、
+// 既存のセットは計測タイプの一致有無に関わらずすべて削除し、値が空でsetNumber=1の
+// セットを1件だけ作り直す（addExercisesToSessionの自動生成ロジックと同じ形）
 export async function replaceSessionExercise(sessionExerciseId: number, newExerciseId: number) {
+  const now = Date.now();
   await db.transaction(async (tx) => {
     const [wse] = await tx
-      .select({ exerciseId: workoutSessionExercises.exerciseId })
+      .select({ exerciseId: workoutSessionExercises.exerciseId, sessionId: workoutSessionExercises.sessionId })
       .from(workoutSessionExercises)
       .where(eq(workoutSessionExercises.id, sessionExerciseId));
     if (!wse || wse.exerciseId === newExerciseId) return;
-
-    const [oldExercise] = await tx
-      .select({ measurementType: exercises.measurementType })
-      .from(exercises)
-      .where(eq(exercises.id, wse.exerciseId));
-    const [newExercise] = await tx
-      .select({ measurementType: exercises.measurementType })
-      .from(exercises)
-      .where(eq(exercises.id, newExerciseId));
-    const sameMeasurementType = oldExercise?.measurementType === newExercise?.measurementType;
 
     await tx
       .update(workoutSessionExercises)
       .set({ exerciseId: newExerciseId })
       .where(eq(workoutSessionExercises.id, sessionExerciseId));
 
-    await tx
-      .update(sets)
-      .set(
-        sameMeasurementType
-          ? { exerciseId: newExerciseId }
-          : {
-              exerciseId: newExerciseId,
-              weight: null,
-              reps: null,
-              durationSeconds: null,
-              distanceMeters: null,
-              completedAt: null,
-            },
-      )
-      .where(eq(sets.workoutSessionExerciseId, sessionExerciseId));
+    await tx.delete(sets).where(eq(sets.workoutSessionExerciseId, sessionExerciseId));
+    await tx.insert(sets).values(freshSetValues(wse.sessionId, newExerciseId, sessionExerciseId, now));
   });
 }
