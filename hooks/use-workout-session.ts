@@ -39,15 +39,16 @@ export function useWorkoutSession(id: number) {
 
 // 記録タブの履歴一覧用。setsは記録の度に増え続ける実データなので、
 // 全件をJSへ引き上げてから集計するのではなくSQL側でセッションごとにSUM/COUNTする。
-// setCountは種目追加直後に自動生成される値未入力のセット（completedAtがnull）を含めず、
-// 実際に✓で確定したセットのみを数える（そうしないと種目を追加しただけで記録件数が水増しされる）
+// setCount/totalVolumeとも、✓未タップの自動保存中の値（completedAtがnull。種目追加直後の
+// 空セットや、入力途中でアプリを離れた場合の下書き）を含めず、実際に✓で確定したセットのみを
+// 集計する（そうしないと種目を追加・入力しただけで記録件数・総重量が水増しされる）
 export function useSessionStats(): Map<number, SessionSummary> {
   const { data } = useLiveQuery(
     db
       .select({
         sessionId: sets.sessionId,
         setCount: sql<number>`sum(case when ${sets.completedAt} is not null then 1 else 0 end)`,
-        totalVolume: sql<number>`coalesce(sum(${sets.weight} * ${sets.reps}), 0)`,
+        totalVolume: sql<number>`coalesce(sum(case when ${sets.completedAt} is not null then ${sets.weight} * ${sets.reps} else 0 end), 0)`,
       })
       .from(sets)
       .groupBy(sets.sessionId),

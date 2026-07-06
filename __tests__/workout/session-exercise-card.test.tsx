@@ -2,6 +2,7 @@ const mockAddSet = jest.fn();
 const mockDeleteLastSet = jest.fn();
 const mockSaveSet = jest.fn();
 const mockReopenSet = jest.fn();
+const mockSaveDraft = jest.fn();
 const mockPush = jest.fn();
 const mockOnToggleCollapsed = jest.fn();
 
@@ -10,6 +11,7 @@ jest.mock('@/lib/workout/sets', () => ({
   deleteLastSet: (...args: unknown[]) => mockDeleteLastSet(...args),
   saveSet: (...args: unknown[]) => mockSaveSet(...args),
   reopenSet: (...args: unknown[]) => mockReopenSet(...args),
+  saveDraft: (...args: unknown[]) => mockSaveDraft(...args),
 }));
 
 jest.mock('expo-router', () => ({
@@ -69,6 +71,7 @@ beforeEach(() => {
   jest.clearAllMocks();
   mockAddSet.mockResolvedValue(undefined);
   mockDeleteLastSet.mockResolvedValue(undefined);
+  mockSaveDraft.mockResolvedValue(undefined);
   jest.spyOn(Alert, 'alert').mockImplementation(() => {});
 });
 
@@ -91,13 +94,228 @@ test('セット数だけSetRowが描画される', () => {
   expect(checkboxes).toHaveLength(2);
 });
 
-test('セット追加ボタンでaddSetが呼ばれる', async () => {
+test('セット追加ボタンでaddSetが呼ばれる（直前セットが無いのでoverrideValuesはundefined）', async () => {
   const root = render({ exercise, sessionId: 1, sets: [] });
   const btn = findButtonByLabel(root, 'セット追加')!;
   await act(async () => {
     btn.props.onPress();
   });
-  expect(mockAddSet).toHaveBeenCalledWith(1, 10, 500);
+  expect(mockAddSet).toHaveBeenCalledWith(1, 10, 500, undefined);
+});
+
+test('直前セットが✓未タップのまま入力中の場合、その入力値をoverrideValuesとしてaddSetに渡す', async () => {
+  const sets = [{ id: 9, setNumber: 1, weight: null, reps: null, completedAt: null }] as any;
+  const root = render({ exercise, sessionId: 1, sets });
+
+  const inputs = root.findAllByType(TextInput);
+  act(() => {
+    inputs[0].props.onChangeText('60');
+  });
+  act(() => {
+    inputs[1].props.onChangeText('10');
+  });
+
+  const btn = findButtonByLabel(root, 'セット追加')!;
+  await act(async () => {
+    btn.props.onPress();
+  });
+  expect(mockAddSet).toHaveBeenCalledWith(1, 10, 500, { weight: 60, reps: 10 });
+});
+
+test('直前セットが✓タップ済みの場合は入力途中の値を使わず、addSet側の既定コピーに任せる（overrideValues省略）', async () => {
+  const sets = [{ id: 9, setNumber: 1, weight: 60, reps: 10, completedAt: 1 }] as any;
+  const root = render({ exercise, sessionId: 1, sets });
+
+  const btn = findButtonByLabel(root, 'セット追加')!;
+  await act(async () => {
+    btn.props.onPress();
+  });
+  expect(mockAddSet).toHaveBeenCalledWith(1, 10, 500, undefined);
+});
+
+test('直前セットが✓未タップでも一度も入力に触れていない場合は、addSet側の既定コピーに任せる（overrideValues省略）', async () => {
+  const sets = [{ id: 9, setNumber: 1, weight: null, reps: null, completedAt: null }] as any;
+  const root = render({ exercise, sessionId: 1, sets });
+  // 何も入力しない
+
+  const btn = findButtonByLabel(root, 'セット追加')!;
+  await act(async () => {
+    btn.props.onPress();
+  });
+  expect(mockAddSet).toHaveBeenCalledWith(1, 10, 500, undefined);
+});
+
+test('直前セットの入力途中の値がパース不可能で、DB側にもフォールバック値が無い場合はnullになる（Alertは出ない）', async () => {
+  const sets = [{ id: 9, setNumber: 1, weight: null, reps: null, completedAt: null }] as any;
+  const root = render({ exercise, sessionId: 1, sets });
+
+  const inputs = root.findAllByType(TextInput);
+  act(() => {
+    inputs[0].props.onChangeText('60kg'); // 単位付きの不正な入力
+    inputs[1].props.onChangeText('10');
+  });
+
+  const btn = findButtonByLabel(root, 'セット追加')!;
+  await act(async () => {
+    btn.props.onPress();
+  });
+  expect(mockAddSet).toHaveBeenCalledWith(1, 10, 500, { weight: null, reps: 10 });
+  expect(Alert.alert).not.toHaveBeenCalled();
+});
+
+test('直前セットの入力途中の値がパース不可能でも、DB側に既存値があればそれにフォールバックする（タイプミスで値を失わないため）', async () => {
+  // reopen由来などでDBには以前の確定値(80/6)が残っている状態を想定
+  const sets = [{ id: 9, setNumber: 1, weight: 80, reps: 6, completedAt: null }] as any;
+  const root = render({ exercise, sessionId: 1, sets });
+
+  const inputs = root.findAllByType(TextInput);
+  act(() => {
+    inputs[0].props.onChangeText('60kg'); // 単位付きの不正な入力（タイプミス想定）
+  });
+
+  const btn = findButtonByLabel(root, 'セット追加')!;
+  await act(async () => {
+    btn.props.onPress();
+  });
+  // weightは不正入力なのでDBの80にフォールバック、reps欄は未編集のため元のDB表示値(6)のまま
+  expect(mockAddSet).toHaveBeenCalledWith(1, 10, 500, { weight: 80, reps: 6 });
+  expect(Alert.alert).not.toHaveBeenCalled();
+});
+
+test('直前セットを✓再タップで編集に戻した直後にセット追加すると、reopen由来の値がoverrideValuesとして渡る', async () => {
+  mockReopenSet.mockResolvedValue(undefined);
+  const initialSets = [{ id: 9, setNumber: 1, weight: 62.5, reps: 8, completedAt: 123 }] as any;
+
+  let instance!: ReturnType<typeof create>;
+  act(() => {
+    instance = create(
+      <SessionExerciseCard
+        exercise={exercise}
+        sessionId={1}
+        sets={initialSets}
+        collapsed={false}
+        onToggleCollapsed={mockOnToggleCollapsed}
+      />,
+    );
+  });
+  const root = instance.root;
+
+  const checkbox = root
+    .findAllByType(TouchableOpacity)
+    .find((t) => t.props.accessibilityRole === 'checkbox')!;
+  await act(async () => {
+    checkbox.props.onPress();
+  });
+  expect(mockReopenSet).toHaveBeenCalledWith(9);
+
+  // 実運用ではreopenSet完了後、live queryでcompletedAtがnullに更新されて再描画される
+  const reopenedSets = [{ ...initialSets[0], completedAt: null }];
+  act(() => {
+    instance.update(
+      <SessionExerciseCard
+        exercise={exercise}
+        sessionId={1}
+        sets={reopenedSets}
+        collapsed={false}
+        onToggleCollapsed={mockOnToggleCollapsed}
+      />,
+    );
+  });
+
+  const addBtn = findButtonByLabel(root, 'セット追加')!;
+  await act(async () => {
+    addBtn.props.onPress();
+  });
+  expect(mockAddSet).toHaveBeenCalledWith(1, 10, 500, { weight: 62.5, reps: 8 });
+});
+
+test('入力してデバウンス時間が経過するとsaveDraftが呼ばれ、✓未タップの入力が画面を離れても消えないようにDBへ保存される（バグ回帰防止）', () => {
+  jest.useFakeTimers();
+  const sets = [{ id: 9, setNumber: 1, weight: null, reps: null, completedAt: null }] as any;
+  const root = render({ exercise, sessionId: 1, sets });
+
+  const inputs = root.findAllByType(TextInput);
+  act(() => {
+    inputs[1].props.onChangeText('10');
+  });
+  expect(mockSaveDraft).not.toHaveBeenCalled();
+
+  act(() => {
+    jest.advanceTimersByTime(400);
+  });
+  expect(mockSaveDraft).toHaveBeenCalledWith(9, { weight: null, reps: 10 });
+  jest.useRealTimers();
+});
+
+test('入力途中の値が0の場合、overrideValuesでも0のままコピーされる（SetRow→addSetの結合経路での境界値）', async () => {
+  const sets = [{ id: 9, setNumber: 1, weight: null, reps: null, completedAt: null }] as any;
+  const root = render({ exercise, sessionId: 1, sets });
+
+  const inputs = root.findAllByType(TextInput);
+  act(() => {
+    inputs[0].props.onChangeText('0');
+    inputs[1].props.onChangeText('0');
+  });
+
+  const btn = findButtonByLabel(root, 'セット追加')!;
+  await act(async () => {
+    btn.props.onPress();
+  });
+  expect(mockAddSet).toHaveBeenCalledWith(1, 10, 500, { weight: 0, reps: 0 });
+});
+
+test('time計測タイプで直前セットの入力途中の時間(mm:ss)をoverrideValuesとして秒数に変換してコピーする', async () => {
+  const timeExercise = { ...exercise, measurementType: 'time' };
+  const sets = [{ id: 9, setNumber: 1, durationSeconds: null, completedAt: null }] as any;
+  const root = render({ exercise: timeExercise, sessionId: 1, sets });
+
+  const inputs = root.findAllByType(TextInput);
+  act(() => {
+    inputs[0].props.onChangeText('1:30');
+  });
+
+  const btn = findButtonByLabel(root, 'セット追加')!;
+  await act(async () => {
+    btn.props.onPress();
+  });
+  expect(mockAddSet).toHaveBeenCalledWith(1, 10, 500, { durationSeconds: 90 });
+});
+
+test('weight_time計測タイプで直前セットの入力途中の重量・時間をoverrideValuesとしてコピーする', async () => {
+  const weightTimeExercise = { ...exercise, measurementType: 'weight_time' };
+  const sets = [{ id: 9, setNumber: 1, weight: null, durationSeconds: null, completedAt: null }] as any;
+  const root = render({ exercise: weightTimeExercise, sessionId: 1, sets });
+
+  const inputs = root.findAllByType(TextInput);
+  act(() => {
+    inputs[0].props.onChangeText('40');
+    inputs[1].props.onChangeText('0:45');
+  });
+
+  const btn = findButtonByLabel(root, 'セット追加')!;
+  await act(async () => {
+    btn.props.onPress();
+  });
+  expect(mockAddSet).toHaveBeenCalledWith(1, 10, 500, { weight: 40, durationSeconds: 45 });
+});
+
+test('distance_time計測タイプで距離だけ入力途中・時間は未入力のままセット追加すると、部分的にoverrideValuesへ反映される', async () => {
+  const distanceExercise = { ...exercise, measurementType: 'distance_time' };
+  const sets = [
+    { id: 9, setNumber: 1, distanceMeters: null, durationSeconds: null, completedAt: null },
+  ] as any;
+  const root = render({ exercise: distanceExercise, sessionId: 1, sets });
+
+  const inputs = root.findAllByType(TextInput);
+  act(() => {
+    inputs[0].props.onChangeText('5'); // 距離(km)だけ入力
+  });
+
+  const btn = findButtonByLabel(root, 'セット追加')!;
+  await act(async () => {
+    btn.props.onPress();
+  });
+  expect(mockAddSet).toHaveBeenCalledWith(1, 10, 500, { distanceMeters: 5000, durationSeconds: null });
 });
 
 test('セットが0件のときセット削除ボタンは無効', () => {
@@ -147,6 +365,55 @@ test('削除確認をキャンセルするとdeleteLastSetは呼ばれない', a
     btn.props.onPress();
   });
   expect(mockDeleteLastSet).not.toHaveBeenCalled();
+});
+
+test('セット削除後に別idの新しいセットが同じ位置に来ても、削除済みセットの古いdraftは使われない', async () => {
+  const initialSets = [{ id: 9, setNumber: 1, weight: null, reps: null, completedAt: null }] as any;
+  let instance!: ReturnType<typeof create>;
+  act(() => {
+    instance = create(
+      <SessionExerciseCard
+        exercise={exercise}
+        sessionId={1}
+        sets={initialSets}
+        collapsed={false}
+        onToggleCollapsed={mockOnToggleCollapsed}
+      />,
+    );
+  });
+  const root = instance.root;
+
+  const inputs = root.findAllByType(TextInput);
+  act(() => {
+    inputs[0].props.onChangeText('999');
+  });
+
+  const deleteBtn = findButtonByLabel(root, 'セット削除')!;
+  await act(async () => {
+    deleteBtn.props.onPress();
+  });
+  expect(mockDeleteLastSet).toHaveBeenCalledWith(500);
+
+  // 削除後、別id(20)の新しいセットが同じ位置に来た状態を再現（idは使い回されない前提）
+  const newSets = [{ id: 20, setNumber: 1, weight: null, reps: null, completedAt: null }] as any;
+  act(() => {
+    instance.update(
+      <SessionExerciseCard
+        exercise={exercise}
+        sessionId={1}
+        sets={newSets}
+        collapsed={false}
+        onToggleCollapsed={mockOnToggleCollapsed}
+      />,
+    );
+  });
+
+  const addBtn = findButtonByLabel(root, 'セット追加')!;
+  await act(async () => {
+    addBtn.props.onPress();
+  });
+  // 旧id(9)の"999"が誤って使われず、addSet側の既定コピーに委ねられる（overrideValues省略）
+  expect(mockAddSet).toHaveBeenCalledWith(1, 10, 500, undefined);
 });
 
 test('セット追加が失敗した場合はエラーAlertを表示する', async () => {

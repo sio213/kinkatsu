@@ -6,8 +6,8 @@ import { useDebouncedPush } from '@/hooks/use-debounced-push';
 import type { SessionExercise } from '@/hooks/use-workout-session';
 import { MEASUREMENT_TYPES, type MeasurementType } from '@/lib/exercises/constants';
 import { getExerciseImages } from '@/lib/exercises/images';
-import { MEASUREMENT_COLUMNS } from '@/lib/workout/set-format';
-import { addSet, deleteLastSet, reopenSet, saveSet, type SetValues } from '@/lib/workout/sets';
+import { MEASUREMENT_COLUMNS, parseColumnsWithFallback } from '@/lib/workout/set-format';
+import { addSet, deleteLastSet, reopenSet, saveDraft, saveSet, type SetValues } from '@/lib/workout/sets';
 import { Image } from 'expo-image';
 import { memo, useCallback, useRef } from 'react';
 import { Alert, LayoutAnimation, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
@@ -39,6 +39,24 @@ export const SessionExerciseCard = memo(function SessionExerciseCard({
   const isMutatingRef = useRef(false);
   const pushDebounced = useDebouncedPush();
   const expanded = !collapsed;
+  // ✓未タップのまま入力中のセット値（setId→表示文字列）。DBにはまだ保存されていないため、
+  // 「セット追加」時にこれをコピー元として使えるようにする。re-renderは不要なのでrefで持つ
+  const draftValuesRef = useRef<Map<number, Record<string, string>>>(new Map());
+
+  const handleDraftChange = useCallback((setId: number, values: Record<string, string>) => {
+    draftValuesRef.current.set(setId, values);
+  }, []);
+
+  // 1文字入力するたびに呼ばれるバックグラウンド保存。ここでAlertを出すと入力中に
+  // 何度もポップアップが出てしまうため、失敗時はログのみに留める（最終的な保存は
+  // ✓タップ時のhandleSaveSetがAlert付きで担保する）
+  const handleAutoSaveDraft = useCallback(async (setId: number, values: SetValues) => {
+    try {
+      await saveDraft(setId, values);
+    } catch (e) {
+      console.error('[auto save draft]', e);
+    }
+  }, []);
 
   const handlePressInfo = useCallback(() => {
     pushDebounced(`/exercise/${exercise.id}`);
@@ -53,27 +71,43 @@ export const SessionExerciseCard = memo(function SessionExerciseCard({
     if (isMutatingRef.current) return;
     isMutatingRef.current = true;
     try {
-      await addSet(sessionId, exercise.id, exercise.sessionExerciseId);
+      // 直前のセットが✓未タップ（completedAt: null）の場合、DBにはまだ値が保存されていないため、
+      // 画面上の入力途中の値（draft）があればそれをコピー元にする。✓タップ済みならDB上の
+      // 確定値がそのままコピー元になるので、addSet側の既定動作（overrideValues省略）に任せる。
+      // draftの一部の列が不正な入力（"60kg"等）でパースできない場合は、黙ってnullにはせず
+      // その列だけDB上のlast（直前セットの既存値）にフォールバックする
+      const last = sets[sets.length - 1];
+      let overrideValues: SetValues | undefined;
+      if (last && last.completedAt == null) {
+        const draft = draftValuesRef.current.get(last.id);
+        if (draft) {
+          overrideValues = parseColumnsWithFallback(columns, draft, last);
+        }
+      }
+      await addSet(sessionId, exercise.id, exercise.sessionExerciseId, overrideValues);
     } catch (e) {
       console.error('[add set]', e);
       Alert.alert('エラー', 'セットを追加できませんでした。');
     } finally {
       isMutatingRef.current = false;
     }
-  }, [sessionId, exercise.id, exercise.sessionExerciseId]);
+  }, [sessionId, exercise.id, exercise.sessionExerciseId, sets, columns]);
 
   const runDeleteLastSet = useCallback(async () => {
     if (isMutatingRef.current) return;
     isMutatingRef.current = true;
     try {
+      const last = sets[sets.length - 1];
       await deleteLastSet(exercise.sessionExerciseId);
+      // 削除したセットのdraftは二度と参照されないため、Mapに積み上がらないよう掃除しておく
+      if (last) draftValuesRef.current.delete(last.id);
     } catch (e) {
       console.error('[delete set]', e);
       Alert.alert('エラー', 'セットを削除できませんでした。');
     } finally {
       isMutatingRef.current = false;
     }
-  }, [exercise.sessionExerciseId]);
+  }, [exercise.sessionExerciseId, sets]);
 
   const handleDeleteSet = useCallback(() => {
     const last = sets[sets.length - 1];
@@ -92,6 +126,8 @@ export const SessionExerciseCard = memo(function SessionExerciseCard({
   const handleSaveSet = useCallback(async (setId: number, values: SetValues) => {
     try {
       await saveSet(setId, values);
+      // 確定後はhandleAddSetがこのセットのdraftを参照しなくなるため、Mapに積み上がらないよう掃除する
+      draftValuesRef.current.delete(setId);
     } catch (e) {
       console.error('[save set]', e);
       Alert.alert('エラー', 'セットを保存できませんでした。');
@@ -170,6 +206,8 @@ export const SessionExerciseCard = memo(function SessionExerciseCard({
             measurementType={measurementType}
             onSave={handleSaveSet}
             onReopen={handleReopenSet}
+            onDraftChange={handleDraftChange}
+            onAutoSaveDraft={handleAutoSaveDraft}
           />
         ))}
 
