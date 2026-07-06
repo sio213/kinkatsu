@@ -1,5 +1,5 @@
 import { db } from '@/db/client';
-import { workoutSessionExercises, workoutSessions } from '@/db/schema';
+import { sets, workoutSessionExercises, workoutSessions } from '@/db/schema';
 import { eq } from 'drizzle-orm';
 
 export async function startWorkoutSession() {
@@ -32,11 +32,25 @@ export async function addExercisesToSession(sessionId: number, exerciseIds: numb
       .where(eq(workoutSessionExercises.sessionId, sessionId));
     const startIndex =
       existing.length > 0 ? Math.max(...existing.map((e) => e.orderIndex)) + 1 : 0;
-    await tx.insert(workoutSessionExercises).values(
-      exerciseIds.map((exerciseId, i) => ({
+    const inserted = await tx
+      .insert(workoutSessionExercises)
+      .values(
+        exerciseIds.map((exerciseId, i) => ({
+          sessionId,
+          exerciseId,
+          orderIndex: startIndex + i,
+          createdAt: now,
+        })),
+      )
+      .returning();
+    // 種目追加直後にセットが1件も無いと入力を始めにくいため、カードごとに値が空のセットを1件自動生成する
+    await tx.insert(sets).values(
+      inserted.map((wse) => ({
         sessionId,
-        exerciseId,
-        orderIndex: startIndex + i,
+        exerciseId: wse.exerciseId,
+        workoutSessionExerciseId: wse.id,
+        setNumber: 1,
+        completedAt: null,
         createdAt: now,
       })),
     );
