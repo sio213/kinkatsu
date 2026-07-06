@@ -74,6 +74,11 @@ const SEATED_BARBELL_SHOULDER_PRESS = make({
 });
 const ABBREVIATION_SET = [BENCH_PRESS, BARBELL_SHOULDER_PRESS, SEATED_BARBELL_SHOULDER_PRESS];
 
+// 英語表記エイリアスの検索確認用（HIP_THRUSTはMUSCLE_SET定義済みのものを再利用する）
+const LAT_PULLDOWN = make({ id: 24, name: 'ラットプルダウン', category: 'back', slug: 'lat_pulldown', source: 'preset' });
+const PULL_UP = make({ id: 26, name: 'プルアップ（懸垂）', category: 'back', slug: 'pull_up', source: 'preset' });
+const ENGLISH_ALIAS_SET = [BENCH_PRESS, LAT_PULLDOWN, HIP_THRUST, PULL_UP];
+
 describe('filterExercises', () => {
   it('空配列 → []', () => {
     expect(filterExercises([], CATEGORY_ALL, '')).toEqual([]);
@@ -348,6 +353,26 @@ describe('filterExercises', () => {
     it('OHPは立位のバーベルショルダープレスのみにマッチし、座位バリエーションには誤爆しない', () => {
       const result = filterExercises(ABBREVIATION_SET, CATEGORY_ALL, 'OHP');
       expect(result.map((e) => e.name)).toEqual(['バーベルショルダープレス']);
+    });
+
+    it('英語表記でマッチする（Bench Press→ベンチプレス）', () => {
+      const result = filterExercises(ENGLISH_ALIAS_SET, CATEGORY_ALL, 'Bench Press');
+      expect(result.map((e) => e.name)).toContain('ベンチプレス');
+    });
+
+    it('英語表記は大文字小文字を区別しない（lat pulldown→ラットプルダウン）', () => {
+      const result = filterExercises(ENGLISH_ALIAS_SET, CATEGORY_ALL, 'lat pulldown');
+      expect(result.map((e) => e.name)).toContain('ラットプルダウン');
+    });
+
+    it('英語表記の一部の単語だけでもマッチする（hip→ヒップスラスト）', () => {
+      const result = filterExercises(ENGLISH_ALIAS_SET, CATEGORY_ALL, 'hip');
+      expect(result.map((e) => e.name)).toContain('ヒップスラスト');
+    });
+
+    it('ハイフンつき英語表記はハイフン無しクエリでもマッチする（Pull-Up→pull up）', () => {
+      const result = filterExercises(ENGLISH_ALIAS_SET, CATEGORY_ALL, 'pull up');
+      expect(result.map((e) => e.name)).toContain('プルアップ（懸垂）');
     });
   });
 
