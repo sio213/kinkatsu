@@ -56,3 +56,9 @@ export async function addExercisesToSession(sessionId: number, exerciseIds: numb
     );
   });
 }
+
+// 種目カードの「⋮」メニューの「削除」。sets側はworkoutSessionExerciseIdにonDelete cascadeが
+// 張られているため、このカード（workoutSessionExercises行）を消せば記録済みセットも連動して消える
+export async function removeExerciseFromSession(sessionExerciseId: number) {
+  await db.delete(workoutSessionExercises).where(eq(workoutSessionExercises.id, sessionExerciseId));
+}

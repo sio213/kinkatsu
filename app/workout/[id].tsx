@@ -135,13 +135,15 @@ export default function WorkoutScreen() {
           contentContainerStyle={styles.exerciseListContent}
           data={sessionExercises}
           keyExtractor={(item) => String(item.sessionExerciseId)}
-          renderItem={({ item }) => (
+          renderItem={({ item, index }) => (
             <ListErrorBoundary>
               <SessionExerciseCard
                 exercise={item}
                 sessionId={sessionId}
                 sets={sessionSets.get(item.sessionExerciseId) ?? EMPTY_SETS}
                 collapsed={collapsedIds.has(item.sessionExerciseId)}
+                isFirst={index === 0}
+                isLast={index === sessionExercises.length - 1}
                 onToggleCollapsed={handleToggleCollapsed}
               />
             </ListErrorBoundary>
