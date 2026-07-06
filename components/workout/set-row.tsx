@@ -82,14 +82,9 @@ export const SetRow = memo(function SetRow({
     Keyboard.dismiss();
     try {
       if (done) {
+        // ✓は完了/未完了の純粋なトグル。値は常時編集可能でvaluesが唯一の情報源のため、
+        // reopen時にDB値へ引き戻す必要はない（編集済みならその値のままでよい）
         await onReopen(set.id);
-        const reopened = toDisplayValues(columns, set);
-        valuesRef.current = reopened;
-        setValues(reopened);
-        // ここで渡す値はDB上の確定値そのものなので、addSet側のoverrideValues省略時の
-        // 既定コピー（DB直前値）と実質同じ結果になる。それでも呼ぶのは、reopen直後に
-        // ユーザーが値を編集した場合にdraftValuesRefが追従できるようにするため
-        onDraftChange?.(set.id, reopened);
       } else {
         // 空欄はnull保存でよいが、非空の入力がパースに失敗した場合（不正な貼り付け等）は
         // 気づかれずに値が消えたまま完了扱いにならないよう、保存せず気づかせる
@@ -116,41 +111,32 @@ export const SetRow = memo(function SetRow({
       <Text style={styles.number}>{set.setNumber}</Text>
       {columns.map((c) => {
         const isDuration = c.key === 'durationSeconds';
-        const input =
-          isDuration && !done ? (
-            <DurationInput
-              initialValue={values[c.key] ?? ''}
-              onChange={(text) => handleFieldChange(c.key, text)}
-              exerciseName={exerciseName}
-              setNumber={set.setNumber}
-            />
-          ) : (
-            <TextInput
-              style={[styles.cell, done && styles.cellDone]}
-              value={done ? c.toDisplay(set[c.key]) : values[c.key]}
-              onChangeText={(text) => handleFieldChange(c.key, text)}
-              editable={!done}
-              pointerEvents={done ? 'none' : 'auto'}
-              keyboardType={c.keyboardType}
-              textAlign="center"
-              placeholder="-"
-              placeholderTextColor={Colors.textPlaceholder}
-              accessibilityLabel={`${exerciseName} セット${set.setNumber} ${c.label}`}
-            />
-          );
-        // 完了済みセルはロックされ見た目だけでは編集し直せることが伝わりにくいため、
-        // タップでも✓と同じ「編集に戻す」操作を呼べるようにする
-        if (!done) return <View key={c.key} style={styles.cellWrapper}>{input}</View>;
+        // ✓済みでも重量・回数欄は直接編集できる（入力ミスに後で気づくケースがあるため）。
+        // ✓はcompletedAtの完了/未完了トグルに徹し、編集可否とは独立させている
+        const input = isDuration ? (
+          <DurationInput
+            initialValue={values[c.key] ?? ''}
+            onChange={(text) => handleFieldChange(c.key, text)}
+            exerciseName={exerciseName}
+            setNumber={set.setNumber}
+            done={done}
+          />
+        ) : (
+          <TextInput
+            style={[styles.cell, done && styles.cellDone]}
+            value={values[c.key]}
+            onChangeText={(text) => handleFieldChange(c.key, text)}
+            keyboardType={c.keyboardType}
+            textAlign="center"
+            placeholder="-"
+            placeholderTextColor={Colors.textPlaceholder}
+            accessibilityLabel={`${exerciseName} セット${set.setNumber} ${c.label}`}
+          />
+        );
         return (
-          <TouchableOpacity
-            key={c.key}
-            style={styles.cellWrapper}
-            onPress={handleTogglePress}
-            accessibilityRole="button"
-            accessibilityLabel={`${exerciseName} セット${set.setNumber}を編集`}
-          >
+          <View key={c.key} style={styles.cellWrapper}>
             {input}
-          </TouchableOpacity>
+          </View>
         );
       })}
       <TouchableOpacity
@@ -182,10 +168,10 @@ const styles = StyleSheet.create({
     fontWeight: '600',
     color: Colors.textPrimary,
   },
+  // ✓済みでも編集可能なため、グレーアウトではなく枠線色だけで「確定済み」を示す
   cellDone: {
-    backgroundColor: Colors.surfaceSubtle,
-    borderColor: Colors.border,
-    color: Colors.textMuted,
+    borderColor: Colors.accent,
+    borderWidth: 1.5,
   },
   check: {
     width: 24,
