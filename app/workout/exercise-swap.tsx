@@ -3,7 +3,7 @@ import { ExerciseSearchBar } from '@/components/exercises/exercise-search-bar';
 import { ListErrorBoundary } from '@/components/ui/list-error-boundary';
 import { NotFoundState } from '@/components/ui/not-found-state';
 import { PrimaryButton } from '@/components/ui/primary-button';
-import { SwapExerciseRow } from '@/components/workout/swap-exercise-row';
+import { PickerExerciseRow } from '@/components/workout/picker-exercise-row';
 import { Colors } from '@/constants/theme';
 import type { Exercise } from '@/db/schema';
 import { useDebouncedPush } from '@/hooks/use-debounced-push';
@@ -11,7 +11,7 @@ import { useExercises } from '@/hooks/use-exercises';
 import { useKeyboardInset } from '@/hooks/use-keyboard-inset';
 import { CATEGORY_ALL } from '@/lib/exercises/constants';
 import { filterExercises } from '@/lib/exercises/filter';
-import { swapSessionExercise } from '@/lib/workout/session';
+import { replaceSessionExercise } from '@/lib/workout/session';
 import { useFocusEffect, useLocalSearchParams, useRouter } from 'expo-router';
 import { useCallback, useMemo, useRef, useState } from 'react';
 import { Alert, FlatList, Keyboard, StyleSheet, Text, View } from 'react-native';
@@ -21,14 +21,19 @@ export default function ExerciseSwapScreen() {
   const {
     sessionExerciseId: sessionExerciseIdParam,
     currentExerciseId: currentExerciseIdParam,
+    currentExerciseName,
     currentMeasurementType,
+    hasRecordedData: hasRecordedDataParam,
   } = useLocalSearchParams<{
     sessionExerciseId: string;
     currentExerciseId: string;
+    currentExerciseName: string;
     currentMeasurementType: string;
+    hasRecordedData: string;
   }>();
   const sessionExerciseId = Number(sessionExerciseIdParam);
   const currentExerciseId = Number(currentExerciseIdParam);
+  const hasRecordedData = hasRecordedDataParam === 'true';
   const router = useRouter();
   const pushDebounced = useDebouncedPush();
   const { exercises } = useExercises();
@@ -53,7 +58,7 @@ export default function ExerciseSwapScreen() {
     [exercises, activeCategory, search, currentExerciseId],
   );
 
-  const handleSelect = useCallback((id: number) => {
+  const handleToggle = useCallback((id: number) => {
     Keyboard.dismiss();
     setSelectedId(id);
   }, []);
@@ -70,10 +75,10 @@ export default function ExerciseSwapScreen() {
       if (isSwappingRef.current) return;
       isSwappingRef.current = true;
       try {
-        await swapSessionExercise(sessionExerciseId, newExerciseId);
+        await replaceSessionExercise(sessionExerciseId, newExerciseId);
         router.back();
       } catch (e) {
-        console.error('[swap session exercise]', e);
+        console.error('[replace session exercise]', e);
         Alert.alert('エラー', '種目を入れ替えられませんでした。');
       } finally {
         isSwappingRef.current = false;
@@ -83,31 +88,46 @@ export default function ExerciseSwapScreen() {
   );
 
   const handleSubmit = useCallback(() => {
-    const selected = candidates.find((e) => e.id === selectedId);
+    // 選択済みidが検索・カテゴリ絞り込みでcandidatesから一時的に外れていても解決できるよう、
+    // 絞り込み前の全種目一覧から探す（絞り込み後のリストだと無言で何も起きなくなるバグを避ける）
+    const selected = exercises.find((e) => e.id === selectedId);
     if (!selected) return;
-    // 計測タイプが同じなら入力済みの値をそのまま引き継げるため確認なしで即入れ替える。
-    // 異なる場合は値がクリアされる（swapSessionExercise側の挙動）ため、事前に確認する
-    if (selected.measurementType === currentMeasurementType) {
+    const sameMeasurementType = selected.measurementType === currentMeasurementType;
+    // 計測タイプが同じなら値をそのまま引き継げる。異なっていても、まだ何も記録していなければ
+    // 失われるものが無いため、確認なしで入れ替えてよい（セット削除の確認要否と同じ考え方）
+    if (sameMeasurementType || !hasRecordedData) {
       runSwap(selected.id);
       return;
     }
-    Alert.alert('この種目に入れ替えますか？', '入力済みの記録は失われます。', [
+    Alert.alert(`「${selected.name}」に入れ替えますか？`, '入力済みの記録は失われます。', [
       { text: 'キャンセル', style: 'cancel' },
       { text: '入れ替える', style: 'destructive', onPress: () => runSwap(selected.id) },
     ]);
-  }, [candidates, selectedId, currentMeasurementType, runSwap]);
+  }, [exercises, selectedId, currentMeasurementType, hasRecordedData, runSwap]);
 
   const renderItem = useCallback(
     ({ item: e }: { item: Exercise }) => (
       <ListErrorBoundary>
-        <SwapExerciseRow exercise={e} selected={e.id === selectedId} onSelect={handleSelect} onPressInfo={handlePressInfo} />
+        <PickerExerciseRow
+          exercise={e}
+          selected={e.id === selectedId}
+          onToggle={handleToggle}
+          onPressInfo={handlePressInfo}
+          selectionMode="radio"
+        />
       </ListErrorBoundary>
     ),
-    [selectedId, handleSelect, handlePressInfo],
+    [selectedId, handleToggle, handlePressInfo],
   );
 
   const listHeader = (
     <View style={styles.headerArea}>
+      <View style={styles.currentExerciseRow}>
+        <Text style={styles.currentExerciseLabel}>現在の種目</Text>
+        <Text style={styles.currentExerciseName} numberOfLines={1}>
+          {currentExerciseName}
+        </Text>
+      </View>
       <ExerciseSearchBar value={search} onChangeText={setSearch} onSubmitEditing={Keyboard.dismiss} />
       <CategoryFilterChips activeCategory={activeCategory} onChange={setActiveCategory} />
     </View>
@@ -161,6 +181,9 @@ const styles = StyleSheet.create({
   content: { paddingHorizontal: 16, paddingBottom: 16 },
 
   headerArea: { paddingTop: 12, gap: 8, marginBottom: 4 },
+  currentExerciseRow: { flexDirection: 'row', alignItems: 'baseline', gap: 6, paddingHorizontal: 2 },
+  currentExerciseLabel: { fontSize: 12, color: Colors.textMuted },
+  currentExerciseName: { fontSize: 14, fontWeight: '700', color: Colors.textPrimary, flexShrink: 1 },
 
   emptyWrapper: { alignItems: 'center', paddingVertical: 32 },
   empty: { color: Colors.textPlaceholder, fontSize: 14 },

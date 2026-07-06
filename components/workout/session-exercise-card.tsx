@@ -74,15 +74,29 @@ export const SessionExerciseCard = memo(function SessionExerciseCard({
   }, [pushDebounced, exercise.id]);
 
   const handleSwapExercise = useCallback(() => {
+    // 確認ダイアログの要否をexercise-swap画面側で判断できるよう、既に何か記録済みか
+    // （✓確定済みだけでなく、✓未タップの入力途中の値も含めて）を渡しておく
+    const hasRecordedData = sets.some(
+      (s) =>
+        s.completedAt != null ||
+        s.weight != null ||
+        s.reps != null ||
+        s.durationSeconds != null ||
+        s.distanceMeters != null,
+    );
     pushDebounced({
       pathname: '/workout/exercise-swap',
       params: {
         sessionExerciseId: String(exercise.sessionExerciseId),
         currentExerciseId: String(exercise.id),
-        currentMeasurementType: measurementType,
+        currentExerciseName: exercise.name,
+        // 入れ替え先画面での計測タイプ比較はexercises.measurementTypeの生値同士で行うため、
+        // このカードでの未知値フォールバック(measurementType変数)ではなく生値を渡す
+        currentMeasurementType: exercise.measurementType,
+        hasRecordedData: hasRecordedData ? 'true' : 'false',
       },
     });
-  }, [pushDebounced, exercise.sessionExerciseId, exercise.id, measurementType]);
+  }, [pushDebounced, exercise.sessionExerciseId, exercise.id, exercise.name, exercise.measurementType, sets]);
 
   const handleToggleExpanded = useCallback(() => {
     LayoutAnimation.configureNext(LayoutAnimation.Presets.easeInEaseOut);

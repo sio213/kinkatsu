@@ -28,6 +28,9 @@ jest.mock('@/db/client', () => {
 
   const tx = {
     insert: txInsert,
+    // replaceSessionExercise/swapExerciseOrderがtx.updateを使うため、db.updateと同じ
+    // mockUpdateSet/mockUpdateWhereを共有する（テーブルの出し分けは不要、呼び出し順で見る）
+    update: jest.fn().mockReturnValue({ set: (...args: unknown[]) => mockUpdateSet(...args) }),
     select: jest.fn().mockReturnValue({
       from: jest.fn().mockReturnValue({ where: (...args: unknown[]) => mockSelectWhere(...args) }),
     }),
@@ -48,13 +51,19 @@ jest.mock('@/db/client', () => {
 
 jest.mock('@/db/schema', () => ({
   workoutSessions: { id: 'id', startedAt: 'startedAt', endedAt: 'endedAt' },
-  workoutSessionExercises: { sessionId: 'sessionId', orderIndex: 'orderIndex' },
-  sets: { sessionId: 'sessionId' },
+  workoutSessionExercises: { id: 'id', sessionId: 'sessionId', orderIndex: 'orderIndex', exerciseId: 'exerciseId' },
+  sets: { sessionId: 'sessionId', workoutSessionExerciseId: 'workoutSessionExerciseId' },
+  exercises: { id: 'id', measurementType: 'measurementType' },
 }));
 
 jest.mock('drizzle-orm', () => ({ eq: jest.fn((col, val) => ({ col, val })) }));
 
-import { addExercisesToSession, endWorkoutSession, startWorkoutSession } from '@/lib/workout/session';
+import {
+  addExercisesToSession,
+  endWorkoutSession,
+  replaceSessionExercise,
+  startWorkoutSession,
+} from '@/lib/workout/session';
 
 beforeEach(() => {
   jest.clearAllMocks();
@@ -210,5 +219,79 @@ describe('addExercisesToSession', () => {
     mockReturning.mockResolvedValueOnce([{ id: 100, exerciseId: 10 }]);
     mockSetsInsertValues.mockRejectedValueOnce(new Error('sets insert error'));
     await expect(addExercisesToSession(1, [10])).rejects.toThrow('sets insert error');
+  });
+});
+
+describe('replaceSessionExercise', () => {
+  // 呼び出し順は: ① workoutSessionExercisesから対象行取得 ② exercisesから旧種目取得
+  // ③ exercisesから新種目取得。tx.selectは共通モックのためmockResolvedValueOnceを順に積む
+
+  it('既存のexerciseIdと同じ場合は何もしない（no-op）', async () => {
+    mockSelectWhere.mockResolvedValueOnce([{ exerciseId: 5 }]);
+    await replaceSessionExercise(1, 5);
+
+    expect(mockUpdateSet).not.toHaveBeenCalled();
+  });
+
+  it('対象のworkoutSessionExercises行が見つからない場合は何もしない', async () => {
+    mockSelectWhere.mockResolvedValueOnce([]);
+    await replaceSessionExercise(1, 5);
+
+    expect(mockUpdateSet).not.toHaveBeenCalled();
+  });
+
+  it('計測タイプが同じ種目に入れ替える場合、exerciseIdだけ更新し値はクリアしない', async () => {
+    mockSelectWhere
+      .mockResolvedValueOnce([{ exerciseId: 10 }]) // wse
+      .mockResolvedValueOnce([{ measurementType: 'weight_reps' }]) // 旧種目
+      .mockResolvedValueOnce([{ measurementType: 'weight_reps' }]); // 新種目
+
+    await replaceSessionExercise(1, 20);
+
+    // 1回目: workoutSessionExercises.exerciseId更新
+    expect(mockUpdateSet.mock.calls[0][0]).toEqual({ exerciseId: 20 });
+    // 2回目: sets側もexerciseIdだけ更新（値のキーを含まない）
+    expect(mockUpdateSet.mock.calls[1][0]).toEqual({ exerciseId: 20 });
+  });
+
+  it('計測タイプが異なる種目に入れ替える場合、setsの値もクリアする（セット数＝行自体は維持）', async () => {
+    mockSelectWhere
+      .mockResolvedValueOnce([{ exerciseId: 10 }]) // wse
+      .mockResolvedValueOnce([{ measurementType: 'weight_reps' }]) // 旧種目
+      .mockResolvedValueOnce([{ measurementType: 'time' }]); // 新種目
+
+    await replaceSessionExercise(1, 20);
+
+    expect(mockUpdateSet.mock.calls[0][0]).toEqual({ exerciseId: 20 });
+    expect(mockUpdateSet.mock.calls[1][0]).toEqual({
+      exerciseId: 20,
+      weight: null,
+      reps: null,
+      durationSeconds: null,
+      distanceMeters: null,
+      completedAt: null,
+    });
+  });
+
+  it('workoutSessionExercises更新後、setsはworkoutSessionExerciseIdで対象を絞ってupdateする', async () => {
+    mockSelectWhere
+      .mockResolvedValueOnce([{ exerciseId: 10 }])
+      .mockResolvedValueOnce([{ measurementType: 'weight_reps' }])
+      .mockResolvedValueOnce([{ measurementType: 'weight_reps' }]);
+
+    await replaceSessionExercise(7, 20);
+
+    expect(mockUpdateWhere).toHaveBeenNthCalledWith(1, { col: 'id', val: 7 });
+    expect(mockUpdateWhere).toHaveBeenNthCalledWith(2, { col: 'workoutSessionExerciseId', val: 7 });
+  });
+
+  it('DB更新が失敗した場合はエラーを握りつぶさずthrowする（呼び出し側でAlertを出すため）', async () => {
+    mockSelectWhere
+      .mockResolvedValueOnce([{ exerciseId: 10 }])
+      .mockResolvedValueOnce([{ measurementType: 'weight_reps' }])
+      .mockResolvedValueOnce([{ measurementType: 'weight_reps' }]);
+    mockUpdateWhere.mockRejectedValueOnce(new Error('db error'));
+
+    await expect(replaceSessionExercise(1, 20)).rejects.toThrow('db error');
   });
 });

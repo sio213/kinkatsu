@@ -94,13 +94,15 @@ export async function swapExerciseOrder(sessionExerciseId: number, targetSession
   });
 }
 
-// 種目カードの「⋮」メニューの「種目を入れ替え」。setsはexerciseId/workoutSessionExerciseIdの
-// 両方を持つ非正規化構造のため、workoutSessionExercises側だけでなくsets.exerciseIdも
-// 揃えておく。計測タイプ（重量×回数/回数のみ/時間 等）が変わる場合、既存の入力値は
-// 新しい列構成と噛み合わなくなるためクリアする（セット数＝行自体は維持し、値だけnullに戻す）。
-// 呼び出し側（入れ替え確認ダイアログの要否判断）と同じ「計測タイプが同じか」の判定をここでも
-// 独立して行い、DB側だけで見ても整合性が保てるようにしている
-export async function swapSessionExercise(sessionExerciseId: number, newExerciseId: number) {
+// 種目カードの「⋮」メニューの「種目を入れ替え」。既存のswapExerciseOrder（並び順の入れ替え）と
+// 名前が紛らわしくならないよう、こちらは種目そのものの置換であることが分かる名前にしている。
+// setsはexerciseId/workoutSessionExerciseIdの両方を持つ非正規化構造のため、
+// workoutSessionExercises側だけでなくsets.exerciseIdも揃えておく。計測タイプ（重量×回数/
+// 回数のみ/時間 等）が変わる場合、既存の入力値は新しい列構成と噛み合わなくなるためクリアする
+// （セット数＝行自体は維持し、値だけnullに戻す）。呼び出し側（入れ替え確認ダイアログの要否判断）
+// でも同じ「計測タイプが同じか」の判定を行うが、呼び出し側はexercises.measurementTypeの生値を
+// そのまま渡す前提とし、ここでの判定と基準を揃えている
+export async function replaceSessionExercise(sessionExerciseId: number, newExerciseId: number) {
   await db.transaction(async (tx) => {
     const [wse] = await tx
       .select({ exerciseId: workoutSessionExercises.exerciseId })
