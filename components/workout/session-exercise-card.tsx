@@ -6,11 +6,13 @@ import { useDebouncedPush } from '@/hooks/use-debounced-push';
 import type { SessionExercise } from '@/hooks/use-workout-session';
 import { MEASUREMENT_TYPES, type MeasurementType } from '@/lib/exercises/constants';
 import { getExerciseImages } from '@/lib/exercises/images';
+import { removeExerciseFromSession } from '@/lib/workout/session';
 import { MEASUREMENT_COLUMNS, parseColumnsWithFallback } from '@/lib/workout/set-format';
 import { addSet, deleteLastSet, reopenSet, saveDraft, saveSet, type SetValues } from '@/lib/workout/sets';
 import { Image } from 'expo-image';
 import { memo, useCallback, useRef } from 'react';
 import { Alert, LayoutAnimation, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
+import { ExerciseCardMenu } from './exercise-card-menu';
 import { SetRow } from './set-row';
 
 type Props = {
@@ -18,6 +20,8 @@ type Props = {
   sessionId: number;
   sets: Set[];
   collapsed: boolean;
+  isFirst: boolean;
+  isLast: boolean;
   onToggleCollapsed: (sessionExerciseId: number) => void;
 };
 
@@ -26,6 +30,8 @@ export const SessionExerciseCard = memo(function SessionExerciseCard({
   sessionId,
   sets,
   collapsed,
+  isFirst,
+  isLast,
   onToggleCollapsed,
 }: Props) {
   const images = getExerciseImages(exercise);
@@ -143,6 +149,24 @@ export const SessionExerciseCard = memo(function SessionExerciseCard({
     }
   }, []);
 
+  const handleDeleteExercise = useCallback(() => {
+    Alert.alert('この種目を削除しますか？', '記録した内容も削除されます。', [
+      { text: 'キャンセル', style: 'cancel' },
+      {
+        text: '削除',
+        style: 'destructive',
+        onPress: async () => {
+          try {
+            await removeExerciseFromSession(exercise.sessionExerciseId);
+          } catch (e) {
+            console.error('[delete exercise]', e);
+            Alert.alert('エラー', '種目を削除できませんでした。');
+          }
+        },
+      },
+    ]);
+  }, [exercise.sessionExerciseId]);
+
   return (
     <View style={styles.card}>
       <TouchableOpacity
@@ -171,6 +195,9 @@ export const SessionExerciseCard = memo(function SessionExerciseCard({
           >
             <IconSymbol name="info.circle" size={20} color={Colors.textPlaceholder} />
           </TouchableOpacity>
+          {expanded && (
+            <ExerciseCardMenu isFirst={isFirst} isLast={isLast} onDelete={handleDeleteExercise} />
+          )}
           {!expanded && (
             <View style={styles.collapsedSummary}>
               <Text style={styles.collapsedSummaryText}>{sets.length}セット</Text>
