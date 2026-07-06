@@ -34,6 +34,7 @@ function DurationInput({ initialValue, onChange, exerciseName, setNumber }: Dura
   // 更新する鏡を経由することで、常に最新の値を基準にonChangeへ渡す（set-row.tsx側のvaluesRefと同じ対策）
   const minRef = useRef(min);
   const secRef = useRef(sec);
+  const minInputRef = useRef<TextInput>(null);
   const secInputRef = useRef<TextInput>(null);
 
   const handleMinChange = (text: string) => {
@@ -55,7 +56,17 @@ function DurationInput({ initialValue, onChange, exerciseName, setNumber }: Dura
 
   return (
     <View style={styles.durationCell}>
+      {/* 分・秒を固定幅にして中央へ寄せた結果、枠の左右に生まれる余白がタップに反応しなく
+          なってしまうため、両端をそれぞれ隣接する分・秒欄へフォーカスするタップ領域にする */}
+      <TouchableOpacity
+        style={styles.durationSpacer}
+        activeOpacity={1}
+        onPress={() => minInputRef.current?.focus()}
+        accessibilityElementsHidden
+        importantForAccessibility="no-hide-descendants"
+      />
       <TextInput
+        ref={minInputRef}
         style={[styles.durationPart, styles.durationMinPart]}
         value={min}
         onChangeText={handleMinChange}
@@ -87,6 +98,13 @@ function DurationInput({ initialValue, onChange, exerciseName, setNumber }: Dura
         placeholder="秒"
         placeholderTextColor={Colors.textPlaceholder}
         accessibilityLabel={`${exerciseName} セット${setNumber} 時間 秒`}
+      />
+      <TouchableOpacity
+        style={styles.durationSpacer}
+        activeOpacity={1}
+        onPress={() => secInputRef.current?.focus()}
+        accessibilityElementsHidden
+        importantForAccessibility="no-hide-descendants"
       />
     </View>
   );
@@ -274,7 +292,6 @@ const styles = StyleSheet.create({
   durationCell: {
     flexDirection: 'row',
     alignItems: 'center',
-    justifyContent: 'center',
     backgroundColor: Colors.surface,
     borderWidth: 1,
     borderColor: Colors.borderStrong,
@@ -284,13 +301,17 @@ const styles = StyleSheet.create({
   },
   // flex:1にすると、time単独のように列幅が広い場合に分・秒それぞれが独立してその半分の
   // 幅の中央に寄ってしまい、間が間延びして見える。固定幅にして「分:秒」をひとまとまりの
-  // 塊としてdurationCell側のjustifyContent:'center'で中央寄せすることで、列幅によらず
-  // 見た目の間隔を一定に保つ
+  // 塊にし、左右のdurationSpacer（flex:1の余白）で挟むことで中央寄せしつつ、その余白
+  // 部分もタップで隣接する入力欄へフォーカスできるようにする
   durationPart: {
     padding: 0,
     fontSize: 14,
     fontWeight: '600',
     color: Colors.textPrimary,
+  },
+  durationSpacer: {
+    flex: 1,
+    alignSelf: 'stretch',
   },
   durationMinPart: {
     width: 30,
