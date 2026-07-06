@@ -142,30 +142,20 @@ export default function WorkoutScreen() {
         options={{
           title: isActive ? 'トレーニング中' : '記録の編集',
           headerRight: () => (
-            <View style={styles.headerRightRow}>
-              <View style={styles.timerChip}>
-                <IconSymbol name="timer" size={16} color={Colors.accent} />
-                <Text style={styles.timerText}>
-                  {isActive
-                    ? formatElapsed(now - session.startedAt)
-                    : formatSessionDuration(session.startedAt, session.endedAt)}
-                </Text>
-              </View>
-              <TouchableOpacity
-                style={styles.menuTrigger}
-                hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
-                accessibilityRole="button"
-                accessibilityLabel="メニューを開く"
-                accessibilityState={{ expanded: menuOpen }}
-                onPress={() => setMenuOpen((v) => !v)}
-              >
-                <IconSymbol
-                  name="ellipsis"
-                  size={20}
-                  color={menuOpen ? Colors.accent : Colors.textPlaceholder}
-                />
-              </TouchableOpacity>
-            </View>
+            <TouchableOpacity
+              style={styles.menuTrigger}
+              hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+              accessibilityRole="button"
+              accessibilityLabel="メニューを開く"
+              accessibilityState={{ expanded: menuOpen }}
+              onPress={() => setMenuOpen((v) => !v)}
+            >
+              <IconSymbol
+                name="ellipsis"
+                size={20}
+                color={menuOpen ? Colors.accent : Colors.textPlaceholder}
+              />
+            </TouchableOpacity>
           ),
         }}
       />
@@ -182,6 +172,14 @@ export default function WorkoutScreen() {
       </Modal>
       <View style={styles.subHeader}>
         <Text style={styles.headerDate}>{formatSessionDateGroup(session.startedAt)}</Text>
+        <View style={styles.timerChip}>
+          <IconSymbol name="timer" size={16} color={Colors.accent} />
+          <Text style={styles.timerText}>
+            {isActive
+              ? formatElapsed(now - session.startedAt)
+              : formatSessionDuration(session.startedAt, session.endedAt)}
+          </Text>
+        </View>
       </View>
 
       {sessionExercises.length === 0 ? (
@@ -229,9 +227,15 @@ export default function WorkoutScreen() {
 const styles = StyleSheet.create({
   safeArea: { flex: 1, backgroundColor: Colors.background },
 
-  subHeader: { paddingHorizontal: 16, paddingTop: 8, paddingBottom: 6 },
+  subHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    paddingHorizontal: 16,
+    paddingTop: 8,
+    paddingBottom: 6,
+  },
   headerDate: { fontSize: 12, color: Colors.textMuted },
-  headerRightRow: { flexDirection: 'row', alignItems: 'center' },
   timerChip: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -240,7 +244,6 @@ const styles = StyleSheet.create({
     borderRadius: 999,
     paddingHorizontal: 12,
     paddingVertical: 6,
-    marginRight: 8,
   },
   timerText: { fontSize: 14, fontWeight: '700', color: Colors.textPrimary },
   menuTrigger: {
