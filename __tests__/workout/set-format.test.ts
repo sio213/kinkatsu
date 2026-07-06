@@ -1,4 +1,5 @@
 import {
+  combineDurationDisplay,
   formatDistanceKmDisplay,
   formatDurationDisplay,
   MEASUREMENT_COLUMNS,
@@ -8,6 +9,7 @@ import {
   parseDurationInput,
   parseIntInput,
   parseNumberInput,
+  splitDurationDisplay,
   toDisplayValues,
 } from '@/lib/workout/set-format';
 
@@ -61,6 +63,35 @@ describe('formatDurationDisplay', () => {
   it('nullやundefinedは空文字を返す', () => {
     expect(formatDurationDisplay(null)).toBe('');
     expect(formatDurationDisplay(undefined)).toBe('');
+  });
+});
+
+describe('splitDurationDisplay / combineDurationDisplay（時間入力の分・秒分割）', () => {
+  it('"mm:ss"形式を分・秒に分解する', () => {
+    expect(splitDurationDisplay('1:30')).toEqual({ min: '1', sec: '30' });
+    expect(splitDurationDisplay('0:45')).toEqual({ min: '0', sec: '45' });
+  });
+
+  it('空文字は分・秒とも空文字になる', () => {
+    expect(splitDurationDisplay('')).toEqual({ min: '', sec: '' });
+  });
+
+  it('コロンが無い等の不正な形式も分・秒とも空文字になる', () => {
+    expect(splitDurationDisplay('abc')).toEqual({ min: '', sec: '' });
+  });
+
+  it('分・秒どちらかが空欄でも0として結合する', () => {
+    expect(combineDurationDisplay('', '45')).toBe('0:45');
+    expect(combineDurationDisplay('5', '')).toBe('5:0');
+  });
+
+  it('分・秒とも空欄なら空文字のまま（未入力扱い）', () => {
+    expect(combineDurationDisplay('', '')).toBe('');
+  });
+
+  it('分・秒を結合した文字列はparseDurationInputで正しくパースできる（ラウンドトリップ）', () => {
+    const combined = combineDurationDisplay('5', '');
+    expect(parseDurationInput(combined)).toBe(300);
   });
 });
 

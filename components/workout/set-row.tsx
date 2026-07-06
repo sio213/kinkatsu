@@ -1,3 +1,4 @@
+import { DurationInput } from '@/components/workout/duration-input';
 import { IconSymbol } from '@/components/ui/icon-symbol';
 import { Colors } from '@/constants/theme';
 import type { Set } from '@/db/schema';
@@ -114,20 +115,29 @@ export const SetRow = memo(function SetRow({
     <View style={styles.row}>
       <Text style={styles.number}>{set.setNumber}</Text>
       {columns.map((c) => {
-        const input = (
-          <TextInput
-            style={[styles.cell, done && styles.cellDone]}
-            value={done ? c.toDisplay(set[c.key]) : values[c.key]}
-            onChangeText={(text) => handleFieldChange(c.key, text)}
-            editable={!done}
-            pointerEvents={done ? 'none' : 'auto'}
-            keyboardType={c.keyboardType}
-            textAlign="center"
-            placeholder="-"
-            placeholderTextColor={Colors.textPlaceholder}
-            accessibilityLabel={`${exerciseName} セット${set.setNumber} ${c.label}`}
-          />
-        );
+        const isDuration = c.key === 'durationSeconds';
+        const input =
+          isDuration && !done ? (
+            <DurationInput
+              initialValue={values[c.key] ?? ''}
+              onChange={(text) => handleFieldChange(c.key, text)}
+              exerciseName={exerciseName}
+              setNumber={set.setNumber}
+            />
+          ) : (
+            <TextInput
+              style={[styles.cell, done && styles.cellDone]}
+              value={done ? c.toDisplay(set[c.key]) : values[c.key]}
+              onChangeText={(text) => handleFieldChange(c.key, text)}
+              editable={!done}
+              pointerEvents={done ? 'none' : 'auto'}
+              keyboardType={c.keyboardType}
+              textAlign="center"
+              placeholder="-"
+              placeholderTextColor={Colors.textPlaceholder}
+              accessibilityLabel={`${exerciseName} セット${set.setNumber} ${c.label}`}
+            />
+          );
         // 完了済みセルはロックされ見た目だけでは編集し直せることが伝わりにくいため、
         // タップでも✓と同じ「編集に戻す」操作を呼べるようにする
         if (!done) return <View key={c.key} style={styles.cellWrapper}>{input}</View>;
