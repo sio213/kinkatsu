@@ -1,3 +1,4 @@
+import { DesignIcon } from '@/components/ui/design-icon';
 import { IconSymbol } from '@/components/ui/icon-symbol';
 import { ListErrorBoundary } from '@/components/ui/list-error-boundary';
 import { NotFoundState } from '@/components/ui/not-found-state';
@@ -13,11 +14,12 @@ import {
   useSessionSets,
   useWorkoutSession,
 } from '@/hooks/use-workout-session';
-import { endWorkoutSession } from '@/lib/workout/session';
+import { deleteSession, endWorkoutSession } from '@/lib/workout/session';
 import { formatSessionDateGroup, formatSessionDuration } from '@/lib/workout/summary';
+import { useHeaderHeight } from '@react-navigation/elements';
 import { Stack, useLocalSearchParams, useRouter } from 'expo-router';
 import { useCallback, useEffect, useRef, useState } from 'react';
-import { Alert, FlatList, StyleSheet, Text, View } from 'react-native';
+import { Alert, FlatList, Modal, Pressable, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 function formatElapsed(ms: number): string {
@@ -39,6 +41,8 @@ export default function WorkoutScreen() {
   const [now, setNow] = useState(() => Date.now());
   const isFinishingRef = useRef(false);
   const keyboardInset = useKeyboardInset();
+  const headerHeight = useHeaderHeight();
+  const [menuOpen, setMenuOpen] = useState(false);
   // 種目カードのアコーディオン開閉状態。カード側のローカルstateにすると、FlatListの
   // virtualizationでカードがアンマウント→再マウントされた際に開閉状態がリセットされてしまうため、
   // この画面が生きている間は保持されるようここで持つ（値未保存=展開中がデフォルト）
@@ -93,6 +97,27 @@ export default function WorkoutScreen() {
     router.push({ pathname: '/workout/exercise-picker', params: { sessionId: String(sessionId) } });
   };
 
+  const handleDeleteSession = () => {
+    if (sessionId == null) return;
+    setMenuOpen(false);
+    Alert.alert('この記録を削除しますか？', '記録した種目・セットもすべて削除されます。', [
+      { text: 'キャンセル', style: 'cancel' },
+      {
+        text: '削除',
+        style: 'destructive',
+        onPress: async () => {
+          try {
+            await deleteSession(sessionId);
+            router.back();
+          } catch (e) {
+            console.error('[workout session delete]', e);
+            Alert.alert('エラー', '記録を削除できませんでした。');
+          }
+        },
+      },
+    ]);
+  };
+
   if (sessionId == null || (loaded && !session)) {
     return (
       <SafeAreaView style={styles.safeArea} edges={['bottom']}>
@@ -117,19 +142,44 @@ export default function WorkoutScreen() {
         options={{
           title: isActive ? 'トレーニング中' : '記録の編集',
           headerRight: () => (
-            <View style={styles.timerChip}>
-              <IconSymbol name="timer" size={16} color={Colors.accent} />
-              <Text style={styles.timerText}>
-                {isActive
-                  ? formatElapsed(now - session.startedAt)
-                  : formatSessionDuration(session.startedAt, session.endedAt)}
-              </Text>
-            </View>
+            <TouchableOpacity
+              style={styles.menuTrigger}
+              hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+              accessibilityRole="button"
+              accessibilityLabel="メニューを開く"
+              accessibilityState={{ expanded: menuOpen }}
+              onPress={() => setMenuOpen((v) => !v)}
+            >
+              <IconSymbol
+                name="ellipsis"
+                size={20}
+                color={menuOpen ? Colors.accent : Colors.textPlaceholder}
+              />
+            </TouchableOpacity>
           ),
         }}
       />
+
+      {/* Modalで独立レイヤーに描画することで、FlatListとの描画順の衝突を避ける */}
+      <Modal visible={menuOpen} transparent animationType="fade" onRequestClose={() => setMenuOpen(false)}>
+        <Pressable style={styles.menuBackdrop} onPress={() => setMenuOpen(false)} />
+        <View style={[styles.menu, { top: headerHeight, right: 16 }]}>
+          <TouchableOpacity style={styles.menuItem} onPress={handleDeleteSession} accessibilityLabel="削除">
+            <DesignIcon name="delete-outline" size={18} color={Colors.danger} />
+            <Text style={[styles.menuItemText, styles.menuItemDanger]}>削除</Text>
+          </TouchableOpacity>
+        </View>
+      </Modal>
       <View style={styles.subHeader}>
         <Text style={styles.headerDate}>{formatSessionDateGroup(session.startedAt)}</Text>
+        <View style={styles.timerChip}>
+          <IconSymbol name="timer" size={16} color={Colors.accent} />
+          <Text style={styles.timerText}>
+            {isActive
+              ? formatElapsed(now - session.startedAt)
+              : formatSessionDuration(session.startedAt, session.endedAt)}
+          </Text>
+        </View>
       </View>
 
       {sessionExercises.length === 0 ? (
@@ -177,7 +227,14 @@ export default function WorkoutScreen() {
 const styles = StyleSheet.create({
   safeArea: { flex: 1, backgroundColor: Colors.background },
 
-  subHeader: { paddingHorizontal: 16, paddingTop: 8, paddingBottom: 6 },
+  subHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    paddingHorizontal: 16,
+    paddingTop: 8,
+    paddingBottom: 6,
+  },
   headerDate: { fontSize: 12, color: Colors.textMuted },
   timerChip: {
     flexDirection: 'row',
@@ -187,9 +244,32 @@ const styles = StyleSheet.create({
     borderRadius: 999,
     paddingHorizontal: 12,
     paddingVertical: 6,
-    marginRight: 8,
   },
   timerText: { fontSize: 14, fontWeight: '700', color: Colors.textPrimary },
+  menuTrigger: {
+    width: 32,
+    height: 32,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  menuBackdrop: { flex: 1 },
+  menu: {
+    position: 'absolute',
+    backgroundColor: Colors.surface,
+    borderWidth: 1,
+    borderColor: Colors.border,
+    borderRadius: 10,
+    paddingVertical: 4,
+    minWidth: 140,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.12,
+    shadowRadius: 12,
+    elevation: 4,
+  },
+  menuItem: { flexDirection: 'row', alignItems: 'center', gap: 9, paddingVertical: 9, paddingHorizontal: 10 },
+  menuItemText: { fontSize: 13, fontWeight: '500', color: Colors.textPrimary },
+  menuItemDanger: { color: Colors.danger },
 
   body: { flex: 1, alignItems: 'center', justifyContent: 'center', gap: 16, paddingHorizontal: 16 },
   emptyText: { fontSize: 13.5, color: Colors.textPlaceholder },
