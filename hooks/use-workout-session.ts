@@ -38,13 +38,15 @@ export function useWorkoutSession(id: number) {
 }
 
 // 記録タブの履歴一覧用。setsは記録の度に増え続ける実データなので、
-// 全件をJSへ引き上げてから集計するのではなくSQL側でセッションごとにSUM/COUNTする
+// 全件をJSへ引き上げてから集計するのではなくSQL側でセッションごとにSUM/COUNTする。
+// setCountは種目追加直後に自動生成される値未入力のセット（completedAtがnull）を含めず、
+// 実際に✓で確定したセットのみを数える（そうしないと種目を追加しただけで記録件数が水増しされる）
 export function useSessionStats(): Map<number, SessionSummary> {
   const { data } = useLiveQuery(
     db
       .select({
         sessionId: sets.sessionId,
-        setCount: sql<number>`count(*)`,
+        setCount: sql<number>`sum(case when ${sets.completedAt} is not null then 1 else 0 end)`,
         totalVolume: sql<number>`coalesce(sum(${sets.weight} * ${sets.reps}), 0)`,
       })
       .from(sets)
@@ -55,11 +57,13 @@ export function useSessionStats(): Map<number, SessionSummary> {
   );
 }
 
-// トレーニング中画面の終了確認（セット0件かどうか）用。行の中身は使わないため件数のみ取得する
+// トレーニング中画面の終了確認（何かセットを記録済みかどうか）用。行の中身は使わないため件数のみ取得する。
+// 種目追加直後の自動生成セット（completedAtがnull）は「まだ記録していない」に含めるため、
+// ✓で確定したセットのみを数える
 export function useSessionSetCount(sessionId: number): number {
   const { data } = useLiveQuery(
     db
-      .select({ count: sql<number>`count(*)` })
+      .select({ count: sql<number>`sum(case when ${sets.completedAt} is not null then 1 else 0 end)` })
       .from(sets)
       .where(eq(sets.sessionId, sessionId)),
   );
