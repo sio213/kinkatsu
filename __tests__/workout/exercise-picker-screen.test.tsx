@@ -2,7 +2,6 @@ const mockBack = jest.fn();
 const mockPush = jest.fn();
 const mockUseLocalSearchParams = jest.fn();
 const mockUseExercises = jest.fn();
-const mockUseSessionExercises = jest.fn();
 const mockAddExercisesToSession = jest.fn();
 
 jest.mock('expo-router', () => ({
@@ -17,10 +16,6 @@ jest.mock('expo-router', () => ({
 
 jest.mock('@/hooks/use-exercises', () => ({
   useExercises: () => mockUseExercises(),
-}));
-
-jest.mock('@/hooks/use-workout-session', () => ({
-  useSessionExercises: (...args: unknown[]) => mockUseSessionExercises(...args),
 }));
 
 jest.mock('@/hooks/use-keyboard-inset', () => ({
@@ -61,7 +56,6 @@ beforeEach(() => {
   jest.clearAllMocks();
   mockUseLocalSearchParams.mockReturnValue({ sessionId: '5' });
   mockUseExercises.mockReturnValue({ exercises: [benchPress, squat] });
-  mockUseSessionExercises.mockReturnValue([]);
   mockAddExercisesToSession.mockResolvedValue(undefined);
   jest.spyOn(Alert, 'alert').mockImplementation(() => {});
 });
@@ -174,11 +168,12 @@ test('sessionIdが不正(NaN)な場合は「見つかりません」画面にな
   expect(mockAddExercisesToSession).not.toHaveBeenCalled();
 });
 
-test('既にセッションに追加済みの種目は候補一覧に出ない（二重追加防止）', () => {
-  mockUseSessionExercises.mockReturnValue([{ ...benchPress, orderIndex: 0 }]);
+test('既にセッションに追加済みの種目も候補一覧に出る（ウォームアップ→本セット等、同じ種目を複数回追加できる）', () => {
+  // 種目追加ピッカーはセッションへの追加状況に関わらず全種目を候補にする
+  // （重複防止は行わない。同じ種目を複数カードとして追加したいユースケースがあるため）
   const root = render();
 
-  expect(() => root.findByProps({ accessibilityLabel: benchPressLabel })).toThrow();
+  expect(root.findByProps({ accessibilityLabel: benchPressLabel })).toBeDefined();
   expect(root.findByProps({ accessibilityLabel: squatLabel })).toBeDefined();
 });
 

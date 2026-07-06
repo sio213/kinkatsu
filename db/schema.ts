@@ -84,6 +84,11 @@ export const sets = sqliteTable(
     exerciseId: integer('exercise_id')
       .notNull()
       .references(() => exercises.id, { onDelete: 'restrict' }),
+    // 同じ種目をセッション内に複数回追加できるため、どのカード（workoutSessionExercises行）に
+    // 属するセットかを紐付ける。カード削除時はそのカードのセットも一緒に消えてよいためcascade
+    workoutSessionExerciseId: integer('workout_session_exercise_id')
+      .notNull()
+      .references(() => workoutSessionExercises.id, { onDelete: 'cascade' }),
     setNumber: integer('set_number').notNull(),
     weight: real('weight'),
     reps: integer('reps'),
@@ -97,6 +102,8 @@ export const sets = sqliteTable(
     bySession: index('idx_sets_session').on(t.sessionId),
     // 「前回の記録」を種目単位で辿るためのインデックス
     byExercise: index('idx_sets_exercise').on(t.exerciseId),
+    // トレーニング中画面でカード（workoutSessionExercises）ごとにセットをグルーピングするためのインデックス
+    byWorkoutSessionExercise: index('idx_sets_wse').on(t.workoutSessionExerciseId),
   }),
 );
 
