@@ -90,13 +90,10 @@ export const SessionExerciseCard = memo(function SessionExerciseCard({
         sessionExerciseId: String(exercise.sessionExerciseId),
         currentExerciseId: String(exercise.id),
         currentExerciseName: exercise.name,
-        // 入れ替え先画面での計測タイプ比較はexercises.measurementTypeの生値同士で行うため、
-        // このカードでの未知値フォールバック(measurementType変数)ではなく生値を渡す
-        currentMeasurementType: exercise.measurementType,
         hasRecordedData: hasRecordedData ? 'true' : 'false',
       },
     });
-  }, [pushDebounced, exercise.sessionExerciseId, exercise.id, exercise.name, exercise.measurementType, sets]);
+  }, [pushDebounced, exercise.sessionExerciseId, exercise.id, exercise.name, sets]);
 
   const handleToggleExpanded = useCallback(() => {
     LayoutAnimation.configureNext(LayoutAnimation.Presets.easeInEaseOut);
