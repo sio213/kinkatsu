@@ -2,6 +2,7 @@ import { CategoryChip } from '@/components/exercises/category-chip';
 import { IconSymbol } from '@/components/ui/icon-symbol';
 import { Colors } from '@/constants/theme';
 import type { Set } from '@/db/schema';
+import { useDebouncedPush } from '@/hooks/use-debounced-push';
 import type { SessionExercise } from '@/hooks/use-workout-session';
 import { MEASUREMENT_TYPES, type MeasurementType } from '@/lib/exercises/constants';
 import { getExerciseImages } from '@/lib/exercises/images';
@@ -28,6 +29,11 @@ export const SessionExerciseCard = memo(function SessionExerciseCard({
     : 'weight_reps';
   const columns = MEASUREMENT_COLUMNS[measurementType];
   const isMutatingRef = useRef(false);
+  const pushDebounced = useDebouncedPush();
+
+  const handlePressInfo = useCallback(() => {
+    pushDebounced(`/exercise/${exercise.id}`);
+  }, [pushDebounced, exercise.id]);
 
   const handleAddSet = useCallback(async () => {
     if (isMutatingRef.current) return;
@@ -97,6 +103,14 @@ export const SessionExerciseCard = memo(function SessionExerciseCard({
           </Text>
           <CategoryChip category={exercise.category} />
         </View>
+        <TouchableOpacity
+          onPress={handlePressInfo}
+          hitSlop={{ top: 14, bottom: 14, left: 14, right: 14 }}
+          accessibilityRole="button"
+          accessibilityLabel={`${exercise.name}の詳細を見る`}
+        >
+          <IconSymbol name="info.circle" size={20} color={Colors.textPlaceholder} />
+        </TouchableOpacity>
       </View>
 
       <View style={styles.body}>
