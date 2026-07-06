@@ -3,6 +3,7 @@ import {
   formatDurationDisplay,
   MEASUREMENT_COLUMNS,
   parseColumns,
+  parseColumnsWithFallback,
   parseDistanceKmInput,
   parseDurationInput,
   parseIntInput,
@@ -181,5 +182,43 @@ describe('parseColumns', () => {
       durationSeconds: '',
     });
     expect(result).toEqual({ distanceMeters: 5000, durationSeconds: null });
+  });
+});
+
+describe('parseColumnsWithFallback', () => {
+  it('正常にパースできる場合はparseColumnsと同じ', () => {
+    const result = parseColumnsWithFallback(
+      MEASUREMENT_COLUMNS.weight_reps,
+      { weight: '62.5', reps: '8' },
+      {},
+    );
+    expect(result).toEqual({ weight: 62.5, reps: 8 });
+  });
+
+  it('空欄はfallbackを使わずnullになる', () => {
+    const result = parseColumnsWithFallback(
+      MEASUREMENT_COLUMNS.weight_reps,
+      { weight: '', reps: '' },
+      { weight: 999, reps: 999 },
+    );
+    expect(result).toEqual({ weight: null, reps: null });
+  });
+
+  it('不正な入力（パース不可）はfallbackの値を使う（タイプミスで値を失わないため）', () => {
+    const result = parseColumnsWithFallback(
+      MEASUREMENT_COLUMNS.weight_reps,
+      { weight: '60kg', reps: '10' },
+      { weight: 80, reps: 6 },
+    );
+    expect(result).toEqual({ weight: 80, reps: 10 });
+  });
+
+  it('不正な入力でfallback自体もnullの場合はnullになる', () => {
+    const result = parseColumnsWithFallback(
+      MEASUREMENT_COLUMNS.weight_reps,
+      { weight: '60kg', reps: '10' },
+      { weight: null, reps: null },
+    );
+    expect(result).toEqual({ weight: null, reps: 10 });
   });
 });

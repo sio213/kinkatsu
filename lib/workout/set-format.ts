@@ -106,12 +106,17 @@ export const MEASUREMENT_COLUMNS: Record<MeasurementType, SetColumn[]> = {
   weight_time: [WEIGHT_COLUMN, DURATION_COLUMN_SHORT],
 };
 
-// 列定義に沿って、DB値（weight/reps等）をセル表示用の文字列に変換する
+// 列定義に沿って、DB値（weight/reps等）をセル表示用の文字列に変換する。
+// Object.fromEntriesは配列の要素型からタプルを推論できず戻り値がanyになるため、
+// reduceで組み立てて戻り値の型注釈が実際に効くようにする
 export function toDisplayValues(
   columns: SetColumn[],
   values: Partial<Record<SetFieldKey, number | null | undefined>>,
 ): Partial<Record<SetFieldKey, string>> {
-  return Object.fromEntries(columns.map((c) => [c.key, c.toDisplay(values[c.key])]));
+  return columns.reduce<Partial<Record<SetFieldKey, string>>>((acc, c) => {
+    acc[c.key] = c.toDisplay(values[c.key]);
+    return acc;
+  }, {});
 }
 
 // 列定義に沿って、セル表示用の文字列をDB保存用の値にパースする。
@@ -121,5 +126,24 @@ export function parseColumns(
   columns: SetColumn[],
   display: Partial<Record<SetFieldKey, string>>,
 ): Partial<Record<SetFieldKey, number | null>> {
-  return Object.fromEntries(columns.map((c) => [c.key, c.fromDisplay(display[c.key] ?? '')]));
+  return columns.reduce<Partial<Record<SetFieldKey, number | null>>>((acc, c) => {
+    acc[c.key] = c.fromDisplay(display[c.key] ?? '');
+    return acc;
+  }, {});
+}
+
+// parseColumnsと同様だが、パースに失敗した非空入力（例:"60kg"のような不正な貼り付け）は
+// nullにせずfallback（通常はDB上の直前セットの値）を使う。「セット追加」時の入力途中値コピーで、
+// タイプミスによって値が黙って消えるのを防ぐためのもの。空欄は従来通りnullになる
+export function parseColumnsWithFallback(
+  columns: SetColumn[],
+  display: Partial<Record<SetFieldKey, string>>,
+  fallback: Partial<Record<SetFieldKey, number | null | undefined>>,
+): Partial<Record<SetFieldKey, number | null>> {
+  return columns.reduce<Partial<Record<SetFieldKey, number | null>>>((acc, c) => {
+    const text = (display[c.key] ?? '').trim();
+    const parsed = c.fromDisplay(text);
+    acc[c.key] = parsed == null && text !== '' ? (fallback[c.key] ?? null) : parsed;
+    return acc;
+  }, {});
 }

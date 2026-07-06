@@ -6,7 +6,7 @@ import { useDebouncedPush } from '@/hooks/use-debounced-push';
 import type { SessionExercise } from '@/hooks/use-workout-session';
 import { MEASUREMENT_TYPES, type MeasurementType } from '@/lib/exercises/constants';
 import { getExerciseImages } from '@/lib/exercises/images';
-import { MEASUREMENT_COLUMNS, parseColumns } from '@/lib/workout/set-format';
+import { MEASUREMENT_COLUMNS, parseColumnsWithFallback } from '@/lib/workout/set-format';
 import { addSet, deleteLastSet, reopenSet, saveSet, type SetValues } from '@/lib/workout/sets';
 import { Image } from 'expo-image';
 import { memo, useCallback, useRef } from 'react';
@@ -62,13 +62,15 @@ export const SessionExerciseCard = memo(function SessionExerciseCard({
     try {
       // 直前のセットが✓未タップ（completedAt: null）の場合、DBにはまだ値が保存されていないため、
       // 画面上の入力途中の値（draft）があればそれをコピー元にする。✓タップ済みならDB上の
-      // 確定値がそのままコピー元になるので、addSet側の既定動作（overrideValues省略）に任せる
+      // 確定値がそのままコピー元になるので、addSet側の既定動作（overrideValues省略）に任せる。
+      // draftの一部の列が不正な入力（"60kg"等）でパースできない場合は、黙ってnullにはせず
+      // その列だけDB上のlast（直前セットの既存値）にフォールバックする
       const last = sets[sets.length - 1];
       let overrideValues: SetValues | undefined;
       if (last && last.completedAt == null) {
         const draft = draftValuesRef.current.get(last.id);
         if (draft) {
-          overrideValues = parseColumns(columns, draft);
+          overrideValues = parseColumnsWithFallback(columns, draft, last);
         }
       }
       await addSet(sessionId, exercise.id, exercise.sessionExerciseId, overrideValues);
