@@ -1,13 +1,16 @@
 import { CategoryFilterChips } from '@/components/exercises/category-filter-chips';
 import { ExerciseCard } from '@/components/exercises/exercise-card';
 import { ExerciseSearchBar } from '@/components/exercises/exercise-search-bar';
+import { ExerciseSortDropdown } from '@/components/exercises/exercise-sort-dropdown';
 import { ListErrorBoundary } from '@/components/ui/list-error-boundary';
 import { Colors } from '@/constants/theme';
 import type { Exercise } from '@/db/schema';
+import { useExerciseUsageStats } from '@/hooks/use-exercise-usage-stats';
 import { useExercises } from '@/hooks/use-exercises';
 import { useKeyboardInset } from '@/hooks/use-keyboard-inset';
 import { CATEGORY_ALL } from '@/lib/exercises/constants';
 import { filterExercises } from '@/lib/exercises/filter';
+import { useExerciseSortStore } from '@/lib/exercises/sort-store';
 import { useFocusEffect, useRouter } from 'expo-router';
 import { useCallback, useMemo, useState } from 'react';
 import { FlatList, Keyboard, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
@@ -15,6 +18,9 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 
 export default function ExercisesScreen() {
   const { exercises, toggleFavorite } = useExercises();
+  const usageStats = useExerciseUsageStats();
+  const sortBy = useExerciseSortStore((state) => state.listSortBy);
+  const setSortBy = useExerciseSortStore((state) => state.setListSortBy);
   const router = useRouter();
 
   const [search, setSearch] = useState('');
@@ -30,8 +36,8 @@ export default function ExercisesScreen() {
   );
 
   const filtered = useMemo(
-    () => filterExercises(exercises, activeCategory, search),
-    [exercises, activeCategory, search],
+    () => filterExercises(exercises, activeCategory, search, { sortBy, usageStats }),
+    [exercises, activeCategory, search, sortBy, usageStats],
   );
 
   const openCreate = useCallback(
@@ -61,6 +67,7 @@ export default function ExercisesScreen() {
 
       <ExerciseSearchBar value={search} onChangeText={setSearch} />
       <CategoryFilterChips activeCategory={activeCategory} onChange={setActiveCategory} />
+      <ExerciseSortDropdown sortBy={sortBy} onChange={setSortBy} />
     </View>
   );
 

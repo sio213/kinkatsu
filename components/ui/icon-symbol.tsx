@@ -18,6 +18,8 @@ const MAPPING = {
   'paperplane.fill': 'send',
   'chevron.left.forwardslash.chevron.right': 'code',
   'chevron.right': 'chevron-right',
+  'chevron.down': 'expand-more',
+  'chevron.up': 'expand-less',
   ellipsis: 'more-vert',
   'dumbbell.fill': 'fitness-center',
   'list.bullet.clipboard': 'assignment',
