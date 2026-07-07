@@ -22,7 +22,6 @@ const Palette = {
   slate800: '#1E293B',
 
   blue50: '#EFF6FF',
-  blue300: '#93C5FD',
   blue600: '#2563EB',
 
   amber100: '#FEF3C7',
@@ -68,13 +67,6 @@ export const Colors = {
   tabIconDefault: Palette.slate500,
   tabIconSelected: Palette.blue600,
   tint: Palette.blue600,
-
-  // スナックバー（例: プリフィル通知）は他UIと違い常時ダークな面を使う。ダークモード対応時も
-  // 反転させず固定でよい想定のため他トークンとは別枠にしている
-  snackbarBackground: Palette.slate800,
-  snackbarText: Palette.white,
-  snackbarIcon: Palette.blue300,
-  snackbarAction: Palette.blue300,
 };
 
 /**

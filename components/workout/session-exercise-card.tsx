@@ -11,7 +11,7 @@ import { removeExerciseFromSession, swapExerciseOrder, undoPrefill } from '@/lib
 import { MEASUREMENT_COLUMNS, parseColumnsWithFallback } from '@/lib/workout/set-format';
 import { addSet, deleteLastSet, reopenSet, saveDraft, saveSet, type SetValues } from '@/lib/workout/sets';
 import { Image } from 'expo-image';
-import { memo, useCallback, useRef } from 'react';
+import { memo, useCallback, useEffect, useRef, useState } from 'react';
 import { Alert, LayoutAnimation, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import { ExerciseCardMenu } from './exercise-card-menu';
 import { SetRow } from './set-row';
@@ -31,6 +31,10 @@ type Props = {
   // カード内にスナックバー(「前回のセットを挿入」＋「元に戻す」)を表示する
   justPrefilled: boolean;
   onDismissPrefill: (sessionExerciseId: number) => void;
+  // FlatListのonViewableItemsChangedベースで「このカードが実際にビューポート内にあるか」を親から渡す。
+  // 新規追加時はリスト末尾に入るためスクロールしないと画面に映らないことがあり、見えないまま
+  // スナックバーの自動消滅タイマーが進んでしまうのを防ぐために使う
+  isVisible: boolean;
 };
 
 export const SessionExerciseCard = memo(function SessionExerciseCard({
@@ -45,6 +49,7 @@ export const SessionExerciseCard = memo(function SessionExerciseCard({
   onToggleCollapsed,
   justPrefilled,
   onDismissPrefill,
+  isVisible,
 }: Props) {
   const images = getExerciseImages(exercise);
   // 未知のmeasurementType（想定外のDB値）でも画面ごとクラッシュさせず標準の重量×回数にフォールバックする
@@ -215,6 +220,18 @@ export const SessionExerciseCard = memo(function SessionExerciseCard({
     ]);
   }, [exercise.sessionExerciseId]);
 
+  // justPrefilledがtrueになってから実際にisVisible（ビューポート内）になった最初の瞬間に
+  // ラッチする。一度trueになったら（スクロールで再び画面外に出ても）戻さない＝スナックバーの
+  // 自動消滅タイマーは「初めて見えた時点」から数える
+  const [hasBeenVisible, setHasBeenVisible] = useState(false);
+  useEffect(() => {
+    if (!justPrefilled) {
+      setHasBeenVisible(false);
+      return;
+    }
+    if (isVisible) setHasBeenVisible(true);
+  }, [justPrefilled, isVisible]);
+
   const handleDismissPrefill = useCallback(() => {
     onDismissPrefill(exercise.sessionExerciseId);
   }, [onDismissPrefill, exercise.sessionExerciseId]);
@@ -311,6 +328,7 @@ export const SessionExerciseCard = memo(function SessionExerciseCard({
 
         <Snackbar
           visible={justPrefilled}
+          armed={hasBeenVisible}
           message="前回のセットを挿入"
           actionLabel="元に戻す"
           onPressAction={handleUndoPrefill}
@@ -409,9 +427,7 @@ const styles = StyleSheet.create({
     color: Colors.textPlaceholder,
   },
 
-  // カード内埋め込み表示のため、画面下部floating版(旧実装)にあった絶対配置・影は使わず、
-  // 通常のフローの中で上にだけ余白を持たせる
-  prefillSnackbar: { marginTop: 6, shadowOpacity: 0, elevation: 0 },
+  prefillSnackbar: { marginTop: 6 },
 
   actions: { flexDirection: 'row', gap: 8, marginTop: 6 },
   actionButton: {

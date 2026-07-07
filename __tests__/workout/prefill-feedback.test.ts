@@ -1,6 +1,6 @@
 import { notifyPrefilled, subscribePrefilled } from '@/lib/workout/prefill-feedback';
 
-const card = { sessionId: 1, exerciseId: 2, sessionExerciseId: 3 };
+const card = { sessionId: 1, exerciseId: 2, sessionExerciseId: 3, kind: 'new' as const };
 
 describe('prefill-feedback', () => {
   test('登録した全リスナーに通知される', () => {

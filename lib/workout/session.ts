@@ -4,8 +4,15 @@ import { getPreviousSets, type PreviousSetValues } from '@/lib/workout/history';
 import { and, eq, isNull } from 'drizzle-orm';
 
 // 前回この種目をやったカードを特定できた場合の識別情報。呼び出し側（画面）が
-// 「前回のセットを挿入しました」のスナックバー表示・アンドゥに使う
-export type PrefilledCard = { sessionId: number; exerciseId: number; sessionExerciseId: number };
+// 「前回のセットを挿入しました」のスナックバー表示・アンドゥに使う。
+// kindは新規追加(常にリスト末尾に増える)か種目入れ替え(既存カードの位置のまま)かを表し、
+// 呼び出し側が「新規追加時だけ一覧の末尾までスクロールする」といった出し分けに使う
+export type PrefilledCard = {
+  sessionId: number;
+  exerciseId: number;
+  sessionExerciseId: number;
+  kind: 'new' | 'swap';
+};
 
 // 種目カードに最初から入っている、値が空の1セット目。前回の記録が見つからない種目の
 // フォールバックとして使う（従来はこれが常に使われていた）。プリフィル分岐（下記buildInitialSets）と
@@ -106,7 +113,7 @@ export async function addExercisesToSession(
     for (const wse of inserted) {
       const previousSets = await getPreviousSets(tx, wse.exerciseId, sessionId);
       if (previousSets.length > 0) {
-        prefilled.push({ sessionId, exerciseId: wse.exerciseId, sessionExerciseId: wse.id });
+        prefilled.push({ sessionId, exerciseId: wse.exerciseId, sessionExerciseId: wse.id, kind: 'new' });
       }
       initialSetsByCard.push(buildInitialSets(sessionId, wse.exerciseId, wse.id, now, previousSets));
     }
@@ -182,7 +189,7 @@ export async function replaceSessionExercise(
       .values(buildInitialSets(wse.sessionId, newExerciseId, sessionExerciseId, now, previousSets));
 
     return previousSets.length > 0
-      ? { sessionId: wse.sessionId, exerciseId: newExerciseId, sessionExerciseId }
+      ? { sessionId: wse.sessionId, exerciseId: newExerciseId, sessionExerciseId, kind: 'swap' }
       : null;
   });
 }
@@ -192,7 +199,11 @@ export async function replaceSessionExercise(
 // 「元に戻す」の対象ではない実際の記録なので消してはいけない（無条件に全消去すると
 // 確定済みの記録までアンドゥで失われてしまう）。結果的に1件も残らなければ、
 // 種目追加直後と同じ値が空でsetNumber=1のセット1件を作り直す
-export async function undoPrefill({ sessionId, exerciseId, sessionExerciseId }: PrefilledCard) {
+export async function undoPrefill({
+  sessionId,
+  exerciseId,
+  sessionExerciseId,
+}: Pick<PrefilledCard, 'sessionId' | 'exerciseId' | 'sessionExerciseId'>) {
   const now = Date.now();
   await db.transaction(async (tx) => {
     await tx

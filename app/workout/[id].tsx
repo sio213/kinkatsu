@@ -13,6 +13,7 @@ import {
   useSessionSetCount,
   useSessionSets,
   useWorkoutSession,
+  type SessionExercise,
 } from '@/hooks/use-workout-session';
 import { subscribePrefilled } from '@/lib/workout/prefill-feedback';
 import { deleteSession, endWorkoutSession, type PrefilledCard } from '@/lib/workout/session';
@@ -20,8 +21,22 @@ import { formatSessionDateGroup, formatSessionDuration } from '@/lib/workout/sum
 import { useHeaderHeight } from '@react-navigation/elements';
 import { Stack, useLocalSearchParams, useRouter } from 'expo-router';
 import { useCallback, useEffect, useRef, useState } from 'react';
-import { Alert, FlatList, Modal, Pressable, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
+import {
+  Alert,
+  FlatList,
+  Modal,
+  Pressable,
+  StyleSheet,
+  Text,
+  TouchableOpacity,
+  View,
+  type ViewToken,
+} from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
+
+// itemVisiblePercentThreshold: カードの一部だけ画面端にかすっている状態は「見えた」に含めず、
+// 半分以上表示されて初めてスナックバーの自動消滅タイマーを開始する
+const VIEWABILITY_CONFIG = { itemVisiblePercentThreshold: 50 };
 
 function formatElapsed(ms: number): string {
   const totalSeconds = Math.max(0, Math.floor(ms / 1000));
@@ -45,6 +60,13 @@ export default function WorkoutScreen() {
   const headerHeight = useHeaderHeight();
   const [menuOpen, setMenuOpen] = useState(false);
   const [prefilledCards, setPrefilledCards] = useState<PrefilledCard[] | null>(null);
+  const listRef = useRef<FlatList<SessionExercise>>(null);
+  // 各カードが実際にビューポート内にあるかどうか。プリフィルされたカードのスナックバーが
+  // 画面外で見えないまま自動消滅しないよう、SessionExerciseCard側の判定に使う
+  const [viewableIds, setViewableIds] = useState<Set<number>>(() => new Set());
+  const onViewableItemsChanged = useRef(({ viewableItems }: { viewableItems: ViewToken[] }) => {
+    setViewableIds(new Set(viewableItems.map((v) => (v.item as SessionExercise).sessionExerciseId)));
+  }).current;
   // 種目カードのアコーディオン開閉状態。カード側のローカルstateにすると、FlatListの
   // virtualizationでカードがアンマウント→再マウントされた際に開閉状態がリセットされてしまうため、
   // この画面が生きている間は保持されるようここで持つ（値未保存=展開中がデフォルト）
@@ -78,6 +100,11 @@ export default function WorkoutScreen() {
       const forThisSession = cards.filter((c) => c.sessionId === sessionId);
       if (forThisSession.length === 0) return;
       setPrefilledCards((prev) => [...(prev ?? []), ...forThisSession]);
+      // 新規追加（種目入れ替えは対象外）は必ずリスト末尾に入るため、末尾までスクロールして
+      // 追加したカード（＝スナックバーが出ているカード）が画面外のままにならないようにする
+      if (forThisSession.some((c) => c.kind === 'new')) {
+        listRef.current?.scrollToEnd({ animated: true });
+      }
     });
   }, [sessionId]);
 
@@ -212,6 +239,7 @@ export default function WorkoutScreen() {
         </View>
       ) : (
         <FlatList
+          ref={listRef}
           style={styles.exerciseList}
           contentContainerStyle={styles.exerciseListContent}
           data={sessionExercises}
@@ -232,6 +260,7 @@ export default function WorkoutScreen() {
                   prefilledCards?.some((c) => c.sessionExerciseId === item.sessionExerciseId) ?? false
                 }
                 onDismissPrefill={handleDismissPrefill}
+                isVisible={viewableIds.has(item.sessionExerciseId)}
               />
             </ListErrorBoundary>
           )}
@@ -241,6 +270,8 @@ export default function WorkoutScreen() {
           contentInset={{ bottom: keyboardInset }}
           scrollIndicatorInsets={{ bottom: keyboardInset }}
           keyboardShouldPersistTaps="handled"
+          onViewableItemsChanged={onViewableItemsChanged}
+          viewabilityConfig={VIEWABILITY_CONFIG}
         />
       )}
 

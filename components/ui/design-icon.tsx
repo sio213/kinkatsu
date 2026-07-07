@@ -1,12 +1,10 @@
 import type { StyleProp, ViewStyle } from 'react-native';
 import Svg, { Path } from 'react-native-svg';
 
-// Claude Designからダウンロードした Material Symbols のSVGパス。
+// Claude Designからダウンロードした Material Symbols のSVGパス（viewBox: 0 -960 960 960 共通）。
 // IconSymbol（SF Symbols/MaterialIconsのクロスプラットフォーム抽象化）で十分な汎用ナビゲーション
 // アイコン（戻る・⋮・検索等）はそちらを使い、DesignIconはデザインとのピクセル一致が必要な
 // ⋮メニュー内アイコンなど限定的な用途にのみ使う。未使用のパスを増やさないよう使う分だけ追加する。
-// viewBoxはMaterial Symbols系（0 -960 960 960）が既定だが、check-circleのように別のアイコンセットから
-// 持ってきたものはviewBoxが異なるため、アイコンごとに保持している。
 const ICONS = {
   edit: {
     viewBox: '0 -960 960 960',
@@ -27,10 +25,6 @@ const ICONS = {
   'arrow-downward': {
     viewBox: '0 -960 960 960',
     d: 'M440-313v-447q0-17 11.5-28.5T480-800q17 0 28.5 11.5T520-760v447l196-196q12-12 28-11.5t28 12.5q11 12 11.5 28T772-452L508-188q-6 6-13 8.5t-15 2.5q-8 0-15-2.5t-13-8.5L188-452q-11-11-11-27.5t11-28.5q12-12 28.5-12t28.5 12l195 195Z',
-  },
-  'check-circle': {
-    viewBox: '0 0 24 24',
-    d: 'M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm-2 15l-5-5 1.41-1.41L10 14.17l7.59-7.59L19 8l-9 9z',
   },
 } as const;
 

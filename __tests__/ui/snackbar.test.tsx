@@ -112,6 +112,45 @@ describe('Snackbar', () => {
       });
       expect(onDismiss).not.toHaveBeenCalled();
     });
+
+    test('armed=falseの間はvisible=trueでもタイマーが動かない（画面外でスクロール待ちの状態を想定）', () => {
+      const onDismiss = jest.fn();
+      render({ visible: true, armed: false, message: 'A', onDismiss, duration: 4000 });
+
+      act(() => {
+        jest.advanceTimersByTime(10000);
+      });
+      expect(onDismiss).not.toHaveBeenCalled();
+    });
+
+    test('armedがfalse→trueに変わった時点からduration経過後にonDismissが呼ばれる（見えてから数える）', () => {
+      const onDismiss = jest.fn();
+      let instance!: ReturnType<typeof create>;
+      act(() => {
+        instance = create(
+          <Snackbar visible armed={false} message="A" onDismiss={onDismiss} duration={4000} />,
+        );
+      });
+
+      // armed=falseのままどれだけ時間が経ってもタイマーは進んでいない
+      act(() => {
+        jest.advanceTimersByTime(10000);
+      });
+      expect(onDismiss).not.toHaveBeenCalled();
+
+      act(() => {
+        instance.update(<Snackbar visible armed message="A" onDismiss={onDismiss} duration={4000} />);
+      });
+      act(() => {
+        jest.advanceTimersByTime(3999);
+      });
+      expect(onDismiss).not.toHaveBeenCalled();
+
+      act(() => {
+        jest.advanceTimersByTime(1);
+      });
+      expect(onDismiss).toHaveBeenCalledTimes(1);
+    });
   });
 
   describe('アクセシビリティ', () => {

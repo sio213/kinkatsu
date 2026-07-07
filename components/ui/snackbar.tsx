@@ -1,4 +1,4 @@
-import { DesignIcon } from '@/components/ui/design-icon';
+import { IconSymbol } from '@/components/ui/icon-symbol';
 import { Colors } from '@/constants/theme';
 import { useEffect } from 'react';
 import {
@@ -11,13 +11,18 @@ import {
   type ViewStyle,
 } from 'react-native';
 
-const DEFAULT_DURATION_MS = 4000;
+const DEFAULT_DURATION_MS = 6000;
 
-// 記録画面下部に浮かせて出す一時通知（例: 前回のセットを自動挿入したことの案内＋アンドゥ）。
+// 種目カード内に埋め込んで出す一時通知（例: 前回のセットを自動挿入したことの案内＋アンドゥ）。
 // 確認ダイアログにすると毎回の操作が煩わしくなるため、数秒で自動的に消える形にしている
 // （デザイン案P14「挿入＋アンドゥ」。消えたことに気づかれないリスクは許容する前提）
 export function Snackbar({
   visible,
+  // FlatList内でスクロールしないと画面に映らない位置に表示されるケースがあるため、
+  // 「実際にビューポート内に入った」ことを呼び出し側から伝えてもらい、それまでは
+  // 自動消滅タイマーを開始しない（見えないまま消えるのを防ぐ）。既定はtrueで、
+  // ビューポート判定が不要な単純な呼び出し元は今まで通りvisible=true immediately timerでよい
+  armed = true,
   message,
   actionLabel,
   onPressAction,
@@ -26,6 +31,7 @@ export function Snackbar({
   style,
 }: {
   visible: boolean;
+  armed?: boolean;
   message: string;
   actionLabel?: string;
   onPressAction?: () => void;
@@ -36,11 +42,11 @@ export function Snackbar({
   // messageもdepsに含めることで、表示中に別のプリフィルが続けて起きて内容だけ変わった場合も
   // タイマーが最新表示から仕切り直しになる
   useEffect(() => {
-    if (!visible) return;
+    if (!visible || !armed) return;
     const timer = setTimeout(onDismiss, duration);
     return () => clearTimeout(timer);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [visible, message, duration]);
+  }, [visible, armed, message, duration]);
 
   // accessibilityLiveRegionはAndroid専用でVoiceOver(iOS)には効かないため、出現時に
   // 明示的に読み上げさせる。actionLabelがある場合は存在にも気づけるよう文言に含める
@@ -61,17 +67,18 @@ export function Snackbar({
       accessibilityLiveRegion="polite"
     >
       <View style={styles.messageRow}>
-        <DesignIcon name="check-circle" size={18} color={Colors.snackbarIcon} />
+        <IconSymbol name="clock.arrow.circlepath" size={17} color={Colors.accent} />
         <Text style={styles.message}>{message}</Text>
       </View>
       {actionLabel && onPressAction ? (
         <TouchableOpacity
+          style={styles.actionButton}
           onPress={onPressAction}
-          hitSlop={{ top: 12, bottom: 12, left: 12, right: 12 }}
+          hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
           accessibilityRole="button"
           accessibilityLabel={actionLabel}
         >
-          <Text style={styles.action}>{actionLabel}</Text>
+          <Text style={styles.actionText}>{actionLabel}</Text>
         </TouchableOpacity>
       ) : null}
     </View>
@@ -83,24 +90,21 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    gap: 12,
-    backgroundColor: Colors.snackbarBackground,
-    borderRadius: 10,
-    paddingVertical: 12,
-    paddingHorizontal: 14,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.16,
-    shadowRadius: 12,
-    elevation: 4,
+    gap: 10,
+    backgroundColor: Colors.accentSurface,
+    borderRadius: 8,
+    borderWidth: 1,
+    borderColor: Colors.border,
+    paddingVertical: 8,
+    paddingHorizontal: 10,
   },
-  messageRow: { flexDirection: 'row', alignItems: 'center', gap: 8, flexShrink: 1 },
-  message: { fontSize: 13.5, fontWeight: '600', color: Colors.snackbarText, flexShrink: 1 },
-  // アイコン（状態表示・非インタラクティブ）と色が同じなため、下線でタップ可能な要素だと分かるようにする
-  action: {
-    fontSize: 13.5,
-    fontWeight: '700',
-    color: Colors.snackbarAction,
-    textDecorationLine: 'underline',
+  messageRow: { flexDirection: 'row', alignItems: 'center', gap: 7, flexShrink: 1 },
+  message: { fontSize: 12.5, fontWeight: '600', color: Colors.textPrimary, flexShrink: 1 },
+  actionButton: {
+    backgroundColor: Colors.accent,
+    borderRadius: 6,
+    paddingVertical: 6,
+    paddingHorizontal: 10,
   },
+  actionText: { fontSize: 12, fontWeight: '700', color: Colors.onAccent },
 });
