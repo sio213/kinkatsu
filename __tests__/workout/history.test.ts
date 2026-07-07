@@ -76,41 +76,22 @@ describe('computePersonalBestIds', () => {
     expect(computePersonalBestIds(entries, 'weight_reps')).toEqual(new Set([2]));
   });
 
-  it('重量・回数が同じ場合はセット数が多い方を優先する', () => {
+  it('重量・回数が同じ場合はセット数に関わらず最初にその記録を達成した日（より古い日付）を優先する', () => {
+    // 後からセット数を稼いだだけの日をベスト扱いにしない（@user-advisorレビュー: セット数・総量は
+    // 追い込み度の指標であって自己ベストの判定材料ではない、というフィードバックに基づく）
     const entries = [
       entry(1, 1000, [confirmedSet({ weight: 60, reps: 8 })]),
       entry(2, 2000, [
         confirmedSet({ weight: 60, reps: 8 }),
         confirmedSet({ weight: 55, reps: 8, setNumber: 2 }),
+        confirmedSet({ weight: 55, reps: 8, setNumber: 3 }),
       ]),
     ];
-    expect(computePersonalBestIds(entries, 'weight_reps')).toEqual(new Set([2]));
-  });
-
-  it('重量・回数・セット数が同じ場合は総量（重量×回数の合計）が多い方を優先する', () => {
-    const entries = [
-      entry(1, 1000, [
-        confirmedSet({ weight: 60, reps: 8 }),
-        confirmedSet({ weight: 50, reps: 8, setNumber: 2 }),
-      ]),
-      entry(2, 2000, [
-        confirmedSet({ weight: 60, reps: 8 }),
-        confirmedSet({ weight: 55, reps: 8, setNumber: 2 }),
-      ]),
-    ];
-    expect(computePersonalBestIds(entries, 'weight_reps')).toEqual(new Set([2]));
-  });
-
-  it('重量・回数・セット数・総量が全て同じ場合は直近の日付を優先する', () => {
-    const entries = [
-      entry(1, 1000, [confirmedSet({ weight: 60, reps: 8 })]),
-      entry(2, 2000, [confirmedSet({ weight: 60, reps: 8 })]),
-    ];
-    expect(computePersonalBestIds(entries, 'weight_reps')).toEqual(new Set([2]));
+    expect(computePersonalBestIds(entries, 'weight_reps')).toEqual(new Set([1]));
 
     // 呼び出し順（新しい順で渡されるケース）を入れ替えても結果は変わらない
     const reversed = [entries[1], entries[0]];
-    expect(computePersonalBestIds(reversed, 'weight_reps')).toEqual(new Set([2]));
+    expect(computePersonalBestIds(reversed, 'weight_reps')).toEqual(new Set([1]));
   });
 
   it('1entry内に複数セットがある場合はentry内の最大重量同士で比較する', () => {
@@ -130,7 +111,7 @@ describe('computePersonalBestIds', () => {
     expect(computePersonalBestIds(entries, 'weight_time')).toEqual(new Set([3]));
   });
 
-  it('repsは回数の最大値、同値ならセット数→総回数で比較する', () => {
+  it('repsは回数の最大値で判定する', () => {
     const entries = [
       entry(1, 1000, [confirmedSet({ reps: 10 })]),
       entry(2, 2000, [confirmedSet({ reps: 12 })]),

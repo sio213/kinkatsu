@@ -133,17 +133,15 @@ function maxOf(values: (number | null)[]): number | null {
   return max;
 }
 
-function sumOf(values: (number | null)[]): number {
-  return values.reduce<number>((sum, v) => sum + (v ?? 0), 0);
-}
-
 // カード（entry）1件を「自己ベスト」として比較するためのスコア配列を作る。配列の前方の要素ほど
 // 優先度が高く、先頭から順に比較して大きい方を勝ちとする（辞書式順序）。値が無いカード（✓確定
-// セットが1件も無い等）はnullを返し、比較対象から除外する
+// セットが1件も無い等）はnullを返し、比較対象から除外する。
+// セット数・総量（ボリューム）はここでは比較しない。「自己ベスト」は1セット単体の強さ
+// （重量→回数/時間）で決まるものであり、何セットこなしたかは追い込み度・総負荷の指標であって
+// 自己ベストの判定材料ではないというユーザーフィードバックに基づく（@user-advisorレビュー）
 function computeEntryScore(measurementType: MeasurementType, entry: HistoryEntry): number[] | null {
   const confirmed = entry.sets.filter((s) => s.completedAt != null);
   if (confirmed.length === 0) return null;
-  const setCount = confirmed.length;
 
   switch (measurementType) {
     case 'weight_reps': {
@@ -151,31 +149,29 @@ function computeEntryScore(measurementType: MeasurementType, entry: HistoryEntry
       if (maxWeight == null) return null;
       // 同じ重量が複数セットあれば、その中で一番回数が多いものを比較対象にする
       const repsAtMaxWeight = maxOf(confirmed.filter((s) => s.weight === maxWeight).map((s) => s.reps)) ?? 0;
-      const totalVolume = sumOf(confirmed.map((s) => (s.weight ?? 0) * (s.reps ?? 0)));
-      return [maxWeight, repsAtMaxWeight, setCount, totalVolume];
+      return [maxWeight, repsAtMaxWeight];
     }
     case 'weight_time': {
       const maxWeight = maxOf(confirmed.map((s) => s.weight));
       if (maxWeight == null) return null;
       const durationAtMaxWeight =
         maxOf(confirmed.filter((s) => s.weight === maxWeight).map((s) => s.durationSeconds)) ?? 0;
-      const totalVolume = sumOf(confirmed.map((s) => (s.weight ?? 0) * (s.durationSeconds ?? 0)));
-      return [maxWeight, durationAtMaxWeight, setCount, totalVolume];
+      return [maxWeight, durationAtMaxWeight];
     }
     case 'reps': {
       const max = maxOf(confirmed.map((s) => s.reps));
       if (max == null) return null;
-      return [max, setCount, sumOf(confirmed.map((s) => s.reps))];
+      return [max];
     }
     case 'time': {
       const max = maxOf(confirmed.map((s) => s.durationSeconds));
       if (max == null) return null;
-      return [max, setCount, sumOf(confirmed.map((s) => s.durationSeconds))];
+      return [max];
     }
     case 'distance_time': {
       const max = maxOf(confirmed.map((s) => s.distanceMeters));
       if (max == null) return null;
-      return [max, setCount, sumOf(confirmed.map((s) => s.distanceMeters))];
+      return [max];
     }
   }
 }
@@ -190,7 +186,8 @@ function isHigherScore(a: number[], b: number[]): boolean {
 
 // 種目の全履歴の中から「自己ベスト」を1件だけ選んでカードidを返す（無ければ空のSet）。
 // 比較優先順位: ①計測タイプごとの主指標（重量/回数/時間/距離）の最大値 → ②重量種目は同じ重量の
-// 中での回数・時間 → ③セット数 → ④総量（重量×回数等の合計） → ⑤直近の日付。
+// 中での回数・時間 → ③それでも同値なら、後から同じ記録にタイしただけの日ではなく最初にその
+// 記録を達成した日（＝より古い日付）を自己ベストとする。
 // ✓未確定（completedAt null）のセットは「まだ確認していない値」のため指標に含めない
 export function computePersonalBestIds(
   entries: HistoryEntry[],
@@ -205,7 +202,7 @@ export function computePersonalBestIds(
     if (
       best == null ||
       isHigherScore(score, best.score) ||
-      (!isHigherScore(best.score, score) && entry.startedAt > best.startedAt)
+      (!isHigherScore(best.score, score) && entry.startedAt < best.startedAt)
     ) {
       best = { workoutSessionExerciseId: entry.workoutSessionExerciseId, startedAt: entry.startedAt, score };
     }
