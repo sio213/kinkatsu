@@ -11,6 +11,11 @@ type ExerciseSortState = {
   // 種目一覧タブで選択中の並び替え軸。デフォルトは既存の挙動（カテゴリ順→名前順）を維持する
   listSortBy: ExerciseSortBy;
   setListSortBy: (sortBy: ExerciseSortBy) => void;
+  // ワークアウト中の種目追加ピッカーで選択中の並び替え軸。種目タブとは独立して保持する
+  // （ピッカーは「前回の続き」を素早く選ぶ場面が中心なので、既定を最近使った順にする）。
+  // 記録が無い種目しか無ければsortByUsage側の仕様により自動的に名前順にフォールバックする
+  pickerSortBy: ExerciseSortBy;
+  setPickerSortBy: (sortBy: ExerciseSortBy) => void;
 };
 
 export const useExerciseSortStore = create<ExerciseSortState>()(
@@ -18,6 +23,8 @@ export const useExerciseSortStore = create<ExerciseSortState>()(
     (set) => ({
       listSortBy: 'category',
       setListSortBy: (sortBy) => set({ listSortBy: sortBy }),
+      pickerSortBy: 'recent',
+      setPickerSortBy: (sortBy) => set({ pickerSortBy: sortBy }),
     }),
     {
       name: 'exercise-sort-preference',
@@ -29,6 +36,7 @@ export const useExerciseSortStore = create<ExerciseSortState>()(
         return {
           ...current,
           listSortBy: p && isExerciseSortBy(p.listSortBy) ? p.listSortBy : current.listSortBy,
+          pickerSortBy: p && isExerciseSortBy(p.pickerSortBy) ? p.pickerSortBy : current.pickerSortBy,
         };
       },
     },
