@@ -1,12 +1,13 @@
 import { CategoryChip } from '@/components/exercises/category-chip';
 import { IconSymbol } from '@/components/ui/icon-symbol';
+import { Snackbar } from '@/components/ui/snackbar';
 import { Colors } from '@/constants/theme';
 import type { Set } from '@/db/schema';
 import { useDebouncedPush } from '@/hooks/use-debounced-push';
 import type { SessionExercise } from '@/hooks/use-workout-session';
 import { MEASUREMENT_TYPES, type MeasurementType } from '@/lib/exercises/constants';
 import { getExerciseImages } from '@/lib/exercises/images';
-import { removeExerciseFromSession, swapExerciseOrder } from '@/lib/workout/session';
+import { removeExerciseFromSession, swapExerciseOrder, undoPrefill } from '@/lib/workout/session';
 import { MEASUREMENT_COLUMNS, parseColumnsWithFallback } from '@/lib/workout/set-format';
 import { addSet, deleteLastSet, reopenSet, saveDraft, saveSet, type SetValues } from '@/lib/workout/sets';
 import { Image } from 'expo-image';
@@ -26,6 +27,10 @@ type Props = {
   previousSessionExerciseId: number | null;
   nextSessionExerciseId: number | null;
   onToggleCollapsed: (sessionExerciseId: number) => void;
+  // 種目追加/入れ替え直後、前回のセットが自動挿入された場合にtrue（デザイン案P14）。
+  // カード内にスナックバー(「前回のセットを挿入」＋「元に戻す」)を表示する
+  justPrefilled: boolean;
+  onDismissPrefill: (sessionExerciseId: number) => void;
 };
 
 export const SessionExerciseCard = memo(function SessionExerciseCard({
@@ -38,6 +43,8 @@ export const SessionExerciseCard = memo(function SessionExerciseCard({
   previousSessionExerciseId,
   nextSessionExerciseId,
   onToggleCollapsed,
+  justPrefilled,
+  onDismissPrefill,
 }: Props) {
   const images = getExerciseImages(exercise);
   // 未知のmeasurementType（想定外のDB値）でも画面ごとクラッシュさせず標準の重量×回数にフォールバックする
@@ -208,6 +215,22 @@ export const SessionExerciseCard = memo(function SessionExerciseCard({
     ]);
   }, [exercise.sessionExerciseId]);
 
+  const handleDismissPrefill = useCallback(() => {
+    onDismissPrefill(exercise.sessionExerciseId);
+  }, [onDismissPrefill, exercise.sessionExerciseId]);
+
+  const handleUndoPrefill = useCallback(async () => {
+    // 楽観的にスナックバーを閉じる。DB側の反映を待って閉じると、連打やもたつきで
+    // 「押したのに閉じない」ように見えるため（他の楽観的更新箇所と同じ方針）
+    handleDismissPrefill();
+    try {
+      await undoPrefill({ sessionId, exerciseId: exercise.id, sessionExerciseId: exercise.sessionExerciseId });
+    } catch (e) {
+      console.error('[undo prefill]', e);
+      Alert.alert('エラー', '元に戻せませんでした。');
+    }
+  }, [handleDismissPrefill, sessionId, exercise.id, exercise.sessionExerciseId]);
+
   return (
     <View style={styles.card}>
       <TouchableOpacity
@@ -285,6 +308,15 @@ export const SessionExerciseCard = memo(function SessionExerciseCard({
             onAutoSaveDraft={handleAutoSaveDraft}
           />
         ))}
+
+        <Snackbar
+          visible={justPrefilled}
+          message="前回のセットを挿入"
+          actionLabel="元に戻す"
+          onPressAction={handleUndoPrefill}
+          onDismiss={handleDismissPrefill}
+          style={styles.prefillSnackbar}
+        />
 
         <View style={styles.actions}>
           <TouchableOpacity
@@ -376,6 +408,10 @@ const styles = StyleSheet.create({
     fontWeight: '600',
     color: Colors.textPlaceholder,
   },
+
+  // カード内埋め込み表示のため、画面下部floating版(旧実装)にあった絶対配置・影は使わず、
+  // 通常のフローの中で上にだけ余白を持たせる
+  prefillSnackbar: { marginTop: 6, shadowOpacity: 0, elevation: 0 },
 
   actions: { flexDirection: 'row', gap: 8, marginTop: 6 },
   actionButton: {
