@@ -312,7 +312,7 @@ describe('addExercisesToSession', () => {
         createdAt: expect.any(Number),
       },
     ]);
-    expect(prefilled).toEqual([{ sessionId: 1, exerciseId: 10, sessionExerciseId: 100 }]);
+    expect(prefilled).toEqual([{ sessionId: 1, exerciseId: 10, sessionExerciseId: 100, kind: 'new' }]);
   });
 
   it('複数種目を同時に追加した場合、前回の記録がある種目だけがプリフィル対象として返る', async () => {
@@ -329,7 +329,7 @@ describe('addExercisesToSession', () => {
 
     const prefilled = await addExercisesToSession(1, [10, 11]);
 
-    expect(prefilled).toEqual([{ sessionId: 1, exerciseId: 10, sessionExerciseId: 100 }]);
+    expect(prefilled).toEqual([{ sessionId: 1, exerciseId: 10, sessionExerciseId: 100, kind: 'new' }]);
   });
 });
 
@@ -433,7 +433,7 @@ describe('replaceSessionExercise', () => {
         createdAt: expect.any(Number),
       },
     ]);
-    expect(prefilled).toEqual({ sessionId: 3, exerciseId: 20, sessionExerciseId: 7 });
+    expect(prefilled).toEqual({ sessionId: 3, exerciseId: 20, sessionExerciseId: 7, kind: 'swap' });
   });
 
   it('入れ替え先の種目に前回の記録が無ければnullを返す（プリフィル通知を出さない）', async () => {

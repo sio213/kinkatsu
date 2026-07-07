@@ -57,7 +57,10 @@ export const SetRow = memo(function SetRow({
   useEffect(() => {
     if (done) wasEverConfirmedRef.current = true;
   }, [done]);
-  const ghost = !done && hadInitialValueRef.current && !wasEverConfirmedRef.current;
+  // ✓を押さなくても、値を書き換えた時点で「本人が今日の値として確認した」とみなし、
+  // ゴースト表示を解除する（handleFieldChangeで立てる）
+  const editedRef = useRef(false);
+  const ghost = !done && hadInitialValueRef.current && !wasEverConfirmedRef.current && !editedRef.current;
   // 連続したonChangeText呼び出し（同一レンダーサイクル内でバッチ処理される場合）でも
   // 常に最新の値を基準にマージするための鏡。setValuesの外で同期的に更新する
   const valuesRef = useRef(values);
@@ -82,6 +85,7 @@ export const SetRow = memo(function SetRow({
   }, []);
 
   const handleFieldChange = (key: string, text: string) => {
+    editedRef.current = true;
     const next = { ...valuesRef.current, [key]: text };
     valuesRef.current = next;
     setValues(next);
