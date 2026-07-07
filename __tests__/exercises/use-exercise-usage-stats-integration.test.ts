@@ -43,21 +43,28 @@ function insertCard(db: Database.Database, sessionId: number, exerciseId: number
   ).run(sessionId, exerciseId, orderIndex, now);
 }
 
-// use-exercise-usage-stats.ts の useLiveQuery が発行するクエリと同じ集計SQL
-const USAGE_STATS_SQL = `
-  SELECT
-    wse.exercise_id AS exerciseId,
-    COUNT(DISTINCT CASE WHEN ws.started_at >= ? THEN ws.id END) AS recentUsageCount,
-    MAX(ws.started_at) AS lastUsedAt
-  FROM workout_session_exercises wse
-  INNER JOIN workout_sessions ws ON wse.session_id = ws.id
-  GROUP BY wse.exercise_id
-`;
+// use-exercise-usage-stats.ts の useLiveQuery が発行するクエリと同じ集計SQL。
+// excludeSessionIdが指定されたときだけWHERE句を足す（drizzleの
+// .where(cond ?? undefined)でWHERE句自体が省略されるのと同じ挙動）
+function usageStatsSql(excludeSessionId?: number): string {
+  const whereClause = excludeSessionId != null ? 'WHERE wse.session_id != ?' : '';
+  return `
+    SELECT
+      wse.exercise_id AS exerciseId,
+      COUNT(DISTINCT CASE WHEN ws.started_at >= ? THEN ws.id END) AS recentUsageCount,
+      MAX(ws.started_at) AS lastUsedAt
+    FROM workout_session_exercises wse
+    INNER JOIN workout_sessions ws ON wse.session_id = ws.id
+    ${whereClause}
+    GROUP BY wse.exercise_id
+  `;
+}
 
 type UsageStatsRow = { exerciseId: number; recentUsageCount: number; lastUsedAt: number };
 
-function queryUsageStats(db: Database.Database, since: number): UsageStatsRow[] {
-  return db.prepare(USAGE_STATS_SQL).all(since) as UsageStatsRow[];
+function queryUsageStats(db: Database.Database, since: number, excludeSessionId?: number): UsageStatsRow[] {
+  const params = excludeSessionId != null ? [since, excludeSessionId] : [since];
+  return db.prepare(usageStatsSql(excludeSessionId)).all(...params) as UsageStatsRow[];
 }
 
 describe('useExerciseUsageStats相当の集計SQL（実SQLite）', () => {
@@ -152,6 +159,38 @@ describe('useExerciseUsageStats相当の集計SQL（実SQLite）', () => {
       .prepare('SELECT ended_at AS endedAt FROM workout_sessions WHERE id = ?')
       .get(sessionId) as { endedAt: number | null };
     expect(endedAt.endedAt).toBeNull();
+
+    const [row] = queryUsageStats(db, since);
+    expect(row.recentUsageCount).toBe(1);
+  });
+
+  it('excludeSessionIdを渡すと、そのセッションの分がrecentUsageCount・lastUsedAtの両方から除外される（進行中セッションで今追加した種目が「最近使った順」の最上位に来てしまう問題への対応）', () => {
+    const exerciseId = insertExercise(db, 'ベンチプレス');
+    const since = 10_000;
+    const pastSession = insertSession(db, since + 1_000);
+    insertCard(db, pastSession, exerciseId, 0);
+    // 今まさに種目を追加している進行中セッション。startedAtが最新でも実績集計からは除く
+    const currentSession = insertSession(db, since + 9_999);
+    insertCard(db, currentSession, exerciseId, 0);
+
+    const [row] = queryUsageStats(db, since, currentSession);
+    expect(row.recentUsageCount).toBe(1);
+    expect(row.lastUsedAt).toBe(since + 1_000);
+  });
+
+  it('excludeSessionIdが唯一の使用実績だった場合、その種目は結果行に出現しない', () => {
+    const exerciseId = insertExercise(db, 'デッドリフト');
+    const currentSession = insertSession(db, 10_000);
+    insertCard(db, currentSession, exerciseId, 0);
+
+    const rows = queryUsageStats(db, 0, currentSession);
+    expect(rows.find((r) => r.exerciseId === exerciseId)).toBeUndefined();
+  });
+
+  it('excludeSessionIdを渡さない場合は従来どおり全セッションが対象になる（後方互換）', () => {
+    const exerciseId = insertExercise(db, 'スクワット');
+    const since = 10_000;
+    insertCard(db, insertSession(db, since), exerciseId, 0);
 
     const [row] = queryUsageStats(db, since);
     expect(row.recentUsageCount).toBe(1);

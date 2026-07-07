@@ -27,7 +27,9 @@ export default function ExercisePickerScreen() {
   const router = useRouter();
   const pushDebounced = useDebouncedPush();
   const { exercises } = useExercises();
-  const usageStats = useExerciseUsageStats();
+  // 今まさに種目を追加している進行中セッションを実績集計から除外する（自分自身を
+  // 「過去の実績」として参照しないようにするため。詳細はhookのコメントを参照）
+  const usageStats = useExerciseUsageStats(Number.isFinite(sessionId) ? sessionId : undefined);
   const sortBy = useExerciseSortStore((state) => state.pickerSortBy);
   const setSortBy = useExerciseSortStore((state) => state.setPickerSortBy);
 

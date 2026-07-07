@@ -3,6 +3,7 @@ const mockPush = jest.fn();
 const mockUseLocalSearchParams = jest.fn();
 const mockUseExercises = jest.fn();
 const mockReplaceSessionExercise = jest.fn();
+const mockUseExerciseUsageStats = jest.fn();
 
 jest.mock('expo-router', () => ({
   useRouter: () => ({ back: mockBack, push: mockPush }),
@@ -20,6 +21,10 @@ jest.mock('@/hooks/use-keyboard-inset', () => ({
   useKeyboardInset: () => 0,
 }));
 
+jest.mock('@/hooks/use-exercise-usage-stats', () => ({
+  useExerciseUsageStats: (...args: unknown[]) => mockUseExerciseUsageStats(...args),
+}));
+
 jest.mock('@/lib/workout/session', () => ({
   replaceSessionExercise: (...args: unknown[]) => mockReplaceSessionExercise(...args),
 }));
@@ -28,6 +33,7 @@ import React from 'react';
 import { act, create, type ReactTestInstance } from 'react-test-renderer';
 import { Alert, Text, TextInput, TouchableOpacity } from 'react-native';
 import ExerciseSwapScreen from '@/app/workout/exercise-swap';
+import { useExerciseSortStore } from '@/lib/exercises/sort-store';
 
 const benchPress = {
   id: 10,
@@ -76,14 +82,19 @@ function render() {
 beforeEach(() => {
   jest.clearAllMocks();
   mockUseLocalSearchParams.mockReturnValue({
+    sessionId: '1',
     sessionExerciseId: '500',
     currentExerciseId: '10',
     currentExerciseName: 'ベンチプレス',
     hasRecordedData: 'true',
   });
   mockUseExercises.mockReturnValue({ exercises: [benchPress, inclineBenchPress, running] });
+  mockUseExerciseUsageStats.mockReturnValue(new Map());
   mockReplaceSessionExercise.mockResolvedValue(undefined);
   jest.spyOn(Alert, 'alert').mockImplementation(() => {});
+  // zustandのstoreはモジュールシングルトンでテスト間を跨いで共有されるため、
+  // 前のテストで選んだ並び替え軸が漏れないようデフォルトへ戻す
+  useExerciseSortStore.setState({ swapSortBy: 'frequent' });
 });
 
 test('現在の種目名がヘッダー付近に表示される', () => {
@@ -323,4 +334,68 @@ test('ⓘボタンを押すと種目詳細へ遷移する', () => {
   });
 
   expect(mockPush).toHaveBeenCalledWith('/exercise/11');
+});
+
+function findMenuItem(root: ReactTestInstance, label: string) {
+  return root.findAllByType(TouchableOpacity).find((t) => t.props.accessibilityLabel === label);
+}
+
+function findSortTrigger(root: ReactTestInstance) {
+  return root
+    .findAllByType(TouchableOpacity)
+    .find((t) => (t.props.accessibilityLabel as string)?.startsWith('並び替え: '));
+}
+
+test('並び替えドロップダウンが表示され、デフォルトは「よく使う順」', () => {
+  const root = render();
+  expect(findSortTrigger(root)!.props.accessibilityLabel).toBe('並び替え: よく使う順');
+});
+
+test('種目タブ・ピッカーとは独立した並び替え軸を持つ', () => {
+  useExerciseSortStore.getState().setListSortBy('name');
+  useExerciseSortStore.getState().setPickerSortBy('recent');
+  const root = render();
+  expect(findSortTrigger(root)!.props.accessibilityLabel).toBe('並び替え: よく使う順');
+});
+
+test('並び替えを変更すると候補一覧の並びが変わる', () => {
+  mockUseExerciseUsageStats.mockReturnValue(
+    new Map([
+      [inclineBenchPress.id, { recentUsageCount: 1, lastUsedAt: 200 }],
+      [running.id, { recentUsageCount: 10, lastUsedAt: 100 }],
+    ]),
+  );
+  const root = render();
+
+  act(() => {
+    findSortTrigger(root)!.props.onPress();
+  });
+  act(() => {
+    findMenuItem(root, '最近使った順')!.props.onPress();
+  });
+
+  const names = root
+    .findAllByType(Text)
+    .map((t) => [t.props.children].flat().join(''))
+    .filter((text) => text === 'インクラインベンチプレス' || text === 'ランニング');
+  // recentUsageCountはランニングの方が多いが、最近使った順に切り替えたので
+  // lastUsedAtが新しいインクラインベンチプレスが先に来る
+  expect(names).toEqual(['インクラインベンチプレス', 'ランニング']);
+});
+
+test('useExerciseUsageStatsに入れ替え対象セッションのsessionIdをexcludeSessionIdとして渡す（自分自身を実績として参照しないため）', () => {
+  render();
+  expect(mockUseExerciseUsageStats).toHaveBeenCalledWith(1);
+});
+
+test('sessionIdが不正(NaN)なときはexcludeSessionIdをundefinedで呼ぶ', () => {
+  mockUseLocalSearchParams.mockReturnValue({
+    sessionId: 'abc',
+    sessionExerciseId: '500',
+    currentExerciseId: '10',
+    currentExerciseName: 'ベンチプレス',
+    hasRecordedData: 'true',
+  });
+  render();
+  expect(mockUseExerciseUsageStats).toHaveBeenCalledWith(undefined);
 });

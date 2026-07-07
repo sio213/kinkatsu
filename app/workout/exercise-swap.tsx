@@ -1,5 +1,6 @@
 import { CategoryFilterChips } from '@/components/exercises/category-filter-chips';
 import { ExerciseSearchBar } from '@/components/exercises/exercise-search-bar';
+import { ExerciseSortDropdown } from '@/components/exercises/exercise-sort-dropdown';
 import { ListErrorBoundary } from '@/components/ui/list-error-boundary';
 import { NotFoundState } from '@/components/ui/not-found-state';
 import { PrimaryButton } from '@/components/ui/primary-button';
@@ -7,10 +8,12 @@ import { PickerExerciseRow } from '@/components/workout/picker-exercise-row';
 import { Colors } from '@/constants/theme';
 import type { Exercise } from '@/db/schema';
 import { useDebouncedPush } from '@/hooks/use-debounced-push';
+import { useExerciseUsageStats } from '@/hooks/use-exercise-usage-stats';
 import { useExercises } from '@/hooks/use-exercises';
 import { useKeyboardInset } from '@/hooks/use-keyboard-inset';
 import { CATEGORY_ALL } from '@/lib/exercises/constants';
 import { filterExercises } from '@/lib/exercises/filter';
+import { useExerciseSortStore } from '@/lib/exercises/sort-store';
 import { notifyPrefilled } from '@/lib/workout/prefill-feedback';
 import { replaceSessionExercise } from '@/lib/workout/session';
 import { useFocusEffect, useLocalSearchParams, useRouter } from 'expo-router';
@@ -20,22 +23,30 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 
 export default function ExerciseSwapScreen() {
   const {
+    sessionId: sessionIdParam,
     sessionExerciseId: sessionExerciseIdParam,
     currentExerciseId: currentExerciseIdParam,
     currentExerciseName,
     hasRecordedData: hasRecordedDataParam,
   } = useLocalSearchParams<{
+    sessionId: string;
     sessionExerciseId: string;
     currentExerciseId: string;
     currentExerciseName: string;
     hasRecordedData: string;
   }>();
+  const sessionId = Number(sessionIdParam);
   const sessionExerciseId = Number(sessionExerciseIdParam);
   const currentExerciseId = Number(currentExerciseIdParam);
   const hasRecordedData = hasRecordedDataParam === 'true';
   const router = useRouter();
   const pushDebounced = useDebouncedPush();
   const { exercises } = useExercises();
+  // 今まさに入れ替え対象になっている進行中セッションを実績集計から除外する
+  // （exercise-picker.tsxと同じ理由。詳細はhookのコメントを参照）
+  const usageStats = useExerciseUsageStats(Number.isFinite(sessionId) ? sessionId : undefined);
+  const sortBy = useExerciseSortStore((state) => state.swapSortBy);
+  const setSortBy = useExerciseSortStore((state) => state.setSwapSortBy);
 
   const [search, setSearch] = useState('');
   const [activeCategory, setActiveCategory] = useState<string>(CATEGORY_ALL);
@@ -53,8 +64,11 @@ export default function ExerciseSwapScreen() {
 
   // 入れ替え先の候補から自分自身（現在の種目）は除く。選んでも差分が無いため
   const candidates = useMemo(
-    () => filterExercises(exercises, activeCategory, search).filter((e) => e.id !== currentExerciseId),
-    [exercises, activeCategory, search, currentExerciseId],
+    () =>
+      filterExercises(exercises, activeCategory, search, { sortBy, usageStats }).filter(
+        (e) => e.id !== currentExerciseId,
+      ),
+    [exercises, activeCategory, search, currentExerciseId, sortBy, usageStats],
   );
 
   const handleToggle = useCallback((id: number) => {
@@ -130,6 +144,7 @@ export default function ExerciseSwapScreen() {
       </View>
       <ExerciseSearchBar value={search} onChangeText={setSearch} onSubmitEditing={Keyboard.dismiss} />
       <CategoryFilterChips activeCategory={activeCategory} onChange={setActiveCategory} />
+      <ExerciseSortDropdown sortBy={sortBy} onChange={setSortBy} />
     </View>
   );
 
