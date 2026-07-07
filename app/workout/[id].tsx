@@ -66,18 +66,26 @@ export default function WorkoutScreen() {
   // 含んでいないことがある。ここで即座にscrollToEndすると古い（1つ前の）末尾までしか
   // 動かず「スクロールされていないように見える」バグになる。そのため一旦「スクロール予約」
   // だけ立てておき、実際にFlatListのコンテンツサイズが変わった（＝新カードがレイアウトに
-  // 反映された）タイミングで初めてscrollToEndする
+  // 反映された）タイミングで初めてscrollToEndする。
+  // また、新カードのレイアウトは1回のonContentSizeChangeで確定するとは限らず（キーボードを
+  // 閉じるアニメーションのinset変化等を挟んで複数回に分けて変化することがある）、そのたびに
+  // scrollToEndを呼び直す。一定時間(400ms)コンテンツサイズの変化が無くなったら「落ち着いた」と
+  // みなし、最後にanimated:falseで正しい末尾へスナップさせてから予約を解除する
   const pendingScrollToEndRef = useRef(false);
+  const scrollSettleTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const handleContentSizeChange = useCallback(() => {
     if (!pendingScrollToEndRef.current) return;
-    pendingScrollToEndRef.current = false;
-    // onContentSizeChangeが呼ばれた直後は、まだ新しい行の高さやキーボード閉じアニメーション由来の
-    // insetがネイティブ側のスクロール計測に完全に反映しきっていないことがあり、scrollToEndが
-    // AddExerciseButton手前（新カードのスナックバー分）で止まって見えることがある。アニメーション
-    // 付きで一度スクロールした後、レイアウトが落ち着くのを待ってanimated:falseで正しい末尾に
-    // 補正することで、AddExerciseButton下の余白まで確実に届かせる
     listRef.current?.scrollToEnd({ animated: true });
-    setTimeout(() => listRef.current?.scrollToEnd({ animated: false }), 300);
+    if (scrollSettleTimeoutRef.current) clearTimeout(scrollSettleTimeoutRef.current);
+    scrollSettleTimeoutRef.current = setTimeout(() => {
+      pendingScrollToEndRef.current = false;
+      listRef.current?.scrollToEnd({ animated: false });
+    }, 400);
+  }, []);
+  useEffect(() => {
+    return () => {
+      if (scrollSettleTimeoutRef.current) clearTimeout(scrollSettleTimeoutRef.current);
+    };
   }, []);
   // 各カードが実際にビューポート内にあるかどうか。プリフィルされたカードのスナックバーが
   // 画面外で見えないまま自動消滅しないよう、SessionExerciseCard側の判定に使う
