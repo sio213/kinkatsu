@@ -11,6 +11,7 @@ import { useExercises } from '@/hooks/use-exercises';
 import { useKeyboardInset } from '@/hooks/use-keyboard-inset';
 import { CATEGORY_ALL } from '@/lib/exercises/constants';
 import { filterExercises } from '@/lib/exercises/filter';
+import { notifyPrefilled } from '@/lib/workout/prefill-feedback';
 import { replaceSessionExercise } from '@/lib/workout/session';
 import { useFocusEffect, useLocalSearchParams, useRouter } from 'expo-router';
 import { useCallback, useMemo, useRef, useState } from 'react';
@@ -73,7 +74,8 @@ export default function ExerciseSwapScreen() {
       if (isSwappingRef.current) return;
       isSwappingRef.current = true;
       try {
-        await replaceSessionExercise(sessionExerciseId, newExerciseId);
+        const prefilled = await replaceSessionExercise(sessionExerciseId, newExerciseId);
+        if (prefilled) notifyPrefilled([prefilled]);
         router.back();
       } catch (e) {
         console.error('[replace session exercise]', e);

@@ -75,15 +75,9 @@ export const SessionExerciseCard = memo(function SessionExerciseCard({
 
   const handleSwapExercise = useCallback(() => {
     // 確認ダイアログの要否をexercise-swap画面側で判断できるよう、既に何か記録済みか
-    // （✓確定済みだけでなく、✓未タップの入力途中の値も含めて）を渡しておく
-    const hasRecordedData = sets.some(
-      (s) =>
-        s.completedAt != null ||
-        s.weight != null ||
-        s.reps != null ||
-        s.durationSeconds != null ||
-        s.distanceMeters != null,
-    );
+    // （✓確定済みかどうか）を渡しておく。前回セットのプリフィル（✓未タップ・値だけ入っている状態）は
+    // ユーザーがまだ確認していないため「記録済み」に含めない（セット削除の確認要否と同じ考え方）
+    const hasRecordedData = sets.some((s) => s.completedAt != null);
     pushDebounced({
       pathname: '/workout/exercise-swap',
       params: {

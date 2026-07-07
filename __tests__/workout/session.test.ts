@@ -56,16 +56,34 @@ jest.mock('@/db/client', () => {
 jest.mock('@/db/schema', () => ({
   workoutSessions: { id: 'id', startedAt: 'startedAt', endedAt: 'endedAt' },
   workoutSessionExercises: { id: 'id', sessionId: 'sessionId', orderIndex: 'orderIndex', exerciseId: 'exerciseId' },
-  sets: { sessionId: 'sessionId', workoutSessionExerciseId: 'workoutSessionExerciseId' },
+  sets: {
+    id: 'id',
+    sessionId: 'sessionId',
+    workoutSessionExerciseId: 'workoutSessionExerciseId',
+    completedAt: 'completedAt',
+  },
 }));
 
-jest.mock('drizzle-orm', () => ({ eq: jest.fn((col, val) => ({ col, val })) }));
+jest.mock('drizzle-orm', () => ({
+  eq: jest.fn((col, val) => ({ col, val })),
+  and: jest.fn((...conditions) => ({ and: conditions })),
+  isNull: jest.fn((col) => ({ isNull: col })),
+}));
+
+// getPreviousSets自体のクエリ検証はhistory-integration.test.tsが担当する。ここでは
+// addExercisesToSession/replaceSessionExerciseがその結果をどう使うか（プリフィル vs
+// フォールバック）だけを見たいため、戻り値を差し替えられるようモック化する
+const mockGetPreviousSets = jest.fn();
+jest.mock('@/lib/workout/history', () => ({
+  getPreviousSets: (...args: unknown[]) => mockGetPreviousSets(...args),
+}));
 
 import {
   addExercisesToSession,
   endWorkoutSession,
   replaceSessionExercise,
   startWorkoutSession,
+  undoPrefill,
 } from '@/lib/workout/session';
 
 beforeEach(() => {
@@ -75,6 +93,8 @@ beforeEach(() => {
   mockUpdateWhere.mockResolvedValue(undefined);
   mockDeleteWhere.mockResolvedValue(undefined);
   mockSelectWhere.mockResolvedValue([]);
+  // 既定は「前回の記録なし」。プリフィルを検証するテストだけ個別にmockResolvedValueOnceで上書きする
+  mockGetPreviousSets.mockResolvedValue([]);
 });
 
 describe('startWorkoutSession', () => {
@@ -163,6 +183,10 @@ describe('addExercisesToSession', () => {
         exerciseId: 10,
         workoutSessionExerciseId: 100,
         setNumber: 1,
+        weight: null,
+        reps: null,
+        durationSeconds: null,
+        distanceMeters: null,
         completedAt: null,
         createdAt: expect.any(Number),
       },
@@ -171,6 +195,10 @@ describe('addExercisesToSession', () => {
         exerciseId: 11,
         workoutSessionExerciseId: 101,
         setNumber: 1,
+        weight: null,
+        reps: null,
+        durationSeconds: null,
+        distanceMeters: null,
         completedAt: null,
         createdAt: expect.any(Number),
       },
@@ -194,6 +222,10 @@ describe('addExercisesToSession', () => {
         exerciseId: 20,
         workoutSessionExerciseId: 200,
         setNumber: 1,
+        weight: null,
+        reps: null,
+        durationSeconds: null,
+        distanceMeters: null,
         completedAt: null,
         createdAt: expect.any(Number),
       },
@@ -207,7 +239,18 @@ describe('addExercisesToSession', () => {
 
     const setsPayload = mockSetsInsertValues.mock.calls[0][0];
     expect(Object.keys(setsPayload[0]).sort()).toEqual(
-      ['sessionId', 'exerciseId', 'workoutSessionExerciseId', 'setNumber', 'completedAt', 'createdAt'].sort(),
+      [
+        'sessionId',
+        'exerciseId',
+        'workoutSessionExerciseId',
+        'setNumber',
+        'weight',
+        'reps',
+        'durationSeconds',
+        'distanceMeters',
+        'completedAt',
+        'createdAt',
+      ].sort(),
     );
   });
 
@@ -223,6 +266,70 @@ describe('addExercisesToSession', () => {
     mockReturning.mockResolvedValueOnce([{ id: 100, exerciseId: 10 }]);
     mockSetsInsertValues.mockRejectedValueOnce(new Error('sets insert error'));
     await expect(addExercisesToSession(1, [10])).rejects.toThrow('sets insert error');
+  });
+
+  it('getPreviousSetsが失敗した場合もエラーを握りつぶさずthrowする', async () => {
+    mockSelectWhere.mockResolvedValueOnce([]);
+    mockReturning.mockResolvedValueOnce([{ id: 100, exerciseId: 10 }]);
+    mockGetPreviousSets.mockRejectedValueOnce(new Error('query error'));
+    await expect(addExercisesToSession(1, [10])).rejects.toThrow('query error');
+  });
+
+  it('前回の記録がある種目は、値をコピーしたセット列(completedAt:null)を作り、プリフィルされたカードとして返す', async () => {
+    mockSelectWhere.mockResolvedValueOnce([]);
+    mockReturning.mockResolvedValueOnce([{ id: 100, exerciseId: 10 }]);
+    mockGetPreviousSets.mockResolvedValueOnce([
+      { setNumber: 1, weight: 60, reps: 10, durationSeconds: null, distanceMeters: null },
+      { setNumber: 2, weight: 60, reps: 8, durationSeconds: null, distanceMeters: null },
+    ]);
+
+    const prefilled = await addExercisesToSession(1, [10]);
+
+    const setsPayload = mockSetsInsertValues.mock.calls[0][0];
+    expect(setsPayload).toEqual([
+      {
+        sessionId: 1,
+        exerciseId: 10,
+        workoutSessionExerciseId: 100,
+        setNumber: 1,
+        weight: 60,
+        reps: 10,
+        durationSeconds: null,
+        distanceMeters: null,
+        completedAt: null,
+        createdAt: expect.any(Number),
+      },
+      {
+        sessionId: 1,
+        exerciseId: 10,
+        workoutSessionExerciseId: 100,
+        setNumber: 2,
+        weight: 60,
+        reps: 8,
+        durationSeconds: null,
+        distanceMeters: null,
+        completedAt: null,
+        createdAt: expect.any(Number),
+      },
+    ]);
+    expect(prefilled).toEqual([{ sessionId: 1, exerciseId: 10, sessionExerciseId: 100 }]);
+  });
+
+  it('複数種目を同時に追加した場合、前回の記録がある種目だけがプリフィル対象として返る', async () => {
+    mockSelectWhere.mockResolvedValueOnce([]);
+    mockReturning.mockResolvedValueOnce([
+      { id: 100, exerciseId: 10 },
+      { id: 101, exerciseId: 11 },
+    ]);
+    mockGetPreviousSets.mockImplementation(async (_tx: unknown, exerciseId: number) =>
+      exerciseId === 10
+        ? [{ setNumber: 1, weight: 60, reps: 10, durationSeconds: null, distanceMeters: null }]
+        : [],
+    );
+
+    const prefilled = await addExercisesToSession(1, [10, 11]);
+
+    expect(prefilled).toEqual([{ sessionId: 1, exerciseId: 10, sessionExerciseId: 100 }]);
   });
 });
 
@@ -255,14 +362,20 @@ describe('replaceSessionExercise', () => {
     expect(mockDeleteWhere).toHaveBeenCalledWith({ col: 'workoutSessionExerciseId', val: 7 });
 
     const setsPayload = mockSetsInsertValues.mock.calls[0][0];
-    expect(setsPayload).toEqual({
-      sessionId: 3,
-      exerciseId: 20,
-      workoutSessionExerciseId: 7,
-      setNumber: 1,
-      completedAt: null,
-      createdAt: expect.any(Number),
-    });
+    expect(setsPayload).toEqual([
+      {
+        sessionId: 3,
+        exerciseId: 20,
+        workoutSessionExerciseId: 7,
+        setNumber: 1,
+        weight: null,
+        reps: null,
+        durationSeconds: null,
+        distanceMeters: null,
+        completedAt: null,
+        createdAt: expect.any(Number),
+      },
+    ]);
   });
 
   it('workoutSessionExercises更新→セット削除→セット再作成の順で実行する', async () => {
@@ -295,5 +408,86 @@ describe('replaceSessionExercise', () => {
     mockSetsInsertValues.mockRejectedValueOnce(new Error('sets insert error'));
 
     await expect(replaceSessionExercise(1, 20)).rejects.toThrow('sets insert error');
+  });
+
+  it('入れ替え先の種目に前回の記録があれば、そのセット列をコピーしてPrefilledCardを返す', async () => {
+    mockSelectWhere.mockResolvedValueOnce([{ exerciseId: 10, sessionId: 3 }]);
+    mockGetPreviousSets.mockResolvedValueOnce([
+      { setNumber: 1, weight: 100, reps: 5, durationSeconds: null, distanceMeters: null },
+    ]);
+
+    const prefilled = await replaceSessionExercise(7, 20);
+
+    const setsPayload = mockSetsInsertValues.mock.calls[0][0];
+    expect(setsPayload).toEqual([
+      {
+        sessionId: 3,
+        exerciseId: 20,
+        workoutSessionExerciseId: 7,
+        setNumber: 1,
+        weight: 100,
+        reps: 5,
+        durationSeconds: null,
+        distanceMeters: null,
+        completedAt: null,
+        createdAt: expect.any(Number),
+      },
+    ]);
+    expect(prefilled).toEqual({ sessionId: 3, exerciseId: 20, sessionExerciseId: 7 });
+  });
+
+  it('入れ替え先の種目に前回の記録が無ければnullを返す（プリフィル通知を出さない）', async () => {
+    mockSelectWhere.mockResolvedValueOnce([{ exerciseId: 10, sessionId: 1 }]);
+
+    const prefilled = await replaceSessionExercise(1, 20);
+
+    expect(prefilled).toBeNull();
+  });
+});
+
+describe('undoPrefill', () => {
+  it('✓未確定(completedAt:null)のセットだけを削除し、何も残らなければ値が空でsetNumber=1のセットを1件作り直す', async () => {
+    mockSelectWhere.mockResolvedValueOnce([]); // 削除後、残っているセットが無い
+
+    await undoPrefill({ sessionId: 3, exerciseId: 20, sessionExerciseId: 7 });
+
+    expect(mockDeleteWhere).toHaveBeenCalledWith({
+      and: [{ col: 'workoutSessionExerciseId', val: 7 }, { isNull: 'completedAt' }],
+    });
+    const setsPayload = mockSetsInsertValues.mock.calls[0][0];
+    expect(setsPayload).toEqual({
+      sessionId: 3,
+      exerciseId: 20,
+      workoutSessionExerciseId: 7,
+      setNumber: 1,
+      weight: null,
+      reps: null,
+      durationSeconds: null,
+      distanceMeters: null,
+      completedAt: null,
+      createdAt: expect.any(Number),
+    });
+  });
+
+  it('✓確定済みのセットが残っていれば、空セットへの作り直しはしない（確定済みの記録を消さないため）', async () => {
+    mockSelectWhere.mockResolvedValueOnce([{ id: 999 }]);
+
+    await undoPrefill({ sessionId: 3, exerciseId: 20, sessionExerciseId: 7 });
+
+    expect(mockSetsInsertValues).not.toHaveBeenCalled();
+  });
+
+  it('削除が失敗した場合はエラーを握りつぶさずthrowする', async () => {
+    mockDeleteWhere.mockRejectedValueOnce(new Error('db error'));
+    await expect(
+      undoPrefill({ sessionId: 3, exerciseId: 20, sessionExerciseId: 7 }),
+    ).rejects.toThrow('db error');
+  });
+
+  it('残存セットの確認クエリが失敗した場合もエラーを握りつぶさずthrowする', async () => {
+    mockSelectWhere.mockRejectedValueOnce(new Error('select error'));
+    await expect(
+      undoPrefill({ sessionId: 3, exerciseId: 20, sessionExerciseId: 7 }),
+    ).rejects.toThrow('select error');
   });
 });

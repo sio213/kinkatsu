@@ -56,7 +56,7 @@ beforeEach(() => {
   jest.clearAllMocks();
   mockUseLocalSearchParams.mockReturnValue({ sessionId: '5' });
   mockUseExercises.mockReturnValue({ exercises: [benchPress, squat] });
-  mockAddExercisesToSession.mockResolvedValue(undefined);
+  mockAddExercisesToSession.mockResolvedValue([]);
   jest.spyOn(Alert, 'alert').mockImplementation(() => {});
 });
 
@@ -129,8 +129,8 @@ test('追加が失敗した場合はエラーAlertを表示し、router.backは�
 test('追加ボタンを連打してもaddExercisesToSessionは1回しか呼ばれない', async () => {
   let resolveAdd!: () => void;
   mockAddExercisesToSession.mockReturnValue(
-    new Promise<void>((resolve) => {
-      resolveAdd = resolve;
+    new Promise<unknown[]>((resolve) => {
+      resolveAdd = () => resolve([]);
     }),
   );
   const root = render();

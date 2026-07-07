@@ -3,6 +3,7 @@ import { IconSymbol } from '@/components/ui/icon-symbol';
 import { ListErrorBoundary } from '@/components/ui/list-error-boundary';
 import { NotFoundState } from '@/components/ui/not-found-state';
 import { PrimaryButton } from '@/components/ui/primary-button';
+import { Snackbar } from '@/components/ui/snackbar';
 import { AddExerciseButton } from '@/components/workout/add-exercise-button';
 import { SessionExerciseCard } from '@/components/workout/session-exercise-card';
 import { Colors } from '@/constants/theme';
@@ -14,7 +15,8 @@ import {
   useSessionSets,
   useWorkoutSession,
 } from '@/hooks/use-workout-session';
-import { deleteSession, endWorkoutSession } from '@/lib/workout/session';
+import { subscribePrefilled } from '@/lib/workout/prefill-feedback';
+import { deleteSession, endWorkoutSession, undoPrefill, type PrefilledCard } from '@/lib/workout/session';
 import { formatSessionDateGroup, formatSessionDuration } from '@/lib/workout/summary';
 import { useHeaderHeight } from '@react-navigation/elements';
 import { Stack, useLocalSearchParams, useRouter } from 'expo-router';
@@ -43,6 +45,7 @@ export default function WorkoutScreen() {
   const keyboardInset = useKeyboardInset();
   const headerHeight = useHeaderHeight();
   const [menuOpen, setMenuOpen] = useState(false);
+  const [prefilledCards, setPrefilledCards] = useState<PrefilledCard[] | null>(null);
   // 種目カードのアコーディオン開閉状態。カード側のローカルstateにすると、FlatListの
   // virtualizationでカードがアンマウント→再マウントされた際に開閉状態がリセットされてしまうため、
   // この画面が生きている間は保持されるようここで持つ（値未保存=展開中がデフォルト）
@@ -64,6 +67,32 @@ export default function WorkoutScreen() {
     const interval = setInterval(() => setNow(Date.now()), 1000);
     return () => clearInterval(interval);
   }, [session]);
+
+  // 種目追加/入れ替え画面はDB操作直後にrouter.back()で閉じるため、プリフィルが起きたことは
+  // pub/sub経由でここに届く（lib/workout/prefill-feedback.ts）。他のセッション画面からの
+  // 通知が紛れ込まないようsessionIdが一致するものだけ拾う
+  useEffect(() => {
+    if (sessionId == null) return;
+    return subscribePrefilled((cards) => {
+      const forThisSession = cards.filter((c) => c.sessionId === sessionId);
+      if (forThisSession.length === 0) return;
+      // スナックバー表示中に続けて別の種目を追加してプリフィルが起きた場合、前のバッチを
+      // 上書きすると「元に戻す」を呼べなくなるカードが出てしまうため、既存のバッチに追加する
+      setPrefilledCards((prev) => [...(prev ?? []), ...forThisSession]);
+    });
+  }, [sessionId]);
+
+  const handleUndoPrefill = async () => {
+    if (!prefilledCards) return;
+    const cards = prefilledCards;
+    setPrefilledCards(null);
+    try {
+      await Promise.all(cards.map((card) => undoPrefill(card)));
+    } catch (e) {
+      console.error('[undo prefill]', e);
+      Alert.alert('エラー', '元に戻せませんでした。');
+    }
+  };
 
   const finish = async () => {
     if (sessionId == null) return;
@@ -217,6 +246,15 @@ export default function WorkoutScreen() {
         />
       )}
 
+      <Snackbar
+        visible={prefilledCards != null}
+        message="前回のセットを挿入"
+        actionLabel="元に戻す"
+        onPressAction={handleUndoPrefill}
+        onDismiss={() => setPrefilledCards(null)}
+        style={[styles.snackbar, isActive ? styles.snackbarAboveFooter : styles.snackbarAtBottom]}
+      />
+
       {isActive && (
         <View style={styles.footer}>
           <PrimaryButton label="トレーニングを終了" onPress={handleFinish} />
@@ -279,6 +317,10 @@ const styles = StyleSheet.create({
   exerciseList: { flex: 1 },
   exerciseListContent: { padding: 16, gap: 10 },
   addExerciseBtnInline: { marginTop: 4 },
+
+  snackbar: { position: 'absolute', left: 16, right: 16 },
+  snackbarAboveFooter: { bottom: 88 },
+  snackbarAtBottom: { bottom: 16 },
 
   footer: {
     padding: 16,
