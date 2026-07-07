@@ -5,6 +5,7 @@ const mockUseWorkoutSession = jest.fn();
 const mockUseSessionSetCount = jest.fn();
 const mockUseSessionExercises = jest.fn();
 const mockUseSessionSets = jest.fn();
+const mockUseExercisesWithHistory = jest.fn();
 const mockEndWorkoutSession = jest.fn();
 const mockDeleteSession = jest.fn();
 const mockUndoLoadHistory = jest.fn();
@@ -33,6 +34,7 @@ jest.mock('@/hooks/use-workout-session', () => ({
   useSessionSetCount: (...args: unknown[]) => mockUseSessionSetCount(...args),
   useSessionExercises: (...args: unknown[]) => mockUseSessionExercises(...args),
   useSessionSets: (...args: unknown[]) => mockUseSessionSets(...args),
+  useExercisesWithHistory: (...args: unknown[]) => mockUseExercisesWithHistory(...args),
   EMPTY_SETS: [],
   EMPTY_PREFILLED_SET_IDS: [],
 }));
@@ -89,6 +91,7 @@ beforeEach(() => {
   mockUseSessionSetCount.mockReturnValue(0);
   mockUseSessionExercises.mockReturnValue([]);
   mockUseSessionSets.mockReturnValue(new Map());
+  mockUseExercisesWithHistory.mockReturnValue(new Set());
   mockEndWorkoutSession.mockResolvedValue(undefined);
   mockDeleteSession.mockResolvedValue(undefined);
   mockUndoLoadHistory.mockResolvedValue(undefined);

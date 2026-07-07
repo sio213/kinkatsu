@@ -14,6 +14,7 @@ jest.mock('@/db/client', () => {
   return {
     db: {
       select: jest.fn().mockReturnValue({ from: jest.fn().mockReturnValue(chain) }),
+      selectDistinct: jest.fn().mockReturnValue({ from: jest.fn().mockReturnValue(chain) }),
     },
   };
 });
@@ -39,6 +40,9 @@ jest.mock('@/db/schema', () => ({
 jest.mock('drizzle-orm', () => ({
   eq: jest.fn((col, val) => ({ col, val })),
   desc: jest.fn((col) => ({ col, dir: 'desc' })),
+  and: jest.fn((...conds) => ({ conds })),
+  ne: jest.fn((col, val) => ({ col, val, op: 'ne' })),
+  isNotNull: jest.fn((col) => ({ col, op: 'isNotNull' })),
   sql: Object.assign(
     jest.fn((strings: TemplateStringsArray, ...values: unknown[]) => ({ strings, values })),
     { raw: jest.fn() },
@@ -53,6 +57,7 @@ jest.mock('drizzle-orm/expo-sqlite', () => ({
 import React from 'react';
 import { act, create } from 'react-test-renderer';
 import {
+  useExercisesWithHistory,
   useSessionExercises,
   useSessionSetCount,
   useSessionSets,
@@ -175,6 +180,25 @@ describe('useSessionSetCount', () => {
   it('集計行のcountをそのまま返す', () => {
     mockLiveQueryQueue = [{ data: [{ count: 4 }] }];
     expect(mount()).toBe(4);
+  });
+});
+
+describe('useExercisesWithHistory', () => {
+  const mount = makeHarness(() => useExercisesWithHistory(1));
+
+  it('dataがundefinedのとき空Setを返す', () => {
+    mockLiveQueryQueue = [{ data: undefined }];
+    expect(mount()).toEqual(new Set());
+  });
+
+  it('SQL側で絞り込み済みのexerciseIdをSetにする（重複除去はselectDistinct側の責務）', () => {
+    mockLiveQueryQueue = [{ data: [{ exerciseId: 10 }, { exerciseId: 20 }] }];
+    expect(mount()).toEqual(new Set([10, 20]));
+  });
+
+  it('dataが空配列なら空Set', () => {
+    mockLiveQueryQueue = [{ data: [] }];
+    expect(mount()).toEqual(new Set());
   });
 });
 

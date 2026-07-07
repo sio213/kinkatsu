@@ -30,6 +30,9 @@ type Props = {
   // （lib/workout/session.tsのPrefilledCard.prefilledSetIds）。この行idに含まれるSetRowだけ
   // ゴースト表示にする
   prefilledSetIds: number[];
+  // この種目に「過去の記録から読み込む」で読み込める過去記録が1件でもあるか。無ければ
+  // ⋮メニューの当該項目を「上へ移動」等と同じくグレーアウトする
+  hasHistory: boolean;
 };
 
 export type SessionExerciseCardHandle = { focusFirstSet: () => void };
@@ -47,6 +50,7 @@ export const SessionExerciseCard = memo(
       nextSessionExerciseId,
       onToggleCollapsed,
       prefilledSetIds,
+      hasHistory,
     }: Props,
     ref,
   ) {
@@ -287,6 +291,7 @@ export const SessionExerciseCard = memo(
               onMoveUp={handleMoveUp}
               onMoveDown={handleMoveDown}
               onLoadFromHistory={handleLoadFromHistory}
+              hasHistory={hasHistory}
               onDelete={handleDeleteExercise}
             />
           )}

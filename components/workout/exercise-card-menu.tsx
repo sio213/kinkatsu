@@ -15,6 +15,8 @@ type Props = {
   onMoveUp: () => void;
   onMoveDown: () => void;
   onLoadFromHistory: () => void;
+  // この種目に読み込める過去記録が1件も無ければ「上へ移動」等と同じくグレーアウトする
+  hasHistory: boolean;
   onDelete: () => void;
 };
 
@@ -26,6 +28,7 @@ export function ExerciseCardMenu({
   onMoveUp,
   onMoveDown,
   onLoadFromHistory,
+  hasHistory,
   onDelete,
 }: Props) {
   const triggerRef = useRef<View>(null);
@@ -64,6 +67,7 @@ export function ExerciseCardMenu({
   };
 
   const handleLoadFromHistory = () => {
+    if (!hasHistory) return;
     handleClose();
     onLoadFromHistory();
   };
@@ -133,10 +137,14 @@ export function ExerciseCardMenu({
             <TouchableOpacity
               style={styles.menuItem}
               onPress={handleLoadFromHistory}
+              disabled={!hasHistory}
               accessibilityLabel="過去の記録から読み込む"
+              accessibilityState={{ disabled: !hasHistory }}
             >
-              <DesignIcon name="history" size={18} color={Colors.textMuted} />
-              <Text style={styles.menuItemText}>過去の記録から読み込む</Text>
+              <DesignIcon name="history" size={18} color={hasHistory ? Colors.textMuted : Colors.textPlaceholder} />
+              <Text style={[styles.menuItemText, !hasHistory && styles.menuItemDisabled]}>
+                過去の記録から読み込む
+              </Text>
             </TouchableOpacity>
             <TouchableOpacity style={styles.menuItem} onPress={handleDelete} accessibilityLabel="削除">
               <DesignIcon name="delete-outline" size={18} color={Colors.danger} />

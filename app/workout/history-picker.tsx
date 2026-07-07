@@ -195,8 +195,8 @@ const styles = StyleSheet.create({
     paddingHorizontal: 16,
     paddingVertical: 10,
   },
-  bannerText: { flex: 1, fontSize: 12.5, color: Colors.accent },
-  bannerTextBold: { fontWeight: '700' },
+  bannerText: { flex: 1, fontSize: 12.5, color: Colors.textMuted },
+  bannerTextBold: { fontWeight: '700', color: Colors.textSecondary },
 
   list: { flex: 1 },
   content: { padding: 16, paddingBottom: 32 },

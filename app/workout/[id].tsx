@@ -11,6 +11,7 @@ import { useKeyboardInset } from '@/hooks/use-keyboard-inset';
 import {
   EMPTY_PREFILLED_SET_IDS,
   EMPTY_SETS,
+  useExercisesWithHistory,
   useSessionExercises,
   useSessionSetCount,
   useSessionSets,
@@ -57,6 +58,7 @@ export default function WorkoutScreen() {
   const setCount = useSessionSetCount(sessionId ?? -1);
   const sessionExercises = useSessionExercises(sessionId ?? -1);
   const sessionSets = useSessionSets(sessionId ?? -1);
+  const exercisesWithHistory = useExercisesWithHistory(sessionId ?? -1);
   const [now, setNow] = useState(() => Date.now());
   const isFinishingRef = useRef(false);
   const keyboardInset = useKeyboardInset();
@@ -334,6 +336,7 @@ export default function WorkoutScreen() {
                   nextSessionExerciseId={sessionExercises[index + 1]?.sessionExerciseId ?? null}
                   onToggleCollapsed={handleToggleCollapsed}
                   prefilledSetIds={prefilledEntry?.prefilledSetIds ?? EMPTY_PREFILLED_SET_IDS}
+                  hasHistory={exercisesWithHistory.has(item.id)}
                 />
               </ListErrorBoundary>
             );
