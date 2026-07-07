@@ -170,7 +170,11 @@ export default function HistoryPickerScreen() {
               onLoad={handleLoad}
             />
           )}
-          renderSectionHeader={({ section }) => <Text style={styles.monthLabel}>{section.title}</Text>}
+          renderSectionHeader={({ section }) => (
+            <View style={styles.monthLabelWrapper}>
+              <Text style={styles.monthLabel}>{section.title}</Text>
+            </View>
+          )}
           ItemSeparatorComponent={() => <View style={styles.cardSeparator} />}
           SectionSeparatorComponent={() => <View style={styles.sectionSeparator} />}
           contentContainerStyle={styles.content}
@@ -200,7 +204,17 @@ const styles = StyleSheet.create({
 
   list: { flex: 1 },
   content: { padding: 16, paddingBottom: 32 },
-  monthLabel: { fontSize: 12, fontWeight: '700', color: Colors.textMuted, marginBottom: 8 },
+  // スクロール中はスティッキーヘッダーとして画面上部に固定表示される。marginHorizontalで
+  // contentの左右paddingを打ち消して画面端まで塗りつぶすことで、背面のカードが透けて
+  // 文字と重なって見えないようにする（背景を不透明にするのが目的で、marginBottom分は
+  // paddingBottomに置き換えている）
+  monthLabelWrapper: {
+    backgroundColor: Colors.background,
+    marginHorizontal: -16,
+    paddingHorizontal: 16,
+    paddingBottom: 8,
+  },
+  monthLabel: { fontSize: 12, fontWeight: '700', color: Colors.textMuted },
   cardSeparator: { height: 8 },
   sectionSeparator: { height: 16 },
 });
