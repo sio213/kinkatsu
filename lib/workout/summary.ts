@@ -45,3 +45,54 @@ export function groupSessionsByDate<T extends { startedAt: number }>(
   }
   return groups.map(({ dateLabel, sessions: s }) => ({ dateLabel, sessions: s }));
 }
+
+// トースト表示用の短い日付（例:「7/3」）
+export function formatShortDate(startedAt: number): string {
+  const d = new Date(startedAt);
+  return `${d.getMonth() + 1}/${d.getDate()}`;
+}
+
+// 「記録から読み込む」画面の直近項目用。1週間以上前は相対表示すると却って分かりにくいためnullを返し、
+// 呼び出し側は絶対日付（formatSessionDateGroup）のみを表示する
+export function formatRelativeDaysAgo(startedAt: number, now: number = Date.now()): string | null {
+  const startOfDay = (t: number) => {
+    const d = new Date(t);
+    d.setHours(0, 0, 0, 0);
+    return d.getTime();
+  };
+  const diffDays = Math.round((startOfDay(now) - startOfDay(startedAt)) / 86_400_000);
+  if (diffDays === 0) return '今日';
+  if (diffDays === 1) return '昨日';
+  if (diffDays >= 2 && diffDays <= 5) return `${diffDays}日前`;
+  return null;
+}
+
+// 「記録から読み込む」画面の月グループ見出し用（例:「2026年7月」）
+export function formatMonthGroup(startedAt: number): string {
+  const d = new Date(startedAt);
+  return `${d.getFullYear()}年${d.getMonth() + 1}月`;
+}
+
+// 年をまたいでも同じ月を誤って同一グループにしないための内部キー（表示には使わない）
+function monthGroupKey(startedAt: number): string {
+  const d = new Date(startedAt);
+  return `${d.getFullYear()}-${d.getMonth()}`;
+}
+
+// 「記録から読み込む」画面用。groupSessionsByDateと同じ考え方で月単位にまとめる。
+// 新しい日付が先頭に来る前提（itemsは降順ソート済み）
+export function groupByMonth<T extends { startedAt: number }>(
+  items: T[],
+): { monthLabel: string; items: T[] }[] {
+  const groups: { key: string; monthLabel: string; items: T[] }[] = [];
+  for (const item of items) {
+    const key = monthGroupKey(item.startedAt);
+    const lastGroup = groups[groups.length - 1];
+    if (lastGroup?.key === key) {
+      lastGroup.items.push(item);
+    } else {
+      groups.push({ key, monthLabel: formatMonthGroup(item.startedAt), items: [item] });
+    }
+  }
+  return groups.map(({ monthLabel, items: i }) => ({ monthLabel, items: i }));
+}

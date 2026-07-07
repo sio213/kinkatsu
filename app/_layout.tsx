@@ -98,6 +98,7 @@ export default function RootLayout() {
         <Stack.Screen name="workout/[id]" options={{ title: '' }} />
         <Stack.Screen name="workout/exercise-picker" options={{ title: '種目を追加' }} />
         <Stack.Screen name="workout/exercise-swap" options={{ title: '種目を入れ替え' }} />
+        <Stack.Screen name="workout/history-picker" options={{ title: '記録から読み込む' }} />
         <Stack.Screen
           name="modal"
           options={{ presentation: 'modal', title: 'Modal' }}

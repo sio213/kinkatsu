@@ -145,10 +145,51 @@ export function parseColumns(
   return parseColumnsWithFallback(columns, display, {});
 }
 
-// parseColumnsと同様だが、パースに失敗した非空入力（例:"60kg"のような不正な貼り付け、
-// "82.5"を打つ途中の"82."のような一瞬だけ不正な状態）はnullにせずfallback（通常はDB上の
-// 既存値）を使う。「セット追加」時の入力途中値コピーや自動保存で、タイプミス・入力途中の
-// 一瞬によって値が黙って消えるのを防ぐためのもの。空欄は従来通りnullになる
+// 「記録から読み込む」画面の一覧表示専用。1分未満は"45秒"のような素の秒数、1分以上は
+// set-row.tsx等と同じ"mm:ss"（formatDurationDisplay）にする。短いホールド系種目が多い
+// time/weight_time計測で"90秒"のような読みにくい表記になるのを避けつつ、既存の分:秒表記とも矛盾しない
+function formatHistoryDuration(seconds: number): string {
+  return seconds < 60 ? `${seconds}秒` : formatDurationDisplay(seconds);
+}
+
+// 限られた横幅で1行にまとめるため単位付きの簡潔な文字列にする（例:"60kg×10","45秒"）。
+// repsだけは他の列と組み合わさる場合（weight_reps）は"10"のように単位を省き、単独の場合
+// （reps計測）だけ"10回"と単位を付ける。重量・時間・距離は組み合わせの有無に関わらず単位を付ける
+function formatHistoryFieldValue(
+  key: SetFieldKey,
+  value: number | null | undefined,
+  repsIsSoleColumn: boolean,
+): string | null {
+  if (value == null) return null;
+  switch (key) {
+    case 'weight':
+      return `${value}kg`;
+    case 'reps':
+      return repsIsSoleColumn ? `${value}回` : `${value}`;
+    case 'durationSeconds':
+      return formatHistoryDuration(value);
+    case 'distanceMeters':
+      return `${formatDistanceKmDisplay(value)}km`;
+  }
+}
+
+// 列定義に沿って複数セットを"60kg×10・60kg×8"のような1本の文字列にする。
+// セット数が多い場合の省略（「…」）は呼び出し側でText numberOfLines={1}に任せる
+export function formatHistorySetSummary(
+  columns: SetColumn[],
+  setsList: Partial<Record<SetFieldKey, number | null | undefined>>[],
+): string {
+  const repsIsSoleColumn = columns.length === 1 && columns[0].key === 'reps';
+  return setsList
+    .map((s) =>
+      columns
+        .map((c) => formatHistoryFieldValue(c.key, s[c.key], repsIsSoleColumn))
+        .filter((v): v is string => v != null)
+        .join('×'),
+    )
+    .join('・');
+}
+
 export function parseColumnsWithFallback(
   columns: SetColumn[],
   display: Partial<Record<SetFieldKey, string>>,

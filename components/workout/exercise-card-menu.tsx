@@ -14,11 +14,20 @@ type Props = {
   onSwap: () => void;
   onMoveUp: () => void;
   onMoveDown: () => void;
+  onLoadFromHistory: () => void;
   onDelete: () => void;
 };
 
 // 種目カードの「⋮」メニュー
-export function ExerciseCardMenu({ isFirst, isLast, onSwap, onMoveUp, onMoveDown, onDelete }: Props) {
+export function ExerciseCardMenu({
+  isFirst,
+  isLast,
+  onSwap,
+  onMoveUp,
+  onMoveDown,
+  onLoadFromHistory,
+  onDelete,
+}: Props) {
   const triggerRef = useRef<View>(null);
   const [anchor, setAnchor] = useState<Anchor | null>(null);
   const open = anchor !== null;
@@ -47,6 +56,11 @@ export function ExerciseCardMenu({ isFirst, isLast, onSwap, onMoveUp, onMoveDown
   const handleMoveDown = () => {
     handleClose();
     onMoveDown();
+  };
+
+  const handleLoadFromHistory = () => {
+    handleClose();
+    onLoadFromHistory();
   };
 
   const handleDelete = () => {
@@ -110,6 +124,14 @@ export function ExerciseCardMenu({ isFirst, isLast, onSwap, onMoveUp, onMoveDown
                 color={isLast ? Colors.textPlaceholder : Colors.textMuted}
               />
               <Text style={[styles.menuItemText, isLast && styles.menuItemDisabled]}>下へ移動</Text>
+            </TouchableOpacity>
+            <TouchableOpacity
+              style={styles.menuItem}
+              onPress={handleLoadFromHistory}
+              accessibilityLabel="過去の記録から読み込む"
+            >
+              <DesignIcon name="assignment" size={18} color={Colors.textMuted} />
+              <Text style={styles.menuItemText}>過去の記録から読み込む</Text>
             </TouchableOpacity>
             <TouchableOpacity style={styles.menuItem} onPress={handleDelete} accessibilityLabel="削除">
               <DesignIcon name="delete-outline" size={18} color={Colors.danger} />

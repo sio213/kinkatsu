@@ -120,6 +120,18 @@ export const SessionExerciseCard = memo(
     });
   }, [pushDebounced, exercise.sessionExerciseId, exercise.id, exercise.name, sets]);
 
+  const handleLoadFromHistory = useCallback(() => {
+    pushDebounced({
+      pathname: '/workout/history-picker',
+      params: {
+        sessionId: String(sessionId),
+        sessionExerciseId: String(exercise.sessionExerciseId),
+        exerciseId: String(exercise.id),
+        exerciseName: exercise.name,
+      },
+    });
+  }, [pushDebounced, sessionId, exercise.sessionExerciseId, exercise.id, exercise.name]);
+
   const handleToggleExpanded = useCallback(() => {
     LayoutAnimation.configureNext(LayoutAnimation.Presets.easeInEaseOut);
     onToggleCollapsed(exercise.sessionExerciseId);
@@ -274,6 +286,7 @@ export const SessionExerciseCard = memo(
               onSwap={handleSwapExercise}
               onMoveUp={handleMoveUp}
               onMoveDown={handleMoveDown}
+              onLoadFromHistory={handleLoadFromHistory}
               onDelete={handleDeleteExercise}
             />
           )}

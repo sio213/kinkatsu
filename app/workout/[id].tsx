@@ -4,6 +4,7 @@ import { ListErrorBoundary } from '@/components/ui/list-error-boundary';
 import { NotFoundState } from '@/components/ui/not-found-state';
 import { PrimaryButton } from '@/components/ui/primary-button';
 import { AddExerciseButton } from '@/components/workout/add-exercise-button';
+import { HistoryLoadToast } from '@/components/workout/history-load-toast';
 import { SessionExerciseCard, type SessionExerciseCardHandle } from '@/components/workout/session-exercise-card';
 import { Colors } from '@/constants/theme';
 import { useKeyboardInset } from '@/hooks/use-keyboard-inset';
@@ -15,16 +16,30 @@ import {
   useSessionSets,
   useWorkoutSession,
 } from '@/hooks/use-workout-session';
+import { subscribeHistoryLoaded, type HistoryLoadEvent } from '@/lib/workout/history-load-feedback';
 import { subscribePrefilled } from '@/lib/workout/prefill-feedback';
-import { deleteSession, endWorkoutSession, type PrefilledCard } from '@/lib/workout/session';
+import { deleteSession, endWorkoutSession, undoLoadHistory, type PrefilledCard } from '@/lib/workout/session';
 import { formatSessionDateGroup, formatSessionDuration } from '@/lib/workout/summary';
 import { useHeaderHeight } from '@react-navigation/elements';
 import type { ParamListBase } from '@react-navigation/native';
 import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { Stack, useLocalSearchParams, useNavigation, useRouter } from 'expo-router';
 import { useCallback, useEffect, useRef, useState } from 'react';
-import { Alert, FlatList, Modal, Pressable, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
+import {
+  AccessibilityInfo,
+  Alert,
+  FlatList,
+  Modal,
+  Pressable,
+  StyleSheet,
+  Text,
+  TouchableOpacity,
+  View,
+} from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
+
+// 「取り消す」を出しっぱなしにしない自動消去までの時間
+const HISTORY_TOAST_DURATION_MS = 5000;
 
 function formatElapsed(ms: number): string {
   const totalSeconds = Math.max(0, Math.floor(ms / 1000));
@@ -47,11 +62,14 @@ export default function WorkoutScreen() {
   const keyboardInset = useKeyboardInset();
   const headerHeight = useHeaderHeight();
   const [menuOpen, setMenuOpen] = useState(false);
-  // 種目追加/入れ替え画面はDB操作直後にrouter.back()で閉じるため、プリフィルが起きたことは
-  // pub/sub経由でここに届く（lib/workout/prefill-feedback.ts）。プリフィルされたセットidが
-  // 分かればカード内のゴースト表示に使える。「クリア」のような能動的な打ち消し操作がもう無いため、
-  // 一度受け取ったカード情報はセッション画面が生きている間ずっと保持してよい（明示的に消す必要が無い）
-  const [prefilledCards, setPrefilledCards] = useState<PrefilledCard[] | null>(null);
+  // 種目追加/入れ替え/記録から読み込む画面はDB操作直後にrouter.back()で閉じるため、プリフィルが
+  // 起きたことはpub/sub経由でここに届く（lib/workout/prefill-feedback.ts）。プリフィルされた
+  // セットidが分かればカード内のゴースト表示に使える。カード（sessionExerciseId）単位のMapで持ち、
+  // 同じカードに対して複数回イベントが来た場合（例:入れ替え後にさらに記録から読み込む等）は
+  // 常に最後のイベントで上書きする。配列+findだと最初に見つかったイベントを使ってしまい、
+  // 削除済みの古いセットidを参照してゴーストが表示されなくなる
+  const [prefilledByCardId, setPrefilledByCardId] = useState<Map<number, PrefilledCard>>(() => new Map());
+  const [historyToast, setHistoryToast] = useState<HistoryLoadEvent | null>(null);
   const navigation = useNavigation<NativeStackNavigationProp<ParamListBase>>();
   // 種目追加直後にオートフォーカスしたいカードの管理。宣言的なautoFocusプロパティは
   // 「戻る」の画面遷移アニメーション中にキーボードが被さって出るタイミング問題があるため
@@ -111,7 +129,11 @@ export default function WorkoutScreen() {
     return subscribePrefilled((cards) => {
       const forThisSession = cards.filter((c) => c.sessionId === sessionId);
       if (forThisSession.length === 0) return;
-      setPrefilledCards((prev) => [...(prev ?? []), ...forThisSession]);
+      setPrefilledByCardId((prev) => {
+        const next = new Map(prev);
+        for (const c of forThisSession) next.set(c.sessionExerciseId, c);
+        return next;
+      });
       // 複数種目を同時追加した場合も、リスト上一番上に来る最初の新規カードだけにフォーカスする。
       // これから戻り遷移が始まる（呼び出し元がこの直後にrouter.back()する）ため、
       // まだ遷移が終わっていない状態としていったんリセットしておく
@@ -122,6 +144,38 @@ export default function WorkoutScreen() {
       }
     });
   }, [sessionId]);
+
+  // 「過去の記録から読み込む」画面はDB操作直後にrouter.back()で閉じるため、読み込んだことと
+  // 取り消しに必要なスナップショットはpub/sub経由でここに届く（lib/workout/history-load-feedback.ts）。
+  // 5秒経ったら「取り消す」を出しっぱなしにしないよう自動的に消す
+  useEffect(() => {
+    if (sessionId == null) return;
+    return subscribeHistoryLoaded((event) => {
+      if (event.sessionId !== sessionId) return;
+      setHistoryToast(event);
+    });
+  }, [sessionId]);
+
+  useEffect(() => {
+    if (!historyToast) return;
+    // accessibilityLiveRegionはAndroidのみ有効なため、iOSのVoiceOverにも通知内容を
+    // 読み上げさせるにはannounceForAccessibilityを別途呼ぶ必要がある
+    AccessibilityInfo.announceForAccessibility(`${historyToast.dateLabel}の記録を読み込みました`);
+    const timer = setTimeout(() => setHistoryToast(null), HISTORY_TOAST_DURATION_MS);
+    return () => clearTimeout(timer);
+  }, [historyToast]);
+
+  const handleUndoHistoryLoad = useCallback(async () => {
+    if (!historyToast) return;
+    const target = historyToast;
+    setHistoryToast(null);
+    try {
+      await undoLoadHistory(target.sessionExerciseId, target.previousSnapshot);
+    } catch (e) {
+      console.error('[undo history load]', e);
+      Alert.alert('エラー', '取り消せませんでした。');
+    }
+  }, [historyToast]);
 
   // 戻り遷移が先に終わっていて、対象カードのマウント（live queryの更新）が後から来る
   // 順序の場合はこちらがtryFocusの発火役になる
@@ -258,9 +312,7 @@ export default function WorkoutScreen() {
           data={sessionExercises}
           keyExtractor={(item) => String(item.sessionExerciseId)}
           renderItem={({ item, index }) => {
-            const prefilledEntry = prefilledCards?.find(
-              (c) => c.sessionExerciseId === item.sessionExerciseId,
-            );
+            const prefilledEntry = prefilledByCardId.get(item.sessionExerciseId);
             return (
               <ListErrorBoundary>
                 <SessionExerciseCard
@@ -293,6 +345,18 @@ export default function WorkoutScreen() {
           scrollIndicatorInsets={{ bottom: keyboardInset }}
           keyboardShouldPersistTaps="handled"
         />
+      )}
+
+      {historyToast && (
+        <View
+          style={[styles.toastWrapper, isActive && styles.toastWrapperAboveFooter]}
+          pointerEvents="box-none"
+        >
+          <HistoryLoadToast
+            message={`${historyToast.dateLabel}の記録を読み込みました`}
+            onUndo={handleUndoHistoryLoad}
+          />
+        </View>
       )}
 
       {isActive && (
@@ -366,4 +430,12 @@ const styles = StyleSheet.create({
     borderTopWidth: 1,
     borderTopColor: Colors.border,
   },
+  toastWrapper: {
+    position: 'absolute',
+    left: 16,
+    right: 16,
+    bottom: 16,
+  },
+  // トレーニング中は下部に「トレーニングを終了」ボタン(footer)があるため、それに被らない高さまで上げる
+  toastWrapperAboveFooter: { bottom: 96 },
 });

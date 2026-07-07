@@ -14,7 +14,7 @@ export type PrefilledCard = {
   sessionId: number;
   exerciseId: number;
   sessionExerciseId: number;
-  kind: 'new' | 'swap';
+  kind: 'new' | 'swap' | 'history';
   prefilledSetIds: number[];
 };
 
@@ -41,6 +41,14 @@ function freshSetValues(sessionId: number, exerciseId: number, workoutSessionExe
 // （中身が空なのに「前回の値がある」ように見える）ため、実際に値がある行だけに絞る
 function hasAnyValue(s: PreviousSetValues): boolean {
   return s.weight != null || s.reps != null || s.durationSeconds != null || s.distanceMeters != null;
+}
+
+// 実際に挿入したセットのうち、コピー元(sourceSets)に値があった行のidだけを残す。
+// addExercisesToSession/replaceSessionExercise/loadHistoryIntoSessionExerciseの3箇所で
+// 同じ絞り込みが必要なため共通化する
+function computePrefilledSetIds(insertedIds: number[], sourceSets: PreviousSetValues[]): number[] {
+  if (sourceSets.length === 0) return [];
+  return insertedIds.filter((_, idx) => hasAnyValue(sourceSets[idx]));
 }
 
 // 前回のセット列をコピーして初期セットを作る。前回の記録が無ければfreshSetValuesにフォールバックする。
@@ -145,11 +153,7 @@ export async function addExercisesToSession(
       const cardSetCount = initialSetsByCard[i].length;
       const cardSetIds = insertedSets.slice(cursor, cursor + cardSetCount).map((s) => s.id);
       cursor += cardSetCount;
-      const previousSetsForCard = previousSetsByCard[i];
-      result[i].prefilledSetIds =
-        previousSetsForCard.length > 0
-          ? cardSetIds.filter((_, idx) => hasAnyValue(previousSetsForCard[idx]))
-          : [];
+      result[i].prefilledSetIds = computePrefilledSetIds(cardSetIds, previousSetsByCard[i]);
     }
     return result;
   });
@@ -227,12 +231,118 @@ export async function replaceSessionExercise(
       exerciseId: newExerciseId,
       sessionExerciseId,
       kind: 'swap',
-      prefilledSetIds:
-        previousSets.length > 0
-          ? insertedSets
-              .map((s, idx) => (hasAnyValue(previousSets[idx]) ? s.id : null))
-              .filter((id): id is number => id != null)
-          : [],
+      prefilledSetIds: computePrefilledSetIds(insertedSets.map((s) => s.id), previousSets),
     };
   });
+}
+
+// 「取り消す」で元に戻せるよう、読み込み直前のセット列をそのまま保持するスナップショット
+export type SetSnapshot = {
+  setNumber: number;
+  weight: number | null;
+  reps: number | null;
+  durationSeconds: number | null;
+  distanceMeters: number | null;
+  completedAt: number | null;
+};
+
+// 「過去の記録から読み込む」画面で選んだ過去のカード（historyWorkoutSessionExerciseId）の
+// セット列を、このカード（sessionExerciseId）にコピーする。既存のセットは全て削除するが、
+// 誤操作時に元へ戻せるよう削除前の状態をSetSnapshotとして返す。completedAtは常にnull（✓は
+// 自動タップしない。ghost表示にしてユーザーに確認させる方針はプリフィルと同じ）
+export async function loadHistoryIntoSessionExercise(
+  sessionExerciseId: number,
+  historyWorkoutSessionExerciseId: number,
+): Promise<{ prefilledSetIds: number[]; previousSnapshot: SetSnapshot[] }> {
+  const now = Date.now();
+  return db.transaction(async (tx) => {
+    const [wse] = await tx
+      .select({ sessionId: workoutSessionExercises.sessionId, exerciseId: workoutSessionExercises.exerciseId })
+      .from(workoutSessionExercises)
+      .where(eq(workoutSessionExercises.id, sessionExerciseId));
+    if (!wse) return { prefilledSetIds: [], previousSnapshot: [] };
+
+    const previousSnapshot: SetSnapshot[] = await tx
+      .select({
+        setNumber: sets.setNumber,
+        weight: sets.weight,
+        reps: sets.reps,
+        durationSeconds: sets.durationSeconds,
+        distanceMeters: sets.distanceMeters,
+        completedAt: sets.completedAt,
+      })
+      .from(sets)
+      .where(eq(sets.workoutSessionExerciseId, sessionExerciseId))
+      .orderBy(sets.setNumber);
+
+    const historySets = await getPreviousSetsForCard(tx, historyWorkoutSessionExerciseId);
+
+    await tx.delete(sets).where(eq(sets.workoutSessionExerciseId, sessionExerciseId));
+    const insertedSets = await tx
+      .insert(sets)
+      .values(buildInitialSets(wse.sessionId, wse.exerciseId, sessionExerciseId, now, historySets))
+      .returning({ id: sets.id });
+
+    return {
+      prefilledSetIds: computePrefilledSetIds(insertedSets.map((s) => s.id), historySets),
+      previousSnapshot,
+    };
+  });
+}
+
+// loadHistoryIntoSessionExerciseの取り消し。読み込み直前のSetSnapshotへ丸ごと復元する
+// （読み込みで新しく採番されたセットidはそのまま破棄し、復元後の行は新しいidを振り直す。
+// SetRowはid単位でキー管理しているだけで連続性は要求しないため問題ない）
+export async function undoLoadHistory(
+  sessionExerciseId: number,
+  previousSnapshot: SetSnapshot[],
+): Promise<void> {
+  const now = Date.now();
+  await db.transaction(async (tx) => {
+    const [wse] = await tx
+      .select({ sessionId: workoutSessionExercises.sessionId, exerciseId: workoutSessionExercises.exerciseId })
+      .from(workoutSessionExercises)
+      .where(eq(workoutSessionExercises.id, sessionExerciseId));
+    if (!wse) return;
+
+    await tx.delete(sets).where(eq(sets.workoutSessionExerciseId, sessionExerciseId));
+
+    const rows =
+      previousSnapshot.length > 0
+        ? previousSnapshot.map((s) => ({
+            sessionId: wse.sessionId,
+            exerciseId: wse.exerciseId,
+            workoutSessionExerciseId: sessionExerciseId,
+            setNumber: s.setNumber,
+            weight: s.weight,
+            reps: s.reps,
+            durationSeconds: s.durationSeconds,
+            distanceMeters: s.distanceMeters,
+            completedAt: s.completedAt,
+            createdAt: now,
+          }))
+        : [freshSetValues(wse.sessionId, wse.exerciseId, sessionExerciseId, now)];
+
+    await tx.insert(sets).values(rows);
+  });
+}
+
+// 特定の過去カード（workoutSessionExerciseId）のセット列をそのまま返す。getPreviousSets
+// （種目単位で直近の1枚を自動で特定する）と違い、こちらは「記録から読み込む」画面で
+// ユーザーが選んだカードそのものを対象にする
+async function getPreviousSetsForCard(
+  tx: Parameters<Parameters<typeof db.transaction>[0]>[0],
+  workoutSessionExerciseId: number,
+): Promise<PreviousSetValues[]> {
+  return tx
+    .select({
+      setNumber: sets.setNumber,
+      weight: sets.weight,
+      reps: sets.reps,
+      durationSeconds: sets.durationSeconds,
+      distanceMeters: sets.distanceMeters,
+    })
+    .from(sets)
+    .where(eq(sets.workoutSessionExerciseId, workoutSessionExerciseId))
+    .orderBy(sets.setNumber);
 }
