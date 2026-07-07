@@ -80,10 +80,10 @@ jest.mock('@/lib/workout/history', () => ({
 
 import {
   addExercisesToSession,
+  clearPrefill,
   endWorkoutSession,
   replaceSessionExercise,
   startWorkoutSession,
-  undoPrefill,
 } from '@/lib/workout/session';
 
 beforeEach(() => {
@@ -312,7 +312,7 @@ describe('addExercisesToSession', () => {
         createdAt: expect.any(Number),
       },
     ]);
-    expect(prefilled).toEqual([{ sessionId: 1, exerciseId: 10, sessionExerciseId: 100, kind: 'new' }]);
+    expect(prefilled).toEqual([{ sessionId: 1, exerciseId: 10, sessionExerciseId: 100 }]);
   });
 
   it('複数種目を同時に追加した場合、前回の記録がある種目だけがプリフィル対象として返る', async () => {
@@ -329,7 +329,7 @@ describe('addExercisesToSession', () => {
 
     const prefilled = await addExercisesToSession(1, [10, 11]);
 
-    expect(prefilled).toEqual([{ sessionId: 1, exerciseId: 10, sessionExerciseId: 100, kind: 'new' }]);
+    expect(prefilled).toEqual([{ sessionId: 1, exerciseId: 10, sessionExerciseId: 100 }]);
   });
 });
 
@@ -433,7 +433,7 @@ describe('replaceSessionExercise', () => {
         createdAt: expect.any(Number),
       },
     ]);
-    expect(prefilled).toEqual({ sessionId: 3, exerciseId: 20, sessionExerciseId: 7, kind: 'swap' });
+    expect(prefilled).toEqual({ sessionId: 3, exerciseId: 20, sessionExerciseId: 7 });
   });
 
   it('入れ替え先の種目に前回の記録が無ければnullを返す（プリフィル通知を出さない）', async () => {
@@ -445,11 +445,11 @@ describe('replaceSessionExercise', () => {
   });
 });
 
-describe('undoPrefill', () => {
+describe('clearPrefill', () => {
   it('✓未確定(completedAt:null)のセットだけを削除し、何も残らなければ値が空でsetNumber=1のセットを1件作り直す', async () => {
     mockSelectWhere.mockResolvedValueOnce([]); // 削除後、残っているセットが無い
 
-    await undoPrefill({ sessionId: 3, exerciseId: 20, sessionExerciseId: 7 });
+    await clearPrefill({ sessionId: 3, exerciseId: 20, sessionExerciseId: 7 });
 
     expect(mockDeleteWhere).toHaveBeenCalledWith({
       and: [{ col: 'workoutSessionExerciseId', val: 7 }, { isNull: 'completedAt' }],
@@ -472,7 +472,7 @@ describe('undoPrefill', () => {
   it('✓確定済みのセットが残っていれば、空セットへの作り直しはしない（確定済みの記録を消さないため）', async () => {
     mockSelectWhere.mockResolvedValueOnce([{ id: 999 }]);
 
-    await undoPrefill({ sessionId: 3, exerciseId: 20, sessionExerciseId: 7 });
+    await clearPrefill({ sessionId: 3, exerciseId: 20, sessionExerciseId: 7 });
 
     expect(mockSetsInsertValues).not.toHaveBeenCalled();
   });
@@ -480,14 +480,14 @@ describe('undoPrefill', () => {
   it('削除が失敗した場合はエラーを握りつぶさずthrowする', async () => {
     mockDeleteWhere.mockRejectedValueOnce(new Error('db error'));
     await expect(
-      undoPrefill({ sessionId: 3, exerciseId: 20, sessionExerciseId: 7 }),
+      clearPrefill({ sessionId: 3, exerciseId: 20, sessionExerciseId: 7 }),
     ).rejects.toThrow('db error');
   });
 
   it('残存セットの確認クエリが失敗した場合もエラーを握りつぶさずthrowする', async () => {
     mockSelectWhere.mockRejectedValueOnce(new Error('select error'));
     await expect(
-      undoPrefill({ sessionId: 3, exerciseId: 20, sessionExerciseId: 7 }),
+      clearPrefill({ sessionId: 3, exerciseId: 20, sessionExerciseId: 7 }),
     ).rejects.toThrow('select error');
   });
 });

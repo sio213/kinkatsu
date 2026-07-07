@@ -3,7 +3,13 @@ import { IconSymbol } from '@/components/ui/icon-symbol';
 import { Colors } from '@/constants/theme';
 import type { Set } from '@/db/schema';
 import type { MeasurementType } from '@/lib/exercises/constants';
-import { MEASUREMENT_COLUMNS, parseColumns, parseColumnsWithFallback, toDisplayValues } from '@/lib/workout/set-format';
+import {
+  hasAnyMeasurementValue,
+  MEASUREMENT_COLUMNS,
+  parseColumns,
+  parseColumnsWithFallback,
+  toDisplayValues,
+} from '@/lib/workout/set-format';
 import type { SetValues } from '@/lib/workout/sets';
 import { memo, useEffect, useRef, useState } from 'react';
 import { Alert, Keyboard, StyleSheet, Text, TextInput, TouchableOpacity, View } from 'react-native';
@@ -40,6 +46,18 @@ export const SetRow = memo(function SetRow({
   const isBusyRef = useRef(false);
 
   const [values, setValues] = useState<Record<string, string>>(() => toDisplayValues(columns, set));
+  // ゴースト表示は「値を持った状態でこの行が渡されてきた（＝前回のプリフィルや、確定せずに
+  // 離脱した過去の入力）」かどうかで判定する。マウント時点のsetだけを見て一度だけ確定させ、
+  // 値の有無を毎レンダーvaluesから見ないことで、今まさに空欄へ手入力している最中の値は
+  // ゴースト扱いにならないようにする（前回値と紛らわしくなる・入力中の視認性が落ちるのを防ぐ）
+  const hadInitialValueRef = useRef(hasAnyMeasurementValue(set));
+  // ✓を一度でも押した（=doneがtrueになった）行は、以後reopenしても「ユーザー自身の記録」であり
+  // ゴースト（未確認の前回値）ではないので、その状態を覚えておく
+  const wasEverConfirmedRef = useRef(done);
+  useEffect(() => {
+    if (done) wasEverConfirmedRef.current = true;
+  }, [done]);
+  const ghost = !done && hadInitialValueRef.current && !wasEverConfirmedRef.current;
   // 連続したonChangeText呼び出し（同一レンダーサイクル内でバッチ処理される場合）でも
   // 常に最新の値を基準にマージするための鏡。setValuesの外で同期的に更新する
   const valuesRef = useRef(values);
@@ -119,10 +137,11 @@ export const SetRow = memo(function SetRow({
             onChange={(text) => handleFieldChange(c.key, text)}
             exerciseName={exerciseName}
             setNumber={set.setNumber}
+            ghost={ghost}
           />
         ) : (
           <TextInput
-            style={styles.cell}
+            style={[styles.cell, ghost && styles.cellGhost]}
             value={values[c.key]}
             onChangeText={(text) => handleFieldChange(c.key, text)}
             keyboardType={c.keyboardType}
@@ -143,7 +162,9 @@ export const SetRow = memo(function SetRow({
         onPress={handleTogglePress}
         accessibilityRole="checkbox"
         accessibilityState={{ checked: done }}
-        accessibilityLabel={`${exerciseName} セット${set.setNumber}`}
+        accessibilityLabel={
+          ghost ? `${exerciseName} セット${set.setNumber}、未確認の値` : `${exerciseName} セット${set.setNumber}`
+        }
         hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
       >
         {done && <IconSymbol name="checkmark" size={14} color={Colors.onAccent} />}
@@ -166,6 +187,15 @@ const styles = StyleSheet.create({
     fontSize: 14,
     fontWeight: '600',
     color: Colors.textPrimary,
+  },
+  // ✓未確定のまま値が入っている行の見た目（ゴースト表示）。文字色だけでなく背景・枠線も
+  // 変えることで、色の濃淡だけに頼らないようにする（WCAG 1.4.1対応）。文字色はtextMutedだと
+  // このaccentSurface背景ではコントラスト比がWCAG AA(4.5:1)にわずかに届かないため、
+  // 一段濃いtextSecondaryにする
+  cellGhost: {
+    backgroundColor: Colors.accentSurface,
+    borderColor: Colors.accent,
+    color: Colors.textSecondary,
   },
   check: {
     width: 24,

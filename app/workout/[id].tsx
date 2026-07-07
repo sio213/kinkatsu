@@ -13,7 +13,6 @@ import {
   useSessionSetCount,
   useSessionSets,
   useWorkoutSession,
-  type SessionExercise,
 } from '@/hooks/use-workout-session';
 import { subscribePrefilled } from '@/lib/workout/prefill-feedback';
 import { deleteSession, endWorkoutSession, type PrefilledCard } from '@/lib/workout/session';
@@ -21,22 +20,8 @@ import { formatSessionDateGroup, formatSessionDuration } from '@/lib/workout/sum
 import { useHeaderHeight } from '@react-navigation/elements';
 import { Stack, useLocalSearchParams, useRouter } from 'expo-router';
 import { useCallback, useEffect, useRef, useState } from 'react';
-import {
-  Alert,
-  FlatList,
-  Modal,
-  Pressable,
-  StyleSheet,
-  Text,
-  TouchableOpacity,
-  View,
-  type ViewToken,
-} from 'react-native';
+import { Alert, FlatList, Modal, Pressable, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-
-// itemVisiblePercentThreshold: カードの一部だけ画面端にかすっている状態は「見えた」に含めず、
-// 半分以上表示されて初めてスナックバーの自動消滅タイマーを開始する
-const VIEWABILITY_CONFIG = { itemVisiblePercentThreshold: 50 };
 
 function formatElapsed(ms: number): string {
   const totalSeconds = Math.max(0, Math.floor(ms / 1000));
@@ -60,39 +45,6 @@ export default function WorkoutScreen() {
   const headerHeight = useHeaderHeight();
   const [menuOpen, setMenuOpen] = useState(false);
   const [prefilledCards, setPrefilledCards] = useState<PrefilledCard[] | null>(null);
-  const listRef = useRef<FlatList<SessionExercise>>(null);
-  // 種目追加直後、notifyPrefilledのコールバックはrouter.back()とほぼ同時に呼ばれるため、
-  // この時点ではFlatListのdata(sessionExercises、別の非同期live query)がまだ新カードを
-  // 含んでいないことがある。ここで即座にscrollToEndすると古い（1つ前の）末尾までしか
-  // 動かず「スクロールされていないように見える」バグになる。そのため一旦「スクロール予約」
-  // だけ立てておき、実際にFlatListのコンテンツサイズが変わった（＝新カードがレイアウトに
-  // 反映された）タイミングで初めてscrollToEndする。
-  // また、新カードのレイアウトは1回のonContentSizeChangeで確定するとは限らず（キーボードを
-  // 閉じるアニメーションのinset変化等を挟んで複数回に分けて変化することがある）、そのたびに
-  // scrollToEndを呼び直す。一定時間(400ms)コンテンツサイズの変化が無くなったら「落ち着いた」と
-  // みなし、最後にanimated:falseで正しい末尾へスナップさせてから予約を解除する
-  const pendingScrollToEndRef = useRef(false);
-  const scrollSettleTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
-  const handleContentSizeChange = useCallback(() => {
-    if (!pendingScrollToEndRef.current) return;
-    listRef.current?.scrollToEnd({ animated: true });
-    if (scrollSettleTimeoutRef.current) clearTimeout(scrollSettleTimeoutRef.current);
-    scrollSettleTimeoutRef.current = setTimeout(() => {
-      pendingScrollToEndRef.current = false;
-      listRef.current?.scrollToEnd({ animated: false });
-    }, 400);
-  }, []);
-  useEffect(() => {
-    return () => {
-      if (scrollSettleTimeoutRef.current) clearTimeout(scrollSettleTimeoutRef.current);
-    };
-  }, []);
-  // 各カードが実際にビューポート内にあるかどうか。プリフィルされたカードのスナックバーが
-  // 画面外で見えないまま自動消滅しないよう、SessionExerciseCard側の判定に使う
-  const [viewableIds, setViewableIds] = useState<Set<number>>(() => new Set());
-  const onViewableItemsChanged = useRef(({ viewableItems }: { viewableItems: ViewToken[] }) => {
-    setViewableIds(new Set(viewableItems.map((v) => (v.item as SessionExercise).sessionExerciseId)));
-  }).current;
   // 種目カードのアコーディオン開閉状態。カード側のローカルstateにすると、FlatListの
   // virtualizationでカードがアンマウント→再マウントされた際に開閉状態がリセットされてしまうため、
   // この画面が生きている間は保持されるようここで持つ（値未保存=展開中がデフォルト）
@@ -117,21 +69,15 @@ export default function WorkoutScreen() {
 
   // 種目追加/入れ替え画面はDB操作直後にrouter.back()で閉じるため、プリフィルが起きたことは
   // pub/sub経由でここに届く（lib/workout/prefill-feedback.ts）。他のセッション画面からの
-  // 通知が紛れ込まないようsessionIdが一致するものだけ拾う。スナックバー自体は種目カード側
-  // (SessionExerciseCard)がカード単位で表示するため、ここでは「どのカードがプリフィル対象か」
-  // だけを保持する
+  // 通知が紛れ込まないようsessionIdが一致するものだけ拾う。「前回の値をクリア」導線自体は
+  // 種目カード側(SessionExerciseCard)がカード単位で表示するため、ここでは
+  // 「どのカードがプリフィル対象か」だけを保持する
   useEffect(() => {
     if (sessionId == null) return;
     return subscribePrefilled((cards) => {
       const forThisSession = cards.filter((c) => c.sessionId === sessionId);
       if (forThisSession.length === 0) return;
       setPrefilledCards((prev) => [...(prev ?? []), ...forThisSession]);
-      // 新規追加（種目入れ替えは対象外）は必ずリスト末尾に入るため、末尾までスクロールして
-      // 追加したカード（＝スナックバーが出ているカード）が画面外のままにならないようにする。
-      // 実際のスクロールはhandleContentSizeChange側で行う（上のコメント参照）
-      if (forThisSession.some((c) => c.kind === 'new')) {
-        pendingScrollToEndRef.current = true;
-      }
     });
   }, [sessionId]);
 
@@ -266,7 +212,6 @@ export default function WorkoutScreen() {
         </View>
       ) : (
         <FlatList
-          ref={listRef}
           style={styles.exerciseList}
           contentContainerStyle={styles.exerciseListContent}
           data={sessionExercises}
@@ -287,7 +232,6 @@ export default function WorkoutScreen() {
                   prefilledCards?.some((c) => c.sessionExerciseId === item.sessionExerciseId) ?? false
                 }
                 onDismissPrefill={handleDismissPrefill}
-                isVisible={viewableIds.has(item.sessionExerciseId)}
               />
             </ListErrorBoundary>
           )}
@@ -297,9 +241,6 @@ export default function WorkoutScreen() {
           contentInset={{ bottom: keyboardInset }}
           scrollIndicatorInsets={{ bottom: keyboardInset }}
           keyboardShouldPersistTaps="handled"
-          onViewableItemsChanged={onViewableItemsChanged}
-          viewabilityConfig={VIEWABILITY_CONFIG}
-          onContentSizeChange={handleContentSizeChange}
         />
       )}
 

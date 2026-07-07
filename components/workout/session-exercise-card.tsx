@@ -1,17 +1,16 @@
 import { CategoryChip } from '@/components/exercises/category-chip';
 import { IconSymbol } from '@/components/ui/icon-symbol';
-import { Snackbar } from '@/components/ui/snackbar';
 import { Colors } from '@/constants/theme';
 import type { Set } from '@/db/schema';
 import { useDebouncedPush } from '@/hooks/use-debounced-push';
 import type { SessionExercise } from '@/hooks/use-workout-session';
 import { MEASUREMENT_TYPES, type MeasurementType } from '@/lib/exercises/constants';
 import { getExerciseImages } from '@/lib/exercises/images';
-import { removeExerciseFromSession, swapExerciseOrder, undoPrefill } from '@/lib/workout/session';
-import { MEASUREMENT_COLUMNS, parseColumnsWithFallback } from '@/lib/workout/set-format';
+import { clearPrefill, removeExerciseFromSession, swapExerciseOrder } from '@/lib/workout/session';
+import { hasAnyMeasurementValue, MEASUREMENT_COLUMNS, parseColumnsWithFallback } from '@/lib/workout/set-format';
 import { addSet, deleteLastSet, reopenSet, saveDraft, saveSet, type SetValues } from '@/lib/workout/sets';
 import { Image } from 'expo-image';
-import { memo, useCallback, useEffect, useRef, useState } from 'react';
+import { memo, useCallback, useEffect, useRef } from 'react';
 import { Alert, LayoutAnimation, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import { ExerciseCardMenu } from './exercise-card-menu';
 import { SetRow } from './set-row';
@@ -27,14 +26,10 @@ type Props = {
   previousSessionExerciseId: number | null;
   nextSessionExerciseId: number | null;
   onToggleCollapsed: (sessionExerciseId: number) => void;
-  // 種目追加/入れ替え直後、前回のセットが自動挿入された場合にtrue（デザイン案P14）。
-  // カード内にスナックバー(「前回のセットを挿入」＋「元に戻す」)を表示する
+  // 種目追加/入れ替え直後、前回のセットが自動挿入された場合にtrue（デザイン案P1「ゴースト値」）。
+  // 未確認（✓未タップ）の行が1件でも残っている間、カード内に「前回の値をクリア」導線を出す
   justPrefilled: boolean;
   onDismissPrefill: (sessionExerciseId: number) => void;
-  // FlatListのonViewableItemsChangedベースで「このカードが実際にビューポート内にあるか」を親から渡す。
-  // 新規追加時はリスト末尾に入るためスクロールしないと画面に映らないことがあり、見えないまま
-  // スナックバーの自動消滅タイマーが進んでしまうのを防ぐために使う
-  isVisible: boolean;
 };
 
 export const SessionExerciseCard = memo(function SessionExerciseCard({
@@ -49,7 +44,6 @@ export const SessionExerciseCard = memo(function SessionExerciseCard({
   onToggleCollapsed,
   justPrefilled,
   onDismissPrefill,
-  isVisible,
 }: Props) {
   const images = getExerciseImages(exercise);
   // 未知のmeasurementType（想定外のDB値）でも画面ごとクラッシュさせず標準の重量×回数にフォールバックする
@@ -220,33 +214,25 @@ export const SessionExerciseCard = memo(function SessionExerciseCard({
     ]);
   }, [exercise.sessionExerciseId]);
 
-  // justPrefilledがtrueになってから実際にisVisible（ビューポート内）になった最初の瞬間に
-  // ラッチする。一度trueになったら（スクロールで再び画面外に出ても）戻さない＝スナックバーの
-  // 自動消滅タイマーは「初めて見えた時点」から数える
-  const [hasBeenVisible, setHasBeenVisible] = useState(false);
+  // ✓未確定のまま値が入っている行が1件でも残っているか。「前回の値をクリア」導線は
+  // justPrefilled（このカードがプリフィルされたこと自体）と合わせて出し分けるため、
+  // ここでは値の有無・完了有無のみで判定してよい
+  const hasGhostRows = sets.some((s) => s.completedAt == null && hasAnyMeasurementValue(s));
+
+  // このカードがプリフィル対象として親から通知された後、全ての行が確認/編集/削除されて
+  // ゴースト行が無くなったら「クリア」導線を消すため親の状態からも取り除いてもらう
   useEffect(() => {
-    if (!justPrefilled) {
-      setHasBeenVisible(false);
-      return;
-    }
-    if (isVisible) setHasBeenVisible(true);
-  }, [justPrefilled, isVisible]);
+    if (justPrefilled && !hasGhostRows) onDismissPrefill(exercise.sessionExerciseId);
+  }, [justPrefilled, hasGhostRows, onDismissPrefill, exercise.sessionExerciseId]);
 
-  const handleDismissPrefill = useCallback(() => {
-    onDismissPrefill(exercise.sessionExerciseId);
-  }, [onDismissPrefill, exercise.sessionExerciseId]);
-
-  const handleUndoPrefill = useCallback(async () => {
-    // 楽観的にスナックバーを閉じる。DB側の反映を待って閉じると、連打やもたつきで
-    // 「押したのに閉じない」ように見えるため（他の楽観的更新箇所と同じ方針）
-    handleDismissPrefill();
+  const handleClearPrefill = useCallback(async () => {
     try {
-      await undoPrefill({ sessionId, exerciseId: exercise.id, sessionExerciseId: exercise.sessionExerciseId });
+      await clearPrefill({ sessionId, exerciseId: exercise.id, sessionExerciseId: exercise.sessionExerciseId });
     } catch (e) {
-      console.error('[undo prefill]', e);
-      Alert.alert('エラー', '元に戻せませんでした。');
+      console.error('[clear prefill]', e);
+      Alert.alert('エラー', '前回の値をクリアできませんでした。');
     }
-  }, [handleDismissPrefill, sessionId, exercise.id, exercise.sessionExerciseId]);
+  }, [sessionId, exercise.id, exercise.sessionExerciseId]);
 
   return (
     <View style={styles.card}>
@@ -326,15 +312,18 @@ export const SessionExerciseCard = memo(function SessionExerciseCard({
           />
         ))}
 
-        <Snackbar
-          visible={justPrefilled}
-          armed={hasBeenVisible}
-          message="前回のセットを挿入"
-          actionLabel="元に戻す"
-          onPressAction={handleUndoPrefill}
-          onDismiss={handleDismissPrefill}
-          style={styles.prefillSnackbar}
-        />
+        {justPrefilled && hasGhostRows && (
+          <TouchableOpacity
+            style={styles.clearPrefillLink}
+            onPress={handleClearPrefill}
+            accessibilityRole="button"
+            accessibilityLabel="前回の値をクリア"
+            hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
+          >
+            <IconSymbol name="clock.arrow.circlepath" size={14} color={Colors.textMuted} />
+            <Text style={styles.clearPrefillText}>前回の値をクリア</Text>
+          </TouchableOpacity>
+        )}
 
         <View style={styles.actions}>
           <TouchableOpacity
@@ -427,7 +416,15 @@ const styles = StyleSheet.create({
     color: Colors.textPlaceholder,
   },
 
-  prefillSnackbar: { marginTop: 6 },
+  clearPrefillLink: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    alignSelf: 'flex-start',
+    gap: 5,
+    marginTop: 6,
+    paddingVertical: 8,
+  },
+  clearPrefillText: { fontSize: 12.5, fontWeight: '600', color: Colors.textMuted },
 
   actions: { flexDirection: 'row', gap: 8, marginTop: 6 },
   actionButton: {

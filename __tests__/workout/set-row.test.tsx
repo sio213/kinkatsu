@@ -520,3 +520,81 @@ test('weight_time計測タイプは重量と時間(分・秒)の3入力で保存
 
   expect(onSave).toHaveBeenCalledWith(1, { weight: 20, durationSeconds: 45 });
 });
+
+describe('ゴースト表示（前回の値プリフィル・手入力途中を問わず✓未確定のまま値がある行）', () => {
+  test('値が入っていて未完了なら、文字色・背景・枠線をゴースト表示にする', () => {
+    const set = { id: 1, setNumber: 1, weight: 60, reps: 10, completedAt: null } as any;
+    const root = render({ set, measurementType: 'weight_reps', onSave: jest.fn(), onReopen: jest.fn() });
+
+    const inputs = root.findAllByType(TextInput);
+    const flatStyle = (style: unknown) => (Array.isArray(style) ? Object.assign({}, ...style.filter(Boolean)) : style);
+    expect(flatStyle(inputs[0].props.style).backgroundColor).not.toBeUndefined();
+    expect(getCheck(root).props.accessibilityLabel).toContain('未確認');
+  });
+
+  test('未入力（空欄）の未完了行はゴースト表示にしない', () => {
+    const set = { id: 1, setNumber: 1, weight: null, reps: null, completedAt: null } as any;
+    const root = render({ set, measurementType: 'weight_reps', onSave: jest.fn(), onReopen: jest.fn() });
+
+    expect(getCheck(root).props.accessibilityLabel).not.toContain('未確認');
+  });
+
+  test('✓確定済みならゴースト表示にしない（値があっても通常表示）', () => {
+    const set = { id: 1, setNumber: 1, weight: 60, reps: 10, completedAt: 123 } as any;
+    const root = render({ set, measurementType: 'weight_reps', onSave: jest.fn(), onReopen: jest.fn() });
+
+    expect(getCheck(root).props.accessibilityLabel).not.toContain('未確認');
+  });
+
+  test('time計測タイプでも値が入っていて未完了ならゴースト表示にする', () => {
+    const set = { id: 1, setNumber: 1, durationSeconds: 90, completedAt: null } as any;
+    const root = render({ set, measurementType: 'time', onSave: jest.fn(), onReopen: jest.fn() });
+
+    expect(getCheck(root).props.accessibilityLabel).toContain('未確認');
+  });
+
+  test('空欄から手入力している最中はゴースト表示にしない（前回値との誤認防止・入力中の視認性維持）', () => {
+    const set = { id: 1, setNumber: 1, weight: null, reps: null, completedAt: null } as any;
+    const root = render({ set, measurementType: 'weight_reps', onSave: jest.fn(), onReopen: jest.fn() });
+
+    const inputs = root.findAllByType(TextInput);
+    act(() => {
+      inputs[0].props.onChangeText('60');
+      inputs[1].props.onChangeText('10');
+    });
+
+    expect(getCheck(root).props.accessibilityLabel).not.toContain('未確認');
+  });
+
+  test('一度✓確定した行は、reopenして未完了に戻ってもゴースト表示が復活しない（自分の記録として扱う）', () => {
+    const confirmedSet = { id: 1, setNumber: 1, weight: 60, reps: 10, completedAt: 123 } as any;
+    let instance!: ReturnType<typeof create>;
+    act(() => {
+      instance = create(
+        <SetRow
+          exerciseName="ベンチプレス"
+          set={confirmedSet}
+          measurementType="weight_reps"
+          onSave={jest.fn()}
+          onReopen={jest.fn()}
+        />,
+      );
+    });
+
+    // reopen後、live queryでcompletedAtがnullに戻って再描画されるケースを再現
+    const reopenedSet = { ...confirmedSet, completedAt: null };
+    act(() => {
+      instance.update(
+        <SetRow
+          exerciseName="ベンチプレス"
+          set={reopenedSet}
+          measurementType="weight_reps"
+          onSave={jest.fn()}
+          onReopen={jest.fn()}
+        />,
+      );
+    });
+
+    expect(getCheck(instance.root).props.accessibilityLabel).not.toContain('未確認');
+  });
+});

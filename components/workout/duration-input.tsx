@@ -8,13 +8,15 @@ type DurationInputProps = {
   onChange: (combined: string) => void;
   exerciseName: string;
   setNumber: number;
+  // 前回の値がまだ確認(✓)されていない状態の見た目（ゴースト表示）にするかどうか
+  ghost?: boolean;
 };
 
 // 分・秒を数値専用キーボードの別入力として扱い、任意の文字が打てないようにする。
 // 秒は入力時点で60以上になる変更を無視することで、そもそも不正な状態に到達させない。
 // ラベルは列のlabel（time型は「時間(分:秒)」）をそのまま使うと"時間(分:秒) 分"のように
 // 読み上げが重複するため、計測タイプによらず固定の「時間」を基準にする
-export function DurationInput({ initialValue, onChange, exerciseName, setNumber }: DurationInputProps) {
+export function DurationInput({ initialValue, onChange, exerciseName, setNumber, ghost }: DurationInputProps) {
   const initial = splitDurationDisplay(initialValue);
   const [min, setMin] = useState(initial.min);
   const [sec, setSec] = useState(initial.sec);
@@ -44,7 +46,7 @@ export function DurationInput({ initialValue, onChange, exerciseName, setNumber 
   };
 
   return (
-    <View style={styles.durationCell}>
+    <View style={[styles.durationCell, ghost && styles.durationCellGhost]}>
       {/* 分・秒を固定幅にして中央へ寄せた結果、枠の左右に生まれる余白がタップに反応しなく
           なってしまうため、両端をそれぞれ隣接する分・秒欄へフォーカスするタップ領域にする */}
       <TouchableOpacity
@@ -56,7 +58,7 @@ export function DurationInput({ initialValue, onChange, exerciseName, setNumber 
       />
       <TextInput
         ref={minInputRef}
-        style={[styles.durationPart, styles.durationMinPart]}
+        style={[styles.durationPart, ghost && styles.durationPartGhost, styles.durationMinPart]}
         value={min}
         onChangeText={handleMinChange}
         keyboardType="number-pad"
@@ -78,7 +80,7 @@ export function DurationInput({ initialValue, onChange, exerciseName, setNumber 
       </TouchableOpacity>
       <TextInput
         ref={secInputRef}
-        style={[styles.durationPart, styles.durationSecPart]}
+        style={[styles.durationPart, ghost && styles.durationPartGhost, styles.durationSecPart]}
         value={sec}
         onChangeText={handleSecChange}
         keyboardType="number-pad"
@@ -110,6 +112,9 @@ const styles = StyleSheet.create({
     paddingVertical: 11,
     paddingHorizontal: 6,
   },
+  // 前回の値がまだ未確認（ゴースト表示）の間、背景・枠線・文字色の3点を変えることで
+  // 文字色の濃淡だけに頼らないようにする（WCAG 1.4.1対応）
+  durationCellGhost: { backgroundColor: Colors.accentSurface, borderColor: Colors.accent },
   // flex:1にすると、time単独のように列幅が広い場合に分・秒それぞれが独立してその半分の
   // 幅の中央に寄ってしまい、間が間延びして見える。固定幅にして「分:秒」をひとまとまりの
   // 塊にし、左右のdurationSpacer（flex:1の余白）で挟むことで中央寄せしつつ、その余白
@@ -120,6 +125,7 @@ const styles = StyleSheet.create({
     fontWeight: '600',
     color: Colors.textPrimary,
   },
+  durationPartGhost: { color: Colors.textSecondary },
   durationSpacer: {
     flex: 1,
     alignSelf: 'stretch',
