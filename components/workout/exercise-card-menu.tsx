@@ -130,7 +130,7 @@ export function ExerciseCardMenu({
               onPress={handleLoadFromHistory}
               accessibilityLabel="過去の記録から読み込む"
             >
-              <DesignIcon name="assignment" size={18} color={Colors.textMuted} />
+              <DesignIcon name="history" size={18} color={Colors.textMuted} />
               <Text style={styles.menuItemText}>過去の記録から読み込む</Text>
             </TouchableOpacity>
             <TouchableOpacity style={styles.menuItem} onPress={handleDelete} accessibilityLabel="削除">
