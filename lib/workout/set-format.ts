@@ -174,6 +174,9 @@ function formatHistoryFieldValue(
 }
 
 // 列定義に沿って複数セットを"60kg×10・60kg×8"のような1本の文字列にする。
+// 全列nullのセット（前回「セット追加」だけ押されて未入力のまま終わった等）は、そのまま
+// joinすると"60kg×10・・"のように空のセグメントが挟まってしまうため、要約から除外する
+// （lib/workout/session.tsが読み込み時に同じ行をコピー対象から除外するのと一貫させる）。
 // セット数が多い場合の省略（「…」）は呼び出し側でText numberOfLines={1}に任せる
 export function formatHistorySetSummary(
   columns: SetColumn[],
@@ -187,6 +190,7 @@ export function formatHistorySetSummary(
         .filter((v): v is string => v != null)
         .join('×'),
     )
+    .filter((line) => line !== '')
     .join('・');
 }
 

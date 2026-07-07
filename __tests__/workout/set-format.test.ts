@@ -314,6 +314,15 @@ describe('formatHistorySetSummary', () => {
     expect(result).toBe('');
   });
 
+  it('全列nullのセットが他のセットの間に混ざっていても、空のセグメントを挟まずスキップする（バグ回帰防止: "60kg×10・・"のように空欄が挟まる不具合）', () => {
+    const result = formatHistorySetSummary(MEASUREMENT_COLUMNS.weight_reps, [
+      { weight: 60, reps: 10 },
+      { weight: null, reps: null },
+      { weight: 55, reps: 8 },
+    ]);
+    expect(result).toBe('60kg×10・55kg×8');
+  });
+
   it('setsListが空配列なら空文字', () => {
     expect(formatHistorySetSummary(MEASUREMENT_COLUMNS.weight_reps, [])).toBe('');
   });

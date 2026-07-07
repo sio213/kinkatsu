@@ -177,7 +177,7 @@ describe('loadHistoryIntoSessionExercise', () => {
     expect(result.prefilledSetIds).toEqual([]);
   });
 
-  it('コピー元のセットが全カラムnullの場合、そのセットidはprefilledSetIdsに含めない', async () => {
+  it('コピー元のセットが全カラムnullの場合、空の1件だけが作られprefilledSetIdsも空になる', async () => {
     mockWseWhere.mockResolvedValueOnce([{ sessionId: 1, exerciseId: 10 }]);
     mockSetsOrderBy
       .mockResolvedValueOnce([])
@@ -188,7 +188,33 @@ describe('loadHistoryIntoSessionExercise', () => {
 
     const result = await loadHistoryIntoSessionExercise(1, 500);
 
+    const insertedPayload = mockInsertValues.mock.calls[0][0];
+    expect(insertedPayload).toHaveLength(1);
+    expect(insertedPayload[0].weight).toBeNull();
     expect(result.prefilledSetIds).toEqual([]);
+  });
+
+  it('コピー元のセットに全カラムnullの行が混ざっている場合、その行だけコピー対象から除外し余分な空行を作らない（バグ回帰防止: 過去の記録から読み込むと余分な空行が出る不具合）', async () => {
+    mockWseWhere.mockResolvedValueOnce([{ sessionId: 3, exerciseId: 20 }]);
+    mockSetsOrderBy
+      .mockResolvedValueOnce([]) // 既存セット(previousSnapshot)は無し
+      .mockResolvedValueOnce([
+        { setNumber: 1, weight: 60, reps: 10, durationSeconds: null, distanceMeters: null },
+        { setNumber: 2, weight: null, reps: null, durationSeconds: null, distanceMeters: null },
+        { setNumber: 3, weight: 55, reps: 8, durationSeconds: null, distanceMeters: null },
+      ]);
+    mockReturning.mockResolvedValueOnce([{ id: 701 }, { id: 702 }]);
+
+    const result = await loadHistoryIntoSessionExercise(7, 500);
+
+    const insertedPayload = mockInsertValues.mock.calls[0][0];
+    expect(
+      insertedPayload.map((row: { setNumber: number; weight: number | null }) => [row.setNumber, row.weight]),
+    ).toEqual([
+      [1, 60],
+      [2, 55],
+    ]);
+    expect(result.prefilledSetIds).toEqual([701, 702]);
   });
 
   it('削除が失敗した場合はエラーを握りつぶさずthrowする（呼び出し側でAlertを出すため）', async () => {

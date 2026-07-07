@@ -36,16 +36,19 @@ function freshSetValues(sessionId: number, exerciseId: number, workoutSessionExe
 }
 
 // 4つの値カラムのいずれかに実際の値が入っているか。前回セットが✓未確定のまま
-// 何も入力せずに終えたセッションの場合、getPreviousSetsは全カラムnullの行を返しうる。
-// そのような行までprefilledSetIdsに含めると、値の無い行が背景色だけゴースト表示される
-// （中身が空なのに「前回の値がある」ように見える）ため、実際に値がある行だけに絞る
+// 何も入力せずに終えたセッションの場合、getPreviousSets/getPreviousSetsForCardは
+// 全カラムnullの行を返しうる（「セット追加」だけ押されて未入力のまま終わった等）。
+// そのような行は「前回入力した値」として意味を持たないため、コピー元から除外する
+// （除外しないと新しいカードに余分な空行が増えたり、値の無い行が背景色だけゴースト表示される
+// ＝中身が空なのに「前回の値がある」ように見える、という2つの問題が起きる）
 function hasAnyValue(s: PreviousSetValues): boolean {
   return s.weight != null || s.reps != null || s.durationSeconds != null || s.distanceMeters != null;
 }
 
 // 実際に挿入したセットのうち、コピー元(sourceSets)に値があった行のidだけを残す。
 // addExercisesToSession/replaceSessionExercise/loadHistoryIntoSessionExerciseの3箇所で
-// 同じ絞り込みが必要なため共通化する
+// 同じ絞り込みが必要なため共通化する。sourceSetsは呼び出し側で既にhasAnyValueで
+// 絞り込み済みの前提だが、念のためここでも同じ判定をかけておく（二重チェックで安全側に倒す）
 function computePrefilledSetIds(insertedIds: number[], sourceSets: PreviousSetValues[]): number[] {
   if (sourceSets.length === 0) return [];
   return insertedIds.filter((_, idx) => hasAnyValue(sourceSets[idx]));
@@ -134,7 +137,9 @@ export async function addExercisesToSession(
     const initialSetsByCard: ReturnType<typeof buildInitialSets>[] = [];
     const previousSetsByCard: PreviousSetValues[][] = [];
     for (const wse of inserted) {
-      const previousSets = await getPreviousSets(tx, wse.exerciseId, sessionId);
+      // 値が1つも無い行（前回「セット追加」だけ押されて未入力のまま終わった等）は
+      // コピー対象から除外する（除外しないと新しいカードに余分な空行が増えてしまう）
+      const previousSets = (await getPreviousSets(tx, wse.exerciseId, sessionId)).filter(hasAnyValue);
       previousSetsByCard.push(previousSets);
       result.push({
         sessionId,
@@ -223,7 +228,8 @@ export async function replaceSessionExercise(
       .where(eq(workoutSessionExercises.id, sessionExerciseId));
 
     await tx.delete(sets).where(eq(sets.workoutSessionExerciseId, sessionExerciseId));
-    const previousSets = await getPreviousSets(tx, newExerciseId, wse.sessionId);
+    // 値が1つも無い行はコピー対象から除外する（addExercisesToSessionと同じ理由）
+    const previousSets = (await getPreviousSets(tx, newExerciseId, wse.sessionId)).filter(hasAnyValue);
     const insertedSets = await tx
       .insert(sets)
       .values(buildInitialSets(wse.sessionId, newExerciseId, sessionExerciseId, now, previousSets))
@@ -278,7 +284,8 @@ export async function loadHistoryIntoSessionExercise(
       .where(eq(sets.workoutSessionExerciseId, sessionExerciseId))
       .orderBy(sets.setNumber);
 
-    const historySets = await getPreviousSetsForCard(tx, historyWorkoutSessionExerciseId);
+    // 値が1つも無い行はコピー対象から除外する（addExercisesToSessionと同じ理由）
+    const historySets = (await getPreviousSetsForCard(tx, historyWorkoutSessionExerciseId)).filter(hasAnyValue);
 
     await tx.delete(sets).where(eq(sets.workoutSessionExerciseId, sessionExerciseId));
     const insertedSets = await tx
