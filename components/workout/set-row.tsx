@@ -24,6 +24,10 @@ type Props = {
   onDraftChange?: (setId: number, values: Record<string, string>) => void;
   // ✓未タップのまま画面を離れても入力が消えないよう、completedAtを変えずにDBへ保存する
   onAutoSaveDraft?: (setId: number, values: SetValues) => Promise<void>;
+  // このカードが今まさに（今回のアプリ起動セッション中に）前回の値をプリフィルされたかどうか。
+  // ゴースト表示はこれが true の間だけ出す。DBの状態（値がある・✓未確定）だけで判定すると、
+  // 記録一覧から過去の記録を開いた時など、プリフィルと無関係な場面でも表示されてしまうため
+  justPrefilled: boolean;
 };
 
 export const SetRow = memo(function SetRow({
@@ -34,12 +38,25 @@ export const SetRow = memo(function SetRow({
   onReopen,
   onDraftChange,
   onAutoSaveDraft,
+  justPrefilled,
 }: Props) {
   const columns = MEASUREMENT_COLUMNS[measurementType];
   const done = set.completedAt != null;
   const isBusyRef = useRef(false);
 
   const [values, setValues] = useState<Record<string, string>>(() => toDisplayValues(columns, set));
+  // ✓を押さなくても、値を書き換えた時点で「本人が今日の値として確認した」とみなし、
+  // ゴースト表示を解除する（handleFieldChangeで立てる）
+  const editedRef = useRef(false);
+  // ✓を一度でも押した行は、その後reopenで未完了に戻ってもゴースト表示を復活させない
+  // （既に一度レビュー済みの自分の記録として扱う）
+  const wasEverConfirmedRef = useRef(done);
+  useEffect(() => {
+    if (done) wasEverConfirmedRef.current = true;
+  }, [done]);
+  // 値が無い行（例: プリフィル後に「セット追加」で足された空の新規行）はゴースト表示にしない
+  const hasValue = columns.some((c) => (values[c.key] ?? '').trim() !== '');
+  const ghost = justPrefilled && !done && !editedRef.current && !wasEverConfirmedRef.current && hasValue;
   // 連続したonChangeText呼び出し（同一レンダーサイクル内でバッチ処理される場合）でも
   // 常に最新の値を基準にマージするための鏡。setValuesの外で同期的に更新する
   const valuesRef = useRef(values);
@@ -64,6 +81,7 @@ export const SetRow = memo(function SetRow({
   }, []);
 
   const handleFieldChange = (key: string, text: string) => {
+    editedRef.current = true;
     const next = { ...valuesRef.current, [key]: text };
     valuesRef.current = next;
     setValues(next);
@@ -119,10 +137,11 @@ export const SetRow = memo(function SetRow({
             onChange={(text) => handleFieldChange(c.key, text)}
             exerciseName={exerciseName}
             setNumber={set.setNumber}
+            ghost={ghost}
           />
         ) : (
           <TextInput
-            style={styles.cell}
+            style={[styles.cell, ghost && styles.cellGhost]}
             value={values[c.key]}
             onChangeText={(text) => handleFieldChange(c.key, text)}
             keyboardType={c.keyboardType}
@@ -143,7 +162,9 @@ export const SetRow = memo(function SetRow({
         onPress={handleTogglePress}
         accessibilityRole="checkbox"
         accessibilityState={{ checked: done }}
-        accessibilityLabel={`${exerciseName} セット${set.setNumber}`}
+        accessibilityLabel={
+          ghost ? `${exerciseName} セット${set.setNumber}、未確認の値` : `${exerciseName} セット${set.setNumber}`
+        }
         hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
       >
         {done && <IconSymbol name="checkmark" size={14} color={Colors.onAccent} />}
@@ -166,6 +187,15 @@ const styles = StyleSheet.create({
     fontSize: 14,
     fontWeight: '600',
     color: Colors.textPrimary,
+  },
+  // ✓未確定のまま値が入っている行の見た目（ゴースト表示）。文字色だけでなく背景・枠線も
+  // 変えることで、色の濃淡だけに頼らないようにする（WCAG 1.4.1対応）。文字色はtextMutedだと
+  // このaccentSurface背景ではコントラスト比がWCAG AA(4.5:1)にわずかに届かないため、
+  // 一段濃いtextSecondaryにする
+  cellGhost: {
+    backgroundColor: Colors.accentSurface,
+    borderColor: Colors.accent,
+    color: Colors.textSecondary,
   },
   check: {
     width: 24,

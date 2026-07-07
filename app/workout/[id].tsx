@@ -13,8 +13,10 @@ import {
   useSessionSetCount,
   useSessionSets,
   useWorkoutSession,
+  type SessionExercise,
 } from '@/hooks/use-workout-session';
-import { deleteSession, endWorkoutSession } from '@/lib/workout/session';
+import { subscribePrefilled } from '@/lib/workout/prefill-feedback';
+import { deleteSession, endWorkoutSession, type PrefilledCard } from '@/lib/workout/session';
 import { formatSessionDateGroup, formatSessionDuration } from '@/lib/workout/summary';
 import { useHeaderHeight } from '@react-navigation/elements';
 import { Stack, useLocalSearchParams, useRouter } from 'expo-router';
@@ -43,6 +45,34 @@ export default function WorkoutScreen() {
   const keyboardInset = useKeyboardInset();
   const headerHeight = useHeaderHeight();
   const [menuOpen, setMenuOpen] = useState(false);
+  const [prefilledCards, setPrefilledCards] = useState<PrefilledCard[] | null>(null);
+  const listRef = useRef<FlatList<SessionExercise>>(null);
+  // 種目追加直後、notifyPrefilledのコールバックはrouter.back()とほぼ同時に呼ばれるため、
+  // この時点ではFlatListのdata(sessionExercises、別の非同期live query)がまだ新カードを
+  // 含んでいないことがある。ここで即座にscrollToEndすると古い（1つ前の）末尾までしか
+  // 動かず「スクロールされていないように見える」バグになる。そのため一旦「スクロール予約」
+  // だけ立てておき、実際にFlatListのコンテンツサイズが変わった（＝新カードがレイアウトに
+  // 反映された）タイミングで初めてscrollToEndする。
+  // また、新カードのレイアウトは1回のonContentSizeChangeで確定するとは限らず（キーボードを
+  // 閉じるアニメーションのinset変化等を挟んで複数回に分けて変化することがある）、そのたびに
+  // scrollToEndを呼び直す。一定時間(400ms)コンテンツサイズの変化が無くなったら「落ち着いた」と
+  // みなし、最後にanimated:falseで正しい末尾へスナップさせてから予約を解除する
+  const pendingScrollToEndRef = useRef(false);
+  const scrollSettleTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const handleContentSizeChange = useCallback(() => {
+    if (!pendingScrollToEndRef.current) return;
+    listRef.current?.scrollToEnd({ animated: true });
+    if (scrollSettleTimeoutRef.current) clearTimeout(scrollSettleTimeoutRef.current);
+    scrollSettleTimeoutRef.current = setTimeout(() => {
+      pendingScrollToEndRef.current = false;
+      listRef.current?.scrollToEnd({ animated: false });
+    }, 400);
+  }, []);
+  useEffect(() => {
+    return () => {
+      if (scrollSettleTimeoutRef.current) clearTimeout(scrollSettleTimeoutRef.current);
+    };
+  }, []);
   // 種目カードのアコーディオン開閉状態。カード側のローカルstateにすると、FlatListの
   // virtualizationでカードがアンマウント→再マウントされた際に開閉状態がリセットされてしまうため、
   // この画面が生きている間は保持されるようここで持つ（値未保存=展開中がデフォルト）
@@ -64,6 +94,32 @@ export default function WorkoutScreen() {
     const interval = setInterval(() => setNow(Date.now()), 1000);
     return () => clearInterval(interval);
   }, [session]);
+
+  // 種目追加/入れ替え画面はDB操作直後にrouter.back()で閉じるため、プリフィルが起きたことは
+  // pub/sub経由でここに届く（lib/workout/prefill-feedback.ts）。他のセッション画面からの
+  // 通知が紛れ込まないようsessionIdが一致するものだけ拾う。「前回の値をクリア」導線自体は
+  // 種目カード側(SessionExerciseCard)がカード単位で表示するため、ここでは
+  // 「どのカードがプリフィル対象か」だけを保持する
+  useEffect(() => {
+    if (sessionId == null) return;
+    return subscribePrefilled((cards) => {
+      const forThisSession = cards.filter((c) => c.sessionId === sessionId);
+      if (forThisSession.length === 0) return;
+      setPrefilledCards((prev) => [...(prev ?? []), ...forThisSession]);
+      // 新規追加（種目入れ替えは対象外）は必ずリスト末尾に入るため、末尾までスクロールして
+      // 追加したカードが画面外のままにならないようにする。実際のスクロールはonContentSizeChange側で行う
+      if (forThisSession.some((c) => c.kind === 'new')) {
+        pendingScrollToEndRef.current = true;
+      }
+    });
+  }, [sessionId]);
+
+  const handleDismissPrefill = useCallback((sessionExerciseId: number) => {
+    setPrefilledCards((prev) => {
+      const next = prev?.filter((c) => c.sessionExerciseId !== sessionExerciseId) ?? [];
+      return next.length > 0 ? next : null;
+    });
+  }, []);
 
   const finish = async () => {
     if (sessionId == null) return;
@@ -189,6 +245,7 @@ export default function WorkoutScreen() {
         </View>
       ) : (
         <FlatList
+          ref={listRef}
           style={styles.exerciseList}
           contentContainerStyle={styles.exerciseListContent}
           data={sessionExercises}
@@ -205,6 +262,10 @@ export default function WorkoutScreen() {
                 previousSessionExerciseId={sessionExercises[index - 1]?.sessionExerciseId ?? null}
                 nextSessionExerciseId={sessionExercises[index + 1]?.sessionExerciseId ?? null}
                 onToggleCollapsed={handleToggleCollapsed}
+                justPrefilled={
+                  prefilledCards?.some((c) => c.sessionExerciseId === item.sessionExerciseId) ?? false
+                }
+                onDismissPrefill={handleDismissPrefill}
               />
             </ListErrorBoundary>
           )}
@@ -214,6 +275,7 @@ export default function WorkoutScreen() {
           contentInset={{ bottom: keyboardInset }}
           scrollIndicatorInsets={{ bottom: keyboardInset }}
           keyboardShouldPersistTaps="handled"
+          onContentSizeChange={handleContentSizeChange}
         />
       )}
 
@@ -277,7 +339,9 @@ const styles = StyleSheet.create({
   emptyText: { fontSize: 13.5, color: Colors.textPlaceholder },
 
   exerciseList: { flex: 1 },
-  exerciseListContent: { padding: 16, gap: 10 },
+  // 末尾までスクロールした時に「トレーニングを終了」ボタンとAddExerciseButtonがくっついて
+  // 見えないよう、下だけ他の辺より広めに余白を取る
+  exerciseListContent: { padding: 16, paddingBottom: 32, gap: 10 },
   addExerciseBtnInline: { marginTop: 4 },
 
   footer: {

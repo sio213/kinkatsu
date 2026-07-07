@@ -29,6 +29,7 @@ const MAPPING = {
   'info.circle': 'info',
   checkmark: 'check',
   xmark: 'close',
+  'clock.arrow.circlepath': 'history',
 } as IconMapping;
 
 /**

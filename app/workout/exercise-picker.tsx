@@ -11,6 +11,7 @@ import { useExercises } from '@/hooks/use-exercises';
 import { useKeyboardInset } from '@/hooks/use-keyboard-inset';
 import { CATEGORY_ALL } from '@/lib/exercises/constants';
 import { filterExercises } from '@/lib/exercises/filter';
+import { notifyPrefilled } from '@/lib/workout/prefill-feedback';
 import { addExercisesToSession } from '@/lib/workout/session';
 import { useFocusEffect, useLocalSearchParams, useRouter } from 'expo-router';
 import { useCallback, useMemo, useRef, useState } from 'react';
@@ -66,7 +67,8 @@ export default function ExercisePickerScreen() {
     if (isAddingRef.current) return;
     isAddingRef.current = true;
     try {
-      await addExercisesToSession(sessionId, selectedIds);
+      const prefilled = await addExercisesToSession(sessionId, selectedIds);
+      notifyPrefilled(prefilled);
       router.back();
     } catch (e) {
       console.error('[add exercises to session]', e);

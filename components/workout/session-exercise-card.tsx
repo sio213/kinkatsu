@@ -6,11 +6,11 @@ import { useDebouncedPush } from '@/hooks/use-debounced-push';
 import type { SessionExercise } from '@/hooks/use-workout-session';
 import { MEASUREMENT_TYPES, type MeasurementType } from '@/lib/exercises/constants';
 import { getExerciseImages } from '@/lib/exercises/images';
-import { removeExerciseFromSession, swapExerciseOrder } from '@/lib/workout/session';
-import { MEASUREMENT_COLUMNS, parseColumnsWithFallback } from '@/lib/workout/set-format';
+import { clearPrefill, removeExerciseFromSession, swapExerciseOrder } from '@/lib/workout/session';
+import { hasAnyMeasurementValue, MEASUREMENT_COLUMNS, parseColumnsWithFallback } from '@/lib/workout/set-format';
 import { addSet, deleteLastSet, reopenSet, saveDraft, saveSet, type SetValues } from '@/lib/workout/sets';
 import { Image } from 'expo-image';
-import { memo, useCallback, useRef } from 'react';
+import { memo, useCallback, useEffect, useRef } from 'react';
 import { Alert, LayoutAnimation, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import { ExerciseCardMenu } from './exercise-card-menu';
 import { SetRow } from './set-row';
@@ -26,6 +26,10 @@ type Props = {
   previousSessionExerciseId: number | null;
   nextSessionExerciseId: number | null;
   onToggleCollapsed: (sessionExerciseId: number) => void;
+  // 種目追加/入れ替え直後、前回のセットが自動挿入された場合にtrue（デザイン案P1「ゴースト値」）。
+  // 未確認（✓未タップ）の行が1件でも残っている間、カード内に「前回の値をクリア」導線を出す
+  justPrefilled: boolean;
+  onDismissPrefill: (sessionExerciseId: number) => void;
 };
 
 export const SessionExerciseCard = memo(function SessionExerciseCard({
@@ -38,6 +42,8 @@ export const SessionExerciseCard = memo(function SessionExerciseCard({
   previousSessionExerciseId,
   nextSessionExerciseId,
   onToggleCollapsed,
+  justPrefilled,
+  onDismissPrefill,
 }: Props) {
   const images = getExerciseImages(exercise);
   // 未知のmeasurementType（想定外のDB値）でも画面ごとクラッシュさせず標準の重量×回数にフォールバックする
@@ -75,15 +81,9 @@ export const SessionExerciseCard = memo(function SessionExerciseCard({
 
   const handleSwapExercise = useCallback(() => {
     // 確認ダイアログの要否をexercise-swap画面側で判断できるよう、既に何か記録済みか
-    // （✓確定済みだけでなく、✓未タップの入力途中の値も含めて）を渡しておく
-    const hasRecordedData = sets.some(
-      (s) =>
-        s.completedAt != null ||
-        s.weight != null ||
-        s.reps != null ||
-        s.durationSeconds != null ||
-        s.distanceMeters != null,
-    );
+    // （✓確定済みかどうか）を渡しておく。前回セットのプリフィル（✓未タップ・値だけ入っている状態）は
+    // ユーザーがまだ確認していないため「記録済み」に含めない（セット削除の確認要否と同じ考え方）
+    const hasRecordedData = sets.some((s) => s.completedAt != null);
     pushDebounced({
       pathname: '/workout/exercise-swap',
       params: {
@@ -214,6 +214,51 @@ export const SessionExerciseCard = memo(function SessionExerciseCard({
     ]);
   }, [exercise.sessionExerciseId]);
 
+  // ✓未確定のまま値が入っている行が1件でも残っているか。「前回の値をクリア」導線は
+  // justPrefilled（このカードがプリフィルされたこと自体）と合わせて出し分けるため、
+  // ここでは値の有無・完了有無のみで判定してよい
+  const hasGhostRows = sets.some((s) => s.completedAt == null && hasAnyMeasurementValue(s));
+
+  // このカードがプリフィル対象として親から通知された後、全ての行が確認/編集/削除されて
+  // ゴースト行が無くなったら「クリア」導線を消すため親の状態からも取り除いてもらう。
+  // 種目入れ替え（swap）の場合、justPrefilledがtrueになる通知(pub/sub)と、実際に
+  // プリフィルされたsets（drizzleのlive query）が届くタイミングは別経路のため、
+  // justPrefilledがtrueになった直後の1レンダーだけsetsがまだ古い（入れ替え前の）状態を
+  // 指していることがある。そこでhasGhostRows=falseと誤判定してこの直後に即dismissして
+  // しまわないよう、「一度でもゴースト行を実際に観測したか」を経てからでないと
+  // dismissしない（新規追加は元々sessionExercises自体が無い状態からsetsごと現れるため
+  // この競合は起きないが、swapは既存カードのまま中身だけ差し替わるため起こりうる）
+  const hasSeenGhostRowsRef = useRef(false);
+  useEffect(() => {
+    if (!justPrefilled) {
+      hasSeenGhostRowsRef.current = false;
+      return;
+    }
+    if (hasGhostRows) {
+      hasSeenGhostRowsRef.current = true;
+      return;
+    }
+    if (hasSeenGhostRowsRef.current) onDismissPrefill(exercise.sessionExerciseId);
+  }, [justPrefilled, hasGhostRows, onDismissPrefill, exercise.sessionExerciseId]);
+
+  const handleClearPrefill = useCallback(async () => {
+    // draftValuesRefは値を書き換えたセットのidを持っている（handleDraftChange参照）。
+    // ✓未確定でも、本人が既に書き換えた値はプリフィルの「手つかずの残骸」ではないため、
+    // クリア対象から除外する
+    const keepSetIds = sets.filter((s) => draftValuesRef.current.has(s.id)).map((s) => s.id);
+    try {
+      await clearPrefill({
+        sessionId,
+        exerciseId: exercise.id,
+        sessionExerciseId: exercise.sessionExerciseId,
+        keepSetIds,
+      });
+    } catch (e) {
+      console.error('[clear prefill]', e);
+      Alert.alert('エラー', '前回の値をクリアできませんでした。');
+    }
+  }, [sessionId, exercise.id, exercise.sessionExerciseId, sets]);
+
   return (
     <View style={styles.card}>
       <TouchableOpacity
@@ -289,8 +334,22 @@ export const SessionExerciseCard = memo(function SessionExerciseCard({
             onReopen={handleReopenSet}
             onDraftChange={handleDraftChange}
             onAutoSaveDraft={handleAutoSaveDraft}
+            justPrefilled={justPrefilled}
           />
         ))}
+
+        {justPrefilled && hasGhostRows && (
+          <TouchableOpacity
+            style={styles.clearPrefillLink}
+            onPress={handleClearPrefill}
+            accessibilityRole="button"
+            accessibilityLabel="前回の値をクリア"
+            hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
+          >
+            <IconSymbol name="clock.arrow.circlepath" size={14} color={Colors.textMuted} />
+            <Text style={styles.clearPrefillText}>前回の値をクリア</Text>
+          </TouchableOpacity>
+        )}
 
         <View style={styles.actions}>
           <TouchableOpacity
@@ -382,6 +441,16 @@ const styles = StyleSheet.create({
     fontWeight: '600',
     color: Colors.textPlaceholder,
   },
+
+  clearPrefillLink: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    alignSelf: 'flex-start',
+    gap: 5,
+    marginTop: 6,
+    paddingVertical: 8,
+  },
+  clearPrefillText: { fontSize: 12.5, fontWeight: '600', color: Colors.textMuted },
 
   actions: { flexDirection: 'row', gap: 8, marginTop: 6 },
   actionButton: {
