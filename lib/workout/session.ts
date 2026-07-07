@@ -63,11 +63,14 @@ function buildInitialSets(
   if (previousSets.length === 0) {
     return [freshSetValues(sessionId, exerciseId, workoutSessionExerciseId, now)];
   }
-  return previousSets.map((s) => ({
+  // setNumberはコピー元の値をそのまま使わず1から振り直す。コピー元の並び（setNumber昇順）は
+  // previousSetsのソート順として活かしつつ、新しいカードの番号はここで完結させることで、
+  // コピー元のsetNumberが何らかの理由で1から始まっていない場合でも新カードは必ず1,2,3...になる
+  return previousSets.map((s, index) => ({
     sessionId,
     exerciseId,
     workoutSessionExerciseId,
-    setNumber: s.setNumber,
+    setNumber: index + 1,
     weight: s.weight,
     reps: s.reps,
     durationSeconds: s.durationSeconds,

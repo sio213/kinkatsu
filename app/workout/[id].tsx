@@ -72,6 +72,10 @@ export default function WorkoutScreen() {
   // 削除済みの古いセットidを参照してゴーストが表示されなくなる
   const [prefilledByCardId, setPrefilledByCardId] = useState<Map<number, PrefilledCard>>(() => new Map());
   const [historyToast, setHistoryToast] = useState<HistoryLoadEvent | null>(null);
+  // トーストが「トレーニングを終了」ボタン(footer)と重ならないよう、実測した高さぶん上に逃がす。
+  // 固定値(マジックナンバー)で見積もると端末のセーフエリアやフォントサイズ設定で簡単にズレて
+  // 再びボタンと重なるため、onLayoutで実際のfooter高さを測って使う
+  const [footerHeight, setFooterHeight] = useState(0);
   const navigation = useNavigation<NativeStackNavigationProp<ParamListBase>>();
   // 種目追加直後にオートフォーカスしたいカードの管理。宣言的なautoFocusプロパティは
   // 「戻る」の画面遷移アニメーション中にキーボードが被さって出るタイミング問題があるため
@@ -352,7 +356,7 @@ export default function WorkoutScreen() {
 
       {historyToast && (
         <View
-          style={[styles.toastWrapper, isActive && styles.toastWrapperAboveFooter]}
+          style={[styles.toastWrapper, { bottom: (isActive ? footerHeight : 0) + 16 }]}
           pointerEvents="box-none"
         >
           <HistoryLoadToast
@@ -363,7 +367,7 @@ export default function WorkoutScreen() {
       )}
 
       {isActive && (
-        <View style={styles.footer}>
+        <View style={styles.footer} onLayout={(e) => setFooterHeight(e.nativeEvent.layout.height)}>
           <PrimaryButton label="トレーニングを終了" onPress={handleFinish} />
         </View>
       )}
@@ -437,8 +441,5 @@ const styles = StyleSheet.create({
     position: 'absolute',
     left: 16,
     right: 16,
-    bottom: 16,
   },
-  // トレーニング中は下部に「トレーニングを終了」ボタン(footer)があるため、それに被らない高さまで上げる
-  toastWrapperAboveFooter: { bottom: 96 },
 });

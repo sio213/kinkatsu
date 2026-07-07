@@ -134,6 +134,24 @@ describe('loadHistoryIntoSessionExercise', () => {
     expect(result.prefilledSetIds).toEqual([701]);
   });
 
+  it('コピー元カードのsetNumberが1から始まっていない/連番でない場合でも、新カードでは1,2,3...に振り直す（バグ回帰防止）', async () => {
+    mockWseWhere.mockResolvedValueOnce([{ sessionId: 3, exerciseId: 20 }]);
+    mockSetsOrderBy
+      .mockResolvedValueOnce([]) // 既存セット(previousSnapshot)は無し
+      .mockResolvedValueOnce([
+        // コピー元カードのsetNumberが何らかの理由で2,3,4など不連続なケース
+        { setNumber: 2, weight: 60, reps: 10, durationSeconds: null, distanceMeters: null },
+        { setNumber: 3, weight: 60, reps: 8, durationSeconds: null, distanceMeters: null },
+        { setNumber: 4, weight: 55, reps: 8, durationSeconds: null, distanceMeters: null },
+      ]);
+    mockReturning.mockResolvedValueOnce([{ id: 701 }, { id: 702 }, { id: 703 }]);
+
+    await loadHistoryIntoSessionExercise(7, 500);
+
+    const insertedPayload = mockInsertValues.mock.calls[0][0];
+    expect(insertedPayload.map((row: { setNumber: number }) => row.setNumber)).toEqual([1, 2, 3]);
+  });
+
   it('コピー元の過去カードにセットが無い場合、値が空でsetNumber=1のセットを1件だけ作り直しprefilledSetIdsは空になる', async () => {
     mockWseWhere.mockResolvedValueOnce([{ sessionId: 1, exerciseId: 10 }]);
     mockSetsOrderBy.mockResolvedValueOnce([]).mockResolvedValueOnce([]); // 既存セットも過去カードのセットも無し
