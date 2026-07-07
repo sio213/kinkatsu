@@ -132,13 +132,14 @@ export const SessionExerciseCard = memo(
     pushDebounced({
       pathname: '/workout/exercise-swap',
       params: {
+        sessionId: String(sessionId),
         sessionExerciseId: String(exercise.sessionExerciseId),
         currentExerciseId: String(exercise.id),
         currentExerciseName: exercise.name,
         hasRecordedData: hasRecordedData ? 'true' : 'false',
       },
     });
-  }, [pushDebounced, exercise.sessionExerciseId, exercise.id, exercise.name, sets]);
+  }, [pushDebounced, sessionId, exercise.sessionExerciseId, exercise.id, exercise.name, sets]);
 
   const handleLoadFromHistory = useCallback(() => {
     // 確認ダイアログの要否を記録から読み込む画面側で判断できるよう、既に何か記録済みか

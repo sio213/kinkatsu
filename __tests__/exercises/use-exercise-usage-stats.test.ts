@@ -1,10 +1,14 @@
 // jest.mock はホイストされるため、変数は var で定義してスコープを合わせる
 /* eslint-disable no-var */
 var mockLiveQueryQueue: { data: unknown }[];
+// where()に渡された引数を後からテストで検証できるよう、chainをモジュールスコープに出す
+var mockWhere: jest.Mock;
 
 jest.mock('@/db/client', () => {
+  mockWhere = jest.fn().mockReturnThis();
   const chain = {
     innerJoin: jest.fn().mockReturnThis(),
+    where: mockWhere,
     groupBy: jest.fn().mockReturnThis(),
   };
   return {
@@ -21,6 +25,7 @@ jest.mock('@/db/schema', () => ({
 
 jest.mock('drizzle-orm', () => ({
   eq: jest.fn((col, val) => ({ col, val })),
+  ne: jest.fn((col, val) => ({ col, val, op: 'ne' })),
   sql: Object.assign(
     jest.fn((strings: TemplateStringsArray, ...values: unknown[]) => ({ strings, values })),
     { raw: jest.fn() },
@@ -33,6 +38,8 @@ jest.mock('drizzle-orm/expo-sqlite', () => ({
 
 import React from 'react';
 import { act, create } from 'react-test-renderer';
+import { ne } from 'drizzle-orm';
+import { workoutSessionExercises } from '@/db/schema';
 import { useExerciseUsageStats } from '@/hooks/use-exercise-usage-stats';
 
 function makeHarness<T>(hook: () => T) {
@@ -106,5 +113,34 @@ describe('useExerciseUsageStats', () => {
 
     expect(captured).toHaveLength(2);
     expect(captured[0]).toBe(captured[1]);
+  });
+});
+
+describe('useExerciseUsageStats: excludeSessionId', () => {
+  function mountWith(excludeSessionId: number | undefined) {
+    mockLiveQueryQueue = [{ data: [] }];
+    act(() => {
+      create(
+        React.createElement(function Harness() {
+          useExerciseUsageStats(excludeSessionId);
+          return null;
+        }),
+      );
+    });
+  }
+
+  it('excludeSessionId省略時はwhereにundefinedを渡す（従来どおり全セッションが対象になる）', () => {
+    mountWith(undefined);
+    expect(mockWhere).toHaveBeenCalledWith(undefined);
+  });
+
+  it('excludeSessionId指定時はne(workoutSessionExercises.sessionId, excludeSessionId)の条件でwhereを呼ぶ', () => {
+    mountWith(42);
+    expect(ne).toHaveBeenCalledWith(workoutSessionExercises.sessionId, 42);
+  });
+
+  it('excludeSessionId=0でも除外条件が有効になる（if(excludeSessionId)のようなtruthyチェックへの後退を防ぐ）', () => {
+    mountWith(0);
+    expect(ne).toHaveBeenCalledWith(workoutSessionExercises.sessionId, 0);
   });
 });
