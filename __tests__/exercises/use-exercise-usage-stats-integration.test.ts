@@ -1,8 +1,8 @@
 // hooks/use-exercise-usage-stats.ts の useExerciseUsageStats() が発行する集計SQL
-// （sum(case when startedAt >= since)/max(startedAt)/groupBy exerciseId）をそのまま
-// 再現し、実SQLite上でwindow境界・JOIN・複数カードの集計が正しく動くかを検証する。
-// モック（use-exercise-usage-stats.test.ts）は行データ→Map変換のロジックしか
-// 検証できないため、集計そのものの正しさはここでしか担保できない
+// （count(distinct case when startedAt >= since then session_id end)/max(startedAt)/
+// groupBy exerciseId）をそのまま再現し、実SQLite上でwindow境界・JOIN・複数カードの
+// 集計が正しく動くかを検証する。モック（use-exercise-usage-stats.test.ts）は
+// 行データ→Map変換のロジックしか検証できないため、集計そのものの正しさはここでしか担保できない
 import Database from 'better-sqlite3';
 import fs from 'node:fs';
 import path from 'node:path';
@@ -47,7 +47,7 @@ function insertCard(db: Database.Database, sessionId: number, exerciseId: number
 const USAGE_STATS_SQL = `
   SELECT
     wse.exercise_id AS exerciseId,
-    SUM(CASE WHEN ws.started_at >= ? THEN 1 ELSE 0 END) AS recentUsageCount,
+    COUNT(DISTINCT CASE WHEN ws.started_at >= ? THEN ws.id END) AS recentUsageCount,
     MAX(ws.started_at) AS lastUsedAt
   FROM workout_session_exercises wse
   INNER JOIN workout_sessions ws ON wse.session_id = ws.id
@@ -107,12 +107,25 @@ describe('useExerciseUsageStats相当の集計SQL（実SQLite）', () => {
     expect(row.lastUsedAt).toBe(since + 5_000);
   });
 
-  it('1セッション内に同じ種目を複数カード追加すると、その分だけrecentUsageCountに加算される（duplicate-exercises仕様どおり）', () => {
+  it('1セッション内に同じ種目を複数カード追加しても、recentUsageCountはセッション数(=1)のまま水増しされない（duplicate-exercises仕様との併用）', () => {
     const exerciseId = insertExercise(db, 'プランク');
     const since = 10_000;
     const sessionId = insertSession(db, since);
     insertCard(db, sessionId, exerciseId, 0);
     insertCard(db, sessionId, exerciseId, 1);
+
+    const [row] = queryUsageStats(db, since);
+    expect(row.recentUsageCount).toBe(1);
+  });
+
+  it('複数セッションにまたがって使えば、各セッション内のカード枚数によらずセッション数分だけカウントされる', () => {
+    const exerciseId = insertExercise(db, 'ベンチプレス');
+    const since = 10_000;
+    const sessionA = insertSession(db, since);
+    insertCard(db, sessionA, exerciseId, 0);
+    insertCard(db, sessionA, exerciseId, 1); // 同セッション内の2枚目
+    const sessionB = insertSession(db, since + 1_000);
+    insertCard(db, sessionB, exerciseId, 0);
 
     const [row] = queryUsageStats(db, since);
     expect(row.recentUsageCount).toBe(2);
