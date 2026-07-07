@@ -71,7 +71,8 @@ function insertSet(
   ).run(sessionId, exerciseId, wseId, setNumber, weight, reps, completed ? now : null, now);
 }
 
-// lib/workout/history.ts の getPreviousSets が発行するSQLをそのままミラーしたもの
+// lib/workout/history.ts の getPreviousSets が発行するSQLをそのままミラーしたもの。
+// ✓未確定（completed_at IS NULL）のセットも「前回入力した値」として対象に含める
 function getPreviousSetsSql(
   db: Database.Database,
   exerciseId: number,
@@ -83,7 +84,7 @@ function getPreviousSetsSql(
        FROM sets s
        JOIN workout_session_exercises wse ON s.workout_session_exercise_id = wse.id
        JOIN workout_sessions ws ON wse.session_id = ws.id
-       WHERE s.exercise_id = ? AND s.completed_at IS NOT NULL AND wse.session_id != ?
+       WHERE s.exercise_id = ? AND wse.session_id != ?
        ORDER BY ws.started_at DESC, wse.id DESC
        LIMIT 1`,
     )
@@ -95,7 +96,7 @@ function getPreviousSetsSql(
     .prepare(
       `SELECT set_number AS setNumber, weight, reps
        FROM sets
-       WHERE workout_session_exercise_id = ? AND completed_at IS NOT NULL
+       WHERE workout_session_exercise_id = ?
        ORDER BY set_number`,
     )
     .all(latestCard.wseId) as { setNumber: number; weight: number | null; reps: number | null }[];
@@ -135,14 +136,16 @@ describe('getPreviousSets（実SQLite）', () => {
     ]);
   });
 
-  it('✓未確定（completed_at IS NULL）のセットは前回の記録として拾わない', () => {
+  it('✓未確定（completed_at IS NULL）のセットも前回入力した値として拾う（押し忘れて終了したケースを想定）', () => {
     const exerciseId = insertExercise(db, 'ベンチプレス');
     const pastSession = insertSession(db, 1000);
     const pastCard = insertCard(db, pastSession, exerciseId, 0);
     insertSet(db, pastSession, exerciseId, pastCard, 1, 60, 10, false);
     const currentSession = insertSession(db, 2000);
 
-    expect(getPreviousSetsSql(db, exerciseId, currentSession)).toEqual([]);
+    expect(getPreviousSetsSql(db, exerciseId, currentSession)).toEqual([
+      { setNumber: 1, weight: 60, reps: 10 },
+    ]);
   });
 
   it('自分自身（excludeSessionId）のセットは前回の記録として拾わない', () => {
@@ -171,22 +174,23 @@ describe('getPreviousSets（実SQLite）', () => {
     ]);
   });
 
-  it('直近カードで一部セットのみ✓済みの場合、✓済み分だけを前回値として返す', () => {
+  it('直近カードが一部✓済み・一部未確定でも、全セットを前回値として返す', () => {
     const exerciseId = insertExercise(db, 'ベンチプレス');
     const pastSession = insertSession(db, 1000);
     const pastCard = insertCard(db, pastSession, exerciseId, 0);
     insertSet(db, pastSession, exerciseId, pastCard, 1, 60, 10, true);
     insertSet(db, pastSession, exerciseId, pastCard, 2, 60, 8, true);
-    insertSet(db, pastSession, exerciseId, pastCard, 3, 60, 6, false); // 3セット目は未完了で離脱
+    insertSet(db, pastSession, exerciseId, pastCard, 3, 60, 6, false); // 3セット目は✓を押し忘れて離脱
     const currentSession = insertSession(db, 2000);
 
     expect(getPreviousSetsSql(db, exerciseId, currentSession)).toEqual([
       { setNumber: 1, weight: 60, reps: 10 },
       { setNumber: 2, weight: 60, reps: 8 },
+      { setNumber: 3, weight: 60, reps: 6 },
     ]);
   });
 
-  it('直近セッションが丸ごと未完了（放置）の場合、完了セットがある1つ前のセッションを採用する', () => {
+  it('直近セッションが丸ごと未確定（放置）でも、より新しい方を前回として採用する', () => {
     const exerciseId = insertExercise(db, 'ベンチプレス');
     const older = insertSession(db, 1000);
     const olderCard = insertCard(db, older, exerciseId, 0);
@@ -194,12 +198,12 @@ describe('getPreviousSets（実SQLite）', () => {
 
     const abandoned = insertSession(db, 2000);
     const abandonedCard = insertCard(db, abandoned, exerciseId, 0);
-    insertSet(db, abandoned, exerciseId, abandonedCard, 1, 70, 5, false); // 全部未完了のまま放置
+    insertSet(db, abandoned, exerciseId, abandonedCard, 1, 70, 5, false); // 全部✓を押さずに終了
 
     const currentSession = insertSession(db, 3000);
 
     expect(getPreviousSetsSql(db, exerciseId, currentSession)).toEqual([
-      { setNumber: 1, weight: 55, reps: 10 },
+      { setNumber: 1, weight: 70, reps: 5 },
     ]);
   });
 
