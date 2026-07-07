@@ -1,6 +1,6 @@
 import { Colors } from '@/constants/theme';
 import { combineDurationDisplay, splitDurationDisplay } from '@/lib/workout/set-format';
-import { useRef, useState } from 'react';
+import { forwardRef, useImperativeHandle, useRef, useState } from 'react';
 import { StyleSheet, Text, TextInput, TouchableOpacity, View } from 'react-native';
 
 type DurationInputProps = {
@@ -12,11 +12,16 @@ type DurationInputProps = {
   ghost?: boolean;
 };
 
+export type DurationInputHandle = { focus: () => void };
+
 // 分・秒を数値専用キーボードの別入力として扱い、任意の文字が打てないようにする。
 // 秒は入力時点で60以上になる変更を無視することで、そもそも不正な状態に到達させない。
 // ラベルは列のlabel（time型は「時間(分:秒)」）をそのまま使うと"時間(分:秒) 分"のように
 // 読み上げが重複するため、計測タイプによらず固定の「時間」を基準にする
-export function DurationInput({ initialValue, onChange, exerciseName, setNumber, ghost }: DurationInputProps) {
+export const DurationInput = forwardRef<DurationInputHandle, DurationInputProps>(function DurationInput(
+  { initialValue, onChange, exerciseName, setNumber, ghost }: DurationInputProps,
+  ref,
+) {
   const initial = splitDurationDisplay(initialValue);
   const [min, setMin] = useState(initial.min);
   const [sec, setSec] = useState(initial.sec);
@@ -27,6 +32,8 @@ export function DurationInput({ initialValue, onChange, exerciseName, setNumber,
   const secRef = useRef(sec);
   const minInputRef = useRef<TextInput>(null);
   const secInputRef = useRef<TextInput>(null);
+
+  useImperativeHandle(ref, () => ({ focus: () => minInputRef.current?.focus() }), []);
 
   const handleMinChange = (text: string) => {
     const digits = text.replace(/\D/g, '').slice(0, 3);
@@ -67,6 +74,7 @@ export function DurationInput({ initialValue, onChange, exerciseName, setNumber,
         placeholder="分"
         placeholderTextColor={Colors.textPlaceholder}
         accessibilityLabel={`${exerciseName} セット${setNumber} 時間 分`}
+        accessibilityHint={ghost ? '前回の記録から自動入力された未確認の値です' : undefined}
       />
       {/* 分が1桁のケース（プランク等の短時間種目で多い）では自動フォーカス移動が発火しないため、
           コロンをタップしても秒欄へ移動できるようにして手動タップの手間を減らす */}
@@ -89,6 +97,7 @@ export function DurationInput({ initialValue, onChange, exerciseName, setNumber,
         placeholder="秒"
         placeholderTextColor={Colors.textPlaceholder}
         accessibilityLabel={`${exerciseName} セット${setNumber} 時間 秒`}
+        accessibilityHint={ghost ? '前回の記録から自動入力された未確認の値です' : undefined}
       />
       <TouchableOpacity
         style={styles.durationSpacer}
@@ -99,7 +108,7 @@ export function DurationInput({ initialValue, onChange, exerciseName, setNumber,
       />
     </View>
   );
-}
+});
 
 const styles = StyleSheet.create({
   durationCell: {

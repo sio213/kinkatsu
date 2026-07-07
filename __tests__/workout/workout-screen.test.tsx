@@ -7,10 +7,14 @@ const mockUseSessionExercises = jest.fn();
 const mockUseSessionSets = jest.fn();
 const mockEndWorkoutSession = jest.fn();
 const mockDeleteSession = jest.fn();
+// 新規追加カードへのフォーカスはnavigation.addListener('transitionEnd', ...)を使うため
+// （app/exercise/new.tsxと同じ方針）、useNavigationも最低限モックしておく必要がある
+const mockAddListener = jest.fn().mockReturnValue(() => {});
 
 jest.mock('expo-router', () => ({
   useRouter: () => ({ back: mockBack, push: mockPush }),
   useLocalSearchParams: () => mockUseLocalSearchParams(),
+  useNavigation: () => ({ addListener: mockAddListener }),
   // Stack.Screen はナビゲーターのoptionsを設定するコンポーネントで本来は見た目を持たないが、
   // headerRightの中身（タイマーチップ・⋮メニュー）をテストで検証できるよう、そのレンダー関数だけ実行してやる
   Stack: {
@@ -29,6 +33,7 @@ jest.mock('@/hooks/use-workout-session', () => ({
   useSessionExercises: (...args: unknown[]) => mockUseSessionExercises(...args),
   useSessionSets: (...args: unknown[]) => mockUseSessionSets(...args),
   EMPTY_SETS: [],
+  EMPTY_PREFILLED_SET_IDS: [],
 }));
 
 jest.mock('@/lib/workout/session', () => ({

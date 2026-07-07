@@ -6,14 +6,14 @@ import { useDebouncedPush } from '@/hooks/use-debounced-push';
 import type { SessionExercise } from '@/hooks/use-workout-session';
 import { MEASUREMENT_TYPES, type MeasurementType } from '@/lib/exercises/constants';
 import { getExerciseImages } from '@/lib/exercises/images';
-import { clearPrefill, removeExerciseFromSession, swapExerciseOrder } from '@/lib/workout/session';
-import { hasAnyMeasurementValue, MEASUREMENT_COLUMNS, parseColumnsWithFallback } from '@/lib/workout/set-format';
+import { removeExerciseFromSession, swapExerciseOrder } from '@/lib/workout/session';
+import { MEASUREMENT_COLUMNS, parseColumnsWithFallback } from '@/lib/workout/set-format';
 import { addSet, deleteLastSet, reopenSet, saveDraft, saveSet, type SetValues } from '@/lib/workout/sets';
 import { Image } from 'expo-image';
-import { memo, useCallback, useEffect, useRef } from 'react';
+import { forwardRef, memo, useCallback, useImperativeHandle, useRef, useState } from 'react';
 import { Alert, LayoutAnimation, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import { ExerciseCardMenu } from './exercise-card-menu';
-import { SetRow } from './set-row';
+import { SetRow, type SetRowHandle } from './set-row';
 
 type Props = {
   exercise: SessionExercise;
@@ -26,25 +26,30 @@ type Props = {
   previousSessionExerciseId: number | null;
   nextSessionExerciseId: number | null;
   onToggleCollapsed: (sessionExerciseId: number) => void;
-  // 種目追加/入れ替え直後、前回のセットが自動挿入された場合にtrue（デザイン案P1「ゴースト値」）。
-  // 未確認（✓未タップ）の行が1件でも残っている間、カード内に「前回の値をクリア」導線を出す
-  justPrefilled: boolean;
-  onDismissPrefill: (sessionExerciseId: number) => void;
+  // 種目追加/入れ替え時に前回の記録から実際に値をコピーして挿入したセットのid一覧
+  // （lib/workout/session.tsのPrefilledCard.prefilledSetIds）。この行idに含まれるSetRowだけ
+  // ゴースト表示にする
+  prefilledSetIds: number[];
 };
 
-export const SessionExerciseCard = memo(function SessionExerciseCard({
-  exercise,
-  sessionId,
-  sets,
-  collapsed,
-  isFirst,
-  isLast,
-  previousSessionExerciseId,
-  nextSessionExerciseId,
-  onToggleCollapsed,
-  justPrefilled,
-  onDismissPrefill,
-}: Props) {
+export type SessionExerciseCardHandle = { focusFirstSet: () => void };
+
+export const SessionExerciseCard = memo(
+  forwardRef<SessionExerciseCardHandle, Props>(function SessionExerciseCard(
+    {
+      exercise,
+      sessionId,
+      sets,
+      collapsed,
+      isFirst,
+      isLast,
+      previousSessionExerciseId,
+      nextSessionExerciseId,
+      onToggleCollapsed,
+      prefilledSetIds,
+    }: Props,
+    ref,
+  ) {
   const images = getExerciseImages(exercise);
   // 未知のmeasurementType（想定外のDB値）でも画面ごとクラッシュさせず標準の重量×回数にフォールバックする
   const measurementType: MeasurementType = (
@@ -59,9 +64,29 @@ export const SessionExerciseCard = memo(function SessionExerciseCard({
   // ✓未タップのまま入力中のセット値（setId→表示文字列）。DBにはまだ保存されていないため、
   // 「セット追加」時にこれをコピー元として使えるようにする。re-renderは不要なのでrefで持つ
   const draftValuesRef = useRef<Map<number, Record<string, string>>>(new Map());
+  // 先頭セット行のref。種目追加直後、画面遷移が完了してから親（workout/[id].tsx）が
+  // focusFirstSet()を呼び、その入力欄へ実際にフォーカスする（RN標準動作でキーボード上に
+  // 自動スクロールされる）。宣言的なautoFocsuプロパティは画面遷移アニメーション中に
+  // キーボードが被さって出るタイミング問題があるため使わない（app/exercise/new.tsxと同じ方針）
+  const firstSetRowRef = useRef<SetRowHandle>(null);
+  useImperativeHandle(ref, () => ({ focusFirstSet: () => firstSetRowRef.current?.focus() }), []);
+
+  // カード内のいずれかのセットが一度でも✓確定されたら（reopenで未確定に戻っても）trueのまま
+  // ラッチする。1セットでも確定したら「もう見た」とみなし、このカードの残りのゴースト行も
+  // 含めて全部通常色に戻すため（set-row.tsx側でこの値を使ってghostを計算する）
+  const hasConfirmedNow = sets.some((s) => s.completedAt != null);
+  const cardReviewedRef = useRef(hasConfirmedNow);
+  if (hasConfirmedNow) cardReviewedRef.current = true;
+  // ✓確定だけでなく、カード内のどれか1つでも値を編集したら「もう見た」扱いにして欲しいという
+  // 要望のため、onDraftChange（1文字入力するたびに全SetRowから呼ばれる）でも同様にラッチする。
+  // 既にtrueの間は同じ値でsetStateしてもReactが再レンダーをスキップするため、キー入力のたびに
+  // 無駄な再レンダーが起きるわけではない
+  const [anyEditedInCard, setAnyEditedInCard] = useState(false);
+  const cardReviewed = cardReviewedRef.current || anyEditedInCard;
 
   const handleDraftChange = useCallback((setId: number, values: Record<string, string>) => {
     draftValuesRef.current.set(setId, values);
+    setAnyEditedInCard(true);
   }, []);
 
   // 1文字入力するたびに呼ばれるバックグラウンド保存。ここでAlertを出すと入力中に
@@ -214,51 +239,6 @@ export const SessionExerciseCard = memo(function SessionExerciseCard({
     ]);
   }, [exercise.sessionExerciseId]);
 
-  // ✓未確定のまま値が入っている行が1件でも残っているか。「前回の値をクリア」導線は
-  // justPrefilled（このカードがプリフィルされたこと自体）と合わせて出し分けるため、
-  // ここでは値の有無・完了有無のみで判定してよい
-  const hasGhostRows = sets.some((s) => s.completedAt == null && hasAnyMeasurementValue(s));
-
-  // このカードがプリフィル対象として親から通知された後、全ての行が確認/編集/削除されて
-  // ゴースト行が無くなったら「クリア」導線を消すため親の状態からも取り除いてもらう。
-  // 種目入れ替え（swap）の場合、justPrefilledがtrueになる通知(pub/sub)と、実際に
-  // プリフィルされたsets（drizzleのlive query）が届くタイミングは別経路のため、
-  // justPrefilledがtrueになった直後の1レンダーだけsetsがまだ古い（入れ替え前の）状態を
-  // 指していることがある。そこでhasGhostRows=falseと誤判定してこの直後に即dismissして
-  // しまわないよう、「一度でもゴースト行を実際に観測したか」を経てからでないと
-  // dismissしない（新規追加は元々sessionExercises自体が無い状態からsetsごと現れるため
-  // この競合は起きないが、swapは既存カードのまま中身だけ差し替わるため起こりうる）
-  const hasSeenGhostRowsRef = useRef(false);
-  useEffect(() => {
-    if (!justPrefilled) {
-      hasSeenGhostRowsRef.current = false;
-      return;
-    }
-    if (hasGhostRows) {
-      hasSeenGhostRowsRef.current = true;
-      return;
-    }
-    if (hasSeenGhostRowsRef.current) onDismissPrefill(exercise.sessionExerciseId);
-  }, [justPrefilled, hasGhostRows, onDismissPrefill, exercise.sessionExerciseId]);
-
-  const handleClearPrefill = useCallback(async () => {
-    // draftValuesRefは値を書き換えたセットのidを持っている（handleDraftChange参照）。
-    // ✓未確定でも、本人が既に書き換えた値はプリフィルの「手つかずの残骸」ではないため、
-    // クリア対象から除外する
-    const keepSetIds = sets.filter((s) => draftValuesRef.current.has(s.id)).map((s) => s.id);
-    try {
-      await clearPrefill({
-        sessionId,
-        exerciseId: exercise.id,
-        sessionExerciseId: exercise.sessionExerciseId,
-        keepSetIds,
-      });
-    } catch (e) {
-      console.error('[clear prefill]', e);
-      Alert.alert('エラー', '前回の値をクリアできませんでした。');
-    }
-  }, [sessionId, exercise.id, exercise.sessionExerciseId, sets]);
-
   return (
     <View style={styles.card}>
       <TouchableOpacity
@@ -324,9 +304,10 @@ export const SessionExerciseCard = memo(function SessionExerciseCard({
           <View style={styles.checkSpacer} />
         </View>
 
-        {sets.map((s) => (
+        {sets.map((s, index) => (
           <SetRow
             key={s.id}
+            ref={index === 0 ? firstSetRowRef : undefined}
             set={s}
             exerciseName={exercise.name}
             measurementType={measurementType}
@@ -334,33 +315,12 @@ export const SessionExerciseCard = memo(function SessionExerciseCard({
             onReopen={handleReopenSet}
             onDraftChange={handleDraftChange}
             onAutoSaveDraft={handleAutoSaveDraft}
-            justPrefilled={justPrefilled}
+            isPrefilledSet={prefilledSetIds.includes(s.id)}
+            cardReviewed={cardReviewed}
           />
         ))}
 
-        {justPrefilled && hasGhostRows && (
-          <TouchableOpacity
-            style={styles.clearPrefillLink}
-            onPress={handleClearPrefill}
-            accessibilityRole="button"
-            accessibilityLabel="前回の値をクリア"
-            hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
-          >
-            <IconSymbol name="clock.arrow.circlepath" size={14} color={Colors.textMuted} />
-            <Text style={styles.clearPrefillText}>前回の値をクリア</Text>
-          </TouchableOpacity>
-        )}
-
         <View style={styles.actions}>
-          <TouchableOpacity
-            style={styles.actionButton}
-            onPress={handleAddSet}
-            accessibilityRole="button"
-            accessibilityLabel="セット追加"
-          >
-            <IconSymbol name="plus" size={17} color={Colors.accent} />
-            <Text style={[styles.actionText, { color: Colors.accent }]}>セット追加</Text>
-          </TouchableOpacity>
           <TouchableOpacity
             style={styles.actionButton}
             onPress={handleDeleteSet}
@@ -383,11 +343,21 @@ export const SessionExerciseCard = memo(function SessionExerciseCard({
               セット削除
             </Text>
           </TouchableOpacity>
+          <TouchableOpacity
+            style={styles.actionButton}
+            onPress={handleAddSet}
+            accessibilityRole="button"
+            accessibilityLabel="セット追加"
+          >
+            <IconSymbol name="plus" size={17} color={Colors.accent} />
+            <Text style={[styles.actionText, { color: Colors.accent }]}>セット追加</Text>
+          </TouchableOpacity>
         </View>
       </View>
     </View>
   );
-});
+  }),
+);
 
 const styles = StyleSheet.create({
   card: {
@@ -441,16 +411,6 @@ const styles = StyleSheet.create({
     fontWeight: '600',
     color: Colors.textPlaceholder,
   },
-
-  clearPrefillLink: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    alignSelf: 'flex-start',
-    gap: 5,
-    marginTop: 6,
-    paddingVertical: 8,
-  },
-  clearPrefillText: { fontSize: 12.5, fontWeight: '600', color: Colors.textMuted },
 
   actions: { flexDirection: 'row', gap: 8, marginTop: 6 },
   actionButton: {

@@ -70,16 +70,6 @@ export function parseIntInput(text: string): number | null {
 
 export type SetFieldKey = 'weight' | 'reps' | 'durationSeconds' | 'distanceMeters';
 
-const SET_FIELD_KEYS: readonly SetFieldKey[] = ['weight', 'reps', 'durationSeconds', 'distanceMeters'];
-
-// 計測タイプによらず、4つの値カラムのいずれかに値が入っているか。ゴースト表示
-// （✓未確定のまま値がある行）の判定に、種目カード単位・セット行単位の両方から使う
-export function hasAnyMeasurementValue(
-  values: Partial<Record<SetFieldKey, number | null | undefined>>,
-): boolean {
-  return SET_FIELD_KEYS.some((k) => values[k] != null);
-}
-
 export type SetColumn = {
   key: SetFieldKey;
   label: string;

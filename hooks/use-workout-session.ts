@@ -97,6 +97,10 @@ export function useSessionExercises(sessionId: number): SessionExercise[] {
 // これを使ってもらう
 export const EMPTY_SETS: Set[] = [];
 
+// プリフィル対象外の種目向けの安定した空配列参照。EMPTY_SETSと同じ理由（`?? []`だと
+// 毎レンダー新しい配列参照になりmemoが効かなくなる）でこれを使ってもらう
+export const EMPTY_PREFILLED_SET_IDS: number[] = [];
+
 // セット入力画面用。セッション内の全setsを一度だけ購読し、sessionExerciseId（カード単位）ごとに
 // JS側でグルーピングする（種目カードの数だけlive queryを張ると数が増えるほど無駄が増えるため、
 // useSessionStatsと同じ方針）。同じ種目をセッション内に複数回追加できるため、グルーピングキーは

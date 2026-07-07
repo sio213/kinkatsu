@@ -1,24 +1,25 @@
 import { db } from '@/db/client';
 import { sets, workoutSessionExercises, workoutSessions } from '@/db/schema';
 import { getPreviousSets, type PreviousSetValues } from '@/lib/workout/history';
-import { and, eq, isNull, notInArray } from 'drizzle-orm';
+import { eq } from 'drizzle-orm';
 
-// 前回この種目をやったカードを特定できた場合の識別情報。呼び出し側（画面）が
-// 「このカードは前回の値をプリフィルした」ことを種目カード側に伝え、未確認の行が
-// 残っている間だけ「クリア」導線を出すのに使う。
+// 種目カードが新規追加/入れ替えされたことを呼び出し側（画面）に伝える情報。
 // kindは新規追加(常にリスト末尾に増える)か種目入れ替え(既存カードの位置のまま)かを表し、
-// 呼び出し側が「新規追加時だけ一覧の末尾までスクロールする」といった出し分けに使う
+// 新規追加時だけ最初の入力欄にオートフォーカスする、といった出し分けに使う。
+// prefilledSetIdsは、前回の記録から実際に値をコピーして挿入したセットのidの一覧
+// （前回の記録が無く空の1件だけを作った場合は空配列）。ゴースト表示（値はあるが✓未確定の行の
+// 見た目）は、このidに含まれる行だけに適用する。「セット追加」ボタンで後から足された行など、
+// プリフィルと無関係な行まで対象にしないための精度担保
 export type PrefilledCard = {
   sessionId: number;
   exerciseId: number;
   sessionExerciseId: number;
   kind: 'new' | 'swap';
+  prefilledSetIds: number[];
 };
 
 // 種目カードに最初から入っている、値が空の1セット目。前回の記録が見つからない種目の
-// フォールバックとして使う（従来はこれが常に使われていた）。プリフィル分岐（下記buildInitialSets）と
-// 同じキー構成にしておく（weight等を省略すると、複数種目を同時追加してプリフィルあり/なしが
-// 混在した際にinsertされる行のシェイプが揃わなくなるため）
+// フォールバックとして使う
 function freshSetValues(sessionId: number, exerciseId: number, workoutSessionExerciseId: number, now: number) {
   return {
     sessionId,
@@ -32,6 +33,14 @@ function freshSetValues(sessionId: number, exerciseId: number, workoutSessionExe
     completedAt: null,
     createdAt: now,
   };
+}
+
+// 4つの値カラムのいずれかに実際の値が入っているか。前回セットが✓未確定のまま
+// 何も入力せずに終えたセッションの場合、getPreviousSetsは全カラムnullの行を返しうる。
+// そのような行までprefilledSetIdsに含めると、値の無い行が背景色だけゴースト表示される
+// （中身が空なのに「前回の値がある」ように見える）ため、実際に値がある行だけに絞る
+function hasAnyValue(s: PreviousSetValues): boolean {
+  return s.weight != null || s.reps != null || s.durationSeconds != null || s.distanceMeters != null;
 }
 
 // 前回のセット列をコピーして初期セットを作る。前回の記録が無ければfreshSetValuesにフォールバックする。
@@ -80,8 +89,9 @@ export async function endWorkoutSession(id: number) {
 // 種目追加ピッカーで選ばれた種目をセッションに追加する。orderIndexは
 // このセッションに既に入っている種目の続き番号にする（並び順を保持するため）。
 // 既存件数の取得と採番をトランザクションでまとめ、同時呼び出しでのorderIndex重複を防ぐ。
-// 過去にその種目をやったことがあれば前回のセット列（値・セット数とも）を自動で挿入し、
-// 呼び出し側が「クリア」導線の表示に使えるようプリフィルされたカードの一覧を返す
+// 過去にその種目をやったことがあれば前回のセット列（値・セット数とも）を自動で挿入する。
+// 呼び出し側（画面）が最初の入力欄へのオートフォーカス・ゴースト表示に使えるよう、
+// 前回の記録の有無に関わらず追加した全カードの情報を返す
 export async function addExercisesToSession(
   sessionId: number,
   exerciseIds: number[],
@@ -109,17 +119,39 @@ export async function addExercisesToSession(
 
     // 同一トランザクション内でクエリを並列発行すると競合しうるため、種目ごとに直列でawaitする
     // （並列化してもメリットが薄い一方、順序が保証されなくなるデメリットの方が大きい）
-    const prefilled: PrefilledCard[] = [];
+    const result: PrefilledCard[] = [];
     const initialSetsByCard: ReturnType<typeof buildInitialSets>[] = [];
+    const previousSetsByCard: PreviousSetValues[][] = [];
     for (const wse of inserted) {
       const previousSets = await getPreviousSets(tx, wse.exerciseId, sessionId);
-      if (previousSets.length > 0) {
-        prefilled.push({ sessionId, exerciseId: wse.exerciseId, sessionExerciseId: wse.id, kind: 'new' });
-      }
+      previousSetsByCard.push(previousSets);
+      result.push({
+        sessionId,
+        exerciseId: wse.exerciseId,
+        sessionExerciseId: wse.id,
+        kind: 'new',
+        prefilledSetIds: [],
+      });
       initialSetsByCard.push(buildInitialSets(sessionId, wse.exerciseId, wse.id, now, previousSets));
     }
-    await tx.insert(sets).values(initialSetsByCard.flat());
-    return prefilled;
+    const insertedSets = await tx.insert(sets).values(initialSetsByCard.flat()).returning({ id: sets.id });
+
+    // insertedSetsはinitialSetsByCardをflattenした順序のまま返るため、各カードのセット数だけ
+    // 先頭から切り出せば、そのカードに実際に挿入されたセットidが分かる。前回の記録が無いカードは
+    // previousSetsByCard[i]が空のため、cardSetIdsは（freshSetValuesの1件のみで）prefilledSetIdsに
+    // 含めない
+    let cursor = 0;
+    for (let i = 0; i < result.length; i++) {
+      const cardSetCount = initialSetsByCard[i].length;
+      const cardSetIds = insertedSets.slice(cursor, cursor + cardSetCount).map((s) => s.id);
+      cursor += cardSetCount;
+      const previousSetsForCard = previousSetsByCard[i];
+      result[i].prefilledSetIds =
+        previousSetsForCard.length > 0
+          ? cardSetIds.filter((_, idx) => hasAnyValue(previousSetsForCard[idx]))
+          : [];
+    }
+    return result;
   });
 }
 
@@ -185,44 +217,22 @@ export async function replaceSessionExercise(
 
     await tx.delete(sets).where(eq(sets.workoutSessionExerciseId, sessionExerciseId));
     const previousSets = await getPreviousSets(tx, newExerciseId, wse.sessionId);
-    await tx
+    const insertedSets = await tx
       .insert(sets)
-      .values(buildInitialSets(wse.sessionId, newExerciseId, sessionExerciseId, now, previousSets));
+      .values(buildInitialSets(wse.sessionId, newExerciseId, sessionExerciseId, now, previousSets))
+      .returning({ id: sets.id });
 
-    return previousSets.length > 0
-      ? { sessionId: wse.sessionId, exerciseId: newExerciseId, sessionExerciseId, kind: 'swap' }
-      : null;
-  });
-}
-
-// 種目カードの「前回の値をクリア」。プリフィルされて以降まだ手を付けていない（＝まだ✓未確定で、
-// かつ値を書き換えてもいない）セットだけを取り除く。ユーザーがどれかのセットを✓確定していた場合や、
-// ✓は押していなくても値を書き換えていた場合（keepSetIdsで渡す）、それらは「クリア」の対象ではない
-// 実際の入力なので消してはいけない（無条件に全消去すると確定済み・編集済みの記録まで失われてしまう）。
-// 結果的に1件も残らなければ、種目追加直後と同じ値が空でsetNumber=1のセット1件を作り直す
-export async function clearPrefill({
-  sessionId,
-  exerciseId,
-  sessionExerciseId,
-  keepSetIds = [],
-}: Pick<PrefilledCard, 'sessionId' | 'exerciseId' | 'sessionExerciseId'> & { keepSetIds?: number[] }) {
-  const now = Date.now();
-  await db.transaction(async (tx) => {
-    const deleteCondition =
-      keepSetIds.length > 0
-        ? and(
-            eq(sets.workoutSessionExerciseId, sessionExerciseId),
-            isNull(sets.completedAt),
-            notInArray(sets.id, keepSetIds),
-          )
-        : and(eq(sets.workoutSessionExerciseId, sessionExerciseId), isNull(sets.completedAt));
-    await tx.delete(sets).where(deleteCondition);
-    const remaining = await tx
-      .select({ id: sets.id })
-      .from(sets)
-      .where(eq(sets.workoutSessionExerciseId, sessionExerciseId));
-    if (remaining.length === 0) {
-      await tx.insert(sets).values(freshSetValues(sessionId, exerciseId, sessionExerciseId, now));
-    }
+    return {
+      sessionId: wse.sessionId,
+      exerciseId: newExerciseId,
+      sessionExerciseId,
+      kind: 'swap',
+      prefilledSetIds:
+        previousSets.length > 0
+          ? insertedSets
+              .map((s, idx) => (hasAnyValue(previousSets[idx]) ? s.id : null))
+              .filter((id): id is number => id != null)
+          : [],
+    };
   });
 }
