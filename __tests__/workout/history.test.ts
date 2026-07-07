@@ -43,71 +43,118 @@ describe('computePersonalBestIds', () => {
     expect(computePersonalBestIds([], 'weight_reps')).toEqual(new Set());
   });
 
-  it('単一entryのみなら必ずそのentryがタグ付けされる', () => {
+  it('単一entryのみなら必ずそのentryが自己ベストになる', () => {
     const e = entry(1, 1000, [confirmedSet({ weight: 60 })]);
     expect(computePersonalBestIds([e], 'weight_reps')).toEqual(new Set([1]));
   });
 
-  it('時系列で重量が更新された回だけタグ付けされる（weight_reps）', () => {
+  it('自己ベストは常に1件だけ（複数entryが順に記録を更新していても最終的な最大値の1件のみ）', () => {
     const entries = [
-      entry(3, 3000, [confirmedSet({ weight: 62.5 })]), // 更新なし（2番目と同値）
-      entry(2, 2000, [confirmedSet({ weight: 62.5 })]), // 更新
-      entry(1, 1000, [confirmedSet({ weight: 55 })]), // 最初の記録
+      entry(3, 3000, [confirmedSet({ weight: 62.5, reps: 8 })]),
+      entry(2, 2000, [confirmedSet({ weight: 57.5, reps: 8 })]),
+      entry(1, 1000, [confirmedSet({ weight: 55, reps: 8 })]),
     ];
-    // 呼び出し側の並び順（新しい順）に関わらず内部で時系列に並べ直して判定する
-    expect(computePersonalBestIds(entries, 'weight_reps')).toEqual(new Set([1, 2]));
+    const result = computePersonalBestIds(entries, 'weight_reps');
+    expect(result.size).toBe(1);
+    expect(result).toEqual(new Set([3]));
   });
 
-  it('同じ最大値に複数回到達しても、最初に到達した回だけがタグ対象（2回目以降は「更新」ではない）', () => {
+  it('重量が最大のentryが選ばれる（weight_reps）', () => {
     const entries = [
-      entry(2, 2000, [confirmedSet({ weight: 60 })]),
-      entry(1, 1000, [confirmedSet({ weight: 60 })]),
+      entry(1, 1000, [confirmedSet({ weight: 55, reps: 10 })]),
+      entry(2, 2000, [confirmedSet({ weight: 62.5, reps: 8 })]),
+      entry(3, 3000, [confirmedSet({ weight: 60, reps: 8 })]),
     ];
-    expect(computePersonalBestIds(entries, 'weight_reps')).toEqual(new Set([1]));
+    expect(computePersonalBestIds(entries, 'weight_reps')).toEqual(new Set([2]));
   });
 
-  it('1entry内に複数セットがある場合はentry内の最大値同士で比較する', () => {
+  it('重量が同じ場合は回数が多い方を優先する', () => {
     const entries = [
-      entry(2, 2000, [confirmedSet({ weight: 60 }), confirmedSet({ weight: 65 })]),
-      entry(1, 1000, [confirmedSet({ weight: 55 })]),
+      entry(1, 1000, [confirmedSet({ weight: 60, reps: 8 })]),
+      entry(2, 2000, [confirmedSet({ weight: 60, reps: 10 })]),
     ];
-    expect(computePersonalBestIds(entries, 'weight_reps')).toEqual(new Set([1, 2]));
+    expect(computePersonalBestIds(entries, 'weight_reps')).toEqual(new Set([2]));
   });
 
-  it('weight_timeは時間でなく重量で判定する', () => {
+  it('重量・回数が同じ場合はセット数が多い方を優先する', () => {
     const entries = [
-      // 時間は短いが重量は重い→自己ベスト更新
-      entry(2, 2000, [confirmedSet({ weight: 30, durationSeconds: 10 })]),
+      entry(1, 1000, [confirmedSet({ weight: 60, reps: 8 })]),
+      entry(2, 2000, [
+        confirmedSet({ weight: 60, reps: 8 }),
+        confirmedSet({ weight: 55, reps: 8, setNumber: 2 }),
+      ]),
+    ];
+    expect(computePersonalBestIds(entries, 'weight_reps')).toEqual(new Set([2]));
+  });
+
+  it('重量・回数・セット数が同じ場合は総量（重量×回数の合計）が多い方を優先する', () => {
+    const entries = [
+      entry(1, 1000, [
+        confirmedSet({ weight: 60, reps: 8 }),
+        confirmedSet({ weight: 50, reps: 8, setNumber: 2 }),
+      ]),
+      entry(2, 2000, [
+        confirmedSet({ weight: 60, reps: 8 }),
+        confirmedSet({ weight: 55, reps: 8, setNumber: 2 }),
+      ]),
+    ];
+    expect(computePersonalBestIds(entries, 'weight_reps')).toEqual(new Set([2]));
+  });
+
+  it('重量・回数・セット数・総量が全て同じ場合は直近の日付を優先する', () => {
+    const entries = [
+      entry(1, 1000, [confirmedSet({ weight: 60, reps: 8 })]),
+      entry(2, 2000, [confirmedSet({ weight: 60, reps: 8 })]),
+    ];
+    expect(computePersonalBestIds(entries, 'weight_reps')).toEqual(new Set([2]));
+
+    // 呼び出し順（新しい順で渡されるケース）を入れ替えても結果は変わらない
+    const reversed = [entries[1], entries[0]];
+    expect(computePersonalBestIds(reversed, 'weight_reps')).toEqual(new Set([2]));
+  });
+
+  it('1entry内に複数セットがある場合はentry内の最大重量同士で比較する', () => {
+    const entries = [
+      entry(2, 2000, [confirmedSet({ weight: 60, reps: 8 }), confirmedSet({ weight: 65, reps: 5 })]),
+      entry(1, 1000, [confirmedSet({ weight: 55, reps: 8 })]),
+    ];
+    expect(computePersonalBestIds(entries, 'weight_reps')).toEqual(new Set([2]));
+  });
+
+  it('weight_timeは時間でなく重量で判定し、同重量なら時間で比較する', () => {
+    const entries = [
       entry(1, 1000, [confirmedSet({ weight: 20, durationSeconds: 60 })]),
+      entry(2, 2000, [confirmedSet({ weight: 30, durationSeconds: 10 })]), // 重量が重い→こちらが自己ベスト
+      entry(3, 3000, [confirmedSet({ weight: 30, durationSeconds: 45 })]), // 同重量なら時間が長い方
     ];
-    expect(computePersonalBestIds(entries, 'weight_time')).toEqual(new Set([1, 2]));
+    expect(computePersonalBestIds(entries, 'weight_time')).toEqual(new Set([3]));
   });
 
-  it('repsは回数で判定する', () => {
+  it('repsは回数の最大値、同値ならセット数→総回数で比較する', () => {
     const entries = [
-      entry(2, 2000, [confirmedSet({ reps: 12 })]),
       entry(1, 1000, [confirmedSet({ reps: 10 })]),
+      entry(2, 2000, [confirmedSet({ reps: 12 })]),
     ];
-    expect(computePersonalBestIds(entries, 'reps')).toEqual(new Set([1, 2]));
+    expect(computePersonalBestIds(entries, 'reps')).toEqual(new Set([2]));
   });
 
-  it('timeは時間(durationSeconds)で判定する', () => {
+  it('timeは時間(durationSeconds)の最大値で判定する', () => {
     const entries = [
-      entry(2, 2000, [confirmedSet({ durationSeconds: 90 })]),
       entry(1, 1000, [confirmedSet({ durationSeconds: 60 })]),
+      entry(2, 2000, [confirmedSet({ durationSeconds: 90 })]),
     ];
-    expect(computePersonalBestIds(entries, 'time')).toEqual(new Set([1, 2]));
+    expect(computePersonalBestIds(entries, 'time')).toEqual(new Set([2]));
   });
 
-  it('distance_timeは距離(distanceMeters)で判定する', () => {
+  it('distance_timeは距離(distanceMeters)の最大値で判定する', () => {
     const entries = [
-      entry(2, 2000, [confirmedSet({ distanceMeters: 6000 })]),
       entry(1, 1000, [confirmedSet({ distanceMeters: 5000 })]),
+      entry(2, 2000, [confirmedSet({ distanceMeters: 6000 })]),
     ];
-    expect(computePersonalBestIds(entries, 'distance_time')).toEqual(new Set([1, 2]));
+    expect(computePersonalBestIds(entries, 'distance_time')).toEqual(new Set([2]));
   });
 
-  it('値が未入力(null)のセットしか無いentryは自己ベスト判定から除外される（0扱いで最古の記録が誤ってタグ付けされない）', () => {
+  it('値が未入力(null)のセットしか無いentryは自己ベスト判定から除外される（0扱いで最古の記録が誤って選ばれない）', () => {
     const entries = [
       entry(2, 2000, [confirmedSet({ weight: 60 })]),
       entry(1, 1000, [confirmedSet({ weight: null })]), // ✓済みだが値未入力
@@ -124,13 +171,9 @@ describe('computePersonalBestIds', () => {
     expect(computePersonalBestIds(entries, 'weight_reps')).toEqual(new Set([1]));
   });
 
-  it('全entryが同一値（一度も更新が無い）場合は最初の1件だけタグ付けされる', () => {
-    const entries = [
-      entry(3, 3000, [confirmedSet({ weight: 60 })]),
-      entry(2, 2000, [confirmedSet({ weight: 60 })]),
-      entry(1, 1000, [confirmedSet({ weight: 60 })]),
-    ];
-    expect(computePersonalBestIds(entries, 'weight_reps')).toEqual(new Set([1]));
+  it('全entryが確定セットを持たない場合は空Setを返す', () => {
+    const entries = [entry(1, 1000, [confirmedSet({ weight: 60, completedAt: null })])];
+    expect(computePersonalBestIds(entries, 'weight_reps')).toEqual(new Set());
   });
 
   it('呼び出し元のentries配列の順序を変更しない（破壊的ソートをしない）', () => {

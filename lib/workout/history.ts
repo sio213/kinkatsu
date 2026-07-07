@@ -122,45 +122,94 @@ export async function getExerciseHistoryEntries(
     .filter((entry) => entry.sets.some((s) => s.completedAt != null));
 }
 
-// 計測タイプごとの「自己ベスト」の指標。重量種目は重量、回数のみは回数、時間系は長さ・距離が
-// 大きいほど良い記録とみなす（フォーム種目ごとの厳密な1RM推定等は行わない、単純な最大値比較）。
-// 値が未入力（null）のセットはこの指標では「記録なし」を表すため0にフォールバックしない
-// （0にすると値の無いセットしか無いカードが「0が自己ベスト」として誤って一番古い記録にタグ付けされる）
-function primaryMetricValue(measurementType: MeasurementType, s: PreviousSetValues): number | null {
+// nullを無視した最大値。全件nullならnull（0にフォールバックしない。0にすると値の無い
+// セットしか無いカードが「0が自己ベスト」として誤って選ばれてしまうため）
+function maxOf(values: (number | null)[]): number | null {
+  let max: number | null = null;
+  for (const v of values) {
+    if (v == null) continue;
+    if (max == null || v > max) max = v;
+  }
+  return max;
+}
+
+function sumOf(values: (number | null)[]): number {
+  return values.reduce<number>((sum, v) => sum + (v ?? 0), 0);
+}
+
+// カード（entry）1件を「自己ベスト」として比較するためのスコア配列を作る。配列の前方の要素ほど
+// 優先度が高く、先頭から順に比較して大きい方を勝ちとする（辞書式順序）。値が無いカード（✓確定
+// セットが1件も無い等）はnullを返し、比較対象から除外する
+function computeEntryScore(measurementType: MeasurementType, entry: HistoryEntry): number[] | null {
+  const confirmed = entry.sets.filter((s) => s.completedAt != null);
+  if (confirmed.length === 0) return null;
+  const setCount = confirmed.length;
+
   switch (measurementType) {
-    case 'weight_reps':
-    case 'weight_time':
-      return s.weight;
-    case 'reps':
-      return s.reps;
-    case 'time':
-      return s.durationSeconds;
-    case 'distance_time':
-      return s.distanceMeters;
+    case 'weight_reps': {
+      const maxWeight = maxOf(confirmed.map((s) => s.weight));
+      if (maxWeight == null) return null;
+      // 同じ重量が複数セットあれば、その中で一番回数が多いものを比較対象にする
+      const repsAtMaxWeight = maxOf(confirmed.filter((s) => s.weight === maxWeight).map((s) => s.reps)) ?? 0;
+      const totalVolume = sumOf(confirmed.map((s) => (s.weight ?? 0) * (s.reps ?? 0)));
+      return [maxWeight, repsAtMaxWeight, setCount, totalVolume];
+    }
+    case 'weight_time': {
+      const maxWeight = maxOf(confirmed.map((s) => s.weight));
+      if (maxWeight == null) return null;
+      const durationAtMaxWeight =
+        maxOf(confirmed.filter((s) => s.weight === maxWeight).map((s) => s.durationSeconds)) ?? 0;
+      const totalVolume = sumOf(confirmed.map((s) => (s.weight ?? 0) * (s.durationSeconds ?? 0)));
+      return [maxWeight, durationAtMaxWeight, setCount, totalVolume];
+    }
+    case 'reps': {
+      const max = maxOf(confirmed.map((s) => s.reps));
+      if (max == null) return null;
+      return [max, setCount, sumOf(confirmed.map((s) => s.reps))];
+    }
+    case 'time': {
+      const max = maxOf(confirmed.map((s) => s.durationSeconds));
+      if (max == null) return null;
+      return [max, setCount, sumOf(confirmed.map((s) => s.durationSeconds))];
+    }
+    case 'distance_time': {
+      const max = maxOf(confirmed.map((s) => s.distanceMeters));
+      if (max == null) return null;
+      return [max, setCount, sumOf(confirmed.map((s) => s.distanceMeters))];
+    }
   }
 }
 
-// entries内で「その時点までで初めて自己ベストを更新した」カードのidを返す。同じ最大値に
-// 複数回到達しても、最初に到達した回だけがタグ対象（2回目以降は「更新」ではないため）。
+// スコア配列を先頭要素から順に比較する（要素数はcomputeEntryScoreの呼び出し元同士で常に揃う）
+function isHigherScore(a: number[], b: number[]): boolean {
+  for (let i = 0; i < a.length; i++) {
+    if (a[i] !== b[i]) return a[i] > b[i];
+  }
+  return false;
+}
+
+// 種目の全履歴の中から「自己ベスト」を1件だけ選んでカードidを返す（無ければ空のSet）。
+// 比較優先順位: ①計測タイプごとの主指標（重量/回数/時間/距離）の最大値 → ②重量種目は同じ重量の
+// 中での回数・時間 → ③セット数 → ④総量（重量×回数等の合計） → ⑤直近の日付。
 // ✓未確定（completedAt null）のセットは「まだ確認していない値」のため指標に含めない
 export function computePersonalBestIds(
   entries: HistoryEntry[],
   measurementType: MeasurementType,
 ): Set<number> {
-  const chronological = [...entries].sort((a, b) => a.startedAt - b.startedAt);
-  let runningMax = -Infinity;
-  const bestIds = new Set<number>();
-  for (const entry of chronological) {
-    const confirmedValues = entry.sets
-      .filter((s) => s.completedAt != null)
-      .map((s) => primaryMetricValue(measurementType, s))
-      .filter((v): v is number => v != null);
-    if (confirmedValues.length === 0) continue;
-    const entryMax = Math.max(...confirmedValues);
-    if (entryMax > runningMax) {
-      runningMax = entryMax;
-      bestIds.add(entry.workoutSessionExerciseId);
+  let best: { workoutSessionExerciseId: number; startedAt: number; score: number[] } | null = null;
+
+  for (const entry of entries) {
+    const score = computeEntryScore(measurementType, entry);
+    if (score == null) continue;
+
+    if (
+      best == null ||
+      isHigherScore(score, best.score) ||
+      (!isHigherScore(best.score, score) && entry.startedAt > best.startedAt)
+    ) {
+      best = { workoutSessionExerciseId: entry.workoutSessionExerciseId, startedAt: entry.startedAt, score };
     }
   }
-  return bestIds;
+
+  return best ? new Set([best.workoutSessionExerciseId]) : new Set();
 }
