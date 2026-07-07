@@ -117,7 +117,7 @@ const styles = StyleSheet.create({
   list: { flex: 1 },
   content: { paddingHorizontal: 16, paddingBottom: 40 },
 
-  headerArea: { paddingTop: 16, gap: 8, marginBottom: 8 },
+  headerArea: { paddingTop: 16, gap: 8, marginBottom: 4 },
   sectionHeader: {
     flexDirection: 'row',
     justifyContent: 'space-between',

@@ -112,7 +112,7 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     gap: 4,
-    paddingVertical: 10,
+    paddingVertical: 8,
     paddingHorizontal: 4,
   },
   triggerText: { fontSize: 13, fontWeight: '600', color: Colors.textMuted },
