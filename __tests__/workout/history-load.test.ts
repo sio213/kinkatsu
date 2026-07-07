@@ -1,7 +1,7 @@
 // session.test.tsのtxモックはselect().from().where()で完結する形（orderByを使わない既存関数向け）
-// のため、loadHistoryIntoSessionExercise/undoLoadHistoryが使う.where().orderBy()チェーンには
-// 対応できない。この2関数専用に、テーブル(workoutSessionExercises/sets)で分岐しつつ
-// orderByまで含めてチェーンできるモックをこのファイルで独自に用意する
+// のため、loadHistoryIntoSessionExerciseが使う.where().orderBy()チェーンには対応できない。
+// この関数専用に、テーブル(workoutSessionExercises/sets)で分岐しつつorderByまで含めて
+// チェーンできるモックをこのファイルで独自に用意する
 /* eslint-disable no-var */
 var mockWseWhere: jest.Mock;
 var mockSetsOrderBy: jest.Mock;
@@ -61,7 +61,7 @@ jest.mock('@/db/schema', () => ({
 
 jest.mock('drizzle-orm', () => ({ eq: jest.fn((col, val) => ({ col, val })) }));
 
-import { loadHistoryIntoSessionExercise, undoLoadHistory } from '@/lib/workout/session';
+import { loadHistoryIntoSessionExercise } from '@/lib/workout/session';
 
 beforeEach(() => {
   jest.clearAllMocks();
@@ -78,26 +78,18 @@ describe('loadHistoryIntoSessionExercise', () => {
 
     const result = await loadHistoryIntoSessionExercise(1, 99);
 
-    expect(result).toEqual({ prefilledSetIds: [], previousSnapshot: [] });
+    expect(result).toEqual({ prefilledSetIds: [] });
     expect(mockDeleteWhere).not.toHaveBeenCalled();
     expect(mockInsertValues).not.toHaveBeenCalled();
   });
 
-  it('既存セット(previousSnapshot用)を読み取ってから削除し、選んだ過去カードのセット列をコピーして挿入し直す', async () => {
+  it('選んだ過去カードのセット列を読み取ってから削除し、コピーして挿入し直す', async () => {
     const callOrder: string[] = [];
     mockWseWhere.mockResolvedValueOnce([{ sessionId: 3, exerciseId: 20 }]);
-    // 1回目の呼び出し=削除前の既存セット(previousSnapshot)、2回目=コピー元(過去カード)のセット
-    mockSetsOrderBy
-      .mockImplementationOnce(async () => {
-        callOrder.push('select-existing');
-        return [
-          { setNumber: 1, weight: 50, reps: 12, durationSeconds: null, distanceMeters: null, completedAt: 111 },
-        ];
-      })
-      .mockImplementationOnce(async () => {
-        callOrder.push('select-history');
-        return [{ setNumber: 1, weight: 80, reps: 5, durationSeconds: null, distanceMeters: null }];
-      });
+    mockSetsOrderBy.mockImplementationOnce(async () => {
+      callOrder.push('select-history');
+      return [{ setNumber: 1, weight: 80, reps: 5, durationSeconds: null, distanceMeters: null }];
+    });
     mockDeleteWhere.mockImplementationOnce(async () => {
       callOrder.push('delete');
     });
@@ -108,9 +100,8 @@ describe('loadHistoryIntoSessionExercise', () => {
 
     const result = await loadHistoryIntoSessionExercise(7, 500);
 
-    // 既存セットの読み取り→過去カードの読み取り→削除→挿入の順で実行する
-    // （previousSnapshot用の読み取りをdeleteより先に済ませておかないと、スナップショットが壊れる）
-    expect(callOrder).toEqual(['select-existing', 'select-history', 'delete', 'insert']);
+    // 過去カードの読み取り→削除→挿入の順で実行する
+    expect(callOrder).toEqual(['select-history', 'delete', 'insert']);
     expect(mockDeleteWhere).toHaveBeenCalledWith({ col: 'workoutSessionExerciseId', val: 7 });
 
     const insertedPayload = mockInsertValues.mock.calls[0][0];
@@ -128,22 +119,17 @@ describe('loadHistoryIntoSessionExercise', () => {
         createdAt: expect.any(Number),
       },
     ]);
-    expect(result.previousSnapshot).toEqual([
-      { setNumber: 1, weight: 50, reps: 12, durationSeconds: null, distanceMeters: null, completedAt: 111 },
-    ]);
     expect(result.prefilledSetIds).toEqual([701]);
   });
 
   it('コピー元カードのsetNumberが1から始まっていない/連番でない場合でも、新カードでは1,2,3...に振り直す（バグ回帰防止）', async () => {
     mockWseWhere.mockResolvedValueOnce([{ sessionId: 3, exerciseId: 20 }]);
-    mockSetsOrderBy
-      .mockResolvedValueOnce([]) // 既存セット(previousSnapshot)は無し
-      .mockResolvedValueOnce([
-        // コピー元カードのsetNumberが何らかの理由で2,3,4など不連続なケース
-        { setNumber: 2, weight: 60, reps: 10, durationSeconds: null, distanceMeters: null },
-        { setNumber: 3, weight: 60, reps: 8, durationSeconds: null, distanceMeters: null },
-        { setNumber: 4, weight: 55, reps: 8, durationSeconds: null, distanceMeters: null },
-      ]);
+    mockSetsOrderBy.mockResolvedValueOnce([
+      // コピー元カードのsetNumberが何らかの理由で2,3,4など不連続なケース
+      { setNumber: 2, weight: 60, reps: 10, durationSeconds: null, distanceMeters: null },
+      { setNumber: 3, weight: 60, reps: 8, durationSeconds: null, distanceMeters: null },
+      { setNumber: 4, weight: 55, reps: 8, durationSeconds: null, distanceMeters: null },
+    ]);
     mockReturning.mockResolvedValueOnce([{ id: 701 }, { id: 702 }, { id: 703 }]);
 
     await loadHistoryIntoSessionExercise(7, 500);
@@ -154,7 +140,7 @@ describe('loadHistoryIntoSessionExercise', () => {
 
   it('コピー元の過去カードにセットが無い場合、値が空でsetNumber=1のセットを1件だけ作り直しprefilledSetIdsは空になる', async () => {
     mockWseWhere.mockResolvedValueOnce([{ sessionId: 1, exerciseId: 10 }]);
-    mockSetsOrderBy.mockResolvedValueOnce([]).mockResolvedValueOnce([]); // 既存セットも過去カードのセットも無し
+    mockSetsOrderBy.mockResolvedValueOnce([]);
     mockReturning.mockResolvedValueOnce([{ id: 900 }]);
 
     const result = await loadHistoryIntoSessionExercise(1, 500);
@@ -179,11 +165,9 @@ describe('loadHistoryIntoSessionExercise', () => {
 
   it('コピー元のセットが全カラムnullの場合、空の1件だけが作られprefilledSetIdsも空になる', async () => {
     mockWseWhere.mockResolvedValueOnce([{ sessionId: 1, exerciseId: 10 }]);
-    mockSetsOrderBy
-      .mockResolvedValueOnce([])
-      .mockResolvedValueOnce([
-        { setNumber: 1, weight: null, reps: null, durationSeconds: null, distanceMeters: null },
-      ]);
+    mockSetsOrderBy.mockResolvedValueOnce([
+      { setNumber: 1, weight: null, reps: null, durationSeconds: null, distanceMeters: null },
+    ]);
     mockReturning.mockResolvedValueOnce([{ id: 701 }]);
 
     const result = await loadHistoryIntoSessionExercise(1, 500);
@@ -196,13 +180,11 @@ describe('loadHistoryIntoSessionExercise', () => {
 
   it('コピー元のセットに全カラムnullの行が混ざっている場合、その行だけコピー対象から除外し余分な空行を作らない（バグ回帰防止: 過去の記録から読み込むと余分な空行が出る不具合）', async () => {
     mockWseWhere.mockResolvedValueOnce([{ sessionId: 3, exerciseId: 20 }]);
-    mockSetsOrderBy
-      .mockResolvedValueOnce([]) // 既存セット(previousSnapshot)は無し
-      .mockResolvedValueOnce([
-        { setNumber: 1, weight: 60, reps: 10, durationSeconds: null, distanceMeters: null },
-        { setNumber: 2, weight: null, reps: null, durationSeconds: null, distanceMeters: null },
-        { setNumber: 3, weight: 55, reps: 8, durationSeconds: null, distanceMeters: null },
-      ]);
+    mockSetsOrderBy.mockResolvedValueOnce([
+      { setNumber: 1, weight: 60, reps: 10, durationSeconds: null, distanceMeters: null },
+      { setNumber: 2, weight: null, reps: null, durationSeconds: null, distanceMeters: null },
+      { setNumber: 3, weight: 55, reps: 8, durationSeconds: null, distanceMeters: null },
+    ]);
     mockReturning.mockResolvedValueOnce([{ id: 701 }, { id: 702 }]);
 
     const result = await loadHistoryIntoSessionExercise(7, 500);
@@ -225,104 +207,5 @@ describe('loadHistoryIntoSessionExercise', () => {
   it('挿入が失敗した場合もエラーを握りつぶさずthrowする（fire-and-forget禁止）', async () => {
     mockReturning.mockRejectedValueOnce(new Error('insert error'));
     await expect(loadHistoryIntoSessionExercise(1, 500)).rejects.toThrow('insert error');
-  });
-});
-
-describe('undoLoadHistory', () => {
-  it('対象カードが見つからない場合は何もしない（delete/insertどちらも呼ばれない）', async () => {
-    mockWseWhere.mockResolvedValueOnce([]);
-
-    await undoLoadHistory(1, [{ setNumber: 1, weight: 60, reps: 10, durationSeconds: null, distanceMeters: null, completedAt: 1 }]);
-
-    expect(mockDeleteWhere).not.toHaveBeenCalled();
-    expect(mockInsertValues).not.toHaveBeenCalled();
-  });
-
-  it('previousSnapshotの内容(completedAtを含む)をそのまま再insertする', async () => {
-    mockWseWhere.mockResolvedValueOnce([{ sessionId: 3, exerciseId: 20 }]);
-    const snapshot = [
-      { setNumber: 1, weight: 60, reps: 10, durationSeconds: null, distanceMeters: null, completedAt: 123 },
-      { setNumber: 2, weight: 60, reps: 8, durationSeconds: null, distanceMeters: null, completedAt: null },
-    ];
-
-    await undoLoadHistory(7, snapshot);
-
-    const insertedPayload = mockInsertValues.mock.calls[0][0];
-    expect(insertedPayload).toEqual([
-      {
-        sessionId: 3,
-        exerciseId: 20,
-        workoutSessionExerciseId: 7,
-        setNumber: 1,
-        weight: 60,
-        reps: 10,
-        durationSeconds: null,
-        distanceMeters: null,
-        completedAt: 123,
-        createdAt: expect.any(Number),
-      },
-      {
-        sessionId: 3,
-        exerciseId: 20,
-        workoutSessionExerciseId: 7,
-        setNumber: 2,
-        weight: 60,
-        reps: 8,
-        durationSeconds: null,
-        distanceMeters: null,
-        completedAt: null,
-        createdAt: expect.any(Number),
-      },
-    ]);
-  });
-
-  it('previousSnapshotが空配列(読み込み前が0セットだった場合)は値が空の1セットにフォールバックする', async () => {
-    mockWseWhere.mockResolvedValueOnce([{ sessionId: 1, exerciseId: 10 }]);
-
-    await undoLoadHistory(1, []);
-
-    const insertedPayload = mockInsertValues.mock.calls[0][0];
-    expect(insertedPayload).toEqual([
-      {
-        sessionId: 1,
-        exerciseId: 10,
-        workoutSessionExerciseId: 1,
-        setNumber: 1,
-        weight: null,
-        reps: null,
-        durationSeconds: null,
-        distanceMeters: null,
-        completedAt: null,
-        createdAt: expect.any(Number),
-      },
-    ]);
-  });
-
-  it('削除→挿入の順で実行する', async () => {
-    // undoLoadHistoryのinsertは.returning()を挟まずtx.insert(sets).values(rows)を直接awaitするため、
-    // values()呼び出し自体（同期的に発火する）をorder記録のフックにする
-    const callOrder: string[] = [];
-    mockWseWhere.mockResolvedValueOnce([{ sessionId: 1, exerciseId: 10 }]);
-    mockDeleteWhere.mockImplementationOnce(async () => {
-      callOrder.push('delete');
-    });
-    mockInsertValues.mockImplementationOnce(() => {
-      callOrder.push('insert');
-      return Promise.resolve(undefined);
-    });
-
-    await undoLoadHistory(1, []);
-
-    expect(callOrder).toEqual(['delete', 'insert']);
-  });
-
-  it('削除が失敗した場合はエラーを握りつぶさずthrowする', async () => {
-    mockDeleteWhere.mockRejectedValueOnce(new Error('delete error'));
-    await expect(undoLoadHistory(1, [])).rejects.toThrow('delete error');
-  });
-
-  it('挿入が失敗した場合もエラーを握りつぶさずthrowする', async () => {
-    mockInsertValues.mockImplementationOnce(() => Promise.reject(new Error('insert error')));
-    await expect(undoLoadHistory(1, [])).rejects.toThrow('insert error');
   });
 });

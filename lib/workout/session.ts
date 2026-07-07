@@ -245,44 +245,20 @@ export async function replaceSessionExercise(
   });
 }
 
-// 「取り消す」で元に戻せるよう、読み込み直前のセット列をそのまま保持するスナップショット
-export type SetSnapshot = {
-  setNumber: number;
-  weight: number | null;
-  reps: number | null;
-  durationSeconds: number | null;
-  distanceMeters: number | null;
-  completedAt: number | null;
-};
-
 // 「過去の記録から読み込む」画面で選んだ過去のカード（historyWorkoutSessionExerciseId）の
-// セット列を、このカード（sessionExerciseId）にコピーする。既存のセットは全て削除するが、
-// 誤操作時に元へ戻せるよう削除前の状態をSetSnapshotとして返す。completedAtは常にnull（✓は
-// 自動タップしない。ghost表示にしてユーザーに確認させる方針はプリフィルと同じ）
+// セット列を、このカード（sessionExerciseId）にコピーする。既存のセットは全て削除する。
+// completedAtは常にnull（✓は自動タップしない。ghost表示にしてユーザーに確認させる方針はプリフィルと同じ）
 export async function loadHistoryIntoSessionExercise(
   sessionExerciseId: number,
   historyWorkoutSessionExerciseId: number,
-): Promise<{ prefilledSetIds: number[]; previousSnapshot: SetSnapshot[] }> {
+): Promise<{ prefilledSetIds: number[] }> {
   const now = Date.now();
   return db.transaction(async (tx) => {
     const [wse] = await tx
       .select({ sessionId: workoutSessionExercises.sessionId, exerciseId: workoutSessionExercises.exerciseId })
       .from(workoutSessionExercises)
       .where(eq(workoutSessionExercises.id, sessionExerciseId));
-    if (!wse) return { prefilledSetIds: [], previousSnapshot: [] };
-
-    const previousSnapshot: SetSnapshot[] = await tx
-      .select({
-        setNumber: sets.setNumber,
-        weight: sets.weight,
-        reps: sets.reps,
-        durationSeconds: sets.durationSeconds,
-        distanceMeters: sets.distanceMeters,
-        completedAt: sets.completedAt,
-      })
-      .from(sets)
-      .where(eq(sets.workoutSessionExerciseId, sessionExerciseId))
-      .orderBy(sets.setNumber);
+    if (!wse) return { prefilledSetIds: [] };
 
     // 値が1つも無い行はコピー対象から除外する（addExercisesToSessionと同じ理由）
     const historySets = (await getPreviousSetsForCard(tx, historyWorkoutSessionExerciseId)).filter(hasAnyValue);
@@ -295,45 +271,7 @@ export async function loadHistoryIntoSessionExercise(
 
     return {
       prefilledSetIds: computePrefilledSetIds(insertedSets.map((s) => s.id), historySets),
-      previousSnapshot,
     };
-  });
-}
-
-// loadHistoryIntoSessionExerciseの取り消し。読み込み直前のSetSnapshotへ丸ごと復元する
-// （読み込みで新しく採番されたセットidはそのまま破棄し、復元後の行は新しいidを振り直す。
-// SetRowはid単位でキー管理しているだけで連続性は要求しないため問題ない）
-export async function undoLoadHistory(
-  sessionExerciseId: number,
-  previousSnapshot: SetSnapshot[],
-): Promise<void> {
-  const now = Date.now();
-  await db.transaction(async (tx) => {
-    const [wse] = await tx
-      .select({ sessionId: workoutSessionExercises.sessionId, exerciseId: workoutSessionExercises.exerciseId })
-      .from(workoutSessionExercises)
-      .where(eq(workoutSessionExercises.id, sessionExerciseId));
-    if (!wse) return;
-
-    await tx.delete(sets).where(eq(sets.workoutSessionExerciseId, sessionExerciseId));
-
-    const rows =
-      previousSnapshot.length > 0
-        ? previousSnapshot.map((s) => ({
-            sessionId: wse.sessionId,
-            exerciseId: wse.exerciseId,
-            workoutSessionExerciseId: sessionExerciseId,
-            setNumber: s.setNumber,
-            weight: s.weight,
-            reps: s.reps,
-            durationSeconds: s.durationSeconds,
-            distanceMeters: s.distanceMeters,
-            completedAt: s.completedAt,
-            createdAt: now,
-          }))
-        : [freshSetValues(wse.sessionId, wse.exerciseId, sessionExerciseId, now)];
-
-    await tx.insert(sets).values(rows);
   });
 }
 

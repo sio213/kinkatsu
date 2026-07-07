@@ -3,7 +3,6 @@ import {
   formatRelativeDaysAgo,
   formatSessionDateGroup,
   formatSessionDuration,
-  formatShortDate,
   groupByMonth,
   groupSessionsByDate,
 } from '@/lib/workout/summary';
@@ -165,12 +164,5 @@ describe('formatMonthGroup / groupByMonth', () => {
 
   it('空配列 → 空配列', () => {
     expect(groupByMonth([])).toEqual([]);
-  });
-});
-
-describe('formatShortDate', () => {
-  it('「M/D」形式にする（トースト表示用）', () => {
-    const ts = new Date(2026, 6, 3, 12, 0).getTime();
-    expect(formatShortDate(ts)).toBe('7/3');
   });
 });

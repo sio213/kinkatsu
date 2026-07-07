@@ -46,12 +46,6 @@ export function groupSessionsByDate<T extends { startedAt: number }>(
   return groups.map(({ dateLabel, sessions: s }) => ({ dateLabel, sessions: s }));
 }
 
-// トースト表示用の短い日付（例:「7/3」）
-export function formatShortDate(startedAt: number): string {
-  const d = new Date(startedAt);
-  return `${d.getMonth() + 1}/${d.getDate()}`;
-}
-
 // 「記録から読み込む」画面の直近項目用。1週間以上前は相対表示すると却って分かりにくいためnullを返し、
 // 呼び出し側は絶対日付（formatSessionDateGroup）のみを表示する
 export function formatRelativeDaysAgo(startedAt: number, now: number = Date.now()): string | null {

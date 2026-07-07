@@ -5,11 +5,10 @@ import { Colors } from '@/constants/theme';
 import { useExercise } from '@/hooks/use-exercises';
 import { MEASUREMENT_TYPES, type MeasurementType } from '@/lib/exercises/constants';
 import { computePersonalBestIds, getExerciseHistoryEntries, type HistoryEntry } from '@/lib/workout/history';
-import { notifyHistoryLoaded } from '@/lib/workout/history-load-feedback';
 import { notifyPrefilled } from '@/lib/workout/prefill-feedback';
 import { loadHistoryIntoSessionExercise } from '@/lib/workout/session';
 import { MEASUREMENT_COLUMNS } from '@/lib/workout/set-format';
-import { formatShortDate, groupByMonth } from '@/lib/workout/summary';
+import { groupByMonth } from '@/lib/workout/summary';
 import { Stack, useLocalSearchParams, useRouter } from 'expo-router';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { Alert, SectionList, StyleSheet, Text, View } from 'react-native';
@@ -85,17 +84,11 @@ export default function HistoryPickerScreen() {
       isLoadingRef.current = true;
       setLoadingCardId(entry.workoutSessionExerciseId);
       try {
-        const { prefilledSetIds, previousSnapshot } = await loadHistoryIntoSessionExercise(
+        const { prefilledSetIds } = await loadHistoryIntoSessionExercise(
           sessionExerciseId,
           entry.workoutSessionExerciseId,
         );
         notifyPrefilled([{ sessionId, exerciseId, sessionExerciseId, kind: 'history', prefilledSetIds }]);
-        notifyHistoryLoaded({
-          sessionId,
-          sessionExerciseId,
-          dateLabel: formatShortDate(entry.startedAt),
-          previousSnapshot,
-        });
         router.back();
       } catch (e) {
         console.error('[load history into session exercise]', e);
