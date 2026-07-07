@@ -30,6 +30,9 @@ type Props = {
   // （lib/workout/session.tsのPrefilledCard.prefilledSetIds）。この行idに含まれるSetRowだけ
   // ゴースト表示にする
   prefilledSetIds: number[];
+  // この種目に「過去の記録から読み込む」で読み込める過去記録が1件でもあるか。無ければ
+  // ⋮メニューの当該項目を「上へ移動」等と同じくグレーアウトする
+  hasHistory: boolean;
 };
 
 export type SessionExerciseCardHandle = { focusFirstSet: () => void };
@@ -47,6 +50,7 @@ export const SessionExerciseCard = memo(
       nextSessionExerciseId,
       onToggleCollapsed,
       prefilledSetIds,
+      hasHistory,
     }: Props,
     ref,
   ) {
@@ -82,6 +86,22 @@ export const SessionExerciseCard = memo(
   // 既にtrueの間は同じ値でsetStateしてもReactが再レンダーをスキップするため、キー入力のたびに
   // 無駄な再レンダーが起きるわけではない
   const [anyEditedInCard, setAnyEditedInCard] = useState(false);
+  // 種目入れ替え・過去記録の読み込みはカード（sessionExerciseId）自体は同じままセット行だけを
+  // 差し替えるため、このコンポーネントはアンマウントされずcardReviewedRefのラッチも残ってしまう。
+  // 差し替え前にこのカードで✓確定/編集済みだった場合、新しく入った未確認のプリフィル値まで
+  // 「もう見た」ものとしてゴースト表示されなくなるバグがあったため、prefilledSetIdsの中身が
+  // 変わった（＝新しいプリフィルが起きた）タイミングでラッチをリセットする。配列の参照ではなく
+  // 中身（idの並び）で比較するのは、呼び出し側が同じidの配列を毎回新しい参照で渡してきても
+  // （実際の内容が変わっていない限り）誤ってリセットしないようにするため
+  const prefilledSetIdsKey = prefilledSetIds.join(',');
+  const prevPrefilledSetIdsKeyRef = useRef(prefilledSetIdsKey);
+  if (prevPrefilledSetIdsKeyRef.current !== prefilledSetIdsKey) {
+    prevPrefilledSetIdsKeyRef.current = prefilledSetIdsKey;
+    if (prefilledSetIds.length > 0) {
+      cardReviewedRef.current = false;
+      if (anyEditedInCard) setAnyEditedInCard(false);
+    }
+  }
   const cardReviewed = cardReviewedRef.current || anyEditedInCard;
 
   const handleDraftChange = useCallback((setId: number, values: Record<string, string>) => {
@@ -119,6 +139,22 @@ export const SessionExerciseCard = memo(
       },
     });
   }, [pushDebounced, exercise.sessionExerciseId, exercise.id, exercise.name, sets]);
+
+  const handleLoadFromHistory = useCallback(() => {
+    // 確認ダイアログの要否を記録から読み込む画面側で判断できるよう、既に何か記録済みか
+    // （✓確定済みかどうか）を渡しておく（handleSwapExerciseと同じ考え方）
+    const hasRecordedData = sets.some((s) => s.completedAt != null);
+    pushDebounced({
+      pathname: '/workout/history-picker',
+      params: {
+        sessionId: String(sessionId),
+        sessionExerciseId: String(exercise.sessionExerciseId),
+        exerciseId: String(exercise.id),
+        exerciseName: exercise.name,
+        hasRecordedData: hasRecordedData ? 'true' : 'false',
+      },
+    });
+  }, [pushDebounced, sessionId, exercise.sessionExerciseId, exercise.id, exercise.name, sets]);
 
   const handleToggleExpanded = useCallback(() => {
     LayoutAnimation.configureNext(LayoutAnimation.Presets.easeInEaseOut);
@@ -274,6 +310,8 @@ export const SessionExerciseCard = memo(
               onSwap={handleSwapExercise}
               onMoveUp={handleMoveUp}
               onMoveDown={handleMoveDown}
+              onLoadFromHistory={handleLoadFromHistory}
+              hasHistory={hasHistory}
               onDelete={handleDeleteExercise}
             />
           )}

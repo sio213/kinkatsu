@@ -333,19 +333,26 @@ describe('addExercisesToSession', () => {
     ]);
   });
 
-  it('前回のセットが全カラムnull(✓未確定のまま何も入力せず終えたセッション)の場合、そのセットidはprefilledSetIdsに含めない（値の無い行がゴースト表示されるのを防ぐ）', async () => {
+  it('前回のセットに全カラムnullの行(✓未確定のまま何も入力せず終えたセッション)が混ざっている場合、その行はコピー対象から除外し余分な空行を作らない（バグ回帰防止: 追加した種目に余分な空行が出る不具合）', async () => {
     mockSelectWhere.mockResolvedValueOnce([]);
     mockReturning.mockResolvedValueOnce([{ id: 100, exerciseId: 10 }]);
     mockGetPreviousSets.mockResolvedValueOnce([
       { setNumber: 1, weight: 60, reps: 10, durationSeconds: null, distanceMeters: null },
       { setNumber: 2, weight: null, reps: null, durationSeconds: null, distanceMeters: null },
+      { setNumber: 3, weight: 55, reps: 8, durationSeconds: null, distanceMeters: null },
     ]);
     mockSetsReturning.mockResolvedValueOnce([{ id: 501 }, { id: 502 }]);
 
     const prefilled = await addExercisesToSession(1, [10]);
 
+    // 全カラムnullの行(setNumber:2)は挿入されず、値のある2件だけが1,2に振り直されてコピーされる
+    const setsPayload = mockSetsInsertValues.mock.calls[0][0];
+    expect(setsPayload.map((s: { setNumber: number; weight: number | null }) => [s.setNumber, s.weight])).toEqual([
+      [1, 60],
+      [2, 55],
+    ]);
     expect(prefilled).toEqual([
-      { sessionId: 1, exerciseId: 10, sessionExerciseId: 100, kind: 'new', prefilledSetIds: [501] },
+      { sessionId: 1, exerciseId: 10, sessionExerciseId: 100, kind: 'new', prefilledSetIds: [501, 502] },
     ]);
   });
 
@@ -483,7 +490,7 @@ describe('replaceSessionExercise', () => {
     });
   });
 
-  it('入れ替え先の種目の前回セットが全カラムnullの場合、そのセットidはprefilledSetIdsに含めない', async () => {
+  it('入れ替え先の種目の前回セットが全カラムnullの場合、コピー対象から除外され空の1件だけが作られる', async () => {
     mockSelectWhere.mockResolvedValueOnce([{ exerciseId: 10, sessionId: 3 }]);
     mockGetPreviousSets.mockResolvedValueOnce([
       { setNumber: 1, weight: null, reps: null, durationSeconds: null, distanceMeters: null },
@@ -492,6 +499,9 @@ describe('replaceSessionExercise', () => {
 
     const prefilled = await replaceSessionExercise(7, 20);
 
+    const setsPayload = mockSetsInsertValues.mock.calls[0][0];
+    expect(setsPayload).toHaveLength(1);
+    expect(setsPayload[0].weight).toBeNull();
     expect(prefilled).toEqual({
       sessionId: 3,
       exerciseId: 20,
@@ -499,6 +509,21 @@ describe('replaceSessionExercise', () => {
       kind: 'swap',
       prefilledSetIds: [],
     });
+  });
+
+  it('入れ替え先の種目の前回セットに全カラムnullの行が混ざっている場合、その行だけコピー対象から除外する（バグ回帰防止）', async () => {
+    mockSelectWhere.mockResolvedValueOnce([{ exerciseId: 10, sessionId: 3 }]);
+    mockGetPreviousSets.mockResolvedValueOnce([
+      { setNumber: 1, weight: 60, reps: 8, durationSeconds: null, distanceMeters: null },
+      { setNumber: 2, weight: null, reps: null, durationSeconds: null, distanceMeters: null },
+    ]);
+    mockSetsReturning.mockResolvedValueOnce([{ id: 701 }]);
+
+    await replaceSessionExercise(7, 20);
+
+    const setsPayload = mockSetsInsertValues.mock.calls[0][0];
+    expect(setsPayload).toHaveLength(1);
+    expect(setsPayload[0]).toMatchObject({ setNumber: 1, weight: 60, reps: 8 });
   });
 
   it('入れ替え先の種目に前回の記録が無ければprefilledSetIdsが空配列のカードを返す', async () => {

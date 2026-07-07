@@ -2,7 +2,7 @@ import { DesignIcon } from '@/components/ui/design-icon';
 import { IconSymbol } from '@/components/ui/icon-symbol';
 import { Colors } from '@/constants/theme';
 import { useRef, useState } from 'react';
-import { Dimensions, Modal, Pressable, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
+import { Dimensions, Keyboard, Modal, Pressable, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 
 const SCREEN_WIDTH = Dimensions.get('window').width;
 
@@ -14,16 +14,33 @@ type Props = {
   onSwap: () => void;
   onMoveUp: () => void;
   onMoveDown: () => void;
+  onLoadFromHistory: () => void;
+  // この種目に読み込める過去記録が1件も無ければ「上へ移動」等と同じくグレーアウトする
+  hasHistory: boolean;
   onDelete: () => void;
 };
 
 // 種目カードの「⋮」メニュー
-export function ExerciseCardMenu({ isFirst, isLast, onSwap, onMoveUp, onMoveDown, onDelete }: Props) {
+export function ExerciseCardMenu({
+  isFirst,
+  isLast,
+  onSwap,
+  onMoveUp,
+  onMoveDown,
+  onLoadFromHistory,
+  hasHistory,
+  onDelete,
+}: Props) {
   const triggerRef = useRef<View>(null);
   const [anchor, setAnchor] = useState<Anchor | null>(null);
   const open = anchor !== null;
 
   const handleOpen = () => {
+    // 親のFlatListはkeyboardShouldPersistTaps="handled"のため、フォーカス中の数値入力欄が
+    // あってもこのボタンのタップだけではフォーカスが外れない。フォーカスが残ったまま
+    // 「種目を入れ替え」「過去の記録から読み込む」で他画面へ遷移して戻ると、その入力欄まで
+    // 自動スクロールしてしまう不具合があったため、メニューを開く時点で明示的にフォーカスを外す
+    Keyboard.dismiss();
     // measureInWindowは非同期（ネイティブブリッジ経由）のため、先に暫定位置でメニューを開いてから
     // 実際の位置に更新する。ネイティブ環境ではほぼ同一フレーム内に解決され体感できるズレは生じない
     setAnchor({ x: 0, y: 0, width: 0, height: 0 });
@@ -47,6 +64,12 @@ export function ExerciseCardMenu({ isFirst, isLast, onSwap, onMoveUp, onMoveDown
   const handleMoveDown = () => {
     handleClose();
     onMoveDown();
+  };
+
+  const handleLoadFromHistory = () => {
+    if (!hasHistory) return;
+    handleClose();
+    onLoadFromHistory();
   };
 
   const handleDelete = () => {
@@ -110,6 +133,19 @@ export function ExerciseCardMenu({ isFirst, isLast, onSwap, onMoveUp, onMoveDown
                 color={isLast ? Colors.textPlaceholder : Colors.textMuted}
               />
               <Text style={[styles.menuItemText, isLast && styles.menuItemDisabled]}>下へ移動</Text>
+            </TouchableOpacity>
+            <TouchableOpacity
+              style={styles.menuItem}
+              onPress={handleLoadFromHistory}
+              disabled={!hasHistory}
+              accessibilityLabel="過去の記録から読み込む"
+              accessibilityState={{ disabled: !hasHistory }}
+              accessibilityHint={!hasHistory ? 'この種目の過去の記録がありません' : undefined}
+            >
+              <DesignIcon name="history" size={18} color={hasHistory ? Colors.textMuted : Colors.textPlaceholder} />
+              <Text style={[styles.menuItemText, !hasHistory && styles.menuItemDisabled]}>
+                過去の記録から読み込む
+              </Text>
             </TouchableOpacity>
             <TouchableOpacity style={styles.menuItem} onPress={handleDelete} accessibilityLabel="削除">
               <DesignIcon name="delete-outline" size={18} color={Colors.danger} />

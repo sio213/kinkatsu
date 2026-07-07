@@ -14,7 +14,7 @@ export type PrefilledCard = {
   sessionId: number;
   exerciseId: number;
   sessionExerciseId: number;
-  kind: 'new' | 'swap';
+  kind: 'new' | 'swap' | 'history';
   prefilledSetIds: number[];
 };
 
@@ -36,11 +36,22 @@ function freshSetValues(sessionId: number, exerciseId: number, workoutSessionExe
 }
 
 // 4つの値カラムのいずれかに実際の値が入っているか。前回セットが✓未確定のまま
-// 何も入力せずに終えたセッションの場合、getPreviousSetsは全カラムnullの行を返しうる。
-// そのような行までprefilledSetIdsに含めると、値の無い行が背景色だけゴースト表示される
-// （中身が空なのに「前回の値がある」ように見える）ため、実際に値がある行だけに絞る
+// 何も入力せずに終えたセッションの場合、getPreviousSets/getPreviousSetsForCardは
+// 全カラムnullの行を返しうる（「セット追加」だけ押されて未入力のまま終わった等）。
+// そのような行は「前回入力した値」として意味を持たないため、コピー元から除外する
+// （除外しないと新しいカードに余分な空行が増えたり、値の無い行が背景色だけゴースト表示される
+// ＝中身が空なのに「前回の値がある」ように見える、という2つの問題が起きる）
 function hasAnyValue(s: PreviousSetValues): boolean {
   return s.weight != null || s.reps != null || s.durationSeconds != null || s.distanceMeters != null;
+}
+
+// 実際に挿入したセットのうち、コピー元(sourceSets)に値があった行のidだけを残す。
+// addExercisesToSession/replaceSessionExercise/loadHistoryIntoSessionExerciseの3箇所で
+// 同じ絞り込みが必要なため共通化する。sourceSetsは呼び出し側で既にhasAnyValueで
+// 絞り込み済みの前提だが、念のためここでも同じ判定をかけておく（二重チェックで安全側に倒す）
+function computePrefilledSetIds(insertedIds: number[], sourceSets: PreviousSetValues[]): number[] {
+  if (sourceSets.length === 0) return [];
+  return insertedIds.filter((_, idx) => hasAnyValue(sourceSets[idx]));
 }
 
 // 前回のセット列をコピーして初期セットを作る。前回の記録が無ければfreshSetValuesにフォールバックする。
@@ -55,11 +66,14 @@ function buildInitialSets(
   if (previousSets.length === 0) {
     return [freshSetValues(sessionId, exerciseId, workoutSessionExerciseId, now)];
   }
-  return previousSets.map((s) => ({
+  // setNumberはコピー元の値をそのまま使わず1から振り直す。コピー元の並び（setNumber昇順）は
+  // previousSetsのソート順として活かしつつ、新しいカードの番号はここで完結させることで、
+  // コピー元のsetNumberが何らかの理由で1から始まっていない場合でも新カードは必ず1,2,3...になる
+  return previousSets.map((s, index) => ({
     sessionId,
     exerciseId,
     workoutSessionExerciseId,
-    setNumber: s.setNumber,
+    setNumber: index + 1,
     weight: s.weight,
     reps: s.reps,
     durationSeconds: s.durationSeconds,
@@ -123,7 +137,9 @@ export async function addExercisesToSession(
     const initialSetsByCard: ReturnType<typeof buildInitialSets>[] = [];
     const previousSetsByCard: PreviousSetValues[][] = [];
     for (const wse of inserted) {
-      const previousSets = await getPreviousSets(tx, wse.exerciseId, sessionId);
+      // 値が1つも無い行（前回「セット追加」だけ押されて未入力のまま終わった等）は
+      // コピー対象から除外する（除外しないと新しいカードに余分な空行が増えてしまう）
+      const previousSets = (await getPreviousSets(tx, wse.exerciseId, sessionId)).filter(hasAnyValue);
       previousSetsByCard.push(previousSets);
       result.push({
         sessionId,
@@ -145,11 +161,7 @@ export async function addExercisesToSession(
       const cardSetCount = initialSetsByCard[i].length;
       const cardSetIds = insertedSets.slice(cursor, cursor + cardSetCount).map((s) => s.id);
       cursor += cardSetCount;
-      const previousSetsForCard = previousSetsByCard[i];
-      result[i].prefilledSetIds =
-        previousSetsForCard.length > 0
-          ? cardSetIds.filter((_, idx) => hasAnyValue(previousSetsForCard[idx]))
-          : [];
+      result[i].prefilledSetIds = computePrefilledSetIds(cardSetIds, previousSetsByCard[i]);
     }
     return result;
   });
@@ -216,7 +228,8 @@ export async function replaceSessionExercise(
       .where(eq(workoutSessionExercises.id, sessionExerciseId));
 
     await tx.delete(sets).where(eq(sets.workoutSessionExerciseId, sessionExerciseId));
-    const previousSets = await getPreviousSets(tx, newExerciseId, wse.sessionId);
+    // 値が1つも無い行はコピー対象から除外する（addExercisesToSessionと同じ理由）
+    const previousSets = (await getPreviousSets(tx, newExerciseId, wse.sessionId)).filter(hasAnyValue);
     const insertedSets = await tx
       .insert(sets)
       .values(buildInitialSets(wse.sessionId, newExerciseId, sessionExerciseId, now, previousSets))
@@ -227,12 +240,57 @@ export async function replaceSessionExercise(
       exerciseId: newExerciseId,
       sessionExerciseId,
       kind: 'swap',
-      prefilledSetIds:
-        previousSets.length > 0
-          ? insertedSets
-              .map((s, idx) => (hasAnyValue(previousSets[idx]) ? s.id : null))
-              .filter((id): id is number => id != null)
-          : [],
+      prefilledSetIds: computePrefilledSetIds(insertedSets.map((s) => s.id), previousSets),
     };
   });
+}
+
+// 「過去の記録から読み込む」画面で選んだ過去のカード（historyWorkoutSessionExerciseId）の
+// セット列を、このカード（sessionExerciseId）にコピーする。既存のセットは全て削除する。
+// completedAtは常にnull（✓は自動タップしない。ghost表示にしてユーザーに確認させる方針はプリフィルと同じ）
+export async function loadHistoryIntoSessionExercise(
+  sessionExerciseId: number,
+  historyWorkoutSessionExerciseId: number,
+): Promise<{ prefilledSetIds: number[] }> {
+  const now = Date.now();
+  return db.transaction(async (tx) => {
+    const [wse] = await tx
+      .select({ sessionId: workoutSessionExercises.sessionId, exerciseId: workoutSessionExercises.exerciseId })
+      .from(workoutSessionExercises)
+      .where(eq(workoutSessionExercises.id, sessionExerciseId));
+    if (!wse) return { prefilledSetIds: [] };
+
+    // 値が1つも無い行はコピー対象から除外する（addExercisesToSessionと同じ理由）
+    const historySets = (await getPreviousSetsForCard(tx, historyWorkoutSessionExerciseId)).filter(hasAnyValue);
+
+    await tx.delete(sets).where(eq(sets.workoutSessionExerciseId, sessionExerciseId));
+    const insertedSets = await tx
+      .insert(sets)
+      .values(buildInitialSets(wse.sessionId, wse.exerciseId, sessionExerciseId, now, historySets))
+      .returning({ id: sets.id });
+
+    return {
+      prefilledSetIds: computePrefilledSetIds(insertedSets.map((s) => s.id), historySets),
+    };
+  });
+}
+
+// 特定の過去カード（workoutSessionExerciseId）のセット列をそのまま返す。getPreviousSets
+// （種目単位で直近の1枚を自動で特定する）と違い、こちらは「記録から読み込む」画面で
+// ユーザーが選んだカードそのものを対象にする
+async function getPreviousSetsForCard(
+  tx: Parameters<Parameters<typeof db.transaction>[0]>[0],
+  workoutSessionExerciseId: number,
+): Promise<PreviousSetValues[]> {
+  return tx
+    .select({
+      setNumber: sets.setNumber,
+      weight: sets.weight,
+      reps: sets.reps,
+      durationSeconds: sets.durationSeconds,
+      distanceMeters: sets.distanceMeters,
+    })
+    .from(sets)
+    .where(eq(sets.workoutSessionExerciseId, workoutSessionExerciseId))
+    .orderBy(sets.setNumber);
 }

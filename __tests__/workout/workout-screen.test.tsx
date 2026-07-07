@@ -5,6 +5,7 @@ const mockUseWorkoutSession = jest.fn();
 const mockUseSessionSetCount = jest.fn();
 const mockUseSessionExercises = jest.fn();
 const mockUseSessionSets = jest.fn();
+const mockUseExercisesWithHistory = jest.fn();
 const mockEndWorkoutSession = jest.fn();
 const mockDeleteSession = jest.fn();
 // 新規追加カードへのフォーカスはnavigation.addListener('transitionEnd', ...)を使うため
@@ -32,6 +33,7 @@ jest.mock('@/hooks/use-workout-session', () => ({
   useSessionSetCount: (...args: unknown[]) => mockUseSessionSetCount(...args),
   useSessionExercises: (...args: unknown[]) => mockUseSessionExercises(...args),
   useSessionSets: (...args: unknown[]) => mockUseSessionSets(...args),
+  useExercisesWithHistory: (...args: unknown[]) => mockUseExercisesWithHistory(...args),
   EMPTY_SETS: [],
   EMPTY_PREFILLED_SET_IDS: [],
 }));
@@ -54,6 +56,8 @@ import { act, create, type ReactTestInstance } from 'react-test-renderer';
 import { Alert, FlatList, Text, TouchableOpacity } from 'react-native';
 import { Stack } from 'expo-router';
 import WorkoutScreen from '@/app/workout/[id]';
+import { SessionExerciseCard } from '@/components/workout/session-exercise-card';
+import { notifyPrefilled } from '@/lib/workout/prefill-feedback';
 
 function findButtonByLabel(root: ReactTestInstance, label: string) {
   return root
@@ -84,6 +88,7 @@ beforeEach(() => {
   mockUseSessionSetCount.mockReturnValue(0);
   mockUseSessionExercises.mockReturnValue([]);
   mockUseSessionSets.mockReturnValue(new Map());
+  mockUseExercisesWithHistory.mockReturnValue(new Set());
   mockEndWorkoutSession.mockResolvedValue(undefined);
   mockDeleteSession.mockResolvedValue(undefined);
   jest.spyOn(Alert, 'alert').mockImplementation(() => {});
@@ -394,4 +399,24 @@ test('FlatListのkeyExtractorはexercise.idではなくsessionExerciseIdを使�
   const keys = data.map((item: { sessionExerciseId: number }) => keyExtractor(item));
 
   expect(keys).toEqual(['100', '101']);
+});
+
+test('同じカードに複数回プリフィル/読み込みイベントが来た場合、最後のイベントのprefilledSetIdsが使われる（配列+findだと最初に見つかった古いidを参照してしまうバグの回帰防止）', () => {
+  mockUseWorkoutSession.mockReturnValue({ session: activeSession, loaded: true });
+  mockUseSessionExercises.mockReturnValue([
+    { id: 10, name: 'ベンチプレス', category: 'chest', measurementType: 'weight_reps', orderIndex: 0, sessionExerciseId: 100 },
+  ]);
+  const root = render();
+
+  act(() => {
+    notifyPrefilled([{ sessionId: 1, exerciseId: 10, sessionExerciseId: 100, kind: 'new', prefilledSetIds: [1, 2] }]);
+  });
+  act(() => {
+    notifyPrefilled([{ sessionId: 1, exerciseId: 10, sessionExerciseId: 100, kind: 'history', prefilledSetIds: [3, 4] }]);
+  });
+
+  const card = root
+    .findAllByType(SessionExerciseCard)
+    .find((c) => c.props.exercise.sessionExerciseId === 100)!;
+  expect(card.props.prefilledSetIds).toEqual([3, 4]);
 });

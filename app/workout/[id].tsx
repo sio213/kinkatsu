@@ -10,6 +10,7 @@ import { useKeyboardInset } from '@/hooks/use-keyboard-inset';
 import {
   EMPTY_PREFILLED_SET_IDS,
   EMPTY_SETS,
+  useExercisesWithHistory,
   useSessionExercises,
   useSessionSetCount,
   useSessionSets,
@@ -42,16 +43,19 @@ export default function WorkoutScreen() {
   const setCount = useSessionSetCount(sessionId ?? -1);
   const sessionExercises = useSessionExercises(sessionId ?? -1);
   const sessionSets = useSessionSets(sessionId ?? -1);
+  const exercisesWithHistory = useExercisesWithHistory(sessionId ?? -1);
   const [now, setNow] = useState(() => Date.now());
   const isFinishingRef = useRef(false);
   const keyboardInset = useKeyboardInset();
   const headerHeight = useHeaderHeight();
   const [menuOpen, setMenuOpen] = useState(false);
-  // 種目追加/入れ替え画面はDB操作直後にrouter.back()で閉じるため、プリフィルが起きたことは
-  // pub/sub経由でここに届く（lib/workout/prefill-feedback.ts）。プリフィルされたセットidが
-  // 分かればカード内のゴースト表示に使える。「クリア」のような能動的な打ち消し操作がもう無いため、
-  // 一度受け取ったカード情報はセッション画面が生きている間ずっと保持してよい（明示的に消す必要が無い）
-  const [prefilledCards, setPrefilledCards] = useState<PrefilledCard[] | null>(null);
+  // 種目追加/入れ替え/記録から読み込む画面はDB操作直後にrouter.back()で閉じるため、プリフィルが
+  // 起きたことはpub/sub経由でここに届く（lib/workout/prefill-feedback.ts）。プリフィルされた
+  // セットidが分かればカード内のゴースト表示に使える。カード（sessionExerciseId）単位のMapで持ち、
+  // 同じカードに対して複数回イベントが来た場合（例:入れ替え後にさらに記録から読み込む等）は
+  // 常に最後のイベントで上書きする。配列+findだと最初に見つかったイベントを使ってしまい、
+  // 削除済みの古いセットidを参照してゴーストが表示されなくなる
+  const [prefilledByCardId, setPrefilledByCardId] = useState<Map<number, PrefilledCard>>(() => new Map());
   const navigation = useNavigation<NativeStackNavigationProp<ParamListBase>>();
   // 種目追加直後にオートフォーカスしたいカードの管理。宣言的なautoFocusプロパティは
   // 「戻る」の画面遷移アニメーション中にキーボードが被さって出るタイミング問題があるため
@@ -111,7 +115,11 @@ export default function WorkoutScreen() {
     return subscribePrefilled((cards) => {
       const forThisSession = cards.filter((c) => c.sessionId === sessionId);
       if (forThisSession.length === 0) return;
-      setPrefilledCards((prev) => [...(prev ?? []), ...forThisSession]);
+      setPrefilledByCardId((prev) => {
+        const next = new Map(prev);
+        for (const c of forThisSession) next.set(c.sessionExerciseId, c);
+        return next;
+      });
       // 複数種目を同時追加した場合も、リスト上一番上に来る最初の新規カードだけにフォーカスする。
       // これから戻り遷移が始まる（呼び出し元がこの直後にrouter.back()する）ため、
       // まだ遷移が終わっていない状態としていったんリセットしておく
@@ -258,9 +266,7 @@ export default function WorkoutScreen() {
           data={sessionExercises}
           keyExtractor={(item) => String(item.sessionExerciseId)}
           renderItem={({ item, index }) => {
-            const prefilledEntry = prefilledCards?.find(
-              (c) => c.sessionExerciseId === item.sessionExerciseId,
-            );
+            const prefilledEntry = prefilledByCardId.get(item.sessionExerciseId);
             return (
               <ListErrorBoundary>
                 <SessionExerciseCard
@@ -282,6 +288,7 @@ export default function WorkoutScreen() {
                   nextSessionExerciseId={sessionExercises[index + 1]?.sessionExerciseId ?? null}
                   onToggleCollapsed={handleToggleCollapsed}
                   prefilledSetIds={prefilledEntry?.prefilledSetIds ?? EMPTY_PREFILLED_SET_IDS}
+                  hasHistory={exercisesWithHistory.has(item.id)}
                 />
               </ListErrorBoundary>
             );

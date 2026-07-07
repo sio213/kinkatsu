@@ -9,7 +9,7 @@ import {
   type WorkoutSession,
 } from '@/db/schema';
 import type { SessionSummary } from '@/lib/workout/summary';
-import { eq, desc, sql, getTableColumns } from 'drizzle-orm';
+import { and, eq, desc, isNotNull, ne, sql, getTableColumns } from 'drizzle-orm';
 import { useLiveQuery } from 'drizzle-orm/expo-sqlite';
 import { useMemo } from 'react';
 
@@ -90,6 +90,28 @@ export function useSessionExercises(sessionId: number): SessionExercise[] {
       .orderBy(workoutSessionExercises.orderIndex),
   );
   return data ?? [];
+}
+
+// 種目カードの「⋮」メニューの「過去の記録から読み込む」を、そもそも読み込める過去記録が
+// 無い種目では「上へ移動」等と同じくグレーアウトするための判定用。excludeSessionIdの種目の
+// 過去カードを個別に問い合わせるとカードの数だけクエリが増えるため、このセッションに
+// 関係なく「1件でも読み込み対象の過去記録がある種目id」をまとめて1クエリで取得する
+export function useExercisesWithHistory(excludeSessionId: number): globalThis.Set<number> {
+  const { data } = useLiveQuery(
+    db
+      .selectDistinct({ exerciseId: workoutSessionExercises.exerciseId })
+      .from(sets)
+      .innerJoin(workoutSessionExercises, eq(sets.workoutSessionExerciseId, workoutSessionExercises.id))
+      .innerJoin(workoutSessions, eq(workoutSessionExercises.sessionId, workoutSessions.id))
+      .where(
+        and(
+          ne(workoutSessionExercises.sessionId, excludeSessionId),
+          isNotNull(workoutSessions.endedAt),
+          isNotNull(sets.completedAt),
+        ),
+      ),
+  );
+  return useMemo(() => new Set((data ?? []).map((row) => row.exerciseId)), [data]);
 }
 
 // sessionSets.get(id)がヒットしない種目向けの安定した空配列参照。

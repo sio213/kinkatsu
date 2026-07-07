@@ -20,7 +20,13 @@ import * as Notifications from 'expo-notifications';
 import { Stack } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
 import { useEffect, useRef } from 'react';
-import { AppState, type AppStateStatus, StyleSheet, Text, View } from 'react-native';
+import {
+  AppState,
+  type AppStateStatus,
+  StyleSheet,
+  Text,
+  View,
+} from 'react-native';
 import 'react-native-reanimated';
 
 Notifications.setNotificationHandler({
@@ -93,11 +99,24 @@ export default function RootLayout() {
       <Stack screenOptions={headerOptions}>
         <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
         <Stack.Screen name="exercise/[id]" options={{ title: '' }} />
-        <Stack.Screen name="exercise/edit/[id]" options={{ title: '種目を編集' }} />
+        <Stack.Screen
+          name="exercise/edit/[id]"
+          options={{ title: '種目を編集' }}
+        />
         <Stack.Screen name="exercise/new" options={{ title: '種目を作成' }} />
         <Stack.Screen name="workout/[id]" options={{ title: '' }} />
-        <Stack.Screen name="workout/exercise-picker" options={{ title: '種目を追加' }} />
-        <Stack.Screen name="workout/exercise-swap" options={{ title: '種目を入れ替え' }} />
+        <Stack.Screen
+          name="workout/exercise-picker"
+          options={{ title: '種目を追加' }}
+        />
+        <Stack.Screen
+          name="workout/exercise-swap"
+          options={{ title: '種目を入れ替え' }}
+        />
+        <Stack.Screen
+          name="workout/history-picker"
+          options={{ title: '過去の記録から読み込む' }}
+        />
         <Stack.Screen
           name="modal"
           options={{ presentation: 'modal', title: 'Modal' }}
@@ -109,7 +128,18 @@ export default function RootLayout() {
 }
 
 const migrationStyles = StyleSheet.create({
-  container: { flex: 1, justifyContent: 'center', alignItems: 'center', padding: 32, gap: 12 },
+  container: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+    padding: 32,
+    gap: 12,
+  },
   title: { fontSize: 17, fontWeight: '700', color: Colors.danger },
-  body: { fontSize: 14, color: Colors.textSecondary, textAlign: 'center', lineHeight: 22 },
+  body: {
+    fontSize: 14,
+    color: Colors.textSecondary,
+    textAlign: 'center',
+    lineHeight: 22,
+  },
 });

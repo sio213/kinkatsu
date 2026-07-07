@@ -2,6 +2,7 @@ import {
   combineDurationDisplay,
   formatDistanceKmDisplay,
   formatDurationDisplay,
+  formatHistorySetSummary,
   MEASUREMENT_COLUMNS,
   parseColumns,
   parseColumnsWithFallback,
@@ -251,5 +252,78 @@ describe('parseColumnsWithFallback', () => {
       { weight: null, reps: null },
     );
     expect(result).toEqual({ weight: null, reps: 10 });
+  });
+});
+
+describe('formatHistorySetSummary', () => {
+  it('weight_reps(2列)は"60kg×10"のように×区切りにする', () => {
+    const result = formatHistorySetSummary(MEASUREMENT_COLUMNS.weight_reps, [
+      { weight: 60, reps: 10 },
+    ]);
+    expect(result).toBe('60kg×10');
+  });
+
+  it('複数セットは"・"区切りで連結する', () => {
+    const result = formatHistorySetSummary(MEASUREMENT_COLUMNS.weight_reps, [
+      { weight: 60, reps: 10 },
+      { weight: 60, reps: 8 },
+    ]);
+    expect(result).toBe('60kg×10・60kg×8');
+  });
+
+  it('reps(1列)は×区切りが発生しない', () => {
+    const result = formatHistorySetSummary(MEASUREMENT_COLUMNS.reps, [{ reps: 20 }, { reps: 18 }]);
+    expect(result).toBe('20回・18回');
+  });
+
+  it('1分未満のtimeは素の秒数("45秒")にする', () => {
+    const result = formatHistorySetSummary(MEASUREMENT_COLUMNS.time, [{ durationSeconds: 45 }]);
+    expect(result).toBe('45秒');
+  });
+
+  it('1分以上のtimeはmm:ss("1:30")にする（他画面のformatDurationDisplayと表記を揃える）', () => {
+    const result = formatHistorySetSummary(MEASUREMENT_COLUMNS.time, [{ durationSeconds: 90 }]);
+    expect(result).toBe('1:30');
+  });
+
+  it('distance_timeはkm表示×時間表示になる', () => {
+    const result = formatHistorySetSummary(MEASUREMENT_COLUMNS.distance_time, [
+      { distanceMeters: 5000, durationSeconds: 1500 },
+    ]);
+    expect(result).toBe('5.0km×25:00');
+  });
+
+  it('weight_timeは重量×時間になる', () => {
+    const result = formatHistorySetSummary(MEASUREMENT_COLUMNS.weight_time, [
+      { weight: 20, durationSeconds: 45 },
+    ]);
+    expect(result).toBe('20kg×45秒');
+  });
+
+  it('一部の列がnull（未入力）の場合、その列だけ省いて連結する（"×"が空欄を挟まない）', () => {
+    const result = formatHistorySetSummary(MEASUREMENT_COLUMNS.weight_reps, [
+      { weight: 60, reps: null },
+    ]);
+    expect(result).toBe('60kg');
+  });
+
+  it('全列nullのセットは空文字になる', () => {
+    const result = formatHistorySetSummary(MEASUREMENT_COLUMNS.weight_reps, [
+      { weight: null, reps: null },
+    ]);
+    expect(result).toBe('');
+  });
+
+  it('全列nullのセットが他のセットの間に混ざっていても、空のセグメントを挟まずスキップする（バグ回帰防止: "60kg×10・・"のように空欄が挟まる不具合）', () => {
+    const result = formatHistorySetSummary(MEASUREMENT_COLUMNS.weight_reps, [
+      { weight: 60, reps: 10 },
+      { weight: null, reps: null },
+      { weight: 55, reps: 8 },
+    ]);
+    expect(result).toBe('60kg×10・55kg×8');
+  });
+
+  it('setsListが空配列なら空文字', () => {
+    expect(formatHistorySetSummary(MEASUREMENT_COLUMNS.weight_reps, [])).toBe('');
   });
 });

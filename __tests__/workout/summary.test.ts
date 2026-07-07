@@ -1,6 +1,9 @@
 import {
+  formatMonthGroup,
+  formatRelativeDaysAgo,
   formatSessionDateGroup,
   formatSessionDuration,
+  groupByMonth,
   groupSessionsByDate,
 } from '@/lib/workout/summary';
 
@@ -71,5 +74,95 @@ describe('formatSessionDateGroup / groupSessionsByDate', () => {
 
   it('空配列 → 空配列', () => {
     expect(groupSessionsByDate([])).toEqual([]);
+  });
+});
+
+describe('formatRelativeDaysAgo', () => {
+  const now = new Date(2026, 6, 7, 12, 0).getTime(); // 2026-07-07
+
+  it('同じ日は「今日」', () => {
+    const today = new Date(2026, 6, 7, 8, 0).getTime();
+    expect(formatRelativeDaysAgo(today, now)).toBe('今日');
+  });
+
+  it('同日内の未来時刻（クロックのわずかなずれ等）でも「今日」のまま', () => {
+    const laterToday = new Date(2026, 6, 7, 23, 0).getTime();
+    expect(formatRelativeDaysAgo(laterToday, now)).toBe('今日');
+  });
+
+  it('1日前は「昨日」', () => {
+    const yesterday = new Date(2026, 6, 6, 8, 0).getTime();
+    expect(formatRelativeDaysAgo(yesterday, now)).toBe('昨日');
+  });
+
+  it('2〜5日前は「N日前」', () => {
+    expect(formatRelativeDaysAgo(new Date(2026, 6, 5, 8, 0).getTime(), now)).toBe('2日前');
+    expect(formatRelativeDaysAgo(new Date(2026, 6, 4, 8, 0).getTime(), now)).toBe('3日前');
+    expect(formatRelativeDaysAgo(new Date(2026, 6, 3, 8, 0).getTime(), now)).toBe('4日前');
+    expect(formatRelativeDaysAgo(new Date(2026, 6, 2, 8, 0).getTime(), now)).toBe('5日前');
+  });
+
+  it('6日前ちょうどはnull（絶対日付のみ表示させる境界）', () => {
+    const sixDaysAgo = new Date(2026, 6, 1, 8, 0).getTime();
+    expect(formatRelativeDaysAgo(sixDaysAgo, now)).toBeNull();
+  });
+
+  it('7日以上前もnull', () => {
+    const aWeekAgo = new Date(2026, 5, 30, 8, 0).getTime();
+    expect(formatRelativeDaysAgo(aWeekAgo, now)).toBeNull();
+  });
+
+  it('日付境界をまたぐ時刻差（23:59→翌0:01）でも正しく「昨日」判定する', () => {
+    const lateNight = new Date(2026, 6, 6, 23, 59).getTime();
+    const justAfterMidnight = new Date(2026, 6, 7, 0, 1).getTime();
+    expect(formatRelativeDaysAgo(lateNight, justAfterMidnight)).toBe('昨日');
+  });
+
+  it('年末年始をまたいでも1日前は「昨日」', () => {
+    const dec31 = new Date(2025, 11, 31, 8, 0).getTime();
+    const jan1 = new Date(2026, 0, 1, 8, 0).getTime();
+    expect(formatRelativeDaysAgo(dec31, jan1)).toBe('昨日');
+  });
+
+  it('nowを省略した場合はDate.now()基準になる', () => {
+    expect(formatRelativeDaysAgo(Date.now())).toBe('今日');
+  });
+});
+
+describe('formatMonthGroup / groupByMonth', () => {
+  it('「YYYY年M月」形式にする', () => {
+    const ts = new Date(2026, 6, 3, 12, 0).getTime();
+    expect(formatMonthGroup(ts)).toBe('2026年7月');
+  });
+
+  it('同じ月の項目を1グループにまとめる', () => {
+    const a = new Date(2026, 6, 3, 9, 0).getTime();
+    const b = new Date(2026, 6, 1, 9, 0).getTime();
+    const c = new Date(2026, 5, 26, 9, 0).getTime();
+    const groups = groupByMonth([{ startedAt: a }, { startedAt: b }, { startedAt: c }]);
+    expect(groups).toHaveLength(2);
+    expect(groups[0].monthLabel).toBe('2026年7月');
+    expect(groups[0].items).toHaveLength(2);
+    expect(groups[1].monthLabel).toBe('2026年6月');
+    expect(groups[1].items).toHaveLength(1);
+  });
+
+  it('年をまたいで同じ月（例:2025年7月と2026年7月）を誤って同一グループにしない', () => {
+    const july2026 = new Date(2026, 6, 1, 9, 0).getTime();
+    const july2025 = new Date(2025, 6, 1, 9, 0).getTime();
+    const groups = groupByMonth([{ startedAt: july2026 }, { startedAt: july2025 }]);
+    expect(groups).toHaveLength(2);
+  });
+
+  it('同月の項目が配列中で非連続の場合は別グループに分裂する', () => {
+    const julyA = new Date(2026, 6, 3, 9, 0).getTime();
+    const june = new Date(2026, 5, 26, 9, 0).getTime();
+    const julyB = new Date(2026, 6, 1, 9, 0).getTime();
+    const groups = groupByMonth([{ startedAt: julyA }, { startedAt: june }, { startedAt: julyB }]);
+    expect(groups).toHaveLength(3);
+  });
+
+  it('空配列 → 空配列', () => {
+    expect(groupByMonth([])).toEqual([]);
   });
 });
