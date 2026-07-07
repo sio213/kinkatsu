@@ -68,6 +68,7 @@ jest.mock('drizzle-orm', () => ({
   eq: jest.fn((col, val) => ({ col, val })),
   and: jest.fn((...conditions) => ({ and: conditions })),
   isNull: jest.fn((col) => ({ isNull: col })),
+  notInArray: jest.fn((col, values) => ({ notInArray: col, values })),
 }));
 
 // getPreviousSets自体のクエリ検証はhistory-integration.test.tsが担当する。ここでは
@@ -467,6 +468,22 @@ describe('clearPrefill', () => {
       completedAt: null,
       createdAt: expect.any(Number),
     });
+  });
+
+  it('keepSetIdsを渡すと、そのidは✓未確定でも削除対象から除外する（手動で編集済みの値を残すため）', async () => {
+    mockSelectWhere.mockResolvedValueOnce([{ id: 42 }]); // 除外されて残ったセット
+
+    await clearPrefill({ sessionId: 3, exerciseId: 20, sessionExerciseId: 7, keepSetIds: [42] });
+
+    expect(mockDeleteWhere).toHaveBeenCalledWith({
+      and: [
+        { col: 'workoutSessionExerciseId', val: 7 },
+        { isNull: 'completedAt' },
+        { notInArray: 'id', values: [42] },
+      ],
+    });
+    // 除外したセットが残っているため、空セットへの作り直しは行わない
+    expect(mockSetsInsertValues).not.toHaveBeenCalled();
   });
 
   it('✓確定済みのセットが残っていれば、空セットへの作り直しはしない（確定済みの記録を消さないため）', async () => {

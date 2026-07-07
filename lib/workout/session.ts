@@ -1,7 +1,7 @@
 import { db } from '@/db/client';
 import { sets, workoutSessionExercises, workoutSessions } from '@/db/schema';
 import { getPreviousSets, type PreviousSetValues } from '@/lib/workout/history';
-import { and, eq, isNull } from 'drizzle-orm';
+import { and, eq, isNull, notInArray } from 'drizzle-orm';
 
 // 前回この種目をやったカードを特定できた場合の識別情報。呼び出し側（画面）が
 // 「このカードは前回の値をプリフィルした」ことを種目カード側に伝え、未確認の行が
@@ -195,20 +195,28 @@ export async function replaceSessionExercise(
   });
 }
 
-// 種目カードの「前回の値をクリア」。プリフィルされた（＝まだ✓未確定の）セットだけを取り除く。
-// ユーザーがどれかのセットを✓確定していた場合、その記録は「クリア」の対象ではない実際の
-// 記録なので消してはいけない（無条件に全消去すると確定済みの記録まで失われてしまう）。
+// 種目カードの「前回の値をクリア」。プリフィルされて以降まだ手を付けていない（＝まだ✓未確定で、
+// かつ値を書き換えてもいない）セットだけを取り除く。ユーザーがどれかのセットを✓確定していた場合や、
+// ✓は押していなくても値を書き換えていた場合（keepSetIdsで渡す）、それらは「クリア」の対象ではない
+// 実際の入力なので消してはいけない（無条件に全消去すると確定済み・編集済みの記録まで失われてしまう）。
 // 結果的に1件も残らなければ、種目追加直後と同じ値が空でsetNumber=1のセット1件を作り直す
 export async function clearPrefill({
   sessionId,
   exerciseId,
   sessionExerciseId,
-}: Pick<PrefilledCard, 'sessionId' | 'exerciseId' | 'sessionExerciseId'>) {
+  keepSetIds = [],
+}: Pick<PrefilledCard, 'sessionId' | 'exerciseId' | 'sessionExerciseId'> & { keepSetIds?: number[] }) {
   const now = Date.now();
   await db.transaction(async (tx) => {
-    await tx
-      .delete(sets)
-      .where(and(eq(sets.workoutSessionExerciseId, sessionExerciseId), isNull(sets.completedAt)));
+    const deleteCondition =
+      keepSetIds.length > 0
+        ? and(
+            eq(sets.workoutSessionExerciseId, sessionExerciseId),
+            isNull(sets.completedAt),
+            notInArray(sets.id, keepSetIds),
+          )
+        : and(eq(sets.workoutSessionExerciseId, sessionExerciseId), isNull(sets.completedAt));
+    await tx.delete(sets).where(deleteCondition);
     const remaining = await tx
       .select({ id: sets.id })
       .from(sets)

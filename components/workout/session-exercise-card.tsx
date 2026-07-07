@@ -220,19 +220,44 @@ export const SessionExerciseCard = memo(function SessionExerciseCard({
   const hasGhostRows = sets.some((s) => s.completedAt == null && hasAnyMeasurementValue(s));
 
   // このカードがプリフィル対象として親から通知された後、全ての行が確認/編集/削除されて
-  // ゴースト行が無くなったら「クリア」導線を消すため親の状態からも取り除いてもらう
+  // ゴースト行が無くなったら「クリア」導線を消すため親の状態からも取り除いてもらう。
+  // 種目入れ替え（swap）の場合、justPrefilledがtrueになる通知(pub/sub)と、実際に
+  // プリフィルされたsets（drizzleのlive query）が届くタイミングは別経路のため、
+  // justPrefilledがtrueになった直後の1レンダーだけsetsがまだ古い（入れ替え前の）状態を
+  // 指していることがある。そこでhasGhostRows=falseと誤判定してこの直後に即dismissして
+  // しまわないよう、「一度でもゴースト行を実際に観測したか」を経てからでないと
+  // dismissしない（新規追加は元々sessionExercises自体が無い状態からsetsごと現れるため
+  // この競合は起きないが、swapは既存カードのまま中身だけ差し替わるため起こりうる）
+  const hasSeenGhostRowsRef = useRef(false);
   useEffect(() => {
-    if (justPrefilled && !hasGhostRows) onDismissPrefill(exercise.sessionExerciseId);
+    if (!justPrefilled) {
+      hasSeenGhostRowsRef.current = false;
+      return;
+    }
+    if (hasGhostRows) {
+      hasSeenGhostRowsRef.current = true;
+      return;
+    }
+    if (hasSeenGhostRowsRef.current) onDismissPrefill(exercise.sessionExerciseId);
   }, [justPrefilled, hasGhostRows, onDismissPrefill, exercise.sessionExerciseId]);
 
   const handleClearPrefill = useCallback(async () => {
+    // draftValuesRefは値を書き換えたセットのidを持っている（handleDraftChange参照）。
+    // ✓未確定でも、本人が既に書き換えた値はプリフィルの「手つかずの残骸」ではないため、
+    // クリア対象から除外する
+    const keepSetIds = sets.filter((s) => draftValuesRef.current.has(s.id)).map((s) => s.id);
     try {
-      await clearPrefill({ sessionId, exerciseId: exercise.id, sessionExerciseId: exercise.sessionExerciseId });
+      await clearPrefill({
+        sessionId,
+        exerciseId: exercise.id,
+        sessionExerciseId: exercise.sessionExerciseId,
+        keepSetIds,
+      });
     } catch (e) {
       console.error('[clear prefill]', e);
       Alert.alert('エラー', '前回の値をクリアできませんでした。');
     }
-  }, [sessionId, exercise.id, exercise.sessionExerciseId]);
+  }, [sessionId, exercise.id, exercise.sessionExerciseId, sets]);
 
   return (
     <View style={styles.card}>
@@ -309,6 +334,7 @@ export const SessionExerciseCard = memo(function SessionExerciseCard({
             onReopen={handleReopenSet}
             onDraftChange={handleDraftChange}
             onAutoSaveDraft={handleAutoSaveDraft}
+            justPrefilled={justPrefilled}
           />
         ))}
 

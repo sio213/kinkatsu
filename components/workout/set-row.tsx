@@ -3,13 +3,7 @@ import { IconSymbol } from '@/components/ui/icon-symbol';
 import { Colors } from '@/constants/theme';
 import type { Set } from '@/db/schema';
 import type { MeasurementType } from '@/lib/exercises/constants';
-import {
-  hasAnyMeasurementValue,
-  MEASUREMENT_COLUMNS,
-  parseColumns,
-  parseColumnsWithFallback,
-  toDisplayValues,
-} from '@/lib/workout/set-format';
+import { MEASUREMENT_COLUMNS, parseColumns, parseColumnsWithFallback, toDisplayValues } from '@/lib/workout/set-format';
 import type { SetValues } from '@/lib/workout/sets';
 import { memo, useEffect, useRef, useState } from 'react';
 import { Alert, Keyboard, StyleSheet, Text, TextInput, TouchableOpacity, View } from 'react-native';
@@ -30,6 +24,10 @@ type Props = {
   onDraftChange?: (setId: number, values: Record<string, string>) => void;
   // ✓未タップのまま画面を離れても入力が消えないよう、completedAtを変えずにDBへ保存する
   onAutoSaveDraft?: (setId: number, values: SetValues) => Promise<void>;
+  // このカードが今まさに（今回のアプリ起動セッション中に）前回の値をプリフィルされたかどうか。
+  // ゴースト表示はこれが true の間だけ出す。DBの状態（値がある・✓未確定）だけで判定すると、
+  // 記録一覧から過去の記録を開いた時など、プリフィルと無関係な場面でも表示されてしまうため
+  justPrefilled: boolean;
 };
 
 export const SetRow = memo(function SetRow({
@@ -40,27 +38,25 @@ export const SetRow = memo(function SetRow({
   onReopen,
   onDraftChange,
   onAutoSaveDraft,
+  justPrefilled,
 }: Props) {
   const columns = MEASUREMENT_COLUMNS[measurementType];
   const done = set.completedAt != null;
   const isBusyRef = useRef(false);
 
   const [values, setValues] = useState<Record<string, string>>(() => toDisplayValues(columns, set));
-  // ゴースト表示は「値を持った状態でこの行が渡されてきた（＝前回のプリフィルや、確定せずに
-  // 離脱した過去の入力）」かどうかで判定する。マウント時点のsetだけを見て一度だけ確定させ、
-  // 値の有無を毎レンダーvaluesから見ないことで、今まさに空欄へ手入力している最中の値は
-  // ゴースト扱いにならないようにする（前回値と紛らわしくなる・入力中の視認性が落ちるのを防ぐ）
-  const hadInitialValueRef = useRef(hasAnyMeasurementValue(set));
-  // ✓を一度でも押した（=doneがtrueになった）行は、以後reopenしても「ユーザー自身の記録」であり
-  // ゴースト（未確認の前回値）ではないので、その状態を覚えておく
+  // ✓を押さなくても、値を書き換えた時点で「本人が今日の値として確認した」とみなし、
+  // ゴースト表示を解除する（handleFieldChangeで立てる）
+  const editedRef = useRef(false);
+  // ✓を一度でも押した行は、その後reopenで未完了に戻ってもゴースト表示を復活させない
+  // （既に一度レビュー済みの自分の記録として扱う）
   const wasEverConfirmedRef = useRef(done);
   useEffect(() => {
     if (done) wasEverConfirmedRef.current = true;
   }, [done]);
-  // ✓を押さなくても、値を書き換えた時点で「本人が今日の値として確認した」とみなし、
-  // ゴースト表示を解除する（handleFieldChangeで立てる）
-  const editedRef = useRef(false);
-  const ghost = !done && hadInitialValueRef.current && !wasEverConfirmedRef.current && !editedRef.current;
+  // 値が無い行（例: プリフィル後に「セット追加」で足された空の新規行）はゴースト表示にしない
+  const hasValue = columns.some((c) => (values[c.key] ?? '').trim() !== '');
+  const ghost = justPrefilled && !done && !editedRef.current && !wasEverConfirmedRef.current && hasValue;
   // 連続したonChangeText呼び出し（同一レンダーサイクル内でバッチ処理される場合）でも
   // 常に最新の値を基準にマージするための鏡。setValuesの外で同期的に更新する
   const valuesRef = useRef(values);
