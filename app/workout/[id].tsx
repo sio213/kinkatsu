@@ -71,12 +71,13 @@ export default function WorkoutScreen() {
   const handleContentSizeChange = useCallback(() => {
     if (!pendingScrollToEndRef.current) return;
     pendingScrollToEndRef.current = false;
-    // onContentSizeChangeが呼ばれた直後の1フレームは、まだ新しい行の高さがネイティブ側の
-    // スクロール計測に完全に反映しきっていないことがあり、scrollToEndが1つ手前で止まって
-    // 見える（＝リスト末尾のAddExerciseButtonまで届かない）ことがある。少し遅らせてもう一度
-    // 呼ぶことで、レイアウトが落ち着いた後の正しい末尾まで確実に届かせる
+    // onContentSizeChangeが呼ばれた直後は、まだ新しい行の高さやキーボード閉じアニメーション由来の
+    // insetがネイティブ側のスクロール計測に完全に反映しきっていないことがあり、scrollToEndが
+    // AddExerciseButton手前（新カードのスナックバー分）で止まって見えることがある。アニメーション
+    // 付きで一度スクロールした後、レイアウトが落ち着くのを待ってanimated:falseで正しい末尾に
+    // 補正することで、AddExerciseButton下の余白まで確実に届かせる
     listRef.current?.scrollToEnd({ animated: true });
-    setTimeout(() => listRef.current?.scrollToEnd({ animated: true }), 100);
+    setTimeout(() => listRef.current?.scrollToEnd({ animated: false }), 300);
   }, []);
   // 各カードが実際にビューポート内にあるかどうか。プリフィルされたカードのスナックバーが
   // 画面外で見えないまま自動消滅しないよう、SessionExerciseCard側の判定に使う
