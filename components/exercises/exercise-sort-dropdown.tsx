@@ -54,7 +54,7 @@ export function ExerciseSortDropdown({ sortBy, onChange }: Props) {
           accessibilityRole="button"
           accessibilityLabel={`並び替え: ${EXERCISE_SORT_LABELS[sortBy]}`}
           accessibilityState={{ expanded: open }}
-          hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+          hitSlop={{ top: 10, bottom: 10, left: 8, right: 8 }}
         >
           <Text style={styles.triggerText}>並び替え: {EXERCISE_SORT_LABELS[sortBy]}</Text>
           <DesignIcon name={open ? 'expand-less' : 'expand-more'} size={16} color={Colors.textMuted} />
@@ -112,7 +112,7 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     gap: 4,
-    paddingVertical: 8,
+    paddingVertical: 6,
     paddingHorizontal: 4,
   },
   triggerText: { fontSize: 13, fontWeight: '600', color: Colors.textMuted },
