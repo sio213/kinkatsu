@@ -1,5 +1,6 @@
 import { CategoryFilterChips } from '@/components/exercises/category-filter-chips';
 import { ExerciseSearchBar } from '@/components/exercises/exercise-search-bar';
+import { ExerciseSortDropdown } from '@/components/exercises/exercise-sort-dropdown';
 import { ListErrorBoundary } from '@/components/ui/list-error-boundary';
 import { NotFoundState } from '@/components/ui/not-found-state';
 import { PrimaryButton } from '@/components/ui/primary-button';
@@ -7,10 +8,12 @@ import { PickerExerciseRow } from '@/components/workout/picker-exercise-row';
 import { Colors } from '@/constants/theme';
 import type { Exercise } from '@/db/schema';
 import { useDebouncedPush } from '@/hooks/use-debounced-push';
+import { useExerciseUsageStats } from '@/hooks/use-exercise-usage-stats';
 import { useExercises } from '@/hooks/use-exercises';
 import { useKeyboardInset } from '@/hooks/use-keyboard-inset';
 import { CATEGORY_ALL } from '@/lib/exercises/constants';
 import { filterExercises } from '@/lib/exercises/filter';
+import { useExerciseSortStore } from '@/lib/exercises/sort-store';
 import { notifyPrefilled } from '@/lib/workout/prefill-feedback';
 import { addExercisesToSession } from '@/lib/workout/session';
 import { useFocusEffect, useLocalSearchParams, useRouter } from 'expo-router';
@@ -24,6 +27,9 @@ export default function ExercisePickerScreen() {
   const router = useRouter();
   const pushDebounced = useDebouncedPush();
   const { exercises } = useExercises();
+  const usageStats = useExerciseUsageStats();
+  const sortBy = useExerciseSortStore((state) => state.pickerSortBy);
+  const setSortBy = useExerciseSortStore((state) => state.setPickerSortBy);
 
   const [search, setSearch] = useState('');
   const [activeCategory, setActiveCategory] = useState<string>(CATEGORY_ALL);
@@ -43,8 +49,8 @@ export default function ExercisePickerScreen() {
   // 同じ種目をセッション内に複数回追加できるため（ウォームアップ→本セットを別カードで記録する等）、
   // 既に追加済みの種目でも候補から除外しない
   const filtered = useMemo(
-    () => filterExercises(exercises, activeCategory, search),
-    [exercises, activeCategory, search],
+    () => filterExercises(exercises, activeCategory, search, { sortBy, usageStats }),
+    [exercises, activeCategory, search, sortBy, usageStats],
   );
 
   const handleToggle = useCallback((id: number) => {
@@ -96,6 +102,7 @@ export default function ExercisePickerScreen() {
     <View style={styles.headerArea}>
       <ExerciseSearchBar value={search} onChangeText={setSearch} onSubmitEditing={Keyboard.dismiss} />
       <CategoryFilterChips activeCategory={activeCategory} onChange={setActiveCategory} />
+      <ExerciseSortDropdown sortBy={sortBy} onChange={setSortBy} />
     </View>
   );
 
