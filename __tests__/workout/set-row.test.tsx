@@ -4,14 +4,17 @@ import { Alert, TextInput } from 'react-native';
 import { SetRow } from '@/components/workout/set-row';
 
 function render(
-  props: Omit<Parameters<typeof SetRow>[0], 'exerciseName' | 'justPrefilled'> & {
+  props: Omit<Parameters<typeof SetRow>[0], 'exerciseName' | 'isPrefilledSet' | 'cardReviewed'> & {
     exerciseName?: string;
-    justPrefilled?: boolean;
+    isPrefilledSet?: boolean;
+    cardReviewed?: boolean;
   },
 ) {
   let instance!: ReturnType<typeof create>;
   act(() => {
-    instance = create(<SetRow exerciseName="ベンチプレス" justPrefilled={true} {...props} />);
+    instance = create(
+      <SetRow exerciseName="ベンチプレス" isPrefilledSet={true} cardReviewed={false} {...props} />,
+    );
   });
   return instance.root;
 }
@@ -163,7 +166,8 @@ describe('onAutoSaveDraft（デバウンス済みの自動保存）', () => {
           onSave={jest.fn()}
           onReopen={jest.fn()}
           onAutoSaveDraft={onAutoSaveDraft}
-          justPrefilled={true}
+          isPrefilledSet={true}
+          cardReviewed={false}
         />,
       );
     });
@@ -527,8 +531,8 @@ test('weight_time計測タイプは重量と時間(分・秒)の3入力で保存
   expect(onSave).toHaveBeenCalledWith(1, { weight: 20, durationSeconds: 45 });
 });
 
-describe('ゴースト表示（justPrefilledされたカードで、値はあるが✓未確定・未編集の行）', () => {
-  test('justPrefilled=trueで値が入っていて未完了なら、文字色・背景・枠線をゴースト表示にする', () => {
+describe('ゴースト表示（isPrefilledSetの行で、値はあるが✓未確定・未編集の行）', () => {
+  test('isPrefilledSet=trueで値が入っていて未完了なら、文字色・背景・枠線をゴースト表示にする', () => {
     const set = { id: 1, setNumber: 1, weight: 60, reps: 10, completedAt: null } as any;
     const root = render({ set, measurementType: 'weight_reps', onSave: jest.fn(), onReopen: jest.fn() });
 
@@ -536,13 +540,6 @@ describe('ゴースト表示（justPrefilledされたカードで、値はある
     const flatStyle = (style: unknown) => (Array.isArray(style) ? Object.assign({}, ...style.filter(Boolean)) : style);
     expect(flatStyle(inputs[0].props.style).backgroundColor).not.toBeUndefined();
     expect(getCheck(root).props.accessibilityLabel).toContain('未確認');
-  });
-
-  test('未入力（空欄）の未完了行はゴースト表示にしない', () => {
-    const set = { id: 1, setNumber: 1, weight: null, reps: null, completedAt: null } as any;
-    const root = render({ set, measurementType: 'weight_reps', onSave: jest.fn(), onReopen: jest.fn() });
-
-    expect(getCheck(root).props.accessibilityLabel).not.toContain('未確認');
   });
 
   test('✓確定済みならゴースト表示にしない（値があっても通常表示）', () => {
@@ -559,46 +556,42 @@ describe('ゴースト表示（justPrefilledされたカードで、値はある
     expect(getCheck(root).props.accessibilityLabel).toContain('未確認');
   });
 
-  test('空欄から手入力している最中はゴースト表示にしない（前回値との誤認防止・入力中の視認性維持）', () => {
-    const set = { id: 1, setNumber: 1, weight: null, reps: null, completedAt: null } as any;
-    const root = render({ set, measurementType: 'weight_reps', onSave: jest.fn(), onReopen: jest.fn() });
-
-    const inputs = root.findAllByType(TextInput);
-    act(() => {
-      inputs[0].props.onChangeText('60');
-      inputs[1].props.onChangeText('10');
-    });
-
-    expect(getCheck(root).props.accessibilityLabel).not.toContain('未確認');
-  });
-
-  test('justPrefilled=falseなら、値があって未完了でもゴースト表示にしない（記録一覧から過去の記録を開いた場合を想定）', () => {
+  test('isPrefilledSet=falseなら、値があって未完了でもゴースト表示にしない（記録一覧から過去の記録を開いた場合を想定）', () => {
     const set = { id: 1, setNumber: 1, weight: 60, reps: 10, completedAt: null } as any;
     const root = render({
       set,
       measurementType: 'weight_reps',
       onSave: jest.fn(),
       onReopen: jest.fn(),
-      justPrefilled: false,
+      isPrefilledSet: false,
     });
 
     expect(getCheck(root).props.accessibilityLabel).not.toContain('未確認');
   });
 
-  test('ゴースト表示中の値を書き換えると、✓を押さなくても即座に通常表示へ戻る', () => {
+  // 「値を編集したら✓を押さなくても即座に通常表示へ戻る」挙動は、以前はSetRow自身のローカル
+  // stateで完結していたが、「1セットでも編集したらカード全体のゴーストを解除して欲しい」という
+  // 要望を受けてカード単位（session-exercise-card.tsx）の責務に移した。onDraftChangeが
+  // 全SetRowから同じ親へ集約されることを前提にしたクロスコンポーネントの挙動になったため、
+  // このテストはsession-exercise-card.test.tsx側で担保する
+  test('cardReviewed=trueなら、このセット自身が未確定（値はあるがreopen後等）でもゴースト表示にしない（カード内の他セットが1つでも確定済みなら「もう見た」扱い）', () => {
     const set = { id: 1, setNumber: 1, weight: 60, reps: 10, completedAt: null } as any;
-    const root = render({ set, measurementType: 'weight_reps', onSave: jest.fn(), onReopen: jest.fn() });
-    expect(getCheck(root).props.accessibilityLabel).toContain('未確認');
-
-    const inputs = root.findAllByType(TextInput);
-    act(() => {
-      inputs[0].props.onChangeText('62.5');
+    const root = render({
+      set,
+      measurementType: 'weight_reps',
+      onSave: jest.fn(),
+      onReopen: jest.fn(),
+      cardReviewed: true,
     });
 
     expect(getCheck(root).props.accessibilityLabel).not.toContain('未確認');
   });
 
-  test('一度✓確定した行は、reopenして未完了に戻ってもゴースト表示が復活しない（自分の記録として扱う）', () => {
+  // カード内のどれか1セットでも✓確定されたら、その後reopenで未確定に戻っても
+  // ゴースト表示を復活させない「スティッキーな」判定はSetRow自身ではなく
+  // session-exercise-card.tsx側（cardReviewedの算出元）の責務。ここでは
+  // SetRowが渡されたcardReviewedをそのまま信頼して使うことだけを確認する
+  test('reopen後にcardReviewedがtrueのまま渡され続ける限り、ゴースト表示は復活しない', () => {
     const confirmedSet = { id: 1, setNumber: 1, weight: 60, reps: 10, completedAt: 123 } as any;
     let instance!: ReturnType<typeof create>;
     act(() => {
@@ -609,12 +602,15 @@ describe('ゴースト表示（justPrefilledされたカードで、値はある
           measurementType="weight_reps"
           onSave={jest.fn()}
           onReopen={jest.fn()}
-          justPrefilled={true}
+          isPrefilledSet={true}
+          cardReviewed={true}
         />,
       );
     });
 
-    // reopen後、live queryでcompletedAtがnullに戻って再描画されるケースを再現
+    // reopen後、live queryでcompletedAtがnullに戻って再描画されるケースを再現。
+    // cardReviewedは親（session-exercise-card.tsx）でラッチされているため、
+    // このセット自身が未確定に戻ってもtrueのまま渡され続ける
     const reopenedSet = { ...confirmedSet, completedAt: null };
     act(() => {
       instance.update(
@@ -624,7 +620,8 @@ describe('ゴースト表示（justPrefilledされたカードで、値はある
           measurementType="weight_reps"
           onSave={jest.fn()}
           onReopen={jest.fn()}
-          justPrefilled={true}
+          isPrefilledSet={true}
+          cardReviewed={true}
         />,
       );
     });
