@@ -140,6 +140,7 @@ export function ExerciseCardMenu({
               disabled={!hasHistory}
               accessibilityLabel="過去の記録から読み込む"
               accessibilityState={{ disabled: !hasHistory }}
+              accessibilityHint={!hasHistory ? 'この種目の過去の記録がありません' : undefined}
             >
               <DesignIcon name="history" size={18} color={hasHistory ? Colors.textMuted : Colors.textPlaceholder} />
               <Text style={[styles.menuItemText, !hasHistory && styles.menuItemDisabled]}>

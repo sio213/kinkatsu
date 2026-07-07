@@ -125,6 +125,9 @@ export const SessionExerciseCard = memo(
   }, [pushDebounced, exercise.sessionExerciseId, exercise.id, exercise.name, sets]);
 
   const handleLoadFromHistory = useCallback(() => {
+    // 確認ダイアログの要否を記録から読み込む画面側で判断できるよう、既に何か記録済みか
+    // （✓確定済みかどうか）を渡しておく（handleSwapExerciseと同じ考え方）
+    const hasRecordedData = sets.some((s) => s.completedAt != null);
     pushDebounced({
       pathname: '/workout/history-picker',
       params: {
@@ -132,9 +135,10 @@ export const SessionExerciseCard = memo(
         sessionExerciseId: String(exercise.sessionExerciseId),
         exerciseId: String(exercise.id),
         exerciseName: exercise.name,
+        hasRecordedData: hasRecordedData ? 'true' : 'false',
       },
     });
-  }, [pushDebounced, sessionId, exercise.sessionExerciseId, exercise.id, exercise.name]);
+  }, [pushDebounced, sessionId, exercise.sessionExerciseId, exercise.id, exercise.name, sets]);
 
   const handleToggleExpanded = useCallback(() => {
     LayoutAnimation.configureNext(LayoutAnimation.Presets.easeInEaseOut);

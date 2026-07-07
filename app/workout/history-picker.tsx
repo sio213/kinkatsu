@@ -8,7 +8,7 @@ import { computePersonalBestIds, getExerciseHistoryEntries, type HistoryEntry } 
 import { notifyPrefilled } from '@/lib/workout/prefill-feedback';
 import { loadHistoryIntoSessionExercise } from '@/lib/workout/session';
 import { MEASUREMENT_COLUMNS } from '@/lib/workout/set-format';
-import { groupByMonth } from '@/lib/workout/summary';
+import { formatSessionDateGroup, groupByMonth } from '@/lib/workout/summary';
 import { Stack, useLocalSearchParams, useRouter } from 'expo-router';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { Alert, SectionList, StyleSheet, Text, View } from 'react-native';
@@ -20,15 +20,18 @@ export default function HistoryPickerScreen() {
     sessionExerciseId: sessionExerciseIdParam,
     exerciseId: exerciseIdParam,
     exerciseName,
+    hasRecordedData: hasRecordedDataParam,
   } = useLocalSearchParams<{
     sessionId: string;
     sessionExerciseId: string;
     exerciseId: string;
     exerciseName: string;
+    hasRecordedData: string;
   }>();
   const sessionId = Number(sessionIdParam);
   const sessionExerciseId = Number(sessionExerciseIdParam);
   const exerciseId = Number(exerciseIdParam);
+  const hasRecordedData = hasRecordedDataParam === 'true';
   const router = useRouter();
   const { exercise } = useExercise(exerciseId);
   const isLoadingRef = useRef(false);
@@ -78,7 +81,7 @@ export default function HistoryPickerScreen() {
     [loadedEntries],
   );
 
-  const handleLoad = useCallback(
+  const runLoad = useCallback(
     async (entry: HistoryEntry) => {
       if (isLoadingRef.current) return;
       isLoadingRef.current = true;
@@ -101,7 +104,25 @@ export default function HistoryPickerScreen() {
     [sessionId, sessionExerciseId, exerciseId, router],
   );
 
-  if (!Number.isFinite(sessionExerciseId) || !Number.isFinite(exerciseId)) {
+  const handleLoad = useCallback(
+    (entry: HistoryEntry) => {
+      // まだ何も確定していないカード（空欄のまま、または前回値のプリフィルを未確認）への読み込みは
+      // 失われるものが無いため確認なしで即実行する。既に✓確定済みの値があるカードだけ、
+      // 上書きされることを確認する（種目入れ替え時の確認要否と同じ考え方）
+      if (!hasRecordedData) {
+        runLoad(entry);
+        return;
+      }
+      const dateLabel = formatSessionDateGroup(entry.startedAt);
+      Alert.alert(`${dateLabel}の記録を読み込みますか？`, '入力済みの記録は失われます。', [
+        { text: 'キャンセル', style: 'cancel' },
+        { text: '読み込む', style: 'destructive', onPress: () => runLoad(entry) },
+      ]);
+    },
+    [hasRecordedData, runLoad],
+  );
+
+  if (!Number.isFinite(sessionId) || !Number.isFinite(sessionExerciseId) || !Number.isFinite(exerciseId)) {
     return (
       <SafeAreaView style={styles.safeArea} edges={['bottom']}>
         <NotFoundState
