@@ -2,7 +2,7 @@ import { DesignIcon } from '@/components/ui/design-icon';
 import { IconSymbol } from '@/components/ui/icon-symbol';
 import { Colors } from '@/constants/theme';
 import { useRef, useState } from 'react';
-import { Dimensions, Modal, Pressable, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
+import { Dimensions, Keyboard, Modal, Pressable, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 
 const SCREEN_WIDTH = Dimensions.get('window').width;
 
@@ -33,6 +33,11 @@ export function ExerciseCardMenu({
   const open = anchor !== null;
 
   const handleOpen = () => {
+    // 親のFlatListはkeyboardShouldPersistTaps="handled"のため、フォーカス中の数値入力欄が
+    // あってもこのボタンのタップだけではフォーカスが外れない。フォーカスが残ったまま
+    // 「種目を入れ替え」「過去の記録から読み込む」で他画面へ遷移して戻ると、その入力欄まで
+    // 自動スクロールしてしまう不具合があったため、メニューを開く時点で明示的にフォーカスを外す
+    Keyboard.dismiss();
     // measureInWindowは非同期（ネイティブブリッジ経由）のため、先に暫定位置でメニューを開いてから
     // 実際の位置に更新する。ネイティブ環境ではほぼ同一フレーム内に解決され体感できるズレは生じない
     setAnchor({ x: 0, y: 0, width: 0, height: 0 });
