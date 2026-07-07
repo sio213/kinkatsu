@@ -5,12 +5,14 @@ import {
   CATEGORY_ORDER,
   getCategoryLabel,
   getCategoryLabelReading,
+  type ExerciseSortBy,
 } from './constants';
 import { getReading } from './readings';
 import { getAliases } from './aliases';
 import { getGuide } from './guides';
 import { getMuscleReadingText } from './muscle-readings';
 import { isFuzzyMatch } from './fuzzy';
+import type { ExerciseUsageStats } from './usage-stats';
 
 export function normalizeForSearch(value: string): string {
   return value
@@ -94,11 +96,47 @@ function matchesAllTokens(tokens: string[], texts: string[], matches: (token: st
   return tokens.every((token) => texts.some((text) => matches(token, text)));
 }
 
+function byName(a: Exercise, b: Exercise): number {
+  return a.name.localeCompare(b.name, 'ja');
+}
+
+function byCategoryThenName(a: Exercise, b: Exercise): number {
+  const ai = CATEGORY_ORDER[a.category] ?? 99;
+  const bi = CATEGORY_ORDER[b.category] ?? 99;
+  return ai !== bi ? ai - bi : byName(a, b);
+}
+
+// 使用実績（頻度・最終使用日）で並べる。getMetricがnullを返す種目（未使用扱い）は、
+// 使用実績がある種目群の下に「名前順」でまとめて固定する（記録データが少ない新規ユーザーで
+// 全件が未使用のときや、記録の無いカスタム種目が並びの中でバラつかないようにするため）
+function sortByUsage(list: Exercise[], getMetric: (e: Exercise) => number | null): Exercise[] {
+  const used: { exercise: Exercise; value: number }[] = [];
+  const unused: Exercise[] = [];
+  for (const exercise of list) {
+    const value = getMetric(exercise);
+    if (value == null) {
+      unused.push(exercise);
+    } else {
+      used.push({ exercise, value });
+    }
+  }
+  used.sort((a, b) => (b.value !== a.value ? b.value - a.value : byName(a.exercise, b.exercise)));
+  unused.sort(byName);
+  return [...used.map((u) => u.exercise), ...unused];
+}
+
+export type FilterExercisesOptions = {
+  sortBy?: ExerciseSortBy;
+  usageStats?: Map<number, ExerciseUsageStats>;
+};
+
 export function filterExercises(
   exercises: Exercise[],
   activeCategory: string,
   search: string,
+  options: FilterExercisesOptions = {},
 ): Exercise[] {
+  const { sortBy = 'category', usageStats } = options;
   pruneSearchIndexCache(exercises);
   let list = exercises;
   if (activeCategory === CATEGORY_FAVORITE) {
@@ -124,9 +162,18 @@ export function filterExercises(
             matchesAllTokens(tokens, getSearchIndex(e).fuzzyTexts, (token, t) => isFuzzyMatch(token, t)),
           );
   }
-  return [...list].sort((a, b) => {
-    const ai = CATEGORY_ORDER[a.category] ?? 99;
-    const bi = CATEGORY_ORDER[b.category] ?? 99;
-    return ai !== bi ? ai - bi : a.name.localeCompare(b.name, 'ja');
-  });
+  switch (sortBy) {
+    case 'name':
+      return [...list].sort(byName);
+    case 'frequent':
+      return sortByUsage(list, (e) => {
+        const stats = usageStats?.get(e.id);
+        return stats != null && stats.recentUsageCount > 0 ? stats.recentUsageCount : null;
+      });
+    case 'recent':
+      return sortByUsage(list, (e) => usageStats?.get(e.id)?.lastUsedAt ?? null);
+    case 'category':
+    default:
+      return [...list].sort(byCategoryThenName);
+  }
 }

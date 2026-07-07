@@ -426,6 +426,158 @@ describe('filterExercises', () => {
       const result = filterExercises([UNKNOWN, CHEST], CATEGORY_ALL, '');
       expect(result[result.length - 1].category).toBe('未知カテゴリ');
     });
+
+    it('sortBy未指定時はoptions無しの呼び出しと同じ（カテゴリ順→名前順）', () => {
+      const result = filterExercises([SHOULDER, CHEST], CATEGORY_ALL, '', {});
+      expect(result[0].category).toBe('chest');
+      expect(result[1].category).toBe('shoulder');
+    });
+
+    it('sortBy=name はカテゴリ無視で名前の localeCompare("ja") 昇順', () => {
+      const result = filterExercises([SHOULDER, CHEST], CATEGORY_ALL, '', { sortBy: 'name' });
+      // 「サイドレイズ」<「ベンチプレス」（50音順）
+      expect(result[0].name).toBe('サイドレイズ');
+      expect(result[1].name).toBe('ベンチプレス');
+    });
+
+    describe('sortBy=frequent（よく使う順）', () => {
+      it('recentUsageCountの降順で並べる', () => {
+        const usageStats = new Map([
+          [CHEST.id, { recentUsageCount: 3, lastUsedAt: 100 }],
+          [SHOULDER.id, { recentUsageCount: 10, lastUsedAt: 50 }],
+        ]);
+        const result = filterExercises([CHEST, SHOULDER], CATEGORY_ALL, '', {
+          sortBy: 'frequent',
+          usageStats,
+        });
+        expect(result.map((e) => e.id)).toEqual([SHOULDER.id, CHEST.id]);
+      });
+
+      it('recentUsageCountが同値なら名前順でタイブレークする', () => {
+        const usageStats = new Map([
+          [CHEST.id, { recentUsageCount: 5, lastUsedAt: 100 }],
+          [SHOULDER.id, { recentUsageCount: 5, lastUsedAt: 50 }],
+        ]);
+        const result = filterExercises([CHEST, SHOULDER], CATEGORY_ALL, '', {
+          sortBy: 'frequent',
+          usageStats,
+        });
+        expect(result.map((e) => e.name)).toEqual(['サイドレイズ', 'ベンチプレス']);
+      });
+
+      it('recentUsageCount=0または統計が無い種目は使用実績ありの種目群より下に名前順で固定される', () => {
+        const usageStats = new Map([[CHEST.id, { recentUsageCount: 1, lastUsedAt: 100 }]]);
+        // SHOULDER: usageStatsに無い（一度も使ったことが無い） / FAV: recentUsageCount=0
+        const usageStatsWithZero = new Map(usageStats).set(FAV.id, {
+          recentUsageCount: 0,
+          lastUsedAt: 9_999,
+        });
+        const result = filterExercises([SHOULDER, FAV, CHEST], CATEGORY_ALL, '', {
+          sortBy: 'frequent',
+          usageStats: usageStatsWithZero,
+        });
+        expect(result[0].id).toBe(CHEST.id);
+        // 未使用群同士は名前順（「サイドレイズ」<「スクワット」）
+        expect(result[1].name).toBe('サイドレイズ');
+        expect(result[2].name).toBe('スクワット');
+      });
+
+      it('usageStats未指定なら全件未使用扱いで名前順にフォールバックする', () => {
+        const result = filterExercises([CHEST, SHOULDER], CATEGORY_ALL, '', { sortBy: 'frequent' });
+        expect(result.map((e) => e.name)).toEqual(['サイドレイズ', 'ベンチプレス']);
+      });
+
+      it('空配列 → 空配列', () => {
+        expect(filterExercises([], CATEGORY_ALL, '', { sortBy: 'frequent' })).toEqual([]);
+      });
+
+      it('usageStatsが空のMapでも未指定と同じ挙動（全件未使用扱いで名前順）', () => {
+        const result = filterExercises([CHEST, SHOULDER], CATEGORY_ALL, '', {
+          sortBy: 'frequent',
+          usageStats: new Map(),
+        });
+        expect(result.map((e) => e.name)).toEqual(['サイドレイズ', 'ベンチプレス']);
+      });
+
+      it('3件以上の同値タイブレークも名前順で安定する', () => {
+        const usageStats = new Map([
+          [CHEST.id, { recentUsageCount: 5, lastUsedAt: 100 }],
+          [SHOULDER.id, { recentUsageCount: 5, lastUsedAt: 100 }],
+          [FAV.id, { recentUsageCount: 5, lastUsedAt: 100 }],
+        ]);
+        const result = filterExercises([SHOULDER, FAV, CHEST], CATEGORY_ALL, '', {
+          sortBy: 'frequent',
+          usageStats,
+        });
+        expect(result.map((e) => e.name)).toEqual(['サイドレイズ', 'スクワット', 'ベンチプレス']);
+      });
+
+      it('全件使用実績ありのときもvalue降順で並ぶ（未使用群が空のケース）', () => {
+        const usageStats = new Map([
+          [CHEST.id, { recentUsageCount: 1, lastUsedAt: 1 }],
+          [SHOULDER.id, { recentUsageCount: 2, lastUsedAt: 1 }],
+        ]);
+        const result = filterExercises([CHEST, SHOULDER], CATEGORY_ALL, '', {
+          sortBy: 'frequent',
+          usageStats,
+        });
+        expect(result.map((e) => e.id)).toEqual([SHOULDER.id, CHEST.id]);
+      });
+    });
+
+    describe('sortBy=recent（最近使った順）', () => {
+      it('lastUsedAtの降順で並べる', () => {
+        const usageStats = new Map([
+          [CHEST.id, { recentUsageCount: 0, lastUsedAt: 100 }],
+          [SHOULDER.id, { recentUsageCount: 0, lastUsedAt: 200 }],
+        ]);
+        const result = filterExercises([CHEST, SHOULDER], CATEGORY_ALL, '', {
+          sortBy: 'recent',
+          usageStats,
+        });
+        expect(result.map((e) => e.id)).toEqual([SHOULDER.id, CHEST.id]);
+      });
+
+      it('recentUsageCount=0でもlastUsedAtがあれば「使用実績あり」として上位に来る（直近4週間は未実施だがそれ以前に使ったことはある種目）', () => {
+        const usageStats = new Map([[CHEST.id, { recentUsageCount: 0, lastUsedAt: 100 }]]);
+        const result = filterExercises([SHOULDER, CHEST], CATEGORY_ALL, '', {
+          sortBy: 'recent',
+          usageStats,
+        });
+        expect(result[0].id).toBe(CHEST.id);
+      });
+
+      it('lastUsedAtが無い（一度も使ったことが無い）種目は下に名前順で固定される', () => {
+        const usageStats = new Map([[CHEST.id, { recentUsageCount: 1, lastUsedAt: 100 }]]);
+        const result = filterExercises([SHOULDER, FAV, CHEST], CATEGORY_ALL, '', {
+          sortBy: 'recent',
+          usageStats,
+        });
+        expect(result[0].id).toBe(CHEST.id);
+        expect(result[1].name).toBe('サイドレイズ');
+        expect(result[2].name).toBe('スクワット');
+      });
+
+      it('空配列 → 空配列', () => {
+        expect(filterExercises([], CATEGORY_ALL, '', { sortBy: 'recent' })).toEqual([]);
+      });
+    });
+
+    it('frequent軸とrecent軸で「使用実績あり」の判定基準が異なる（回帰防止）：直近4週間は未実施だが過去に使ったことがある種目は、frequentでは末尾・recentでは上位に来る', () => {
+      const usageStats = new Map([[CHEST.id, { recentUsageCount: 0, lastUsedAt: 100 }]]);
+
+      const frequentResult = filterExercises([SHOULDER, CHEST], CATEGORY_ALL, '', {
+        sortBy: 'frequent',
+        usageStats,
+      });
+      expect(frequentResult.map((e) => e.name)).toEqual(['サイドレイズ', 'ベンチプレス']);
+
+      const recentResult = filterExercises([SHOULDER, CHEST], CATEGORY_ALL, '', {
+        sortBy: 'recent',
+        usageStats,
+      });
+      expect(recentResult[0].id).toBe(CHEST.id);
+    });
   });
 
   describe('検索インデックスキャッシュの間引き', () => {

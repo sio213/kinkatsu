@@ -72,6 +72,17 @@ export function isPresetExercise(exercise: { source: string }): boolean {
   return exercise.source === 'preset';
 }
 
+// 種目一覧の並び替え軸。'category' が既存の挙動（デフォルト）
+export const EXERCISE_SORT_OPTIONS = ['category', 'name', 'frequent', 'recent'] as const;
+export type ExerciseSortBy = (typeof EXERCISE_SORT_OPTIONS)[number];
+
+export const EXERCISE_SORT_LABELS: Record<ExerciseSortBy, string> = {
+  name: '名前順（50音）',
+  category: 'カテゴリ順',
+  frequent: 'よく使う順',
+  recent: '最近使った順',
+};
+
 // 種目の計測方法。sets テーブルでどの列を使うかを決める
 export const MEASUREMENT_TYPES = [
   'weight_reps',
