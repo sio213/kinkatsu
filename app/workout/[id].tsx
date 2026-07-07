@@ -339,7 +339,9 @@ const styles = StyleSheet.create({
   emptyText: { fontSize: 13.5, color: Colors.textPlaceholder },
 
   exerciseList: { flex: 1 },
-  exerciseListContent: { padding: 16, gap: 10 },
+  // 末尾までスクロールした時に「トレーニングを終了」ボタンとAddExerciseButtonがくっついて
+  // 見えないよう、下だけ他の辺より広めに余白を取る
+  exerciseListContent: { padding: 16, paddingBottom: 32, gap: 10 },
   addExerciseBtnInline: { marginTop: 4 },
 
   footer: {
