@@ -1,4 +1,4 @@
-import { IconSymbol } from '@/components/ui/icon-symbol';
+import { DesignIcon } from '@/components/ui/design-icon';
 import { Colors } from '@/constants/theme';
 import { EXERCISE_SORT_LABELS, type ExerciseSortBy } from '@/lib/exercises/constants';
 import { useRef, useState } from 'react';
@@ -57,7 +57,7 @@ export function ExerciseSortDropdown({ sortBy, onChange }: Props) {
           hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
         >
           <Text style={styles.triggerText}>並び替え: {EXERCISE_SORT_LABELS[sortBy]}</Text>
-          <IconSymbol name={open ? 'chevron.up' : 'chevron.down'} size={16} color={Colors.textMuted} />
+          <DesignIcon name={open ? 'expand-less' : 'expand-more'} size={16} color={Colors.textMuted} />
         </TouchableOpacity>
       </View>
 
@@ -89,7 +89,7 @@ export function ExerciseSortDropdown({ sortBy, onChange }: Props) {
                       accessibilityState={{ checked: selected }}
                     >
                       <View style={styles.checkSlot}>
-                        {selected && <IconSymbol name="checkmark" size={16} color={Colors.accent} />}
+                        {selected && <DesignIcon name="check" size={16} color={Colors.accent} />}
                       </View>
                       <Text style={[styles.menuItemText, selected && styles.menuItemTextSelected]}>
                         {EXERCISE_SORT_LABELS[option]}
