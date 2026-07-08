@@ -1,6 +1,5 @@
 import { Colors, Typography } from '@/constants/theme';
-import { DesignIcon } from '@/components/ui/design-icon';
-import { IconSymbol } from '@/components/ui/icon-symbol';
+import { DropdownMenu, DropdownMenuHeaderTrigger, type DropdownMenuItem } from '@/components/ui/dropdown-menu';
 import { NotFoundState } from '@/components/ui/not-found-state';
 import { SectionHeading } from '@/components/ui/section-heading';
 import { getGuide } from '@/lib/exercises/guides';
@@ -11,23 +10,11 @@ import { getYoutubeSearchUrl } from '@/lib/exercises/youtube';
 import { useExercise, useExercises } from '@/hooks/use-exercises';
 import { useFavoriteToggle } from '@/hooks/use-favorite-toggle';
 import { useDebouncedPush } from '@/hooks/use-debounced-push';
-import { useHeaderHeight } from '@react-navigation/elements';
 import { Stack, useLocalSearchParams, useRouter } from 'expo-router';
 import { useVideoPlayer, VideoView } from 'expo-video';
 import { Image } from 'expo-image';
 import { openBrowserAsync, WebBrowserPresentationStyle } from 'expo-web-browser';
-import { useState } from 'react';
-import {
-  Alert,
-  Dimensions,
-  Modal,
-  Pressable,
-  ScrollView,
-  StyleSheet,
-  Text,
-  TouchableOpacity,
-  View,
-} from 'react-native';
+import { Alert, Dimensions, ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 const SCREEN_WIDTH = Dimensions.get('window').width;
@@ -78,7 +65,6 @@ export default function ExerciseDetailScreen() {
   const { id } = useLocalSearchParams<{ id: string }>();
   const router = useRouter();
   const push = useDebouncedPush();
-  const headerHeight = useHeaderHeight();
 
   const { exercise, loaded } = useExercise(Number(id));
   const { toggleFavorite, removeExercise } = useExercises();
@@ -88,17 +74,13 @@ export default function ExerciseDetailScreen() {
     toggleFavorite,
   );
 
-  const [menuOpen, setMenuOpen] = useState(false);
-
   function handleEdit() {
     if (!exercise) return;
-    setMenuOpen(false);
     push(`/exercise/edit/${exercise.id}`);
   }
 
   function handleDelete() {
     if (!exercise) return;
-    setMenuOpen(false);
     Alert.alert('削除', `「${exercise.name}」を削除しますか？`, [
       { text: 'キャンセル', style: 'cancel' },
       {
@@ -136,46 +118,25 @@ export default function ExerciseDetailScreen() {
   const images = getExerciseImages(exercise);
   const hasContent = Boolean(guide) || Boolean(exercise.note) || formPoints.length > 0;
 
+  const menuItems: DropdownMenuItem[] = [{ key: 'edit', label: '編集', icon: 'edit', onPress: handleEdit }];
+  if (exercise.source === 'custom') {
+    menuItems.push({ key: 'delete', label: '削除', icon: 'delete-outline', danger: true, onPress: handleDelete });
+  }
+
   return (
     <SafeAreaView style={styles.safe} edges={['bottom']}>
       <Stack.Screen
         options={{
           title: exercise.name,
           headerRight: () => (
-            <TouchableOpacity
-              style={styles.menuTrigger}
-              hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
-              accessibilityLabel="メニューを開く"
-              accessibilityRole="button"
-              accessibilityState={{ expanded: menuOpen }}
-              onPress={() => setMenuOpen((v) => !v)}
-            >
-              <IconSymbol
-                name="ellipsis"
-                size={22}
-                color={menuOpen ? Colors.accent : Colors.textPlaceholder}
-              />
-            </TouchableOpacity>
+            <DropdownMenu
+              groups={[menuItems]}
+              minWidth={140}
+              renderTrigger={({ open, onPress }) => <DropdownMenuHeaderTrigger open={open} onPress={onPress} />}
+            />
           ),
         }}
       />
-
-      {/* Modalで独立レイヤーに描画することで、ScrollViewとの描画順の衝突を避ける */}
-      <Modal visible={menuOpen} transparent animationType="fade" onRequestClose={() => setMenuOpen(false)}>
-        <Pressable style={styles.menuBackdrop} onPress={() => setMenuOpen(false)} />
-        <View style={[styles.menu, { top: headerHeight, right: 16 }]}>
-          <TouchableOpacity style={styles.menuItem} onPress={handleEdit} accessibilityLabel="編集">
-            <DesignIcon name="edit" size={18} color={Colors.textMuted} />
-            <Text style={styles.menuItemText}>編集</Text>
-          </TouchableOpacity>
-          {exercise.source === 'custom' && (
-            <TouchableOpacity style={styles.menuItem} onPress={handleDelete} accessibilityLabel="削除">
-              <DesignIcon name="delete-outline" size={18} color={Colors.danger} />
-              <Text style={[styles.menuItemText, styles.menuItemDanger]}>削除</Text>
-            </TouchableOpacity>
-          )}
-        </View>
-      </Modal>
 
       <ScrollView contentContainerStyle={styles.content}>
         <View style={styles.mediaBox}>
@@ -266,38 +227,6 @@ export default function ExerciseDetailScreen() {
 
 const styles = StyleSheet.create({
   safe: { flex: 1, backgroundColor: Colors.background },
-
-  menuTrigger: {
-    width: 36,
-    height: 36,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-
-  menuBackdrop: { flex: 1 },
-  menu: {
-    position: 'absolute',
-    backgroundColor: Colors.surface,
-    borderWidth: 1,
-    borderColor: Colors.border,
-    borderRadius: 10,
-    paddingVertical: 4,
-    minWidth: 140,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.12,
-    shadowRadius: 12,
-    elevation: 4,
-  },
-  menuItem: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 9,
-    paddingVertical: 9,
-    paddingHorizontal: 10,
-  },
-  menuItemText: { ...Typography.body, fontWeight: '500', color: Colors.textPrimary },
-  menuItemDanger: { color: Colors.danger },
 
   content: { paddingBottom: 48 },
 
