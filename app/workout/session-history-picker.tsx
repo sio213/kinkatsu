@@ -1,7 +1,7 @@
 import { CategoryFilterChips } from '@/components/exercises/category-filter-chips';
 import { NotFoundState } from '@/components/ui/not-found-state';
 import { PastTrainingSessionCard } from '@/components/workout/past-training-session-card';
-import { Colors } from '@/constants/theme';
+import { Colors, Typography } from '@/constants/theme';
 import { useDebouncedPush } from '@/hooks/use-debounced-push';
 import { CATEGORY_ALL, CATEGORY_ORDER, UNKNOWN_CATEGORY_ORDER } from '@/lib/exercises/constants';
 import { getPastTrainingSessions, type PastTrainingSession } from '@/lib/workout/history';
@@ -257,7 +257,7 @@ const styles = StyleSheet.create({
   loading: { flex: 1, alignItems: 'center', justifyContent: 'center' },
 
   emptyWrapper: { flex: 1, alignItems: 'center', justifyContent: 'center', paddingVertical: 32 },
-  empty: { color: Colors.textMuted, fontSize: 14 },
+  empty: { color: Colors.textMuted, ...Typography.body, textAlign: 'center' },
 
   list: { flex: 1 },
   content: { padding: 16, paddingBottom: 32 },

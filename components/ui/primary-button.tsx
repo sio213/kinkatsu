@@ -1,4 +1,4 @@
-import { Colors } from '@/constants/theme';
+import { Colors, Typography } from '@/constants/theme';
 import type { ReactNode } from 'react';
 import { StyleSheet, Text, TouchableOpacity, type StyleProp, type ViewStyle } from 'react-native';
 
@@ -37,5 +37,5 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
   },
   disabled: { backgroundColor: Colors.textPlaceholder },
-  text: { fontSize: 15, fontWeight: '600', color: Colors.onAccent },
+  text: { ...Typography.bodyStrong, color: Colors.onAccent },
 });

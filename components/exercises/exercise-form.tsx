@@ -1,7 +1,7 @@
 import { chipStyles } from '@/components/exercises/chip-styles';
 import { FormLabel } from '@/components/ui/form-label';
 import { SectionHeading } from '@/components/ui/section-heading';
-import { Colors } from '@/constants/theme';
+import { Colors, Typography } from '@/constants/theme';
 import {
   EXERCISE_CATEGORIES,
   getCategoryLabel,
@@ -229,7 +229,7 @@ const styles = StyleSheet.create({
     borderRadius: 8,
     paddingHorizontal: 11,
     paddingVertical: 9,
-    fontSize: 15,
+    ...Typography.body,
     color: Colors.textPrimary,
     backgroundColor: Colors.surface,
   },

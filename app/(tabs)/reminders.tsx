@@ -156,8 +156,8 @@ const styles = StyleSheet.create({
     paddingHorizontal: 14,
     paddingVertical: 6,
   },
-  addBtnText: { color: Colors.onAccent, fontWeight: '600', fontSize: 14 },
-  empty: { color: Colors.textPlaceholder, textAlign: 'center', paddingVertical: 16 },
+  addBtnText: { color: Colors.onAccent, ...Typography.bodyStrong },
+  empty: { ...Typography.body, color: Colors.textPlaceholder, textAlign: 'center', paddingVertical: 16 },
 
   addFormWrapper: {
     backgroundColor: Colors.surfaceSubtle,

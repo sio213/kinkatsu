@@ -130,17 +130,17 @@ const styles = StyleSheet.create({
     paddingHorizontal: 14,
     paddingVertical: 6,
   },
-  addBtnText: { color: Colors.onAccent, fontWeight: '600', fontSize: 14 },
+  addBtnText: { color: Colors.onAccent, ...Typography.bodyStrong },
 
   separator: { height: 8 },
 
   emptyWrapper: { alignItems: 'center', paddingVertical: 32, gap: 12 },
-  empty: { color: Colors.textPlaceholder, fontSize: 14 },
+  empty: { color: Colors.textPlaceholder, ...Typography.body, textAlign: 'center' },
   emptyAddBtn: {
     backgroundColor: Colors.accent,
     borderRadius: 8,
     paddingHorizontal: 20,
     paddingVertical: 10,
   },
-  emptyAddBtnText: { color: Colors.onAccent, fontWeight: '600', fontSize: 14 },
+  emptyAddBtnText: { color: Colors.onAccent, ...Typography.bodyStrong },
 });

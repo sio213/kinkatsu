@@ -1,5 +1,5 @@
 import { ExerciseFormScreen } from '@/components/exercises/exercise-form-screen';
-import { Colors } from '@/constants/theme';
+import { Colors, Typography } from '@/constants/theme';
 import { useExercise, useExercises } from '@/hooks/use-exercises';
 import { parseFormPoints } from '@/lib/exercises/form-points';
 import type { ExerciseFormValues } from '@/lib/exercises/validation';
@@ -57,5 +57,5 @@ export default function ExerciseEditScreen() {
 const styles = StyleSheet.create({
   safe: { flex: 1, backgroundColor: Colors.background },
   notFound: { flex: 1, alignItems: 'center', justifyContent: 'center', paddingHorizontal: 24 },
-  notFoundText: { fontSize: 15, color: Colors.textMuted },
+  notFoundText: { ...Typography.body, color: Colors.textMuted },
 });

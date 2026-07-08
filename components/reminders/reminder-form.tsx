@@ -1,5 +1,5 @@
 import { FormLabel } from '@/components/ui/form-label';
-import { Colors } from '@/constants/theme';
+import { Colors, Typography } from '@/constants/theme';
 import { WEEKDAY_LABELS } from '@/lib/format';
 import {
   DEFAULT_REMINDER_BODY,
@@ -553,7 +553,7 @@ const styles = StyleSheet.create({
     borderRadius: 8,
     paddingHorizontal: 12,
     paddingVertical: 8,
-    fontSize: 15,
+    ...Typography.body,
     color: Colors.textPrimary,
     backgroundColor: Colors.surface,
   },
@@ -624,8 +624,8 @@ const styles = StyleSheet.create({
 
   buttons: { flexDirection: 'row', gap: 12, marginTop: 20 },
   cancelBtn: { flex: 1, padding: 12, borderRadius: 10, backgroundColor: Colors.border, alignItems: 'center' },
-  cancelBtnText: { fontSize: 15, color: Colors.textSecondary, fontWeight: '600' },
+  cancelBtnText: { ...Typography.bodyStrong, color: Colors.textSecondary },
   submitBtn: { flex: 1, padding: 12, borderRadius: 10, backgroundColor: Colors.accent, alignItems: 'center' },
   submitBtnDisabled: { backgroundColor: Colors.textPlaceholder },
-  submitBtnText: { fontSize: 15, color: Colors.onAccent, fontWeight: '600' },
+  submitBtnText: { ...Typography.bodyStrong, color: Colors.onAccent },
 });
