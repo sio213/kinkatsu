@@ -140,7 +140,7 @@ export default function HistoryPickerScreen() {
         options={{
           headerTitle: () => (
             <View style={styles.headerTitleWrap}>
-              <Text style={styles.headerTitle}>記録から読み込む</Text>
+              <Text style={styles.headerTitle}>過去の記録から読み込む</Text>
               <Text style={styles.headerSubtitle} numberOfLines={1}>
                 {exerciseName}
               </Text>
