@@ -24,10 +24,6 @@ jest.mock('expo-router', () => ({
   },
 }));
 
-jest.mock('@react-navigation/elements', () => ({
-  useHeaderHeight: () => 64,
-}));
-
 jest.mock('@/hooks/use-workout-session', () => ({
   useWorkoutSession: (...args: unknown[]) => mockUseWorkoutSession(...args),
   useSessionSetCount: (...args: unknown[]) => mockUseSessionSetCount(...args),

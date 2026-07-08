@@ -1,4 +1,4 @@
-import { DesignIcon } from '@/components/ui/design-icon';
+import { DropdownMenu, DropdownMenuHeaderTrigger, type DropdownMenuItem } from '@/components/ui/dropdown-menu';
 import { IconSymbol } from '@/components/ui/icon-symbol';
 import { ListErrorBoundary } from '@/components/ui/list-error-boundary';
 import { NotFoundState } from '@/components/ui/not-found-state';
@@ -20,12 +20,11 @@ import {
 import { subscribePrefilled } from '@/lib/workout/prefill-feedback';
 import { deleteSession, endWorkoutSession, type PrefilledCard } from '@/lib/workout/session';
 import { formatSessionDateGroup, formatSessionDuration } from '@/lib/workout/summary';
-import { useHeaderHeight } from '@react-navigation/elements';
 import type { ParamListBase } from '@react-navigation/native';
 import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { Stack, useLocalSearchParams, useNavigation, useRouter } from 'expo-router';
 import { useCallback, useEffect, useRef, useState } from 'react';
-import { Alert, FlatList, Modal, Pressable, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
+import { Alert, FlatList, StyleSheet, Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 function formatElapsed(ms: number): string {
@@ -49,8 +48,6 @@ export default function WorkoutScreen() {
   const [now, setNow] = useState(() => Date.now());
   const isFinishingRef = useRef(false);
   const keyboardInset = useKeyboardInset();
-  const headerHeight = useHeaderHeight();
-  const [menuOpen, setMenuOpen] = useState(false);
   // 種目追加/入れ替え/記録から読み込む画面はDB操作直後にrouter.back()で閉じるため、プリフィルが
   // 起きたことはpub/sub経由でここに届く（lib/workout/prefill-feedback.ts）。プリフィルされた
   // セットidが分かればカード内のゴースト表示に使える。カード（sessionExerciseId）単位のMapで持ち、
@@ -173,7 +170,6 @@ export default function WorkoutScreen() {
 
   const handleLoadFromHistory = () => {
     if (sessionId == null) return;
-    setMenuOpen(false);
     // Modalのフェードアウト中に連打されるとpushが二重発火しうるため、種目カード側の
     // 「過去の記録から読み込む」（session-exercise-card.tsx）や他画面の遷移と同じくデバウンスする
     pushDebounced({ pathname: '/workout/session-history-picker', params: { sessionId: String(sessionId) } });
@@ -181,7 +177,6 @@ export default function WorkoutScreen() {
 
   const handleDeleteSession = () => {
     if (sessionId == null) return;
-    setMenuOpen(false);
     Alert.alert('この記録を削除しますか？', '記録した種目・セットもすべて削除されます。', [
       { text: 'キャンセル', style: 'cancel' },
       {
@@ -218,48 +213,26 @@ export default function WorkoutScreen() {
   // UI（リアルタイムタイマー・「トレーニングを終了」ボタン）だけを出し分ける）
   const isActive = session.endedAt == null;
 
+  const menuItems: DropdownMenuItem[] = [
+    { key: 'history', label: '過去の記録から読み込む', icon: 'history', onPress: handleLoadFromHistory },
+    { key: 'delete', label: '削除', icon: 'delete-outline', danger: true, onPress: handleDeleteSession },
+  ];
+
   return (
     <SafeAreaView style={styles.safeArea} edges={['bottom']}>
       <Stack.Screen
         options={{
           title: isActive ? 'トレーニング中' : '記録の編集',
           headerRight: () => (
-            <TouchableOpacity
-              style={styles.menuTrigger}
-              hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
-              accessibilityRole="button"
-              accessibilityLabel="メニューを開く"
-              accessibilityState={{ expanded: menuOpen }}
-              onPress={() => setMenuOpen((v) => !v)}
-            >
-              <IconSymbol
-                name="ellipsis"
-                size={20}
-                color={menuOpen ? Colors.accent : Colors.textPlaceholder}
-              />
-            </TouchableOpacity>
+            <DropdownMenu
+              groups={[menuItems]}
+              minWidth={140}
+              renderTrigger={({ open, onPress }) => <DropdownMenuHeaderTrigger open={open} onPress={onPress} />}
+            />
           ),
         }}
       />
 
-      {/* Modalで独立レイヤーに描画することで、FlatListとの描画順の衝突を避ける */}
-      <Modal visible={menuOpen} transparent animationType="fade" onRequestClose={() => setMenuOpen(false)}>
-        <Pressable style={styles.menuBackdrop} onPress={() => setMenuOpen(false)} />
-        <View style={[styles.menu, { top: headerHeight, right: 16 }]}>
-          <TouchableOpacity
-            style={styles.menuItem}
-            onPress={handleLoadFromHistory}
-            accessibilityLabel="過去の記録から読み込む"
-          >
-            <DesignIcon name="history" size={18} color={Colors.textMuted} />
-            <Text style={styles.menuItemText}>過去の記録から読み込む</Text>
-          </TouchableOpacity>
-          <TouchableOpacity style={styles.menuItem} onPress={handleDeleteSession} accessibilityLabel="削除">
-            <DesignIcon name="delete-outline" size={18} color={Colors.danger} />
-            <Text style={[styles.menuItemText, styles.menuItemDanger]}>削除</Text>
-          </TouchableOpacity>
-        </View>
-      </Modal>
       <View style={styles.subHeader}>
         <Text style={styles.headerDate}>{formatSessionDateGroup(session.startedAt)}</Text>
         <View style={styles.timerChip}>
@@ -351,30 +324,6 @@ const styles = StyleSheet.create({
     paddingVertical: 6,
   },
   timerText: { ...Typography.metric, color: Colors.textPrimary },
-  menuTrigger: {
-    width: 32,
-    height: 32,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  menuBackdrop: { flex: 1 },
-  menu: {
-    position: 'absolute',
-    backgroundColor: Colors.surface,
-    borderWidth: 1,
-    borderColor: Colors.border,
-    borderRadius: 10,
-    paddingVertical: 4,
-    minWidth: 140,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.12,
-    shadowRadius: 12,
-    elevation: 4,
-  },
-  menuItem: { flexDirection: 'row', alignItems: 'center', gap: 9, paddingVertical: 9, paddingHorizontal: 10 },
-  menuItemText: { ...Typography.body, fontWeight: '500', color: Colors.textPrimary },
-  menuItemDanger: { color: Colors.danger },
 
   body: { flex: 1, alignItems: 'center', justifyContent: 'center', gap: 16, paddingHorizontal: 16 },
   emptyText: { ...Typography.footnote, color: Colors.textMuted },
