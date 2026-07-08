@@ -76,30 +76,42 @@ export const Colors = {
  * 既存箇所への適用は段階的に行うため、この定義自体は既存の見た目を変えない。
  */
 export const Typography = {
-  /** タブ画面のH1（「記録」「種目ライブラリ」等） */
+  /**
+   * タブ画面のH1（「記録」「種目ライブラリ」等）。
+   * 将来タブ画面にもpush画面と同じデザインのヘッダーを追加したら、この役割は無くなりnavTitleに一本化する想定。
+   */
   screenTitle: { fontSize: 20, lineHeight: 26, fontWeight: '700' },
   /** push画面のネイティブヘッダー・疑似ヘッダー */
   navTitle: { fontSize: 17, lineHeight: 22, fontWeight: '700' },
   /** 種目名・セッション名などカードの主題テキスト */
   cardTitle: { fontSize: 16, lineHeight: 22, fontWeight: '700' },
-  /** セクションラベル（「使う筋肉」等） */
+  /**
+   * セクションラベル（「使う筋肉」等）。あえてbodyより小さい太字＋字間広めにした
+   * Eyebrow/Overline見出し（本文の前に置く小さな道しるべ）。本文の代わりに使わないこと。
+   */
   sectionHeading: { fontSize: 13, lineHeight: 18, fontWeight: '700', letterSpacing: 0.2 },
-  /** 標準本文 */
+  /** 標準本文。フォーム入力・ボタン・Dropdownメニュー項目など「操作・確認する」テキスト全般 */
   body: { fontSize: 15, lineHeight: 22, fontWeight: '400' },
   /** ボタンラベル等、強調する本文 */
   bodyStrong: { fontSize: 15, lineHeight: 22, fontWeight: '600' },
-  /** ガイドなどの長文（「読み仮名(readings.ts)」とは無関係。命名衝突を避けるためreadingは使わない） */
+  /**
+   * ガイドなど、ユーザーがまとまった文章をじっくり読む箇所専用（「読み仮名(readings.ts)」とは無関係。
+   * 命名衝突を避けるためreadingは使わない）。行間を広めにして読了体験を優先する。フォーム・ボタン等の
+   * 操作系テキストにはbodyを使い、こちらは転用しない。
+   */
   longform: { fontSize: 16, lineHeight: 25, fontWeight: '400' },
-  /** 補助ラベル */
+  /** やや大きめの補助テキスト（エラーメッセージ・チップ文言・要約1行など）。fontWeightは用途に応じ都度上書きしてよい */
   footnote: { fontSize: 13, lineHeight: 18, fontWeight: '400' },
-  /** 最小の一般テキスト */
+  /**
+   * 最小の一般テキスト（相対日付・件数・列見出しラベルなど）。fontWeightは用途に応じ都度上書きしてよい
+   * （前身のmetricLabelトークンをここに統合したため、太字での使用頻度が高い）。
+   */
   caption: { fontSize: 12, lineHeight: 16, fontWeight: '500' },
-  /** トレーニング中に読む重量・回数などの数値（最優先で視認性を確保する） */
+  /**
+   * トレーニング中に一瞬で読む太字の数値（重量・回数の入力欄、タイマー表示など）。
+   * 前身のtimerトークンをここに統合したため、役割は「重要な数値」全般を指す。
+   */
   metric: { fontSize: 17, lineHeight: 20, fontWeight: '700' },
-  /** セット番号など、数値に添える小ラベル */
-  metricLabel: { fontSize: 12, lineHeight: 16, fontWeight: '600' },
-  /** ワークアウトのタイマー表示 */
-  timer: { fontSize: 16, lineHeight: 20, fontWeight: '700' },
   /** NEW/BESTなどの小バッジ */
   badge: { fontSize: 11, fontWeight: '700' },
 } as const;
