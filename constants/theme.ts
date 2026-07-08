@@ -70,7 +70,8 @@ export const Colors = {
 };
 
 /**
- * タイポグラフィトークン。役割ごとに{fontSize, lineHeight, fontWeight}を定義する。
+ * タイポグラフィトークン。役割ごとに基本{fontSize, lineHeight, fontWeight}を定義する
+ * （sectionHeadingのletterSpacingのように役割固有の追加プロパティを持つものもある。badgeは単一行想定でlineHeightを持たない）。
  * 画面側はここを参照し、fontSizeを直書きしない（詳細はCLAUDE.md「タイポグラフィ・共通コンポーネント」参照）。
  * 既存箇所への適用は段階的に行うため、この定義自体は既存の見た目を変えない。
  */
@@ -87,8 +88,8 @@ export const Typography = {
   body: { fontSize: 15, lineHeight: 22, fontWeight: '400' },
   /** ボタンラベル等、強調する本文 */
   bodyStrong: { fontSize: 15, lineHeight: 22, fontWeight: '600' },
-  /** ガイドなどの長文 */
-  reading: { fontSize: 16, lineHeight: 25, fontWeight: '400' },
+  /** ガイドなどの長文（「読み仮名(readings.ts)」とは無関係。命名衝突を避けるためreadingは使わない） */
+  longform: { fontSize: 16, lineHeight: 25, fontWeight: '400' },
   /** 補助ラベル */
   footnote: { fontSize: 13, lineHeight: 18, fontWeight: '400' },
   /** 最小の一般テキスト */
