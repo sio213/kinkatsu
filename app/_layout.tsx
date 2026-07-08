@@ -115,12 +115,12 @@ export default function RootLayout() {
         />
         <Stack.Screen
           name="workout/history-picker"
-          options={{ title: '過去の記録から読み込む' }}
+          options={{ title: '過去の記録から読み込み' }}
         />
-        {/* デザイン上、単一種目版のhistory-pickerと同じヘッダー文言（過去の記録から読み込む）を使う */}
+        {/* デザイン上、単一種目版のhistory-pickerと同じヘッダー文言（過去の記録から読み込み）を使う */}
         <Stack.Screen
           name="workout/session-history-picker"
-          options={{ title: '過去の記録から読み込む' }}
+          options={{ title: '過去の記録から読み込み' }}
         />
         {/* ヘッダーは選んだ過去セッションの日付（例:「7月3日（木）」）を動的に表示するため、
             画面側でStack.Screen optionsを上書きする（workout/[id]と同じ方針） */}

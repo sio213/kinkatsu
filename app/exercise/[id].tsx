@@ -1,5 +1,5 @@
 import { Colors, Typography } from '@/constants/theme';
-import { DropdownMenu, DropdownMenuHeaderTrigger, type DropdownMenuItem } from '@/components/ui/dropdown-menu';
+import { HeaderMenu, type DropdownMenuItem } from '@/components/ui/dropdown-menu';
 import { NotFoundState } from '@/components/ui/not-found-state';
 import { SectionHeading } from '@/components/ui/section-heading';
 import { getGuide } from '@/lib/exercises/guides';
@@ -104,6 +104,7 @@ export default function ExerciseDetailScreen() {
   if (!exercise) {
     return (
       <SafeAreaView style={styles.safe} edges={['bottom']}>
+        <Stack.Screen options={{ title: '種目' }} />
         <NotFoundState
           message="種目が見つかりません"
           actionLabel="一覧に戻る"
@@ -128,13 +129,7 @@ export default function ExerciseDetailScreen() {
       <Stack.Screen
         options={{
           title: exercise.name,
-          headerRight: () => (
-            <DropdownMenu
-              groups={[menuItems]}
-              minWidth={140}
-              renderTrigger={({ open, onPress }) => <DropdownMenuHeaderTrigger open={open} onPress={onPress} />}
-            />
-          ),
+          headerRight: () => <HeaderMenu groups={[menuItems]} accessibilityLabel="種目のメニューを開く" />,
         }}
       />
 

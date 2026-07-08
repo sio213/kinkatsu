@@ -86,18 +86,48 @@ export function DropdownMenu({ groups, renderTrigger, minWidth = 160, backdropTe
 }
 
 // ヘッダー右上に置く「⋮」トリガー。種目詳細・ワークアウト画面で共通のサイズ・タップ領域を使う
-export function DropdownMenuHeaderTrigger({ open, onPress }: { open: boolean; onPress: () => void }) {
+export function DropdownMenuHeaderTrigger({
+  open,
+  onPress,
+  accessibilityLabel = 'メニューを開く',
+}: {
+  open: boolean;
+  onPress: () => void;
+  accessibilityLabel?: string;
+}) {
   return (
     <TouchableOpacity
       style={styles.headerTrigger}
       hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
       accessibilityRole="button"
-      accessibilityLabel="メニューを開く"
+      accessibilityLabel={accessibilityLabel}
       accessibilityState={{ expanded: open }}
       onPress={onPress}
     >
       <IconSymbol name="ellipsis" size={20} color={open ? Colors.accent : Colors.textPlaceholder} />
     </TouchableOpacity>
+  );
+}
+
+// headerRightにそのまま渡せる「⋮」メニュー。DropdownMenu+DropdownMenuHeaderTriggerの配線を
+// まとめ、画面側での重複（旧: workout/[id].tsx・exercise/[id].tsxがそれぞれ同じ6行を書いていた）を無くす
+export function HeaderMenu({
+  groups,
+  minWidth = 140,
+  accessibilityLabel,
+}: {
+  groups: DropdownMenuItem[][];
+  minWidth?: number;
+  accessibilityLabel?: string;
+}) {
+  return (
+    <DropdownMenu
+      groups={groups}
+      minWidth={minWidth}
+      renderTrigger={({ open, onPress }) => (
+        <DropdownMenuHeaderTrigger open={open} onPress={onPress} accessibilityLabel={accessibilityLabel} />
+      )}
+    />
   );
 }
 

@@ -201,7 +201,7 @@ describe('⋮メニュー: 削除はカスタム種目のみ表示', () => {
     });
 
     const root = render();
-    const menuBtn = findButtonByLabel(root, 'メニューを開く')!;
+    const menuBtn = findButtonByLabel(root, '種目のメニューを開く')!;
     act(() => {
       menuBtn.props.onPress();
     });
@@ -217,7 +217,7 @@ describe('⋮メニュー: 削除はカスタム種目のみ表示', () => {
     });
 
     const root = render();
-    const menuBtn = findButtonByLabel(root, 'メニューを開く')!;
+    const menuBtn = findButtonByLabel(root, '種目のメニューを開く')!;
     act(() => {
       menuBtn.props.onPress();
     });
@@ -237,7 +237,7 @@ describe('⋮メニュー: 削除はカスタム種目のみ表示', () => {
     });
 
     const root = render();
-    const menuBtn = findButtonByLabel(root, 'メニューを開く')!;
+    const menuBtn = findButtonByLabel(root, '種目のメニューを開く')!;
     act(() => {
       menuBtn.props.onPress();
     });

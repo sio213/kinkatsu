@@ -1,6 +1,7 @@
 import { CategoryFilterChips } from '@/components/exercises/category-filter-chips';
 import { ExerciseSearchBar } from '@/components/exercises/exercise-search-bar';
 import { ExerciseSortDropdown } from '@/components/exercises/exercise-sort-dropdown';
+import { HeaderTitle } from '@/components/ui/header-title';
 import { ListErrorBoundary } from '@/components/ui/list-error-boundary';
 import { NotFoundState } from '@/components/ui/not-found-state';
 import { PrimaryButton } from '@/components/ui/primary-button';
@@ -16,7 +17,7 @@ import { filterExercises } from '@/lib/exercises/filter';
 import { useExerciseSortStore } from '@/lib/exercises/sort-store';
 import { notifyPrefilled } from '@/lib/workout/prefill-feedback';
 import { replaceSessionExercise } from '@/lib/workout/session';
-import { useFocusEffect, useLocalSearchParams, useRouter } from 'expo-router';
+import { Stack, useFocusEffect, useLocalSearchParams, useRouter } from 'expo-router';
 import { useCallback, useMemo, useRef, useState } from 'react';
 import { Alert, FlatList, Keyboard, StyleSheet, Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
@@ -136,12 +137,6 @@ export default function ExerciseSwapScreen() {
 
   const listHeader = (
     <View style={styles.headerArea}>
-      <View style={styles.currentExerciseRow}>
-        <Text style={styles.currentExerciseLabel}>現在の種目</Text>
-        <Text style={styles.currentExerciseName} numberOfLines={1}>
-          {currentExerciseName}
-        </Text>
-      </View>
       <ExerciseSearchBar value={search} onChangeText={setSearch} onSubmitEditing={Keyboard.dismiss} />
       <CategoryFilterChips activeCategory={activeCategory} onChange={setActiveCategory} />
       <ExerciseSortDropdown sortBy={sortBy} onChange={setSortBy} />
@@ -171,6 +166,11 @@ export default function ExerciseSwapScreen() {
 
   return (
     <SafeAreaView style={styles.safeArea} edges={['bottom']}>
+      <Stack.Screen
+        options={{
+          headerTitle: () => <HeaderTitle title="種目を入れ替え" subtitle={currentExerciseName} />,
+        }}
+      />
       <FlatList
         style={styles.list}
         data={candidates}
@@ -196,9 +196,6 @@ const styles = StyleSheet.create({
   content: { paddingHorizontal: 16, paddingBottom: 16 },
 
   headerArea: { paddingTop: 12, gap: 8, marginBottom: 4 },
-  currentExerciseRow: { flexDirection: 'row', alignItems: 'baseline', gap: 6, paddingHorizontal: 2 },
-  currentExerciseLabel: { ...Typography.caption, color: Colors.textMuted },
-  currentExerciseName: { ...Typography.cardTitle, color: Colors.textPrimary, flexShrink: 1 },
 
   emptyWrapper: { alignItems: 'center', paddingVertical: 32 },
   empty: { color: Colors.textMuted, ...Typography.body, textAlign: 'center' },

@@ -1,4 +1,5 @@
 import { DesignIcon } from '@/components/ui/design-icon';
+import { HeaderTitle } from '@/components/ui/header-title';
 import { NotFoundState } from '@/components/ui/not-found-state';
 import { HistoryEntryCard } from '@/components/workout/history-entry-card';
 import { Colors, Typography } from '@/constants/theme';
@@ -133,14 +134,7 @@ export default function HistoryPickerScreen() {
     <SafeAreaView style={styles.safeArea} edges={['bottom']}>
       <Stack.Screen
         options={{
-          headerTitle: () => (
-            <View style={styles.headerTitleWrap}>
-              <Text style={styles.headerTitle}>過去の記録から読み込む</Text>
-              <Text style={styles.headerSubtitle} numberOfLines={1}>
-                {exerciseName}
-              </Text>
-            </View>
-          ),
+          headerTitle: () => <HeaderTitle title="過去の記録から読み込み" subtitle={exerciseName} />,
         }}
       />
       {Array.isArray(entries) && entries.length > 0 && (
@@ -195,10 +189,6 @@ export default function HistoryPickerScreen() {
 
 const styles = StyleSheet.create({
   safeArea: { flex: 1, backgroundColor: Colors.background },
-
-  headerTitleWrap: { alignItems: 'center' },
-  headerTitle: { ...Typography.navTitle, color: Colors.textPrimary },
-  headerSubtitle: { ...Typography.caption, color: Colors.textMuted, marginTop: 1 },
 
   banner: {
     flexDirection: 'row',

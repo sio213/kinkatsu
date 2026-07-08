@@ -11,6 +11,11 @@ jest.mock('expo-router', () => ({
   useFocusEffect: (effect: () => (() => void) | void) => {
     effect();
   },
+  // headerTitleの中身（現在の種目名）をテストで検証できるよう、そのレンダー関数だけ実行してやる
+  Stack: {
+    Screen: ({ options }: { options?: { headerTitle?: () => unknown } }) =>
+      options?.headerTitle ? options.headerTitle() : null,
+  },
 }));
 
 jest.mock('@/hooks/use-exercises', () => ({
