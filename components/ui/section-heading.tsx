@@ -1,4 +1,4 @@
-import { Colors } from '@/constants/theme';
+import { Colors, Typography } from '@/constants/theme';
 import type { ReactNode } from 'react';
 import { StyleSheet, Text, View, type StyleProp, type ViewStyle } from 'react-native';
 
@@ -29,5 +29,5 @@ export function SectionHeading({ children, containerStyle, trailing, accessibili
 const styles = StyleSheet.create({
   row: { flexDirection: 'row', alignItems: 'center', gap: 7 },
   bar: { width: 3, height: 14, borderRadius: 2, backgroundColor: Colors.accent },
-  label: { fontSize: 13, fontWeight: '700', color: Colors.textBody, letterSpacing: 0.2 },
+  label: { ...Typography.sectionHeading, color: Colors.textBody },
 });

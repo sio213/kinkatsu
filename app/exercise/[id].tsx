@@ -296,7 +296,7 @@ const styles = StyleSheet.create({
     paddingVertical: 9,
     paddingHorizontal: 10,
   },
-  menuItemText: { fontSize: 13, fontWeight: '500', color: Colors.textPrimary },
+  menuItemText: { ...Typography.body, fontWeight: '500', color: Colors.textPrimary },
   menuItemDanger: { color: Colors.danger },
 
   content: { paddingBottom: 48 },
@@ -395,5 +395,5 @@ const styles = StyleSheet.create({
   },
   cautionText: { ...Typography.footnote, color: Colors.warningText },
 
-  noGuide: { ...Typography.body, color: Colors.textPlaceholder, textAlign: 'center', paddingVertical: 24 },
+  noGuide: { ...Typography.body, color: Colors.textMuted, textAlign: 'center', paddingVertical: 24 },
 });

@@ -201,7 +201,7 @@ const styles = StyleSheet.create({
   currentExerciseName: { ...Typography.cardTitle, color: Colors.textPrimary, flexShrink: 1 },
 
   emptyWrapper: { alignItems: 'center', paddingVertical: 32 },
-  empty: { color: Colors.textPlaceholder, ...Typography.body, textAlign: 'center' },
+  empty: { color: Colors.textMuted, ...Typography.body, textAlign: 'center' },
 
   footer: {
     padding: 16,

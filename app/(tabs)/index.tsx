@@ -136,7 +136,7 @@ const styles = StyleSheet.create({
   resumeBannerText: { color: Colors.accent, ...Typography.bodyStrong },
 
   empty: { flex: 1, alignItems: 'center', justifyContent: 'center', gap: 12 },
-  emptyText: { ...Typography.body, color: Colors.textPlaceholder, textAlign: 'center' },
+  emptyText: { ...Typography.body, color: Colors.textMuted, textAlign: 'center' },
   startBtn: {
     paddingHorizontal: 20,
     marginTop: 4,

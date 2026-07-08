@@ -145,9 +145,8 @@ const migrationStyles = StyleSheet.create({
   },
   title: { ...Typography.navTitle, color: Colors.danger },
   body: {
-    fontSize: 14,
+    ...Typography.body,
     color: Colors.textSecondary,
     textAlign: 'center',
-    lineHeight: 22,
   },
 });

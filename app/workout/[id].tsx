@@ -373,11 +373,11 @@ const styles = StyleSheet.create({
     elevation: 4,
   },
   menuItem: { flexDirection: 'row', alignItems: 'center', gap: 9, paddingVertical: 9, paddingHorizontal: 10 },
-  menuItemText: { fontSize: 13, fontWeight: '500', color: Colors.textPrimary },
+  menuItemText: { ...Typography.body, fontWeight: '500', color: Colors.textPrimary },
   menuItemDanger: { color: Colors.danger },
 
   body: { flex: 1, alignItems: 'center', justifyContent: 'center', gap: 16, paddingHorizontal: 16 },
-  emptyText: { ...Typography.footnote, color: Colors.textPlaceholder },
+  emptyText: { ...Typography.footnote, color: Colors.textMuted },
 
   exerciseList: { flex: 1 },
   // 末尾までスクロールした時に「トレーニングを終了」ボタンとAddExerciseButtonがくっついて
