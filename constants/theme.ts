@@ -70,6 +70,40 @@ export const Colors = {
 };
 
 /**
+ * タイポグラフィトークン。役割ごとに{fontSize, lineHeight, fontWeight}を定義する。
+ * 画面側はここを参照し、fontSizeを直書きしない（詳細はCLAUDE.md「タイポグラフィ・共通コンポーネント」参照）。
+ * 既存箇所への適用は段階的に行うため、この定義自体は既存の見た目を変えない。
+ */
+export const Typography = {
+  /** タブ画面のH1（「記録」「種目ライブラリ」等） */
+  screenTitle: { fontSize: 20, lineHeight: 26, fontWeight: '700' },
+  /** push画面のネイティブヘッダー・疑似ヘッダー */
+  navTitle: { fontSize: 17, lineHeight: 22, fontWeight: '700' },
+  /** 種目名・セッション名などカードの主題テキスト */
+  cardTitle: { fontSize: 16, lineHeight: 22, fontWeight: '700' },
+  /** セクションラベル（「使う筋肉」等） */
+  sectionHeading: { fontSize: 13, lineHeight: 18, fontWeight: '700', letterSpacing: 0.2 },
+  /** 標準本文 */
+  body: { fontSize: 15, lineHeight: 22, fontWeight: '400' },
+  /** ボタンラベル等、強調する本文 */
+  bodyStrong: { fontSize: 15, lineHeight: 22, fontWeight: '600' },
+  /** ガイドなどの長文 */
+  reading: { fontSize: 16, lineHeight: 25, fontWeight: '400' },
+  /** 補助ラベル */
+  footnote: { fontSize: 13, lineHeight: 18, fontWeight: '400' },
+  /** 最小の一般テキスト */
+  caption: { fontSize: 12, lineHeight: 16, fontWeight: '500' },
+  /** トレーニング中に読む重量・回数などの数値（最優先で視認性を確保する） */
+  metric: { fontSize: 17, lineHeight: 20, fontWeight: '700' },
+  /** セット番号など、数値に添える小ラベル */
+  metricLabel: { fontSize: 12, lineHeight: 16, fontWeight: '600' },
+  /** ワークアウトのタイマー表示 */
+  timer: { fontSize: 16, lineHeight: 20, fontWeight: '700' },
+  /** NEW/BESTなどの小バッジ */
+  badge: { fontSize: 11, fontWeight: '700' },
+} as const;
+
+/**
  * プッシュ画面共通のネイティブヘッダー設定（戻るアイコン最小表示・中央揃えタイトル・影なし）。
  * `<Stack screenOptions={headerOptions}>` に一度だけ渡し、各画面はtitle等の差分のみoptionsで指定する。
  * 戻るアイコンの色とタイトルの色を分けるため headerTintColor と headerTitleStyle.color を別々に指定している。
