@@ -61,6 +61,12 @@ test('日付・カテゴリ・相対日付・種目名を表示する', () => {
   expect(root.findByProps({ children: 'ベンチプレス・ダンベルフライ' })).toBeDefined();
 });
 
+test('6ヶ月前のセッションは相対日付として「6ヶ月前」を表示する', () => {
+  const oldSession: PastTrainingSession = { ...singleCategorySession, startedAt: new Date(2026, 0, 4, 10, 0).getTime() };
+  const { root } = render(oldSession);
+  expect(root.findByProps({ children: '6ヶ月前' })).toBeDefined();
+});
+
 test('カテゴリが1種類だけの日は「ほか」を付けない', () => {
   const { root } = render();
   expect(root.findByProps({ children: '胸' })).toBeDefined();
