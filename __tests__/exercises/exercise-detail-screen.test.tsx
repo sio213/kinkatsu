@@ -27,8 +27,52 @@ jest.mock('@/hooks/use-exercises', () => ({
   }),
 }));
 
+type MockVideoPlayerStatus = 'idle' | 'loading' | 'readyToPlay' | 'error';
+type MockVideoPlayerEvent = { status: MockVideoPlayerStatus; oldStatus?: MockVideoPlayerStatus };
+type MockVideoPlayer = {
+  status: MockVideoPlayerStatus;
+  loop: boolean;
+  muted: boolean;
+  play: () => void;
+  addListener: (event: string, cb: (payload: MockVideoPlayerEvent) => void) => { remove: () => void };
+  emitStatusChange: (status: MockVideoPlayerStatus) => void;
+};
+
+// デフォルトはreadyToPlay（既存テストは動画読み込み中の見た目に依存しないため）。
+// 読み込み中/エラー表示を検証するテストだけ明示的に変更する。
+let mockVideoPlayerInitialStatus: MockVideoPlayerStatus = 'readyToPlay';
+let mockLatestVideoPlayer: MockVideoPlayer | null = null;
+
+// jest.mock()のファクトリ内は「mock」で始まる変数しか参照できないため、生成ロジックは外に出す。
+function mockCreateVideoPlayer(configure?: (player: MockVideoPlayer) => void): MockVideoPlayer {
+  // 実際のexpo-videoはイベント名ごとに購読者を分けるため、statusChange以外を購読しても
+  // 誤って発火しないようイベント名でフィルタする。
+  const statusChangeListeners = new Set<(payload: MockVideoPlayerEvent) => void>();
+  const player: MockVideoPlayer = {
+    status: mockVideoPlayerInitialStatus,
+    loop: false,
+    muted: false,
+    play: jest.fn(),
+    addListener: (event, cb) => {
+      if (event !== 'statusChange') {
+        return { remove: () => {} };
+      }
+      statusChangeListeners.add(cb);
+      return { remove: () => statusChangeListeners.delete(cb) };
+    },
+    emitStatusChange: (status) => {
+      const oldStatus = player.status;
+      player.status = status;
+      statusChangeListeners.forEach((cb) => cb({ status, oldStatus }));
+    },
+  };
+  configure?.(player);
+  mockLatestVideoPlayer = player;
+  return player;
+}
+
 jest.mock('expo-video', () => ({
-  useVideoPlayer: () => ({}),
+  useVideoPlayer: (_source: any, configure: any) => mockCreateVideoPlayer(configure),
   VideoView: 'VideoView',
 }));
 
@@ -39,8 +83,9 @@ jest.mock('expo-web-browser', () => ({
 
 import React from 'react';
 import { act, create, type ReactTestInstance } from 'react-test-renderer';
-import { Alert, Text, TouchableOpacity } from 'react-native';
+import { ActivityIndicator, Alert, Text, TouchableOpacity } from 'react-native';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
+import { Image } from 'expo-image';
 import type { Exercise } from '@/db/schema';
 import ExerciseDetailScreen from '@/app/exercise/[id]';
 
@@ -98,6 +143,8 @@ beforeEach(() => {
   mockToggleFavorite.mockResolvedValue(undefined);
   mockRemoveExercise.mockResolvedValue(undefined);
   jest.spyOn(Alert, 'alert').mockImplementation(() => {});
+  mockVideoPlayerInitialStatus = 'readyToPlay';
+  mockLatestVideoPlayer = null;
 });
 
 describe('メモ表示（プリセットのnoteが握りつぶされるバグの再発防止）', () => {
@@ -273,6 +320,80 @@ describe('お気に入りトグル（楽観的UI + ロールバック）', () =>
     expect(Alert.alert).toHaveBeenCalledWith('エラー', 'お気に入りの更新に失敗しました。');
     // ロールバック後は再び「お気に入りに追加」ラベルに戻っている
     expect(findButtonByLabel(root, 'お気に入りに追加')).toBeDefined();
+  });
+});
+
+describe('種目動画のローディング表示', () => {
+  function renderWithVideo() {
+    mockUseExercise.mockReturnValue({
+      exercise: makeExercise({ source: 'preset', slug: 'bench_press' }),
+      loaded: true,
+    });
+    return render();
+  }
+
+  test('読み込み中はスピナーが表示される', () => {
+    mockVideoPlayerInitialStatus = 'loading';
+    const root = renderWithVideo();
+
+    expect(root.findAllByType(ActivityIndicator)).toHaveLength(1);
+    expect(allTexts(root)).not.toContain('⚠️ 動画を読み込めませんでした');
+  });
+
+  test('読み込み完了（readyToPlay）になるとスピナーが消える', () => {
+    mockVideoPlayerInitialStatus = 'loading';
+    const root = renderWithVideo();
+    expect(root.findAllByType(ActivityIndicator)).toHaveLength(1);
+
+    act(() => {
+      mockLatestVideoPlayer!.emitStatusChange('readyToPlay');
+    });
+
+    expect(root.findAllByType(ActivityIndicator)).toHaveLength(0);
+  });
+
+  test('読み込み失敗（error）時はエラー表示になり、無限ローディングにならない', () => {
+    mockVideoPlayerInitialStatus = 'loading';
+    const root = renderWithVideo();
+
+    act(() => {
+      mockLatestVideoPlayer!.emitStatusChange('error');
+    });
+
+    expect(root.findAllByType(ActivityIndicator)).toHaveLength(0);
+    expect(allTexts(root)).toContain('⚠️ 動画を読み込めませんでした');
+  });
+
+  test('idle状態（再生開始前）でもスピナーが表示される', () => {
+    mockVideoPlayerInitialStatus = 'idle';
+    const root = renderWithVideo();
+
+    expect(root.findAllByType(ActivityIndicator)).toHaveLength(1);
+  });
+
+  test('readyToPlayになるとサムネイル画像のオーバーレイも消える', () => {
+    mockVideoPlayerInitialStatus = 'loading';
+    const root = renderWithVideo();
+    expect(root.findAllByType(Image).length).toBeGreaterThan(0);
+
+    act(() => {
+      mockLatestVideoPlayer!.emitStatusChange('readyToPlay');
+    });
+
+    expect(root.findAllByType(Image)).toHaveLength(0);
+  });
+
+  test('動画が無い種目（サムネイルのみ）ではスピナーは表示されない', () => {
+    mockVideoPlayerInitialStatus = 'loading';
+    mockUseExercise.mockReturnValue({
+      exercise: makeExercise({ source: 'custom', slug: null }),
+      loaded: true,
+    });
+
+    const root = render();
+
+    expect(root.findAllByType(ActivityIndicator)).toHaveLength(0);
+    expect(root.findAllByType(Image).length).toBeGreaterThan(0);
   });
 });
 
