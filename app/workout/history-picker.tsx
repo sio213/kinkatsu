@@ -3,7 +3,7 @@ import { NotFoundState } from '@/components/ui/not-found-state';
 import { HistoryEntryCard } from '@/components/workout/history-entry-card';
 import { Colors } from '@/constants/theme';
 import { useExercise } from '@/hooks/use-exercises';
-import { MEASUREMENT_TYPES, type MeasurementType } from '@/lib/exercises/constants';
+import { resolveMeasurementType } from '@/lib/exercises/constants';
 import { computePersonalBestIds, getExerciseHistoryEntries, type HistoryEntry } from '@/lib/workout/history';
 import { notifyPrefilled } from '@/lib/workout/prefill-feedback';
 import { loadHistoryIntoSessionExercise } from '@/lib/workout/session';
@@ -39,12 +39,7 @@ export default function HistoryPickerScreen() {
   // （真偽値だと押していない他のカードまで一律グレーアウトし、どれを押したか分からなくなるため）
   const [loadingCardId, setLoadingCardId] = useState<number | null>(null);
 
-  // 未知のmeasurementType（想定外のDB値）でも画面ごとクラッシュさせず標準の重量×回数にフォールバックする
-  // （session-exercise-card.tsxと同じ理由）
-  const measurementType: MeasurementType =
-    exercise && (MEASUREMENT_TYPES as readonly string[]).includes(exercise.measurementType)
-      ? (exercise.measurementType as MeasurementType)
-      : 'weight_reps';
+  const measurementType = resolveMeasurementType(exercise?.measurementType);
   const columns = MEASUREMENT_COLUMNS[measurementType];
 
   // null=読み込み中、'error'=取得失敗（「記録が無い」と区別してAlertを出す）、配列=取得成功（0件含む）

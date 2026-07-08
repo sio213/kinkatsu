@@ -4,7 +4,7 @@ import { Colors } from '@/constants/theme';
 import type { Set } from '@/db/schema';
 import { useDebouncedPush } from '@/hooks/use-debounced-push';
 import type { SessionExercise } from '@/hooks/use-workout-session';
-import { MEASUREMENT_TYPES, type MeasurementType } from '@/lib/exercises/constants';
+import { resolveMeasurementType } from '@/lib/exercises/constants';
 import { getExerciseImages } from '@/lib/exercises/images';
 import { removeExerciseFromSession, swapExerciseOrder } from '@/lib/workout/session';
 import { MEASUREMENT_COLUMNS, parseColumnsWithFallback } from '@/lib/workout/set-format';
@@ -55,12 +55,7 @@ export const SessionExerciseCard = memo(
     ref,
   ) {
   const images = getExerciseImages(exercise);
-  // 未知のmeasurementType（想定外のDB値）でも画面ごとクラッシュさせず標準の重量×回数にフォールバックする
-  const measurementType: MeasurementType = (
-    MEASUREMENT_TYPES as readonly string[]
-  ).includes(exercise.measurementType)
-    ? (exercise.measurementType as MeasurementType)
-    : 'weight_reps';
+  const measurementType = resolveMeasurementType(exercise.measurementType);
   const columns = MEASUREMENT_COLUMNS[measurementType];
   const isMutatingRef = useRef(false);
   const pushDebounced = useDebouncedPush();
