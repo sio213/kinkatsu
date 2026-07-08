@@ -202,7 +202,7 @@ export const SetRow = memo(
 
 const styles = StyleSheet.create({
   row: { flexDirection: 'row', alignItems: 'center', gap: 7, paddingVertical: 5 },
-  number: { width: 32, textAlign: 'center', ...Typography.metricLabel, color: Colors.textPlaceholder },
+  number: { width: 32, textAlign: 'center', ...Typography.caption, fontWeight: '600', color: Colors.textPlaceholder },
   cellWrapper: { flex: 1 },
   cell: {
     backgroundColor: Colors.surface,

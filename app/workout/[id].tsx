@@ -350,7 +350,7 @@ const styles = StyleSheet.create({
     paddingHorizontal: 12,
     paddingVertical: 6,
   },
-  timerText: { ...Typography.timer, color: Colors.textPrimary },
+  timerText: { ...Typography.metric, color: Colors.textPrimary },
   menuTrigger: {
     width: 32,
     height: 32,
