@@ -1,5 +1,5 @@
 import { DesignIcon } from '@/components/ui/design-icon';
-import { Colors } from '@/constants/theme';
+import { Colors, Typography } from '@/constants/theme';
 import type { HistoryEntry } from '@/lib/workout/history';
 import { formatHistorySetSummary, type SetColumn } from '@/lib/workout/set-format';
 import { formatRelativeDaysAgo, formatSessionDateGroup } from '@/lib/workout/summary';
@@ -84,7 +84,7 @@ const styles = StyleSheet.create({
   topRow: { flexDirection: 'row', alignItems: 'flex-start', justifyContent: 'space-between', gap: 8 },
   info: { flex: 1, gap: 6 },
   dateRow: { flexDirection: 'row', alignItems: 'center', gap: 6, flexWrap: 'wrap' },
-  date: { fontSize: 14, fontWeight: '700', color: Colors.textPrimary },
+  date: { ...Typography.cardTitle, color: Colors.textPrimary },
   relative: { fontSize: 11.5, color: Colors.textMuted },
   bestBadge: {
     flexDirection: 'row',

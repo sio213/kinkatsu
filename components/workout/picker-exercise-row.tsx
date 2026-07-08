@@ -2,7 +2,7 @@ import { CategoryChip } from '@/components/exercises/category-chip';
 import { Checkbox } from '@/components/ui/checkbox';
 import { IconSymbol } from '@/components/ui/icon-symbol';
 import { Radio } from '@/components/ui/radio';
-import { Colors } from '@/constants/theme';
+import { Colors, Typography } from '@/constants/theme';
 import type { Exercise } from '@/db/schema';
 import { getCategoryLabel } from '@/lib/exercises/constants';
 import { getExerciseImages } from '@/lib/exercises/images';
@@ -76,5 +76,5 @@ const styles = StyleSheet.create({
     borderColor: Colors.border,
   },
   info: { flex: 1, gap: 3 },
-  name: { fontSize: 14, fontWeight: '600', color: Colors.textPrimary },
+  name: { ...Typography.cardTitle, color: Colors.textPrimary },
 });

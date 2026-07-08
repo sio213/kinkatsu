@@ -1,4 +1,4 @@
-import { Colors } from '@/constants/theme';
+import { Colors, Typography } from '@/constants/theme';
 import type { Reminder } from '@/db/schema';
 import { formatKindSummary, formatNextFire } from '@/lib/notifications/format';
 import type { ReminderInput, ReminderKind } from '@/lib/notifications/types';
@@ -51,7 +51,7 @@ export function ReminderCard({
       <View style={styles.card}>
         <View style={styles.cardMain}>
           <View style={styles.info}>
-            <Text style={styles.title}>{r.title}</Text>
+            <Text style={styles.title} numberOfLines={1}>{r.title}</Text>
             <Text style={styles.summary}>{formatKindSummary(r)}</Text>
             <Text style={styles.next}>{formatNextFire(getNextFire(r), now)}</Text>
           </View>
@@ -106,7 +106,7 @@ const styles = StyleSheet.create({
   },
   cardMain: { flexDirection: 'row', alignItems: 'center', gap: 12 },
   info: { flex: 1, gap: 2 },
-  title: { fontSize: 15, fontWeight: '600', color: Colors.textPrimary },
+  title: { ...Typography.cardTitle, color: Colors.textPrimary },
   summary: { fontSize: 13, color: Colors.textMuted },
   next: { fontSize: 11, color: Colors.textPlaceholder },
 
@@ -129,5 +129,5 @@ const styles = StyleSheet.create({
     borderColor: Colors.border,
     marginTop: 4,
   },
-  editTitle: { fontSize: 15, fontWeight: '700', color: Colors.textPrimary, marginBottom: 8 },
+  editTitle: { ...Typography.cardTitle, color: Colors.textPrimary, marginBottom: 8 },
 });

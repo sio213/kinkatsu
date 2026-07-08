@@ -1,5 +1,5 @@
 import { CategoryChip } from '@/components/exercises/category-chip';
-import { Colors } from '@/constants/theme';
+import { Colors, Typography } from '@/constants/theme';
 import { getCategoryLabel } from '@/lib/exercises/constants';
 import { pickPrimaryCategory, type PastTrainingSession } from '@/lib/workout/history';
 import { formatRelativeDaysAgo, formatSessionDateGroup } from '@/lib/workout/summary';
@@ -81,7 +81,7 @@ const styles = StyleSheet.create({
   },
   content: { flex: 1, gap: 6 },
   topRow: { flexDirection: 'row', alignItems: 'center', gap: 6, flexWrap: 'wrap' },
-  date: { fontSize: 14, fontWeight: '700', color: Colors.textPrimary },
+  date: { ...Typography.cardTitle, color: Colors.textPrimary },
   relative: { fontSize: 11.5, color: Colors.textMuted },
   exercises: { fontSize: 12.5, color: Colors.textMuted },
   chevron: { fontSize: 20, color: Colors.textPlaceholder, fontWeight: '600' },

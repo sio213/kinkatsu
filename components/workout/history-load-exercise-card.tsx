@@ -1,6 +1,6 @@
 import { CategoryChip } from '@/components/exercises/category-chip';
 import { Checkbox } from '@/components/ui/checkbox';
-import { Colors } from '@/constants/theme';
+import { Colors, Typography } from '@/constants/theme';
 import { getCategoryLabel, resolveMeasurementType } from '@/lib/exercises/constants';
 import { getExerciseImages } from '@/lib/exercises/images';
 import type { SessionHistoryCard } from '@/lib/workout/history';
@@ -66,6 +66,6 @@ const styles = StyleSheet.create({
   },
   info: { flex: 1, gap: 3 },
   nameRow: { flexDirection: 'row', alignItems: 'center', gap: 6 },
-  name: { fontSize: 14, fontWeight: '600', color: Colors.textPrimary, flexShrink: 1 },
+  name: { ...Typography.cardTitle, color: Colors.textPrimary, flexShrink: 1 },
   summary: { fontSize: 12.5, color: Colors.textMuted },
 });
