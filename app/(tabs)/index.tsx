@@ -1,7 +1,7 @@
 import { SessionCard } from '@/components/workout/session-card';
 import { IconSymbol } from '@/components/ui/icon-symbol';
 import { PrimaryButton } from '@/components/ui/primary-button';
-import { Colors } from '@/constants/theme';
+import { Colors, Typography } from '@/constants/theme';
 import type { WorkoutSession } from '@/db/schema';
 import { useSessionStats, useWorkoutSessions } from '@/hooks/use-workout-session';
 import { startWorkoutSession } from '@/lib/workout/session';
@@ -48,7 +48,7 @@ export default function RecordScreen() {
     <SafeAreaView style={styles.safeArea} edges={['top']}>
       <View style={styles.container}>
         <View style={styles.sectionHeader}>
-          <Text style={styles.title}>記録</Text>
+          <Text style={styles.title} numberOfLines={1}>記録</Text>
           {!activeSession && endedSessions.length > 0 && (
             <TouchableOpacity
               style={styles.addBtn}
@@ -115,7 +115,7 @@ const styles = StyleSheet.create({
   container: { flex: 1, padding: 16 },
 
   sectionHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
-  title: { fontSize: 18, fontWeight: '700', color: Colors.textPrimary },
+  title: { ...Typography.screenTitle, color: Colors.textPrimary },
   addBtn: {
     backgroundColor: Colors.accent,
     borderRadius: 8,

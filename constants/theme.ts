@@ -125,7 +125,7 @@ export const headerOptions: NativeStackNavigationOptions = {
   headerBackButtonDisplayMode: 'minimal',
   headerTintColor: Colors.textPlaceholder,
   headerTitleAlign: 'center',
-  headerTitleStyle: { fontSize: 16, fontWeight: '700', color: Colors.textPrimary },
+  headerTitleStyle: { ...Typography.navTitle, color: Colors.textPrimary },
   headerShadowVisible: false,
   headerStyle: { backgroundColor: Colors.background },
 };

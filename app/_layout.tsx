@@ -1,4 +1,4 @@
-import { Colors, headerOptions } from '@/constants/theme';
+import { Colors, headerOptions, Typography } from '@/constants/theme';
 import { db, expoDb } from '@/db/client';
 import { seed } from '@/db/seed';
 import migrations from '@/drizzle/migrations';
@@ -143,7 +143,7 @@ const migrationStyles = StyleSheet.create({
     padding: 32,
     gap: 12,
   },
-  title: { fontSize: 17, fontWeight: '700', color: Colors.danger },
+  title: { ...Typography.navTitle, color: Colors.danger },
   body: {
     fontSize: 14,
     color: Colors.textSecondary,

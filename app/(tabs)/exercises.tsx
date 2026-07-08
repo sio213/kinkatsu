@@ -3,7 +3,7 @@ import { ExerciseCard } from '@/components/exercises/exercise-card';
 import { ExerciseSearchBar } from '@/components/exercises/exercise-search-bar';
 import { ExerciseSortDropdown } from '@/components/exercises/exercise-sort-dropdown';
 import { ListErrorBoundary } from '@/components/ui/list-error-boundary';
-import { Colors } from '@/constants/theme';
+import { Colors, Typography } from '@/constants/theme';
 import type { Exercise } from '@/db/schema';
 import { useExerciseUsageStats } from '@/hooks/use-exercise-usage-stats';
 import { useExercises } from '@/hooks/use-exercises';
@@ -59,7 +59,7 @@ export default function ExercisesScreen() {
   const listHeader = (
     <View style={styles.headerArea}>
       <View style={styles.sectionHeader}>
-        <Text style={styles.title}>種目ライブラリ</Text>
+        <Text style={styles.title} numberOfLines={1}>種目ライブラリ</Text>
         <TouchableOpacity style={styles.addBtn} onPress={() => openCreate()}>
           <Text style={styles.addBtnText}>＋ 追加</Text>
         </TouchableOpacity>
@@ -123,7 +123,7 @@ const styles = StyleSheet.create({
     justifyContent: 'space-between',
     alignItems: 'center',
   },
-  title: { fontSize: 18, fontWeight: '700', color: Colors.textPrimary },
+  title: { ...Typography.screenTitle, color: Colors.textPrimary },
   addBtn: {
     backgroundColor: Colors.accent,
     borderRadius: 8,
