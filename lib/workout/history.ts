@@ -214,6 +214,9 @@ export type SessionHistoryCard = {
   name: string;
   category: string;
   measurementType: string;
+  // サムネイル表示（getExerciseImages）に必要。Exercise型のPick<'source'|'slug'>と同じ形にしておく
+  source: string;
+  slug: string | null;
   sets: HistorySetValues[];
 };
 
@@ -229,6 +232,8 @@ export async function getSessionExerciseCards(sessionId: number): Promise<Sessio
       name: exercises.name,
       category: exercises.category,
       measurementType: exercises.measurementType,
+      source: exercises.source,
+      slug: exercises.slug,
     })
     .from(workoutSessionExercises)
     .innerJoin(exercises, eq(workoutSessionExercises.exerciseId, exercises.id))

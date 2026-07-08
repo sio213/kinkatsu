@@ -80,7 +80,12 @@ export default function SessionHistoryPickerScreen() {
     (session: PastTrainingSession) => {
       pushDebounced({
         pathname: '/workout/session-history-load',
-        params: { sessionId: String(sessionId), sourceSessionId: String(session.sessionId) },
+        params: {
+          sessionId: String(sessionId),
+          sourceSessionId: String(session.sessionId),
+          // 画面3のヘッダーで日付を表示するために渡す。追加のDBクエリを発行せずに済ませるため
+          sourceStartedAt: String(session.startedAt),
+        },
       });
     },
     [pushDebounced, sessionId],
