@@ -2,12 +2,16 @@ import { Colors } from '@/constants/theme';
 import { getCategoryLabel } from '@/lib/exercises/constants';
 import { StyleSheet, Text, View } from 'react-native';
 
-type Props = { category: string };
+type Props = {
+  category: string;
+  // 「過去のトレーニングを選ぶ」画面で複数カテゴリの日を「胸ほか」のように表す時に使う
+  suffix?: string;
+};
 
-export function CategoryChip({ category }: Props) {
+export function CategoryChip({ category, suffix }: Props) {
   return (
     <View style={styles.chip}>
-      <Text style={styles.text}>{getCategoryLabel(category)}</Text>
+      <Text style={styles.text}>{`${getCategoryLabel(category)}${suffix ?? ''}`}</Text>
     </View>
   );
 }

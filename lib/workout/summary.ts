@@ -22,10 +22,19 @@ export function formatSessionDateGroup(startedAt: number): string {
   return `${d.getMonth() + 1}月${d.getDate()}日（${WEEKDAY_LABELS[d.getDay()]}）`;
 }
 
-// 年をまたいでも同じ月日を誤って同一グループにしないための内部キー（表示には使わない）
-function dateGroupKey(startedAt: number): string {
+// 年をまたいでも同じ月日を誤って同一グループにしないための内部キー（表示には使わない）。
+// 「過去のトレーニングを選ぶ」画面で同じ暦日に複数セッションがあるかどうかの判定にも使うためexportする
+export function dateGroupKey(startedAt: number): string {
   const d = new Date(startedAt);
   return `${d.getFullYear()}-${d.getMonth()}-${d.getDate()}`;
+}
+
+// 「過去のトレーニングを選ぶ」画面で、同じ暦日に複数セッションがあり日付だけでは区別できない場合に
+// 開始時刻を補足表示するためのフォーマッタ（例:「8:30」）。lib/notifications/format.tsの
+// HH:MM表記と同じ0埋めの流儀に合わせる
+export function formatSessionTime(startedAt: number): string {
+  const d = new Date(startedAt);
+  return `${String(d.getHours()).padStart(2, '0')}:${String(d.getMinutes()).padStart(2, '0')}`;
 }
 
 // 同じ日付グループのセッションをまとめる。新しい日付が先頭に来る前提（sessionsは降順ソート済み）。
