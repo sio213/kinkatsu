@@ -143,7 +143,7 @@ describe('addHistoryCardsToSession', () => {
       },
     ]);
     expect(result).toEqual([
-      { sessionId: 1, exerciseId: 10, sessionExerciseId: 200, kind: 'history', prefilledSetIds: [900, 901] },
+      { sessionId: 1, exerciseId: 10, sessionExerciseId: 200, kind: 'new', prefilledSetIds: [900, 901] },
     ]);
   });
 
@@ -263,6 +263,6 @@ describe('addHistoryCardsToSession', () => {
 
     const result = await addHistoryCardsToSession(1, [{ exerciseId: 10, sourceWorkoutSessionExerciseId: 999 }]);
 
-    expect(result[0]).toEqual({ sessionId: 1, exerciseId: 10, sessionExerciseId: 200, kind: 'history', prefilledSetIds: [] });
+    expect(result[0]).toEqual({ sessionId: 1, exerciseId: 10, sessionExerciseId: 200, kind: 'new', prefilledSetIds: [] });
   });
 });
