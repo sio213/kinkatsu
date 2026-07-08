@@ -433,14 +433,16 @@ const styles = StyleSheet.create({
   numberLabel: {
     width: 32,
     textAlign: 'center',
-    ...Typography.metricLabel,
+    ...Typography.caption,
+    fontWeight: '600',
     color: Colors.textPlaceholder,
   },
   checkSpacer: { width: 24 },
   columnLabel: {
     flex: 1,
     textAlign: 'center',
-    ...Typography.metricLabel,
+    ...Typography.caption,
+    fontWeight: '600',
     color: Colors.textPlaceholder,
   },
 
