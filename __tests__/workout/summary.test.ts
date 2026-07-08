@@ -102,14 +102,29 @@ describe('formatRelativeDaysAgo', () => {
     expect(formatRelativeDaysAgo(new Date(2026, 6, 2, 8, 0).getTime(), now)).toBe('5日前');
   });
 
-  it('6日前ちょうどはnull（絶対日付のみ表示させる境界）', () => {
+  it('6日前は「6日前」（日単位表示の上限）', () => {
     const sixDaysAgo = new Date(2026, 6, 1, 8, 0).getTime();
-    expect(formatRelativeDaysAgo(sixDaysAgo, now)).toBeNull();
+    expect(formatRelativeDaysAgo(sixDaysAgo, now)).toBe('6日前');
   });
 
-  it('7日以上前もnull', () => {
-    const aWeekAgo = new Date(2026, 5, 30, 8, 0).getTime();
-    expect(formatRelativeDaysAgo(aWeekAgo, now)).toBeNull();
+  it('7〜13日前（1週間〜2週間未満）は「先週」', () => {
+    expect(formatRelativeDaysAgo(new Date(2026, 5, 30, 8, 0).getTime(), now)).toBe('先週');
+    expect(formatRelativeDaysAgo(new Date(2026, 5, 24, 8, 0).getTime(), now)).toBe('先週');
+  });
+
+  it('14日前以降は「N週間前」', () => {
+    expect(formatRelativeDaysAgo(new Date(2026, 5, 23, 8, 0).getTime(), now)).toBe('2週間前');
+    expect(formatRelativeDaysAgo(new Date(2026, 5, 9, 8, 0).getTime(), now)).toBe('4週間前');
+  });
+
+  it('20日前は「2週間前」のまま（21日境界の直前）、21日前で「3週間前」に切り替わる', () => {
+    expect(formatRelativeDaysAgo(new Date(2026, 5, 17, 8, 0).getTime(), now)).toBe('2週間前');
+    expect(formatRelativeDaysAgo(new Date(2026, 5, 16, 8, 0).getTime(), now)).toBe('3週間前');
+  });
+
+  it('未来方向（クロックのずれ等）はnull', () => {
+    const tomorrow = new Date(2026, 6, 8, 8, 0).getTime();
+    expect(formatRelativeDaysAgo(tomorrow, now)).toBeNull();
   });
 
   it('日付境界をまたぐ時刻差（23:59→翌0:01）でも正しく「昨日」判定する', () => {

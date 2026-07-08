@@ -11,3 +11,7 @@ export const expoDb = openDatabaseSync('kinkatsu', {
 expoDb.execSync('PRAGMA foreign_keys = ON;');
 
 export const db = drizzle(expoDb, { schema });
+
+// lib/workout/history.ts・lib/workout/session.tsのトランザクションコールバック引数の型。
+// 両ファイルでそれぞれ定義すると重複するためここに集約する
+export type Tx = Parameters<Parameters<typeof db.transaction>[0]>[0];
