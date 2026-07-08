@@ -198,7 +198,7 @@ const styles = StyleSheet.create({
 
   headerTitleWrap: { alignItems: 'center' },
   headerTitle: { ...Typography.navTitle, color: Colors.textPrimary },
-  headerSubtitle: { fontSize: 11.5, color: Colors.textMuted, marginTop: 1 },
+  headerSubtitle: { ...Typography.caption, color: Colors.textMuted, marginTop: 1 },
 
   banner: {
     flexDirection: 'row',
@@ -208,7 +208,7 @@ const styles = StyleSheet.create({
     paddingHorizontal: 16,
     paddingVertical: 10,
   },
-  bannerText: { flex: 1, fontSize: 12.5, color: Colors.textMuted },
+  bannerText: { flex: 1, ...Typography.footnote, color: Colors.textMuted },
   bannerTextBold: { fontWeight: '700', color: Colors.textSecondary },
 
   list: { flex: 1 },
@@ -223,7 +223,7 @@ const styles = StyleSheet.create({
     paddingHorizontal: 16,
     paddingBottom: 8,
   },
-  monthLabel: { fontSize: 12, fontWeight: '700', color: Colors.textMuted },
+  monthLabel: { ...Typography.caption, fontWeight: '700', color: Colors.textMuted },
   cardSeparator: { height: 8 },
   sectionSeparator: { height: 16 },
 });

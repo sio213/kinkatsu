@@ -3,7 +3,7 @@ import { DesignIcon } from '@/components/ui/design-icon';
 import { NotFoundState } from '@/components/ui/not-found-state';
 import { PrimaryButton } from '@/components/ui/primary-button';
 import { HistoryLoadExerciseCard } from '@/components/workout/history-load-exercise-card';
-import { Colors } from '@/constants/theme';
+import { Colors, Typography } from '@/constants/theme';
 import { getSessionExerciseCards, type SessionHistoryCard } from '@/lib/workout/history';
 import { notifyPrefilled } from '@/lib/workout/prefill-feedback';
 import { addHistoryCardsToSession } from '@/lib/workout/session';
@@ -194,10 +194,10 @@ const styles = StyleSheet.create({
     borderBottomWidth: 1,
     borderBottomColor: Colors.border,
   },
-  headerCount: { fontSize: 12.5, fontWeight: '700', color: Colors.textMuted },
+  headerCount: { ...Typography.footnote, fontWeight: '700', color: Colors.textMuted },
   headerCountValue: { color: Colors.text },
   selectAll: { flexDirection: 'row', alignItems: 'center', gap: 5 },
-  selectAllText: { fontSize: 12.5, fontWeight: '700', color: Colors.accent },
+  selectAllText: { ...Typography.footnote, fontWeight: '700', color: Colors.accent },
 
   loading: { flex: 1, alignItems: 'center', justifyContent: 'center' },
 

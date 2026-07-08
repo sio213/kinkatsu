@@ -414,7 +414,7 @@ const styles = StyleSheet.create({
   // header全体のgap(10)だけに頼ると、ⓘのhitSlop(14pt)と視覚的に密集して見えるため
   trailing: { flexDirection: 'row', alignItems: 'center', gap: 14 },
   collapsedSummary: { flexDirection: 'row', alignItems: 'center', gap: 4 },
-  collapsedSummaryText: { fontSize: 12.5, fontWeight: '600', color: Colors.textPlaceholder },
+  collapsedSummaryText: { ...Typography.footnote, fontWeight: '600', color: Colors.textPlaceholder },
   collapsedChevron: { transform: [{ rotate: '90deg' }] },
   thumbnail: {
     width: 46,
@@ -433,16 +433,14 @@ const styles = StyleSheet.create({
   numberLabel: {
     width: 32,
     textAlign: 'center',
-    fontSize: 11,
-    fontWeight: '600',
+    ...Typography.metricLabel,
     color: Colors.textPlaceholder,
   },
   checkSpacer: { width: 24 },
   columnLabel: {
     flex: 1,
     textAlign: 'center',
-    fontSize: 11,
-    fontWeight: '600',
+    ...Typography.metricLabel,
     color: Colors.textPlaceholder,
   },
 
@@ -457,5 +455,5 @@ const styles = StyleSheet.create({
     borderRadius: 8,
     paddingVertical: 12,
   },
-  actionText: { fontWeight: '600', fontSize: 12.5 },
+  actionText: { ...Typography.footnote, fontWeight: '600' },
 });

@@ -67,5 +67,5 @@ const styles = StyleSheet.create({
   info: { flex: 1, gap: 3 },
   nameRow: { flexDirection: 'row', alignItems: 'center', gap: 6 },
   name: { ...Typography.cardTitle, color: Colors.textPrimary, flexShrink: 1 },
-  summary: { fontSize: 12.5, color: Colors.textMuted },
+  summary: { ...Typography.footnote, color: Colors.textMuted },
 });

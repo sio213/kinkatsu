@@ -340,7 +340,7 @@ const styles = StyleSheet.create({
     paddingTop: 8,
     paddingBottom: 6,
   },
-  headerDate: { fontSize: 12, color: Colors.textMuted },
+  headerDate: { ...Typography.caption, color: Colors.textMuted },
   timerChip: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -377,7 +377,7 @@ const styles = StyleSheet.create({
   menuItemDanger: { color: Colors.danger },
 
   body: { flex: 1, alignItems: 'center', justifyContent: 'center', gap: 16, paddingHorizontal: 16 },
-  emptyText: { fontSize: 13.5, color: Colors.textPlaceholder },
+  emptyText: { ...Typography.footnote, color: Colors.textPlaceholder },
 
   exerciseList: { flex: 1 },
   // 末尾までスクロールした時に「トレーニングを終了」ボタンとAddExerciseButtonがくっついて

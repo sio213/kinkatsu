@@ -107,8 +107,8 @@ const styles = StyleSheet.create({
   cardMain: { flexDirection: 'row', alignItems: 'center', gap: 12 },
   info: { flex: 1, gap: 2 },
   title: { ...Typography.cardTitle, color: Colors.textPrimary },
-  summary: { fontSize: 13, color: Colors.textMuted },
-  next: { fontSize: 11, color: Colors.textPlaceholder },
+  summary: { ...Typography.footnote, color: Colors.textMuted },
+  next: { ...Typography.caption, color: Colors.textPlaceholder },
 
   actions: { flexDirection: 'row', gap: 8 },
   actionBtn: {
@@ -117,7 +117,7 @@ const styles = StyleSheet.create({
     paddingHorizontal: 10,
     backgroundColor: Colors.border,
   },
-  actionBtnText: { fontSize: 12, color: Colors.textBody, fontWeight: '500' },
+  actionBtnText: { ...Typography.caption, color: Colors.textBody },
   actionBtnDanger: { backgroundColor: Colors.dangerSurface },
   actionBtnDangerText: { color: Colors.danger },
 

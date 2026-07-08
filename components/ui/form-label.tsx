@@ -1,4 +1,4 @@
-import { Colors } from '@/constants/theme';
+import { Colors, Typography } from '@/constants/theme';
 import { StyleSheet, Text, View, type StyleProp, type ViewStyle } from 'react-native';
 import { SectionHeading } from './section-heading';
 
@@ -36,6 +36,6 @@ const styles = StyleSheet.create({
     paddingHorizontal: 5,
     paddingVertical: 1,
   },
-  badgeText: { fontSize: 10, fontWeight: '700', color: Colors.danger, letterSpacing: 0.3 },
-  optionalText: { fontSize: 11, fontWeight: '500', color: Colors.textPlaceholder },
+  badgeText: { ...Typography.badge, color: Colors.danger, letterSpacing: 0.3 },
+  optionalText: { ...Typography.caption, color: Colors.textPlaceholder },
 });

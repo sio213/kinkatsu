@@ -345,7 +345,7 @@ const styles = StyleSheet.create({
     paddingHorizontal: 8,
     paddingVertical: 3,
   },
-  categoryText: { fontSize: 11.5, color: Colors.accent, fontWeight: '600' },
+  categoryText: { ...Typography.caption, color: Colors.accent, fontWeight: '600' },
 
   youtubeSection: {
     marginTop: 4,
@@ -368,7 +368,7 @@ const styles = StyleSheet.create({
     paddingHorizontal: 14,
     paddingVertical: 8,
   },
-  youtubeBtnText: { fontSize: 13, fontWeight: '600', color: Colors.accent },
+  youtubeBtnText: { ...Typography.footnote, fontWeight: '600', color: Colors.accent },
 
   section: { gap: 8 },
   sectionBody: { ...Typography.longform, color: Colors.textBody },
@@ -380,10 +380,9 @@ const styles = StyleSheet.create({
     borderRadius: 11,
     backgroundColor: Colors.accent,
     color: Colors.onAccent,
-    fontSize: 12,
-    fontWeight: '700',
-    textAlign: 'center',
+    ...Typography.badge,
     lineHeight: 22,
+    textAlign: 'center',
   },
   pointText: { flex: 1, ...Typography.longform, color: Colors.textBody },
 
@@ -394,7 +393,7 @@ const styles = StyleSheet.create({
     borderLeftWidth: 3,
     borderLeftColor: Colors.warningAccent,
   },
-  cautionText: { fontSize: 13, color: Colors.warningText, lineHeight: 19.5 },
+  cautionText: { ...Typography.footnote, color: Colors.warningText },
 
   noGuide: { ...Typography.body, color: Colors.textPlaceholder, textAlign: 'center', paddingVertical: 24 },
 });

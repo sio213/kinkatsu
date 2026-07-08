@@ -1,4 +1,4 @@
-import { Colors } from '@/constants/theme';
+import { Colors, Typography } from '@/constants/theme';
 import { getCategoryLabel } from '@/lib/exercises/constants';
 import { StyleSheet, Text, View } from 'react-native';
 
@@ -24,5 +24,5 @@ const styles = StyleSheet.create({
     paddingHorizontal: 8,
     paddingVertical: 3,
   },
-  text: { fontSize: 11.5, color: Colors.accent, fontWeight: '600' },
+  text: { ...Typography.caption, color: Colors.accent, fontWeight: '600' },
 });

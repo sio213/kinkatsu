@@ -1,4 +1,4 @@
-import { Colors } from '@/constants/theme';
+import { Colors, Typography } from '@/constants/theme';
 import { openSettings } from '@/lib/notifications/permissions';
 import { StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 
@@ -35,7 +35,7 @@ const styles = StyleSheet.create({
     marginBottom: 8,
     gap: 8,
   },
-  text: { color: Colors.warningText, fontSize: 13 },
+  text: { color: Colors.warningText, ...Typography.footnote },
   btn: {
     backgroundColor: Colors.warning,
     borderRadius: 6,
@@ -43,5 +43,5 @@ const styles = StyleSheet.create({
     paddingHorizontal: 12,
     alignSelf: 'flex-start',
   },
-  btnText: { color: Colors.onAccent, fontSize: 13, fontWeight: '600' },
+  btnText: { color: Colors.onAccent, ...Typography.footnote, fontWeight: '600' },
 });
