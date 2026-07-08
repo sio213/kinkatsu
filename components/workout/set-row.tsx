@@ -1,6 +1,6 @@
 import { DurationInput, type DurationInputHandle } from '@/components/workout/duration-input';
 import { IconSymbol } from '@/components/ui/icon-symbol';
-import { Colors } from '@/constants/theme';
+import { Colors, Typography } from '@/constants/theme';
 import type { Set } from '@/db/schema';
 import type { MeasurementType } from '@/lib/exercises/constants';
 import { MEASUREMENT_COLUMNS, parseColumns, parseColumnsWithFallback, toDisplayValues } from '@/lib/workout/set-format';
@@ -202,7 +202,7 @@ export const SetRow = memo(
 
 const styles = StyleSheet.create({
   row: { flexDirection: 'row', alignItems: 'center', gap: 7, paddingVertical: 5 },
-  number: { width: 32, textAlign: 'center', fontSize: 12, fontWeight: '600', color: Colors.textPlaceholder },
+  number: { width: 32, textAlign: 'center', ...Typography.metricLabel, color: Colors.textPlaceholder },
   cellWrapper: { flex: 1 },
   cell: {
     backgroundColor: Colors.surface,
@@ -211,8 +211,7 @@ const styles = StyleSheet.create({
     borderRadius: 7,
     paddingVertical: 11,
     paddingHorizontal: 10,
-    fontSize: 14,
-    fontWeight: '600',
+    ...Typography.metric,
     color: Colors.textPrimary,
   },
   // ✓未確定のまま値が入っている行の見た目（ゴースト表示）。文字色だけでなく背景・枠線も

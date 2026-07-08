@@ -5,7 +5,7 @@ import { NotFoundState } from '@/components/ui/not-found-state';
 import { PrimaryButton } from '@/components/ui/primary-button';
 import { AddExerciseButton } from '@/components/workout/add-exercise-button';
 import { SessionExerciseCard, type SessionExerciseCardHandle } from '@/components/workout/session-exercise-card';
-import { Colors } from '@/constants/theme';
+import { Colors, Typography } from '@/constants/theme';
 import { useDebouncedPush } from '@/hooks/use-debounced-push';
 import { useKeyboardInset } from '@/hooks/use-keyboard-inset';
 import {
@@ -350,7 +350,7 @@ const styles = StyleSheet.create({
     paddingHorizontal: 12,
     paddingVertical: 6,
   },
-  timerText: { fontSize: 14, fontWeight: '700', color: Colors.textPrimary },
+  timerText: { ...Typography.timer, color: Colors.textPrimary },
   menuTrigger: {
     width: 32,
     height: 32,

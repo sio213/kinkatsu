@@ -1,6 +1,6 @@
 import { CategoryChip } from '@/components/exercises/category-chip';
 import { IconSymbol } from '@/components/ui/icon-symbol';
-import { Colors } from '@/constants/theme';
+import { Colors, Typography } from '@/constants/theme';
 import type { Set } from '@/db/schema';
 import { useDebouncedPush } from '@/hooks/use-debounced-push';
 import type { SessionExercise } from '@/hooks/use-workout-session';
@@ -425,7 +425,7 @@ const styles = StyleSheet.create({
     borderColor: Colors.border,
   },
   info: { flex: 1, gap: 3 },
-  name: { fontSize: 14.5, fontWeight: '700', color: Colors.textPrimary },
+  name: { ...Typography.cardTitle, color: Colors.textPrimary },
 
   body: { padding: 10 },
   bodyHidden: { display: 'none' },
