@@ -1,4 +1,4 @@
-import { Colors } from '@/constants/theme';
+import { Colors, Typography } from '@/constants/theme';
 import { combineDurationDisplay, splitDurationDisplay } from '@/lib/workout/set-format';
 import { forwardRef, useImperativeHandle, useRef, useState } from 'react';
 import { StyleSheet, Text, TextInput, TouchableOpacity, View } from 'react-native';
@@ -130,8 +130,7 @@ const styles = StyleSheet.create({
   // 部分もタップで隣接する入力欄へフォーカスできるようにする
   durationPart: {
     padding: 0,
-    fontSize: 14,
-    fontWeight: '600',
+    ...Typography.metric,
     color: Colors.textPrimary,
   },
   durationPartGhost: { color: Colors.textSecondary },
@@ -139,15 +138,16 @@ const styles = StyleSheet.create({
     flex: 1,
     alignSelf: 'stretch',
   },
+  // フォントサイズ拡大（14→17）に合わせて固定幅も広げ、3桁の分・2桁の秒が収まるようにする。
+  // 距離+時間の種目は99分を超えるセッションもあり得るため、分側は3桁ぶんの余白を多めに確保する
   durationMinPart: {
-    width: 30,
+    width: 40,
   },
   durationSecPart: {
-    width: 24,
+    width: 30,
   },
   durationColon: {
-    fontSize: 14,
-    fontWeight: '600',
+    ...Typography.metric,
     color: Colors.textMuted,
     marginHorizontal: 2,
   },
