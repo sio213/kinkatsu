@@ -5,7 +5,7 @@ import { ListErrorBoundary } from '@/components/ui/list-error-boundary';
 import { NotFoundState } from '@/components/ui/not-found-state';
 import { PrimaryButton } from '@/components/ui/primary-button';
 import { PickerExerciseRow } from '@/components/workout/picker-exercise-row';
-import { Colors } from '@/constants/theme';
+import { Colors, Typography } from '@/constants/theme';
 import type { Exercise } from '@/db/schema';
 import { useDebouncedPush } from '@/hooks/use-debounced-push';
 import { useExerciseUsageStats } from '@/hooks/use-exercise-usage-stats';
@@ -198,7 +198,7 @@ const styles = StyleSheet.create({
   headerArea: { paddingTop: 12, gap: 8, marginBottom: 4 },
   currentExerciseRow: { flexDirection: 'row', alignItems: 'baseline', gap: 6, paddingHorizontal: 2 },
   currentExerciseLabel: { fontSize: 12, color: Colors.textMuted },
-  currentExerciseName: { fontSize: 14, fontWeight: '700', color: Colors.textPrimary, flexShrink: 1 },
+  currentExerciseName: { ...Typography.cardTitle, color: Colors.textPrimary, flexShrink: 1 },
 
   emptyWrapper: { alignItems: 'center', paddingVertical: 32 },
   empty: { color: Colors.textPlaceholder, fontSize: 14 },

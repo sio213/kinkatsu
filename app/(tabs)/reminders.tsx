@@ -2,7 +2,7 @@ import { PermissionBanner } from '@/components/reminders/permission-banner';
 import { ReminderCard } from '@/components/reminders/reminder-card';
 import { ReminderForm } from '@/components/reminders/reminder-form';
 import { ListErrorBoundary } from '@/components/ui/list-error-boundary';
-import { Colors } from '@/constants/theme';
+import { Colors, Typography } from '@/constants/theme';
 import { useKeyboardInset } from '@/hooks/use-keyboard-inset';
 import { useReminders } from '@/hooks/use-reminders';
 import {
@@ -167,5 +167,5 @@ const styles = StyleSheet.create({
     borderColor: Colors.border,
     marginTop: 4,
   },
-  addFormTitle: { fontSize: 15, fontWeight: '700', color: Colors.textPrimary, marginBottom: 8 },
+  addFormTitle: { ...Typography.cardTitle, color: Colors.textPrimary, marginBottom: 8 },
 });

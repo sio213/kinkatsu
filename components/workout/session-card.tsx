@@ -1,4 +1,4 @@
-import { Colors } from '@/constants/theme';
+import { Colors, Typography } from '@/constants/theme';
 import type { WorkoutSession } from '@/db/schema';
 import { useDebouncedPush } from '@/hooks/use-debounced-push';
 import type { SessionSummary } from '@/lib/workout/summary';
@@ -63,7 +63,7 @@ const styles = StyleSheet.create({
   content: { flex: 1, gap: 10 },
   chevron: { fontSize: 20, color: Colors.textPlaceholder, fontWeight: '600' },
   cardRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'baseline' },
-  cardTitle: { fontSize: 14.5, fontWeight: '700', color: Colors.textPrimary },
+  cardTitle: { ...Typography.cardTitle, color: Colors.textPrimary },
   cardDuration: { fontSize: 11, color: Colors.textPlaceholder },
   statRow: { flexDirection: 'row', gap: 6 },
   statChip: {

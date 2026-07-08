@@ -1,5 +1,5 @@
 import { CategoryChip } from '@/components/exercises/category-chip';
-import { Colors } from '@/constants/theme';
+import { Colors, Typography } from '@/constants/theme';
 import type { Exercise } from '@/db/schema';
 import { Image } from 'expo-image';
 import { memo, useCallback } from 'react';
@@ -34,7 +34,7 @@ export const ExerciseCard = memo(function ExerciseCard({
     >
       <Image source={images.thumbnail} style={styles.thumbnail} contentFit="cover" />
       <View style={styles.info}>
-        <Text style={styles.name}>{e.name}</Text>
+        <Text style={styles.name} numberOfLines={1}>{e.name}</Text>
         <View style={styles.meta}>
           <CategoryChip category={e.category} />
         </View>
@@ -73,7 +73,7 @@ const styles = StyleSheet.create({
     borderColor: Colors.border,
   },
   info: { flex: 1, gap: 4 },
-  name: { fontSize: 15, fontWeight: '600', color: Colors.textPrimary },
+  name: { ...Typography.cardTitle, color: Colors.textPrimary },
   meta: { flexDirection: 'row', alignItems: 'center', gap: 6 },
 
   star: { fontSize: 20, color: Colors.borderStrong },
