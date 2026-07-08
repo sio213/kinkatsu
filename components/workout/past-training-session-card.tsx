@@ -2,26 +2,21 @@ import { CategoryChip } from '@/components/exercises/category-chip';
 import { Colors } from '@/constants/theme';
 import { getCategoryLabel } from '@/lib/exercises/constants';
 import { pickPrimaryCategory, type PastTrainingSession } from '@/lib/workout/history';
-import { formatRelativeDaysAgo, formatSessionDateGroup, formatSessionTime } from '@/lib/workout/summary';
+import { formatRelativeDaysAgo, formatSessionDateGroup } from '@/lib/workout/summary';
 import { memo, useCallback, useMemo } from 'react';
 import { StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 
 type Props = {
   session: PastTrainingSession;
   onPress: (session: PastTrainingSession) => void;
-  // 同じ暦日に複数セッションがあり日付だけでは区別できない場合に開始時刻を補足表示する
-  // （getPastTrainingSessionsはカレンダー日ではなくセッション単位で返すため起こりうる）
-  showTime?: boolean;
 };
 
 export const PastTrainingSessionCard = memo(function PastTrainingSessionCard({
   session,
   onPress,
-  showTime = false,
 }: Props) {
   const dateLabel = formatSessionDateGroup(session.startedAt);
   const relativeLabel = formatRelativeDaysAgo(session.startedAt);
-  const timeLabel = showTime ? formatSessionTime(session.startedAt) : null;
 
   const { primaryCategory, hasOtherCategories, exerciseNamesLabel } = useMemo(() => {
     const category = pickPrimaryCategory(session.exercises);
@@ -41,7 +36,6 @@ export const PastTrainingSessionCard = memo(function PastTrainingSessionCard({
   // カード全体を1つの読み上げ単位にまとめる（history-entry-card.tsxと同じ考え方）
   const accessibilityLabel = [
     dateLabel,
-    timeLabel,
     primaryCategory != null ? `${getCategoryLabel(primaryCategory)}${hasOtherCategories ? 'ほか' : ''}` : null,
     relativeLabel,
     exerciseNamesLabel,
@@ -59,7 +53,6 @@ export const PastTrainingSessionCard = memo(function PastTrainingSessionCard({
       <View style={styles.content}>
         <View style={styles.topRow}>
           <Text style={styles.date}>{dateLabel}</Text>
-          {timeLabel && <Text style={styles.time}>{timeLabel}</Text>}
           {primaryCategory != null && (
             <CategoryChip category={primaryCategory} suffix={hasOtherCategories ? 'ほか' : undefined} />
           )}
@@ -75,20 +68,20 @@ export const PastTrainingSessionCard = memo(function PastTrainingSessionCard({
 });
 
 const styles = StyleSheet.create({
-  // デザイン画像はカードの箱（背景・枠線）ではなく、行間を細いディバイダーで区切るフラットな
-  // リストのため、他の一覧カード（session-card.tsx等）とは異なりPickerExerciseRowに近いスタイルにする
+  // session-card.tsx等の記録系カードと同じ箱型スタイルに統一
   row: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: 8,
-    paddingVertical: 12,
-    borderBottomWidth: 1,
-    borderBottomColor: Colors.border,
+    backgroundColor: Colors.surfaceMuted,
+    borderRadius: 10,
+    padding: 12,
+    borderWidth: 1,
+    borderColor: Colors.border,
   },
   content: { flex: 1, gap: 6 },
   topRow: { flexDirection: 'row', alignItems: 'center', gap: 6, flexWrap: 'wrap' },
   date: { fontSize: 14, fontWeight: '700', color: Colors.textPrimary },
-  time: { fontSize: 11.5, color: Colors.textMuted },
   relative: { fontSize: 11.5, color: Colors.textMuted },
   exercises: { fontSize: 12.5, color: Colors.textMuted },
   chevron: { fontSize: 20, color: Colors.textPlaceholder, fontWeight: '600' },
