@@ -1,7 +1,7 @@
 import { DesignIcon } from '@/components/ui/design-icon';
 import { NotFoundState } from '@/components/ui/not-found-state';
 import { HistoryEntryCard } from '@/components/workout/history-entry-card';
-import { Colors } from '@/constants/theme';
+import { Colors, Typography } from '@/constants/theme';
 import { useExercise } from '@/hooks/use-exercises';
 import { resolveMeasurementType } from '@/lib/exercises/constants';
 import { computePersonalBestIds, getExerciseHistoryEntries, type HistoryEntry } from '@/lib/workout/history';
@@ -197,7 +197,7 @@ const styles = StyleSheet.create({
   safeArea: { flex: 1, backgroundColor: Colors.background },
 
   headerTitleWrap: { alignItems: 'center' },
-  headerTitle: { fontSize: 16, fontWeight: '700', color: Colors.textPrimary },
+  headerTitle: { ...Typography.navTitle, color: Colors.textPrimary },
   headerSubtitle: { fontSize: 11.5, color: Colors.textMuted, marginTop: 1 },
 
   banner: {

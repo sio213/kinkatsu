@@ -100,7 +100,7 @@ export default function RemindersScreen() {
           )}
 
           <View style={styles.sectionHeader}>
-            <Text style={styles.title}>筋トレリマインダー</Text>
+            <Text style={styles.title} numberOfLines={1}>筋トレリマインダー</Text>
             {!showForm && (
               <TouchableOpacity style={styles.addBtn} onPress={openCreate}>
                 <Text style={styles.addBtnText}>＋ 追加</Text>
@@ -149,7 +149,7 @@ const styles = StyleSheet.create({
   scroll: { padding: 16, gap: 12, paddingBottom: 40 },
 
   sectionHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
-  title: { fontSize: 18, fontWeight: '700', color: Colors.textPrimary },
+  title: { ...Typography.screenTitle, color: Colors.textPrimary },
   addBtn: {
     backgroundColor: Colors.accent,
     borderRadius: 8,
