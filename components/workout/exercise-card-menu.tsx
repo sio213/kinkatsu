@@ -1,6 +1,6 @@
 import { DesignIcon } from '@/components/ui/design-icon';
 import { IconSymbol } from '@/components/ui/icon-symbol';
-import { Colors } from '@/constants/theme';
+import { Colors, Typography } from '@/constants/theme';
 import { useRef, useState } from 'react';
 import { Dimensions, Keyboard, Modal, Pressable, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 
@@ -175,7 +175,7 @@ const styles = StyleSheet.create({
     elevation: 4,
   },
   menuItem: { flexDirection: 'row', alignItems: 'center', gap: 9, paddingVertical: 9, paddingHorizontal: 10 },
-  menuItemText: { fontSize: 13, fontWeight: '500', color: Colors.textPrimary },
+  menuItemText: { ...Typography.body, fontWeight: '500', color: Colors.textPrimary },
   menuItemDisabled: { color: Colors.textPlaceholder },
   menuItemDanger: { color: Colors.danger },
 });

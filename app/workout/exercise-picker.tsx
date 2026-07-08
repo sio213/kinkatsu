@@ -162,7 +162,7 @@ const styles = StyleSheet.create({
   headerArea: { paddingTop: 12, gap: 8, marginBottom: 4 },
 
   emptyWrapper: { alignItems: 'center', paddingVertical: 32 },
-  empty: { color: Colors.textPlaceholder, ...Typography.body, textAlign: 'center' },
+  empty: { color: Colors.textMuted, ...Typography.body, textAlign: 'center' },
 
   footer: {
     padding: 16,

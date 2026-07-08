@@ -135,7 +135,7 @@ const styles = StyleSheet.create({
   separator: { height: 8 },
 
   emptyWrapper: { alignItems: 'center', paddingVertical: 32, gap: 12 },
-  empty: { color: Colors.textPlaceholder, ...Typography.body, textAlign: 'center' },
+  empty: { color: Colors.textMuted, ...Typography.body, textAlign: 'center' },
   emptyAddBtn: {
     backgroundColor: Colors.accent,
     borderRadius: 8,

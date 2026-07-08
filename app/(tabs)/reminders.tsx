@@ -157,7 +157,7 @@ const styles = StyleSheet.create({
     paddingVertical: 6,
   },
   addBtnText: { color: Colors.onAccent, ...Typography.bodyStrong },
-  empty: { ...Typography.body, color: Colors.textPlaceholder, textAlign: 'center', paddingVertical: 16 },
+  empty: { ...Typography.body, color: Colors.textMuted, textAlign: 'center', paddingVertical: 16 },
 
   addFormWrapper: {
     backgroundColor: Colors.surfaceSubtle,

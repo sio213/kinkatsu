@@ -1,5 +1,5 @@
 import { DesignIcon } from '@/components/ui/design-icon';
-import { Colors } from '@/constants/theme';
+import { Colors, Typography } from '@/constants/theme';
 import { EXERCISE_SORT_LABELS, type ExerciseSortBy } from '@/lib/exercises/constants';
 import { useRef, useState } from 'react';
 import { Dimensions, Keyboard, Modal, Pressable, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
@@ -115,7 +115,7 @@ const styles = StyleSheet.create({
     paddingVertical: 6,
     paddingHorizontal: 4,
   },
-  triggerText: { fontSize: 13, fontWeight: '600', color: Colors.textMuted },
+  triggerText: { ...Typography.footnote, fontWeight: '600', color: Colors.textMuted },
   backdrop: { flex: 1 },
   menu: {
     position: 'absolute',
@@ -142,6 +142,6 @@ const styles = StyleSheet.create({
   },
   menuItemSelected: { backgroundColor: Colors.accentSurface },
   checkSlot: { width: 16, alignItems: 'center' },
-  menuItemText: { fontSize: 14, fontWeight: '500', color: Colors.textPrimary },
+  menuItemText: { ...Typography.body, fontWeight: '500', color: Colors.textPrimary },
   menuItemTextSelected: { color: Colors.accent, fontWeight: '600' },
 });
