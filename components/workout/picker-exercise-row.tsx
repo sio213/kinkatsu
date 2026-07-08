@@ -1,6 +1,7 @@
 import { CategoryChip } from '@/components/exercises/category-chip';
 import { Checkbox } from '@/components/ui/checkbox';
 import { IconSymbol } from '@/components/ui/icon-symbol';
+import { Radio } from '@/components/ui/radio';
 import { Colors } from '@/constants/theme';
 import type { Exercise } from '@/db/schema';
 import { getCategoryLabel } from '@/lib/exercises/constants';
@@ -37,13 +38,7 @@ export const PickerExerciseRow = memo(function PickerExerciseRow({
       accessibilityState={{ checked: selected }}
       accessibilityLabel={`${e.name}、${getCategoryLabel(e.category)}`}
     >
-      {isRadio ? (
-        <View style={[styles.radio, selected && styles.radioSelected]}>
-          {selected && <View style={styles.radioDot} />}
-        </View>
-      ) : (
-        <Checkbox checked={selected} />
-      )}
+      {isRadio ? <Radio selected={selected} size={22} /> : <Checkbox checked={selected} size={22} />}
       <Image source={images.thumbnail} style={styles.thumbnail} contentFit="cover" />
       <View style={styles.info}>
         <Text style={styles.name} numberOfLines={1}>
@@ -71,22 +66,6 @@ const styles = StyleSheet.create({
     paddingVertical: 12,
     borderBottomWidth: 1,
     borderBottomColor: Colors.border,
-  },
-  radio: {
-    width: 22,
-    height: 22,
-    borderRadius: 11,
-    borderWidth: 1.5,
-    borderColor: Colors.borderStrong,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  radioSelected: { borderColor: Colors.accent },
-  radioDot: {
-    width: 11,
-    height: 11,
-    borderRadius: 5.5,
-    backgroundColor: Colors.accent,
   },
   thumbnail: {
     width: 40,

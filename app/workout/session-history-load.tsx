@@ -117,7 +117,9 @@ export default function SessionHistoryLoadScreen() {
 
       {hasCards && (
         <View style={styles.header}>
-          <Text style={styles.headerCount}>{`読み込む種目 ${selectedIds.size}/${loadedCards.length}`}</Text>
+          <Text style={styles.headerCount}>
+            読み込む種目 <Text style={styles.headerCountValue}>{`${selectedIds.size} / ${loadedCards.length}`}</Text>
+          </Text>
           <TouchableOpacity
             style={styles.selectAll}
             onPress={handleToggleAll}
@@ -186,21 +188,16 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'space-between',
     paddingHorizontal: 16,
-    paddingTop: 12,
-    paddingBottom: 4,
+    paddingVertical: 12,
+    borderTopWidth: 1,
+    borderTopColor: Colors.border,
+    borderBottomWidth: 1,
+    borderBottomColor: Colors.border,
   },
-  headerCount: { fontSize: 12.5, color: Colors.textMuted },
-  // デザイン画像の「全選択」はチップに近いピル型のタップ領域。chip-styles.tsxと似た配色にする
-  selectAll: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 6,
-    backgroundColor: Colors.accentSurface,
-    borderRadius: 999,
-    paddingHorizontal: 10,
-    paddingVertical: 6,
-  },
-  selectAllText: { fontSize: 12.5, fontWeight: '600', color: Colors.accent },
+  headerCount: { fontSize: 12.5, fontWeight: '700', color: Colors.textMuted },
+  headerCountValue: { color: Colors.text },
+  selectAll: { flexDirection: 'row', alignItems: 'center', gap: 5 },
+  selectAllText: { fontSize: 12.5, fontWeight: '700', color: Colors.accent },
 
   loading: { flex: 1, alignItems: 'center', justifyContent: 'center' },
 
