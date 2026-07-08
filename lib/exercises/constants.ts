@@ -68,6 +68,10 @@ export const CATEGORY_ORDER: Record<string, number> = Object.fromEntries(
   EXERCISE_CATEGORIES.map((c, i) => [c, i]),
 );
 
+// CATEGORY_ORDER[category]は未知のカテゴリ文字列に対してundefinedを返すため、
+// ソート・タイブレークの際は必ずこの番兵値でフォールバックし、未知カテゴリを末尾に送る
+export const UNKNOWN_CATEGORY_ORDER = EXERCISE_CATEGORIES.length;
+
 export function isPresetExercise(exercise: { source: string }): boolean {
   return exercise.source === 'preset';
 }

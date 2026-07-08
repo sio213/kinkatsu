@@ -1,6 +1,6 @@
 import { db, type Tx } from '@/db/client';
 import { exercises, sets, workoutSessionExercises, workoutSessions } from '@/db/schema';
-import type { MeasurementType } from '@/lib/exercises/constants';
+import { UNKNOWN_CATEGORY_ORDER, CATEGORY_ORDER, type MeasurementType } from '@/lib/exercises/constants';
 import { and, desc, eq, inArray, isNotNull, ne } from 'drizzle-orm';
 
 export type PreviousSetValues = {
@@ -181,6 +181,31 @@ export async function getPastTrainingSessions(excludeSessionId: number): Promise
     entry.exercises.push({ exerciseId: c.exerciseId, name: c.name, category: c.category });
   }
   return Array.from(sessionsById.values());
+}
+
+// 「過去のトレーニングを選ぶ」画面のカードで、複数カテゴリの日を「胸ほか」のように表す際の
+// 代表カテゴリを決める。そのセッションで最も種目数が多いカテゴリを選び、同数の場合はCATEGORY_ORDER
+// （胸/背中→肩→腕→脚→お尻→体幹/腹筋→有酸素→その他）で先に来る方を優先し、常に同じ結果になるようにする。
+// getPastTrainingSessionsは✓確定セットを持つカードが1件以上あるセッションしか返さないため、
+// 呼び出し側はexercisesが空でないことを前提にできるが、念のため空配列はガードする
+export function pickPrimaryCategory(exercises: PastTrainingSessionExercise[]): string | null {
+  if (exercises.length === 0) return null;
+  const counts = new Map<string, number>();
+  for (const e of exercises) {
+    counts.set(e.category, (counts.get(e.category) ?? 0) + 1);
+  }
+  let best = exercises[0].category;
+  for (const [category, count] of counts) {
+    const bestCount = counts.get(best)!;
+    if (
+      count > bestCount ||
+      (count === bestCount &&
+        (CATEGORY_ORDER[category] ?? UNKNOWN_CATEGORY_ORDER) < (CATEGORY_ORDER[best] ?? UNKNOWN_CATEGORY_ORDER))
+    ) {
+      best = category;
+    }
+  }
+  return best;
 }
 
 export type SessionHistoryCard = {

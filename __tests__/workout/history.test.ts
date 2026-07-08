@@ -16,7 +16,7 @@ jest.mock('drizzle-orm', () => ({
   ne: jest.fn(),
 }));
 
-import { computePersonalBestIds, type HistoryEntry } from '@/lib/workout/history';
+import { computePersonalBestIds, pickPrimaryCategory, type HistoryEntry, type PastTrainingSessionExercise } from '@/lib/workout/history';
 
 function entry(
   workoutSessionExerciseId: number,
@@ -162,5 +162,41 @@ describe('computePersonalBestIds', () => {
     const original = [...entries];
     computePersonalBestIds(entries, 'weight_reps');
     expect(entries).toEqual(original);
+  });
+});
+
+function exercise(category: string, name = category): PastTrainingSessionExercise {
+  return { exerciseId: Math.random(), name, category };
+}
+
+describe('pickPrimaryCategory', () => {
+  it('exercisesが空配列ならnullを返す（getPastTrainingSessionsが空セッションを返さない前提の防御）', () => {
+    expect(pickPrimaryCategory([])).toBeNull();
+  });
+
+  it('単一カテゴリならそのカテゴリを返す', () => {
+    expect(pickPrimaryCategory([exercise('chest'), exercise('chest')])).toBe('chest');
+  });
+
+  it('種目数が最も多いカテゴリを返す', () => {
+    expect(pickPrimaryCategory([exercise('chest'), exercise('chest'), exercise('shoulder')])).toBe('chest');
+  });
+
+  it('先頭要素が最終的な代表カテゴリでなくても、種目数最多のカテゴリを正しく選ぶ（best更新分岐の回帰防止）', () => {
+    // shoulderが先頭だがchestの方が種目数が多い
+    expect(pickPrimaryCategory([exercise('shoulder'), exercise('chest'), exercise('chest')])).toBe('chest');
+  });
+
+  it('種目数が同数の場合はCATEGORY_ORDER（胸/背中→肩→腕→脚→...）で先に来るカテゴリを優先する', () => {
+    expect(pickPrimaryCategory([exercise('back'), exercise('chest')])).toBe('chest');
+  });
+
+  it('3カテゴリが同数で並ぶ場合も、配列の並び順に関わらずCATEGORY_ORDERで先に来るカテゴリを優先する', () => {
+    // 配列順(glute→shoulder→chest)とCATEGORY_ORDER順(chest→...→glute)が逆転しているケース
+    expect(pickPrimaryCategory([exercise('glute'), exercise('shoulder'), exercise('chest')])).toBe('chest');
+  });
+
+  it('未知のカテゴリ文字列が混ざっていてもクラッシュせず、既知カテゴリの方を優先する', () => {
+    expect(pickPrimaryCategory([exercise('legacy_unknown'), exercise('chest')])).toBe('chest');
   });
 });

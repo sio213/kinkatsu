@@ -5,6 +5,7 @@ import {
   CATEGORY_ORDER,
   getCategoryLabel,
   getCategoryLabelReading,
+  UNKNOWN_CATEGORY_ORDER,
   type ExerciseSortBy,
 } from './constants';
 import { getReading } from './readings';
@@ -101,8 +102,8 @@ function byName(a: Exercise, b: Exercise): number {
 }
 
 function byCategoryThenName(a: Exercise, b: Exercise): number {
-  const ai = CATEGORY_ORDER[a.category] ?? 99;
-  const bi = CATEGORY_ORDER[b.category] ?? 99;
+  const ai = CATEGORY_ORDER[a.category] ?? UNKNOWN_CATEGORY_ORDER;
+  const bi = CATEGORY_ORDER[b.category] ?? UNKNOWN_CATEGORY_ORDER;
   return ai !== bi ? ai - bi : byName(a, b);
 }
 
