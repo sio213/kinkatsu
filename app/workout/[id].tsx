@@ -6,6 +6,7 @@ import { PrimaryButton } from '@/components/ui/primary-button';
 import { AddExerciseButton } from '@/components/workout/add-exercise-button';
 import { SessionExerciseCard, type SessionExerciseCardHandle } from '@/components/workout/session-exercise-card';
 import { Colors } from '@/constants/theme';
+import { useDebouncedPush } from '@/hooks/use-debounced-push';
 import { useKeyboardInset } from '@/hooks/use-keyboard-inset';
 import {
   EMPTY_PREFILLED_SET_IDS,
@@ -37,6 +38,7 @@ function formatElapsed(ms: number): string {
 export default function WorkoutScreen() {
   const { id } = useLocalSearchParams<{ id: string }>();
   const router = useRouter();
+  const pushDebounced = useDebouncedPush();
   const parsedId = Number(id);
   const sessionId = Number.isFinite(parsedId) ? parsedId : null;
   const { session, loaded } = useWorkoutSession(sessionId ?? -1);
@@ -169,6 +171,14 @@ export default function WorkoutScreen() {
     router.push({ pathname: '/workout/exercise-picker', params: { sessionId: String(sessionId) } });
   };
 
+  const handleLoadFromHistory = () => {
+    if (sessionId == null) return;
+    setMenuOpen(false);
+    // Modalのフェードアウト中に連打されるとpushが二重発火しうるため、種目カード側の
+    // 「過去の記録から読み込む」（session-exercise-card.tsx）や他画面の遷移と同じくデバウンスする
+    pushDebounced({ pathname: '/workout/session-history-picker', params: { sessionId: String(sessionId) } });
+  };
+
   const handleDeleteSession = () => {
     if (sessionId == null) return;
     setMenuOpen(false);
@@ -236,6 +246,14 @@ export default function WorkoutScreen() {
       <Modal visible={menuOpen} transparent animationType="fade" onRequestClose={() => setMenuOpen(false)}>
         <Pressable style={styles.menuBackdrop} onPress={() => setMenuOpen(false)} />
         <View style={[styles.menu, { top: headerHeight, right: 16 }]}>
+          <TouchableOpacity
+            style={styles.menuItem}
+            onPress={handleLoadFromHistory}
+            accessibilityLabel="過去の記録から読み込む"
+          >
+            <DesignIcon name="history" size={18} color={Colors.textMuted} />
+            <Text style={styles.menuItemText}>過去の記録から読み込む</Text>
+          </TouchableOpacity>
           <TouchableOpacity style={styles.menuItem} onPress={handleDeleteSession} accessibilityLabel="削除">
             <DesignIcon name="delete-outline" size={18} color={Colors.danger} />
             <Text style={[styles.menuItemText, styles.menuItemDanger]}>削除</Text>

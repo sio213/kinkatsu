@@ -199,7 +199,12 @@ export type HistoryCardSelection = { exerciseId: number; sourceWorkoutSessionExe
 // 新規カードとして一括追加する。addExercisesToSessionと違い「その種目の直近の記録」ではなく、
 // ユーザーが画面上で確認した「選んだ過去カードそのもの」のセット値をコピーする（見た値と入る値が
 // 一致することを保証するため）。同じ種目が今日のセッションに既にあっても上書きはせず、常に
-// 新規カードとして追加する（種目追加ピッカーと同じ「同じ種目を複数回追加できる」仕様を踏襲）
+// 新規カードとして追加する（種目追加ピッカーと同じ「同じ種目を複数回追加できる」仕様を踏襲）。
+// kindは（loadHistoryIntoSessionExerciseと同じ'history'ではなく）'new'にする。ここで作るのは
+// 既存カードの差し替えではなく常に新規のworkoutSessionExercises行なので、種目追加ピッカーと
+// 同様にapp/workout/[id].tsxのオートフォーカス・自動スクロール対象（kind==='new'）に含める必要がある
+// （@designerレビュー: 'history'のままだと一覧末尾に追加されても画面がスクロールせず、
+// 読み込みが成功したかユーザーが確認できないというUXバグになるため修正）
 export async function addHistoryCardsToSession(
   sessionId: number,
   selections: HistoryCardSelection[],
@@ -207,7 +212,7 @@ export async function addHistoryCardsToSession(
   if (selections.length === 0) return [];
   const now = Date.now();
   return db.transaction((tx) =>
-    insertSessionExerciseCards(tx, sessionId, selections, now, 'history', (t, spec) =>
+    insertSessionExerciseCards(tx, sessionId, selections, now, 'new', (t, spec) =>
       getPreviousSetsForCard(t, spec.sourceWorkoutSessionExerciseId),
     ),
   );
