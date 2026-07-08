@@ -1,5 +1,5 @@
 import { IconSymbol } from '@/components/ui/icon-symbol';
-import { Colors } from '@/constants/theme';
+import { Colors, Typography } from '@/constants/theme';
 import { StyleSheet, Text, TouchableOpacity, type StyleProp, type ViewStyle } from 'react-native';
 
 type Props = {
@@ -33,5 +33,5 @@ const styles = StyleSheet.create({
     paddingHorizontal: 16,
     paddingVertical: 11,
   },
-  text: { color: Colors.accent, fontWeight: '600', fontSize: 14 },
+  text: { color: Colors.accent, ...Typography.bodyStrong },
 });

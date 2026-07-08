@@ -1,4 +1,4 @@
-import { Colors } from '@/constants/theme';
+import { Colors, Typography } from '@/constants/theme';
 import { DesignIcon } from '@/components/ui/design-icon';
 import { IconSymbol } from '@/components/ui/icon-symbol';
 import { NotFoundState } from '@/components/ui/not-found-state';
@@ -371,7 +371,7 @@ const styles = StyleSheet.create({
   youtubeBtnText: { fontSize: 13, fontWeight: '600', color: Colors.accent },
 
   section: { gap: 8 },
-  sectionBody: { fontSize: 14, color: Colors.textBody, lineHeight: 22 },
+  sectionBody: { ...Typography.longform, color: Colors.textBody },
 
   pointRow: { flexDirection: 'row', gap: 10, alignItems: 'flex-start' },
   pointNumber: {
@@ -385,7 +385,7 @@ const styles = StyleSheet.create({
     textAlign: 'center',
     lineHeight: 22,
   },
-  pointText: { flex: 1, fontSize: 14, color: Colors.textBody, lineHeight: 22 },
+  pointText: { flex: 1, ...Typography.longform, color: Colors.textBody },
 
   cautionBox: {
     backgroundColor: Colors.warningSurface,
@@ -396,5 +396,5 @@ const styles = StyleSheet.create({
   },
   cautionText: { fontSize: 13, color: Colors.warningText, lineHeight: 19.5 },
 
-  noGuide: { fontSize: 14, color: Colors.textPlaceholder, textAlign: 'center', paddingVertical: 24 },
+  noGuide: { ...Typography.body, color: Colors.textPlaceholder, textAlign: 'center', paddingVertical: 24 },
 });

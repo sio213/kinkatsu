@@ -1,4 +1,4 @@
-import { Colors } from '@/constants/theme';
+import { Colors, Typography } from '@/constants/theme';
 import { StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 
 type Props = {
@@ -26,12 +26,12 @@ export function NotFoundState({ message, actionLabel, onPressAction }: Props) {
 
 const styles = StyleSheet.create({
   notFound: { flex: 1, alignItems: 'center', justifyContent: 'center', gap: 16, paddingHorizontal: 24 },
-  notFoundText: { fontSize: 15, color: Colors.textMuted },
+  notFoundText: { ...Typography.body, color: Colors.textMuted },
   notFoundBackBtn: {
     backgroundColor: Colors.accent,
     borderRadius: 8,
     paddingHorizontal: 20,
     paddingVertical: 10,
   },
-  notFoundBackBtnText: { color: Colors.onAccent, fontWeight: '600', fontSize: 14 },
+  notFoundBackBtnText: { color: Colors.onAccent, ...Typography.bodyStrong },
 });

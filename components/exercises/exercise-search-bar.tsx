@@ -1,5 +1,5 @@
 import { IconSymbol } from '@/components/ui/icon-symbol';
-import { Colors } from '@/constants/theme';
+import { Colors, Typography } from '@/constants/theme';
 import { Platform, StyleSheet, TextInput, TouchableOpacity, View } from 'react-native';
 
 type Props = {
@@ -64,7 +64,7 @@ const styles = StyleSheet.create({
     paddingLeft: 36,
     paddingRight: 36,
     paddingVertical: 9,
-    fontSize: 14,
+    ...Typography.body,
     color: Colors.textPrimary,
     backgroundColor: Colors.surfaceMuted,
   },

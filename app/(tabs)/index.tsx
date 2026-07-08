@@ -122,7 +122,7 @@ const styles = StyleSheet.create({
     paddingHorizontal: 16,
     paddingVertical: 12,
   },
-  addBtnText: { color: Colors.onAccent, fontWeight: '600', fontSize: 14 },
+  addBtnText: { color: Colors.onAccent, ...Typography.bodyStrong },
 
   resumeBanner: {
     flexDirection: 'row',
@@ -133,10 +133,10 @@ const styles = StyleSheet.create({
     padding: 12,
     marginTop: 12,
   },
-  resumeBannerText: { color: Colors.accent, fontWeight: '600', fontSize: 14 },
+  resumeBannerText: { color: Colors.accent, ...Typography.bodyStrong },
 
   empty: { flex: 1, alignItems: 'center', justifyContent: 'center', gap: 12 },
-  emptyText: { fontSize: 14, color: Colors.textPlaceholder, textAlign: 'center', lineHeight: 20 },
+  emptyText: { ...Typography.body, color: Colors.textPlaceholder, textAlign: 'center' },
   startBtn: {
     paddingHorizontal: 20,
     marginTop: 4,
