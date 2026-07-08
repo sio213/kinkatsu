@@ -45,11 +45,11 @@ const singleCategorySession: PastTrainingSession = {
   ],
 };
 
-function render(session: PastTrainingSession = singleCategorySession, showTime = false) {
+function render(session: PastTrainingSession = singleCategorySession) {
   const onPress = jest.fn();
   let instance!: ReturnType<typeof create>;
   act(() => {
-    instance = create(<PastTrainingSessionCard session={session} onPress={onPress} showTime={showTime} />);
+    instance = create(<PastTrainingSessionCard session={session} onPress={onPress} />);
   });
   return { root: instance.root, onPress };
 }
@@ -135,15 +135,7 @@ test('右端に遷移を示すchevronを表示する', () => {
   expect(root.findAllByType(Text).some((t) => t.props.children === '›')).toBe(true);
 });
 
-test('showTimeがfalse（既定）なら開始時刻を表示しない', () => {
+test('開始時刻は表示しない', () => {
   const { root } = render();
   expect(() => root.findByProps({ children: '10:00' })).toThrow();
-});
-
-test('showTimeがtrueなら開始時刻を表示し、accessibilityLabelにも含める（同じ暦日に複数セッションある場合の区別用）', () => {
-  const { root } = render(singleCategorySession, true);
-  expect(root.findByProps({ children: '10:00' })).toBeDefined();
-  expect(
-    root.findByProps({ accessibilityLabel: '7月1日（水）、10:00、胸、2日前、ベンチプレス・ダンベルフライ' }),
-  ).toBeDefined();
 });

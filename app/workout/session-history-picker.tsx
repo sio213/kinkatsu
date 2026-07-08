@@ -5,7 +5,7 @@ import { Colors } from '@/constants/theme';
 import { useDebouncedPush } from '@/hooks/use-debounced-push';
 import { CATEGORY_ALL, CATEGORY_ORDER, UNKNOWN_CATEGORY_ORDER } from '@/lib/exercises/constants';
 import { getPastTrainingSessions, type PastTrainingSession } from '@/lib/workout/history';
-import { dateGroupKey, groupByMonth } from '@/lib/workout/summary';
+import { groupByMonth } from '@/lib/workout/summary';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { ActivityIndicator, SectionList, StyleSheet, Text, View } from 'react-native';
@@ -58,18 +58,6 @@ export default function SessionHistoryPickerScreen() {
     if (activeCategory === CATEGORY_ALL) return loadedSessions;
     return loadedSessions.filter((s) => s.exercises.some((e) => e.category === activeCategory));
   }, [loadedSessions, activeCategory]);
-
-  // getPastTrainingSessionsはカレンダー日ではなくセッション単位で返す仕様のため、同じ暦日に
-  // 2回以上トレーニングしていると日付・カテゴリ・相対日付が同じカードが並びうる。
-  // そのケースだけ開始時刻を補足表示して区別できるようにする（通常は1日1セッションのため増やさない）
-  const duplicateDateKeys = useMemo(() => {
-    const counts = new Map<string, number>();
-    for (const s of filteredSessions) {
-      const key = dateGroupKey(s.startedAt);
-      counts.set(key, (counts.get(key) ?? 0) + 1);
-    }
-    return new Set(Array.from(counts.entries()).filter(([, count]) => count > 1).map(([key]) => key));
-  }, [filteredSessions]);
 
   const sections = useMemo(
     () => groupByMonth(filteredSessions).map((group) => ({ title: group.monthLabel, data: group.items })),
@@ -142,18 +130,13 @@ export default function SessionHistoryPickerScreen() {
           style={styles.list}
           sections={sections}
           keyExtractor={(item) => String(item.sessionId)}
-          renderItem={({ item }) => (
-            <PastTrainingSessionCard
-              session={item}
-              onPress={handleSelect}
-              showTime={duplicateDateKeys.has(dateGroupKey(item.startedAt))}
-            />
-          )}
+          renderItem={({ item }) => <PastTrainingSessionCard session={item} onPress={handleSelect} />}
           renderSectionHeader={({ section }) => (
             <View style={styles.monthLabelWrapper}>
               <Text style={styles.monthLabel}>{section.title}</Text>
             </View>
           )}
+          ItemSeparatorComponent={() => <View style={styles.cardSeparator} />}
           SectionSeparatorComponent={() => <View style={styles.sectionSeparator} />}
           contentContainerStyle={styles.content}
         />
@@ -182,5 +165,6 @@ const styles = StyleSheet.create({
     paddingBottom: 8,
   },
   monthLabel: { fontSize: 12, fontWeight: '700', color: Colors.textMuted },
+  cardSeparator: { height: 8 },
   sectionSeparator: { height: 16 },
 });
