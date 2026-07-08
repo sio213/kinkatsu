@@ -132,16 +132,54 @@ export type PastTrainingSession = {
   exercises: PastTrainingSessionExercise[];
 };
 
-// 「過去のトレーニングを選ぶ」画面用。excludeSessionId以外の終了済みセッションを新しい順で返す。
+export type PastTrainingSessionsPage = {
+  sessions: PastTrainingSession[];
+  hasMore: boolean;
+};
+
+// 「過去のトレーニングを選ぶ」画面用。excludeSessionId以外の終了済みセッションを新しい順でページ単位に返す。
 // グルーピングの単位はカレンダー上の「日」ではなく「セッション」であることに注意
 // （同じ日に2回トレーニングしていれば2件になる。画面側で同日をまとめて1カードにする場合は
-// 呼び出し側で追加のグルーピングが必要）。getExerciseHistoryEntriesと同じ方針で、まずカード
-// 一覧（種目メタ情報つき）を1クエリで取得し、別クエリでカードごとの✓確定セットの有無をまとめて
-// 調べてからJS側でセッション単位にグルーピングする。✓確定セットが1件も無いカード（種目を
-// 追加しただけで記録しなかった等）はセッション内の種目一覧から除外し、結果としてセッション内の
-// 全カードがそれに該当すればそのセッション自体も一覧から消える。この画面はセット内容までは
-// 表示しないため、setsは件数チェックのみでJSへは持ち帰らない
-export async function getPastTrainingSessions(excludeSessionId: number): Promise<PastTrainingSession[]> {
+// 呼び出し側で追加のグルーピングが必要）。ヘビーユーザーほどセッション数が線形に増え全件JOINが
+// 重くなるため、まずworkoutSessions単体をlimit/offsetでページングしてから、そのページ分の
+// セッションidだけでカード・確定セット有無を取得する（全件取得はしない）。
+// ページングの単位（1段目のクエリ）は最終的な表示の単位（✓確定セットを持つカードが1件以上ある
+// セッション）と必ず一致させる。1段目でsets.completedAtを見ずに終了済みというだけでページングすると、
+// そのページ全体が「追加しただけで記録しなかった」セッションだけだった場合にsessions=[]なのに
+// hasMore=trueという状態が起こり、画面側が「記録がありません」の空表示で止まってしまう
+// （SectionListが空になりonEndReachedの配線自体が無くなるため、それより古い記録に永久に到達できない）。
+// そのためsets.completedAt IS NOT NULLの行までJOINしてselectDistinctし、1段目の時点で
+// 「表示され得るセッションだけ」に絞り込む。
+// limit+1件フェッチして実際にlimit件を超えていればhasMore=trueとし、次ページの有無をカウント
+// クエリ無しで判定する
+export async function getPastTrainingSessions(
+  excludeSessionId: number,
+  { limit, offset }: { limit: number; offset: number },
+): Promise<PastTrainingSessionsPage> {
+  const sessionRows = await db
+    .selectDistinct({ id: workoutSessions.id, startedAt: workoutSessions.startedAt })
+    .from(workoutSessions)
+    .innerJoin(workoutSessionExercises, eq(workoutSessionExercises.sessionId, workoutSessions.id))
+    .innerJoin(sets, eq(sets.workoutSessionExerciseId, workoutSessionExercises.id))
+    .where(
+      and(
+        ne(workoutSessions.id, excludeSessionId),
+        isNotNull(workoutSessions.endedAt),
+        isNotNull(sets.completedAt),
+      ),
+    )
+    // startedAtが同値のセッションが複数あるとページ境界での重複・欠落が起こりうるため、
+    // idを第2キーにしてページングの並び順を決定的にする（getPreviousSetsのdesc(id)と同じ方針）
+    .orderBy(desc(workoutSessions.startedAt), desc(workoutSessions.id))
+    .limit(limit + 1)
+    .offset(offset);
+
+  const hasMore = sessionRows.length > limit;
+  const pageSessionIds = (hasMore ? sessionRows.slice(0, limit) : sessionRows).map((r) => r.id);
+  if (pageSessionIds.length === 0) return { sessions: [], hasMore: false };
+
+  // getExerciseHistoryEntriesと同じ方針で、まずカード一覧（種目メタ情報つき）を1クエリで取得し、
+  // 別クエリでカードごとの✓確定セットの有無をまとめて調べてからJS側でセッション単位にグルーピングする
   const cards = await db
     .select({
       sessionId: workoutSessions.id,
@@ -154,13 +192,12 @@ export async function getPastTrainingSessions(excludeSessionId: number): Promise
     .from(workoutSessionExercises)
     .innerJoin(workoutSessions, eq(workoutSessionExercises.sessionId, workoutSessions.id))
     .innerJoin(exercises, eq(workoutSessionExercises.exerciseId, exercises.id))
-    .where(
-      and(ne(workoutSessionExercises.sessionId, excludeSessionId), isNotNull(workoutSessions.endedAt)),
-    )
-    .orderBy(desc(workoutSessions.startedAt), workoutSessionExercises.orderIndex);
+    .where(inArray(workoutSessionExercises.sessionId, pageSessionIds))
+    // 1段目と同じタイブレークを使い、startedAtが同値のセッション同士の出現順を1段目と一致させる
+    .orderBy(desc(workoutSessions.startedAt), desc(workoutSessions.id), workoutSessionExercises.orderIndex);
 
-  if (cards.length === 0) return [];
-
+  // pageSessionIdsは「✓確定セットを持つカードが1件以上ある」ことをJOINで保証したセッションだけなので、
+  // 対応するカードが1件も無い（cards.length === 0になる）ことはない
   const cardIds = cards.map((c) => c.workoutSessionExerciseId);
   const confirmedCards = await db
     .selectDistinct({ workoutSessionExerciseId: sets.workoutSessionExerciseId })
@@ -180,7 +217,7 @@ export async function getPastTrainingSessions(excludeSessionId: number): Promise
     }
     entry.exercises.push({ exerciseId: c.exerciseId, name: c.name, category: c.category });
   }
-  return Array.from(sessionsById.values());
+  return { sessions: Array.from(sessionsById.values()), hasMore };
 }
 
 // 「過去のトレーニングを選ぶ」画面のカードで、複数カテゴリの日を「胸ほか」のように表す際の
