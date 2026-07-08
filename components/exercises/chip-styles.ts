@@ -1,4 +1,4 @@
-import { Colors } from '@/constants/theme';
+import { Colors, Typography } from '@/constants/theme';
 import { StyleSheet } from 'react-native';
 
 export const chipStyles = StyleSheet.create({
@@ -11,6 +11,6 @@ export const chipStyles = StyleSheet.create({
     borderColor: Colors.border,
   },
   chipActive: { backgroundColor: Colors.accent, borderColor: Colors.accent },
-  chipText: { fontSize: 13, color: Colors.textMuted, fontWeight: '500' },
+  chipText: { ...Typography.footnote, color: Colors.textMuted, fontWeight: '500' },
   chipTextActive: { color: Colors.onAccent },
 });

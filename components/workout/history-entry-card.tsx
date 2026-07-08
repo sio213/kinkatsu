@@ -85,7 +85,7 @@ const styles = StyleSheet.create({
   info: { flex: 1, gap: 6 },
   dateRow: { flexDirection: 'row', alignItems: 'center', gap: 6, flexWrap: 'wrap' },
   date: { ...Typography.cardTitle, color: Colors.textPrimary },
-  relative: { fontSize: 11.5, color: Colors.textMuted },
+  relative: { ...Typography.caption, color: Colors.textMuted },
   bestBadge: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -95,7 +95,7 @@ const styles = StyleSheet.create({
     paddingHorizontal: 7,
     paddingVertical: 2,
   },
-  bestBadgeText: { fontSize: 10.5, fontWeight: '700', color: Colors.warningText },
+  bestBadgeText: { ...Typography.badge, color: Colors.warningText },
   loadButton: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -106,6 +106,6 @@ const styles = StyleSheet.create({
     paddingVertical: 10,
   },
   loadButtonDisabled: { backgroundColor: Colors.textPlaceholder },
-  loadButtonText: { fontSize: 12.5, fontWeight: '700', color: Colors.onAccent },
-  summary: { fontSize: 12.5, color: Colors.textMuted },
+  loadButtonText: { ...Typography.footnote, fontWeight: '700', color: Colors.onAccent },
+  summary: { ...Typography.footnote, color: Colors.textMuted },
 });

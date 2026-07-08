@@ -235,7 +235,7 @@ const styles = StyleSheet.create({
   },
   inputMultiline: { minHeight: 56, textAlignVertical: 'top' },
 
-  errorText: { fontSize: 12, color: Colors.danger, marginTop: -4 },
+  errorText: { ...Typography.caption, color: Colors.danger, marginTop: -4 },
 
   chipRow: { flexDirection: 'row', flexWrap: 'wrap', gap: 6 },
 
@@ -247,10 +247,9 @@ const styles = StyleSheet.create({
     borderRadius: 11,
     backgroundColor: Colors.accent,
     color: Colors.onAccent,
-    fontSize: 12,
-    fontWeight: '700',
-    textAlign: 'center',
+    ...Typography.badge,
     lineHeight: 22,
+    textAlign: 'center',
   },
   pointInput: { flex: 1 },
   pointRemoveBtn: {
@@ -267,7 +266,7 @@ const styles = StyleSheet.create({
     paddingHorizontal: 14,
     paddingVertical: 8,
   },
-  pointAddBtnText: { fontSize: 13, fontWeight: '600', color: Colors.accent },
+  pointAddBtnText: { ...Typography.footnote, fontWeight: '600', color: Colors.accent },
 
   favoriteRow: {
     flexDirection: 'row',

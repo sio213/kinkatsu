@@ -546,7 +546,7 @@ export function ReminderForm({ initial = DEFAULT_INPUT, onSubmit, onCancel, subm
 const styles = StyleSheet.create({
   container: { gap: 0 },
   labelSpacing: { marginTop: 12, marginBottom: 4 },
-  errorText: { fontSize: 12, color: Colors.danger, marginBottom: 4 },
+  errorText: { ...Typography.caption, color: Colors.danger, marginBottom: 4 },
   input: {
     borderWidth: 1,
     borderColor: Colors.borderStrong,
@@ -580,7 +580,7 @@ const styles = StyleSheet.create({
     borderColor: Colors.border,
   },
   chipActive: { backgroundColor: Colors.accent, borderColor: Colors.accent },
-  chipText: { fontSize: 13, color: Colors.textSecondary },
+  chipText: { ...Typography.footnote, color: Colors.textSecondary },
   chipTextActive: { color: Colors.onAccent, fontWeight: '600' },
 
   wdRow: { flexDirection: 'row', gap: 6 },
@@ -594,7 +594,7 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: Colors.border,
   },
-  wdChipText: { fontSize: 13, color: Colors.textSecondary },
+  wdChipText: { ...Typography.footnote, color: Colors.textSecondary },
 
   mdGrid: { flexDirection: 'row', flexWrap: 'wrap', gap: 6 },
   mdChip: {
@@ -608,7 +608,7 @@ const styles = StyleSheet.create({
     borderColor: Colors.border,
   },
   mdChipEom: { width: 52 },
-  mdChipText: { fontSize: 12, color: Colors.textSecondary },
+  mdChipText: { ...Typography.caption, color: Colors.textSecondary },
 
   stepperRow: { flexDirection: 'row', alignItems: 'center', gap: 16 },
   stepperBtn: {

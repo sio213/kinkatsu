@@ -64,7 +64,7 @@ const styles = StyleSheet.create({
   chevron: { fontSize: 20, color: Colors.textPlaceholder, fontWeight: '600' },
   cardRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'baseline' },
   cardTitle: { ...Typography.cardTitle, color: Colors.textPrimary },
-  cardDuration: { fontSize: 11, color: Colors.textPlaceholder },
+  cardDuration: { ...Typography.caption, color: Colors.textPlaceholder },
   statRow: { flexDirection: 'row', gap: 6 },
   statChip: {
     flexDirection: 'row',
@@ -74,6 +74,6 @@ const styles = StyleSheet.create({
     paddingHorizontal: 9,
     paddingVertical: 5,
   },
-  statChipValue: { fontSize: 12.5, fontWeight: '700', color: Colors.textPrimary },
-  statChipLabel: { fontSize: 11, color: Colors.textMuted },
+  statChipValue: { ...Typography.footnote, fontWeight: '700', color: Colors.textPrimary },
+  statChipLabel: { ...Typography.caption, color: Colors.textMuted },
 });

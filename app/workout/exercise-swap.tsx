@@ -197,7 +197,7 @@ const styles = StyleSheet.create({
 
   headerArea: { paddingTop: 12, gap: 8, marginBottom: 4 },
   currentExerciseRow: { flexDirection: 'row', alignItems: 'baseline', gap: 6, paddingHorizontal: 2 },
-  currentExerciseLabel: { fontSize: 12, color: Colors.textMuted },
+  currentExerciseLabel: { ...Typography.caption, color: Colors.textMuted },
   currentExerciseName: { ...Typography.cardTitle, color: Colors.textPrimary, flexShrink: 1 },
 
   emptyWrapper: { alignItems: 'center', paddingVertical: 32 },

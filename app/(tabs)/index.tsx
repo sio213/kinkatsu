@@ -144,7 +144,7 @@ const styles = StyleSheet.create({
 
   list: { flex: 1, marginTop: 16 },
   scroll: { paddingBottom: 40 },
-  dateLabel: { fontSize: 12, fontWeight: '700', color: Colors.textMuted, marginBottom: 8 },
+  dateLabel: { ...Typography.caption, fontWeight: '700', color: Colors.textMuted, marginBottom: 8 },
   cardSeparator: { height: 8 },
   sectionSeparator: { height: 16 },
 });

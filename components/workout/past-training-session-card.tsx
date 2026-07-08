@@ -82,7 +82,7 @@ const styles = StyleSheet.create({
   content: { flex: 1, gap: 6 },
   topRow: { flexDirection: 'row', alignItems: 'center', gap: 6, flexWrap: 'wrap' },
   date: { ...Typography.cardTitle, color: Colors.textPrimary },
-  relative: { fontSize: 11.5, color: Colors.textMuted },
-  exercises: { fontSize: 12.5, color: Colors.textMuted },
+  relative: { ...Typography.caption, color: Colors.textMuted },
+  exercises: { ...Typography.footnote, color: Colors.textMuted },
   chevron: { fontSize: 20, color: Colors.textPlaceholder, fontWeight: '600' },
 });

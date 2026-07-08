@@ -268,10 +268,10 @@ const styles = StyleSheet.create({
     paddingHorizontal: 16,
     paddingBottom: 8,
   },
-  monthLabel: { fontSize: 12, fontWeight: '700', color: Colors.textMuted },
+  monthLabel: { ...Typography.caption, fontWeight: '700', color: Colors.textMuted },
   cardSeparator: { height: 8 },
   sectionSeparator: { height: 16 },
   footerLoading: { paddingVertical: 16, alignItems: 'center' },
   footerError: { paddingVertical: 16, alignItems: 'center' },
-  footerErrorText: { fontSize: 12.5, color: Colors.textMuted },
+  footerErrorText: { ...Typography.footnote, color: Colors.textMuted },
 });
