@@ -8,8 +8,8 @@ type Props = {
 };
 
 // 見た目のみのプレゼンテーショナルコンポーネント。タップ処理は呼び出し側のTouchableOpacityが持つ
-// （history-load-exercise-card.tsxの行チェックボックスと、画面の「全選択」トグルで共有し、
-// サイズ・角丸・チェックマークの見た目がズレないようにする）
+// （history-load-exercise-card.tsxの行チェックボックス、画面の「全選択」トグル、
+// picker-exercise-row.tsxのチェックボックスモードで共有し、サイズ・角丸・チェックマークの見た目がズレないようにする）
 export function Checkbox({ checked, size = 22 }: Props) {
   return (
     <View
