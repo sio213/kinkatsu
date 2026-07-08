@@ -122,6 +122,40 @@ describe('formatRelativeDaysAgo', () => {
     expect(formatRelativeDaysAgo(new Date(2026, 5, 16, 8, 0).getTime(), now)).toBe('3週間前');
   });
 
+  it('29日前は「4週間前」のまま（30日境界の直前）、30日前で「1ヶ月前」に切り替わる', () => {
+    const nowForMonth = new Date(2026, 7, 5, 12, 0).getTime(); // 2026-08-05
+    expect(formatRelativeDaysAgo(new Date(2026, 6, 7, 8, 0).getTime(), nowForMonth)).toBe('4週間前'); // 29日前
+    expect(formatRelativeDaysAgo(new Date(2026, 6, 6, 8, 0).getTime(), nowForMonth)).toBe('1ヶ月前'); // 30日前
+  });
+
+  it('30日以降は「Nヶ月前」（Math.floor(日数/30)）', () => {
+    const nowFor6Months = new Date(2027, 0, 3, 12, 0).getTime(); // 2027-01-03（180日後）
+    expect(formatRelativeDaysAgo(new Date(2026, 6, 7, 8, 0).getTime(), nowFor6Months)).toBe('6ヶ月前');
+  });
+
+  it('359日前は「11ヶ月前」のまま（360日=1年境界の直前）、360日前で「1年前」に切り替わる（365日にわずかに届かなくても0年前にならない）', () => {
+    const start = new Date(2026, 6, 7, 8, 0).getTime();
+    expect(formatRelativeDaysAgo(start, new Date(2027, 6, 1, 12, 0).getTime())).toBe('11ヶ月前'); // 359日前
+    expect(formatRelativeDaysAgo(start, new Date(2027, 6, 2, 12, 0).getTime())).toBe('1年前'); // 360日前
+  });
+
+  it('729日前は「1年前」のまま（730日=2年境界の直前）、730日前で「2年前」に切り替わる', () => {
+    const start = new Date(2026, 6, 7, 8, 0).getTime();
+    expect(formatRelativeDaysAgo(start, new Date(2028, 6, 5, 12, 0).getTime())).toBe('1年前'); // 729日前
+    expect(formatRelativeDaysAgo(start, new Date(2028, 6, 6, 12, 0).getTime())).toBe('2年前'); // 730日前
+  });
+
+  it('1094日前は「2年前」のまま、1095日前で「3年前」に切り替わる', () => {
+    const start = new Date(2026, 6, 7, 8, 0).getTime();
+    expect(formatRelativeDaysAgo(start, new Date(2029, 6, 5, 12, 0).getTime())).toBe('2年前'); // 1094日前
+    expect(formatRelativeDaysAgo(start, new Date(2029, 6, 6, 12, 0).getTime())).toBe('3年前'); // 1095日前
+  });
+
+  it('長期間の記録（10年規模）でも桁あふれや表示崩れなく「N年前」を返す', () => {
+    const start = new Date(2026, 6, 7, 8, 0).getTime();
+    expect(formatRelativeDaysAgo(start, new Date(2036, 6, 14, 12, 0).getTime())).toBe('10年前'); // 3660日前
+  });
+
   it('未来方向（クロックのずれ等）はnull', () => {
     const tomorrow = new Date(2026, 6, 8, 8, 0).getTime();
     expect(formatRelativeDaysAgo(tomorrow, now)).toBeNull();
