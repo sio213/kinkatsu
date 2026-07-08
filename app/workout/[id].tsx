@@ -1,4 +1,6 @@
-import { DropdownMenu, DropdownMenuHeaderTrigger, type DropdownMenuItem } from '@/components/ui/dropdown-menu';
+import { ContextBar } from '@/components/ui/context-bar';
+import { HeaderMenu, type DropdownMenuItem } from '@/components/ui/dropdown-menu';
+import { HeaderTitle } from '@/components/ui/header-title';
 import { IconSymbol } from '@/components/ui/icon-symbol';
 import { ListErrorBoundary } from '@/components/ui/list-error-boundary';
 import { NotFoundState } from '@/components/ui/not-found-state';
@@ -198,6 +200,7 @@ export default function WorkoutScreen() {
   if (sessionId == null || (loaded && !session)) {
     return (
       <SafeAreaView style={styles.safeArea} edges={['bottom']}>
+        <Stack.Screen options={{ title: 'トレーニング' }} />
         <NotFoundState
           message="トレーニングが見つかりません"
           actionLabel="戻る"
@@ -222,19 +225,17 @@ export default function WorkoutScreen() {
     <SafeAreaView style={styles.safeArea} edges={['bottom']}>
       <Stack.Screen
         options={{
-          title: isActive ? 'トレーニング中' : '記録の編集',
-          headerRight: () => (
-            <DropdownMenu
-              groups={[menuItems]}
-              minWidth={140}
-              renderTrigger={({ open, onPress }) => <DropdownMenuHeaderTrigger open={open} onPress={onPress} />}
+          headerTitle: () => (
+            <HeaderTitle
+              title={isActive ? 'トレーニング中' : '記録の編集'}
+              subtitle={formatSessionDateGroup(session.startedAt)}
             />
           ),
+          headerRight: () => <HeaderMenu groups={[menuItems]} accessibilityLabel="トレーニングのメニューを開く" />,
         }}
       />
 
-      <View style={styles.subHeader}>
-        <Text style={styles.headerDate}>{formatSessionDateGroup(session.startedAt)}</Text>
+      <ContextBar justify="flex-end">
         <View style={styles.timerChip}>
           <IconSymbol name="timer" size={16} color={Colors.accent} />
           <Text style={styles.timerText}>
@@ -243,7 +244,7 @@ export default function WorkoutScreen() {
               : formatSessionDuration(session.startedAt, session.endedAt)}
           </Text>
         </View>
-      </View>
+      </ContextBar>
 
       {sessionExercises.length === 0 ? (
         <View style={styles.body}>
@@ -305,15 +306,6 @@ export default function WorkoutScreen() {
 const styles = StyleSheet.create({
   safeArea: { flex: 1, backgroundColor: Colors.background },
 
-  subHeader: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    paddingHorizontal: 16,
-    paddingTop: 8,
-    paddingBottom: 6,
-  },
-  headerDate: { ...Typography.caption, color: Colors.textMuted },
   timerChip: {
     flexDirection: 'row',
     alignItems: 'center',

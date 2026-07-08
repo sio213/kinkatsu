@@ -128,7 +128,7 @@ test('種目名がヘッダーのサブタイトルに表示される', async ()
 
 test('取得成功かつ1件以上あれば注意バナーを表示する', async () => {
   const root = await renderResolved([entry1]);
-  expect(root.findByProps({ children: '過去の記録から読み込む' })).toBeDefined();
+  expect(root.findByProps({ children: '過去の記録から読み込み' })).toBeDefined();
   expect(() => root.findByProps({ children: 'この種目の過去の記録がまだありません' })).toThrow();
 });
 

@@ -4,18 +4,14 @@ const mockUseLocalSearchParams = jest.fn();
 const mockAddHistoryCardsToSession = jest.fn();
 const mockNotifyPrefilled = jest.fn();
 
-jest.mock('expo-router', () => {
-  const { createElement } = require('react');
-  const { Text } = require('react-native');
-  return {
-    useRouter: () => ({ back: mockBack, dismiss: mockDismiss }),
-    useLocalSearchParams: () => mockUseLocalSearchParams(),
-    Stack: {
-      Screen: ({ options }: { options?: { title?: string } }) =>
-        options?.title ? createElement(Text, null, options.title) : null,
-    },
-  };
-});
+jest.mock('expo-router', () => ({
+  useRouter: () => ({ back: mockBack, dismiss: mockDismiss }),
+  useLocalSearchParams: () => mockUseLocalSearchParams(),
+  Stack: {
+    Screen: ({ options }: { options?: { headerTitle?: () => unknown } }) =>
+      options?.headerTitle ? options.headerTitle() : null,
+  },
+}));
 
 // lib/workout/history.tsはトップレベルで@/db/client(expo-sqlite依存)を読み込むため、
 // history-picker-screen.test.tsxと同じ理由でdb/client等は最小限モックする
@@ -131,6 +127,7 @@ beforeEach(() => {
 
 test('ヘッダーに選んだ過去セッションの日付を表示する', async () => {
   const root = await renderResolved([benchCard]);
+  expect(root.findByProps({ children: 'この記録から読み込み' })).toBeDefined();
   expect(root.findByProps({ children: '7月3日（金）' })).toBeDefined();
 });
 

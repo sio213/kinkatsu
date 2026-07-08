@@ -1,5 +1,7 @@
 import { Checkbox } from '@/components/ui/checkbox';
+import { ContextBar } from '@/components/ui/context-bar';
 import { DesignIcon } from '@/components/ui/design-icon';
+import { HeaderTitle } from '@/components/ui/header-title';
 import { NotFoundState } from '@/components/ui/not-found-state';
 import { PrimaryButton } from '@/components/ui/primary-button';
 import { HistoryLoadExerciseCard } from '@/components/workout/history-load-exercise-card';
@@ -102,6 +104,7 @@ export default function SessionHistoryLoadScreen() {
   if (!Number.isFinite(sessionId) || !Number.isFinite(sourceSessionId)) {
     return (
       <SafeAreaView style={styles.safeArea} edges={['bottom']}>
+        <Stack.Screen options={{ title: '過去の記録' }} />
         <NotFoundState
           message="トレーニングが見つかりません"
           actionLabel="戻る"
@@ -113,10 +116,10 @@ export default function SessionHistoryLoadScreen() {
 
   return (
     <SafeAreaView style={styles.safeArea} edges={['bottom']}>
-      <Stack.Screen options={{ title: dateLabel }} />
+      <Stack.Screen options={{ headerTitle: () => <HeaderTitle title="この記録から読み込み" subtitle={dateLabel} /> }} />
 
       {hasCards && (
-        <View style={styles.header}>
+        <ContextBar>
           <Text style={styles.headerCount}>
             読み込む種目 <Text style={styles.headerCountValue}>{`${selectedIds.size} / ${loadedCards.length}`}</Text>
           </Text>
@@ -131,7 +134,7 @@ export default function SessionHistoryLoadScreen() {
             <Checkbox checked={allSelected} />
             <Text style={styles.selectAllText}>全選択</Text>
           </TouchableOpacity>
-        </View>
+        </ContextBar>
       )}
 
       {cards === null ? (
@@ -183,17 +186,6 @@ export default function SessionHistoryLoadScreen() {
 const styles = StyleSheet.create({
   safeArea: { flex: 1, backgroundColor: Colors.background },
 
-  header: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    paddingHorizontal: 16,
-    paddingVertical: 12,
-    borderTopWidth: 1,
-    borderTopColor: Colors.border,
-    borderBottomWidth: 1,
-    borderBottomColor: Colors.border,
-  },
   headerCount: { ...Typography.footnote, fontWeight: '700', color: Colors.textMuted },
   headerCountValue: { color: Colors.text },
   selectAll: { flexDirection: 'row', alignItems: 'center', gap: 5 },
