@@ -46,7 +46,8 @@ export function groupSessionsByDate<T extends { startedAt: number }>(
   return groups.map(({ dateLabel, sessions: s }) => ({ dateLabel, sessions: s }));
 }
 
-// 「記録から読み込む」画面の直近項目用。1週間以上前は相対表示すると却って分かりにくいためnullを返し、
+// 「記録から読み込む」画面の直近項目用。直近1週間は日単位（n日前）、それ以降は週単位（先週／n週間前）の
+// おおまかな相対表示にする。未来方向（クロックのずれ等でstartedAtがnowより後になるケース）はnullを返し、
 // 呼び出し側は絶対日付（formatSessionDateGroup）のみを表示する
 export function formatRelativeDaysAgo(startedAt: number, now: number = Date.now()): string | null {
   const startOfDay = (t: number) => {
@@ -55,10 +56,12 @@ export function formatRelativeDaysAgo(startedAt: number, now: number = Date.now(
     return d.getTime();
   };
   const diffDays = Math.round((startOfDay(now) - startOfDay(startedAt)) / 86_400_000);
+  if (diffDays < 0) return null;
   if (diffDays === 0) return '今日';
   if (diffDays === 1) return '昨日';
-  if (diffDays >= 2 && diffDays <= 5) return `${diffDays}日前`;
-  return null;
+  if (diffDays <= 6) return `${diffDays}日前`;
+  const weeks = Math.floor(diffDays / 7);
+  return weeks === 1 ? '先週' : `${weeks}週間前`;
 }
 
 // 「記録から読み込む」画面の月グループ見出し用（例:「2026年7月」）

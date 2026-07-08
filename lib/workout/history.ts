@@ -1,9 +1,7 @@
-import { db } from '@/db/client';
-import { sets, workoutSessionExercises, workoutSessions } from '@/db/schema';
+import { db, type Tx } from '@/db/client';
+import { exercises, sets, workoutSessionExercises, workoutSessions } from '@/db/schema';
 import type { MeasurementType } from '@/lib/exercises/constants';
 import { and, desc, eq, inArray, isNotNull, ne } from 'drizzle-orm';
-
-type Tx = Parameters<Parameters<typeof db.transaction>[0]>[0];
 
 export type PreviousSetValues = {
   setNumber: number;
@@ -120,6 +118,131 @@ export async function getExerciseHistoryEntries(
       sets: setsByCard.get(c.workoutSessionExerciseId) ?? [],
     }))
     .filter((entry) => entry.sets.some((s) => s.completedAt != null));
+}
+
+export type PastTrainingSessionExercise = {
+  exerciseId: number;
+  name: string;
+  category: string;
+};
+
+export type PastTrainingSession = {
+  sessionId: number;
+  startedAt: number;
+  exercises: PastTrainingSessionExercise[];
+};
+
+// 「過去のトレーニングを選ぶ」画面用。excludeSessionId以外の終了済みセッションを新しい順で返す。
+// グルーピングの単位はカレンダー上の「日」ではなく「セッション」であることに注意
+// （同じ日に2回トレーニングしていれば2件になる。画面側で同日をまとめて1カードにする場合は
+// 呼び出し側で追加のグルーピングが必要）。getExerciseHistoryEntriesと同じ方針で、まずカード
+// 一覧（種目メタ情報つき）を1クエリで取得し、別クエリでカードごとの✓確定セットの有無をまとめて
+// 調べてからJS側でセッション単位にグルーピングする。✓確定セットが1件も無いカード（種目を
+// 追加しただけで記録しなかった等）はセッション内の種目一覧から除外し、結果としてセッション内の
+// 全カードがそれに該当すればそのセッション自体も一覧から消える。この画面はセット内容までは
+// 表示しないため、setsは件数チェックのみでJSへは持ち帰らない
+export async function getPastTrainingSessions(excludeSessionId: number): Promise<PastTrainingSession[]> {
+  const cards = await db
+    .select({
+      sessionId: workoutSessions.id,
+      startedAt: workoutSessions.startedAt,
+      workoutSessionExerciseId: workoutSessionExercises.id,
+      exerciseId: exercises.id,
+      name: exercises.name,
+      category: exercises.category,
+    })
+    .from(workoutSessionExercises)
+    .innerJoin(workoutSessions, eq(workoutSessionExercises.sessionId, workoutSessions.id))
+    .innerJoin(exercises, eq(workoutSessionExercises.exerciseId, exercises.id))
+    .where(
+      and(ne(workoutSessionExercises.sessionId, excludeSessionId), isNotNull(workoutSessions.endedAt)),
+    )
+    .orderBy(desc(workoutSessions.startedAt), workoutSessionExercises.orderIndex);
+
+  if (cards.length === 0) return [];
+
+  const cardIds = cards.map((c) => c.workoutSessionExerciseId);
+  const confirmedCards = await db
+    .selectDistinct({ workoutSessionExerciseId: sets.workoutSessionExerciseId })
+    .from(sets)
+    .where(and(inArray(sets.workoutSessionExerciseId, cardIds), isNotNull(sets.completedAt)));
+  const confirmedIds = new Set(confirmedCards.map((c) => c.workoutSessionExerciseId));
+
+  // Mapは挿入順を保持するため、cardsが既にstartedAt降順・orderIndex昇順でソート済みであれば
+  // そのままセッションの出現順・種目の並び順として使える
+  const sessionsById = new Map<number, PastTrainingSession>();
+  for (const c of cards) {
+    if (!confirmedIds.has(c.workoutSessionExerciseId)) continue;
+    let entry = sessionsById.get(c.sessionId);
+    if (!entry) {
+      entry = { sessionId: c.sessionId, startedAt: c.startedAt, exercises: [] };
+      sessionsById.set(c.sessionId, entry);
+    }
+    entry.exercises.push({ exerciseId: c.exerciseId, name: c.name, category: c.category });
+  }
+  return Array.from(sessionsById.values());
+}
+
+export type SessionHistoryCard = {
+  workoutSessionExerciseId: number;
+  exerciseId: number;
+  name: string;
+  category: string;
+  measurementType: string;
+  sets: HistorySetValues[];
+};
+
+// 「読み込む種目を選ぶ」画面用。指定した過去セッション内のカードを、種目情報とセット内容つきで
+// orderIndex順に返す。✓確定セットが1件も無いカードは対象外（getExerciseHistoryEntriesと同じ理由）。
+// measurementTypeは想定外のDB値でも画面側でフォールバックできるようstringのまま返す
+// （history-picker.tsxのexerciseと同じ扱い）
+export async function getSessionExerciseCards(sessionId: number): Promise<SessionHistoryCard[]> {
+  const cards = await db
+    .select({
+      workoutSessionExerciseId: workoutSessionExercises.id,
+      exerciseId: exercises.id,
+      name: exercises.name,
+      category: exercises.category,
+      measurementType: exercises.measurementType,
+    })
+    .from(workoutSessionExercises)
+    .innerJoin(exercises, eq(workoutSessionExercises.exerciseId, exercises.id))
+    .where(eq(workoutSessionExercises.sessionId, sessionId))
+    .orderBy(workoutSessionExercises.orderIndex);
+
+  if (cards.length === 0) return [];
+
+  const cardIds = cards.map((c) => c.workoutSessionExerciseId);
+  const allSets = await db
+    .select({
+      workoutSessionExerciseId: sets.workoutSessionExerciseId,
+      setNumber: sets.setNumber,
+      weight: sets.weight,
+      reps: sets.reps,
+      durationSeconds: sets.durationSeconds,
+      distanceMeters: sets.distanceMeters,
+      completedAt: sets.completedAt,
+    })
+    .from(sets)
+    .where(inArray(sets.workoutSessionExerciseId, cardIds))
+    .orderBy(sets.setNumber);
+
+  const setsByCard = new Map<number, typeof allSets>();
+  for (const s of allSets) {
+    const list = setsByCard.get(s.workoutSessionExerciseId);
+    if (list) {
+      list.push(s);
+    } else {
+      setsByCard.set(s.workoutSessionExerciseId, [s]);
+    }
+  }
+
+  return cards
+    .map((c) => ({
+      ...c,
+      sets: setsByCard.get(c.workoutSessionExerciseId) ?? [],
+    }))
+    .filter((card) => card.sets.some((s) => s.completedAt != null));
 }
 
 // nullを無視した最大値。全件nullならnull（0にフォールバックしない。0にすると値の無い

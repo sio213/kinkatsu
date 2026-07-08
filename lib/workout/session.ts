@@ -1,4 +1,4 @@
-import { db } from '@/db/client';
+import { db, type Tx } from '@/db/client';
 import { sets, workoutSessionExercises, workoutSessions } from '@/db/schema';
 import { getPreviousSets, type PreviousSetValues } from '@/lib/workout/history';
 import { eq } from 'drizzle-orm';
@@ -100,71 +100,117 @@ export async function endWorkoutSession(id: number) {
     .where(eq(workoutSessions.id, id));
 }
 
-// 種目追加ピッカーで選ばれた種目をセッションに追加する。orderIndexは
-// このセッションに既に入っている種目の続き番号にする（並び順を保持するため）。
-// 既存件数の取得と採番をトランザクションでまとめ、同時呼び出しでのorderIndex重複を防ぐ。
-// 過去にその種目をやったことがあれば前回のセット列（値・セット数とも）を自動で挿入する。
-// 呼び出し側（画面）が最初の入力欄へのオートフォーカス・ゴースト表示に使えるよう、
-// 前回の記録の有無に関わらず追加した全カードの情報を返す
+type ExerciseCardSpec = { exerciseId: number };
+
+// addExercisesToSession（種目単位で直近の記録を自動プリフィル）とaddHistoryCardsToSession
+// （ユーザーが選んだ特定の過去カードをそのままコピー）は、orderIndexの連番採番からカード・セットの
+// 挿入、prefilledSetIdsの算出までの流れが共通のため、プリフィル元の解決方法だけを引数化して集約する。
+// 既存件数の取得と採番をトランザクションでまとめ、同時呼び出しでのorderIndex重複を防ぐ
+async function insertSessionExerciseCards<T extends ExerciseCardSpec>(
+  tx: Tx,
+  sessionId: number,
+  specs: T[],
+  now: number,
+  kind: PrefilledCard['kind'],
+  resolvePreviousSets: (tx: Tx, spec: T) => Promise<PreviousSetValues[]>,
+): Promise<PrefilledCard[]> {
+  if (specs.length === 0) return [];
+  const existing = await tx
+    .select({ orderIndex: workoutSessionExercises.orderIndex })
+    .from(workoutSessionExercises)
+    .where(eq(workoutSessionExercises.sessionId, sessionId));
+  const startIndex =
+    existing.length > 0 ? Math.max(...existing.map((e) => e.orderIndex)) + 1 : 0;
+  const inserted = await tx
+    .insert(workoutSessionExercises)
+    .values(
+      specs.map((s, i) => ({
+        sessionId,
+        exerciseId: s.exerciseId,
+        orderIndex: startIndex + i,
+        createdAt: now,
+      })),
+    )
+    .returning();
+
+  // 同一トランザクション内でクエリを並列発行すると競合しうるため、カードごとに直列でawaitする
+  // （並列化してもメリットが薄い一方、順序が保証されなくなるデメリットの方が大きい）。
+  // inserted[i]とspecs[i]の対応は「単一のINSERT...RETURNINGは挿入した値の順序で行を返す」という
+  // SQLite/expo-sqliteの実際の挙動に依存している（addHistoryCardsToSessionはこの対応が
+  // ズレると別カードのセット値を取り違えるため、addExercisesToSessionより影響が大きい）
+  const result: PrefilledCard[] = [];
+  const initialSetsByCard: ReturnType<typeof buildInitialSets>[] = [];
+  const previousSetsByCard: PreviousSetValues[][] = [];
+  for (let i = 0; i < inserted.length; i++) {
+    const wse = inserted[i];
+    // 値が1つも無い行（前回「セット追加」だけ押されて未入力のまま終わった等）は
+    // コピー対象から除外する（除外しないと新しいカードに余分な空行が増えてしまう）
+    const previousSets = (await resolvePreviousSets(tx, specs[i])).filter(hasAnyValue);
+    previousSetsByCard.push(previousSets);
+    result.push({
+      sessionId,
+      exerciseId: wse.exerciseId,
+      sessionExerciseId: wse.id,
+      kind,
+      prefilledSetIds: [],
+    });
+    initialSetsByCard.push(buildInitialSets(sessionId, wse.exerciseId, wse.id, now, previousSets));
+  }
+  const insertedSets = await tx.insert(sets).values(initialSetsByCard.flat()).returning({ id: sets.id });
+
+  // insertedSetsはinitialSetsByCardをflattenした順序のまま返るため、各カードのセット数だけ
+  // 先頭から切り出せば、そのカードに実際に挿入されたセットidが分かる。前回の記録が無いカードは
+  // previousSetsByCard[i]が空のため、cardSetIdsは（freshSetValuesの1件のみで）prefilledSetIdsに
+  // 含めない
+  let cursor = 0;
+  for (let i = 0; i < result.length; i++) {
+    const cardSetCount = initialSetsByCard[i].length;
+    const cardSetIds = insertedSets.slice(cursor, cursor + cardSetCount).map((s) => s.id);
+    cursor += cardSetCount;
+    result[i].prefilledSetIds = computePrefilledSetIds(cardSetIds, previousSetsByCard[i]);
+  }
+  return result;
+}
+
+// 種目追加ピッカーで選ばれた種目をセッションに追加する。過去にその種目をやったことがあれば
+// 前回のセット列（値・セット数とも）を自動で挿入する。呼び出し側（画面）が最初の入力欄への
+// オートフォーカス・ゴースト表示に使えるよう、前回の記録の有無に関わらず追加した全カードの情報を返す
 export async function addExercisesToSession(
   sessionId: number,
   exerciseIds: number[],
 ): Promise<PrefilledCard[]> {
   if (exerciseIds.length === 0) return [];
   const now = Date.now();
-  return db.transaction(async (tx) => {
-    const existing = await tx
-      .select({ orderIndex: workoutSessionExercises.orderIndex })
-      .from(workoutSessionExercises)
-      .where(eq(workoutSessionExercises.sessionId, sessionId));
-    const startIndex =
-      existing.length > 0 ? Math.max(...existing.map((e) => e.orderIndex)) + 1 : 0;
-    const inserted = await tx
-      .insert(workoutSessionExercises)
-      .values(
-        exerciseIds.map((exerciseId, i) => ({
-          sessionId,
-          exerciseId,
-          orderIndex: startIndex + i,
-          createdAt: now,
-        })),
-      )
-      .returning();
+  return db.transaction((tx) =>
+    insertSessionExerciseCards(
+      tx,
+      sessionId,
+      exerciseIds.map((exerciseId) => ({ exerciseId })),
+      now,
+      'new',
+      (t, spec) => getPreviousSets(t, spec.exerciseId, sessionId),
+    ),
+  );
+}
 
-    // 同一トランザクション内でクエリを並列発行すると競合しうるため、種目ごとに直列でawaitする
-    // （並列化してもメリットが薄い一方、順序が保証されなくなるデメリットの方が大きい）
-    const result: PrefilledCard[] = [];
-    const initialSetsByCard: ReturnType<typeof buildInitialSets>[] = [];
-    const previousSetsByCard: PreviousSetValues[][] = [];
-    for (const wse of inserted) {
-      // 値が1つも無い行（前回「セット追加」だけ押されて未入力のまま終わった等）は
-      // コピー対象から除外する（除外しないと新しいカードに余分な空行が増えてしまう）
-      const previousSets = (await getPreviousSets(tx, wse.exerciseId, sessionId)).filter(hasAnyValue);
-      previousSetsByCard.push(previousSets);
-      result.push({
-        sessionId,
-        exerciseId: wse.exerciseId,
-        sessionExerciseId: wse.id,
-        kind: 'new',
-        prefilledSetIds: [],
-      });
-      initialSetsByCard.push(buildInitialSets(sessionId, wse.exerciseId, wse.id, now, previousSets));
-    }
-    const insertedSets = await tx.insert(sets).values(initialSetsByCard.flat()).returning({ id: sets.id });
+export type HistoryCardSelection = { exerciseId: number; sourceWorkoutSessionExerciseId: number };
 
-    // insertedSetsはinitialSetsByCardをflattenした順序のまま返るため、各カードのセット数だけ
-    // 先頭から切り出せば、そのカードに実際に挿入されたセットidが分かる。前回の記録が無いカードは
-    // previousSetsByCard[i]が空のため、cardSetIdsは（freshSetValuesの1件のみで）prefilledSetIdsに
-    // 含めない
-    let cursor = 0;
-    for (let i = 0; i < result.length; i++) {
-      const cardSetCount = initialSetsByCard[i].length;
-      const cardSetIds = insertedSets.slice(cursor, cursor + cardSetCount).map((s) => s.id);
-      cursor += cardSetCount;
-      result[i].prefilledSetIds = computePrefilledSetIds(cardSetIds, previousSetsByCard[i]);
-    }
-    return result;
-  });
+// 「過去のトレーニングを選ぶ」→「読み込む種目を選ぶ」画面用。選んだ過去カード群を今日のセッションに
+// 新規カードとして一括追加する。addExercisesToSessionと違い「その種目の直近の記録」ではなく、
+// ユーザーが画面上で確認した「選んだ過去カードそのもの」のセット値をコピーする（見た値と入る値が
+// 一致することを保証するため）。同じ種目が今日のセッションに既にあっても上書きはせず、常に
+// 新規カードとして追加する（種目追加ピッカーと同じ「同じ種目を複数回追加できる」仕様を踏襲）
+export async function addHistoryCardsToSession(
+  sessionId: number,
+  selections: HistoryCardSelection[],
+): Promise<PrefilledCard[]> {
+  if (selections.length === 0) return [];
+  const now = Date.now();
+  return db.transaction((tx) =>
+    insertSessionExerciseCards(tx, sessionId, selections, now, 'history', (t, spec) =>
+      getPreviousSetsForCard(t, spec.sourceWorkoutSessionExerciseId),
+    ),
+  );
 }
 
 // 種目カードの「⋮」メニューの「削除」。sets側はworkoutSessionExerciseIdにonDelete cascadeが
@@ -276,10 +322,10 @@ export async function loadHistoryIntoSessionExercise(
 }
 
 // 特定の過去カード（workoutSessionExerciseId）のセット列をそのまま返す。getPreviousSets
-// （種目単位で直近の1枚を自動で特定する）と違い、こちらは「記録から読み込む」画面で
-// ユーザーが選んだカードそのものを対象にする
+// （種目単位で直近の1枚を自動で特定する）と違い、こちらは「記録から読み込む」画面（種目単位・
+// セッション単位どちらも）でユーザーが選んだカードそのものを対象にする
 async function getPreviousSetsForCard(
-  tx: Parameters<Parameters<typeof db.transaction>[0]>[0],
+  tx: Tx,
   workoutSessionExerciseId: number,
 ): Promise<PreviousSetValues[]> {
   return tx
