@@ -408,12 +408,38 @@ describe('getExerciseHistoryEntries（実SQLite）', () => {
   });
 });
 
+type PastTrainingSessionSql = {
+  sessionId: number;
+  startedAt: number;
+  exercises: { exerciseId: number; name: string; category: string }[];
+};
+
 // lib/workout/history.ts の getPastTrainingSessions が発行するクエリをそのままミラーしたもの。
+// 実装同様、まず「✓確定セットを持つカードが1件以上あるセッション」だけをlimit/offsetでページングして
+// から該当セッションのカードを取得する（ページングの単位と表示の単位を一致させ、hasMoreを正確にするため）。
 // 注意: getPastTrainingSessions側のクエリ・カラムを変更した場合はこのヘルパーも合わせて更新すること
 function getPastTrainingSessionsSql(
   db: Database.Database,
   excludeSessionId: number,
-): { sessionId: number; startedAt: number; exercises: { exerciseId: number; name: string; category: string }[] }[] {
+  { limit, offset }: { limit: number; offset: number },
+): { sessions: PastTrainingSessionSql[]; hasMore: boolean } {
+  const sessionRows = db
+    .prepare(
+      `SELECT DISTINCT ws.id AS id
+       FROM workout_sessions ws
+       JOIN workout_session_exercises wse ON wse.session_id = ws.id
+       JOIN sets s ON s.workout_session_exercise_id = wse.id
+       WHERE ws.id != ? AND ws.ended_at IS NOT NULL AND s.completed_at IS NOT NULL
+       ORDER BY ws.started_at DESC, ws.id DESC
+       LIMIT ? OFFSET ?`,
+    )
+    .all(excludeSessionId, limit + 1, offset) as { id: number }[];
+
+  const hasMore = sessionRows.length > limit;
+  const pageSessionIds = (hasMore ? sessionRows.slice(0, limit) : sessionRows).map((r) => r.id);
+  if (pageSessionIds.length === 0) return { sessions: [], hasMore: false };
+
+  const sessionPlaceholders = pageSessionIds.map(() => '?').join(',');
   const cards = db
     .prepare(
       `SELECT wse.session_id AS sessionId, ws.started_at AS startedAt, wse.id AS workoutSessionExerciseId,
@@ -421,10 +447,10 @@ function getPastTrainingSessionsSql(
        FROM workout_session_exercises wse
        JOIN workout_sessions ws ON wse.session_id = ws.id
        JOIN exercises e ON wse.exercise_id = e.id
-       WHERE wse.session_id != ? AND ws.ended_at IS NOT NULL
-       ORDER BY ws.started_at DESC, wse.order_index ASC`,
+       WHERE wse.session_id IN (${sessionPlaceholders})
+       ORDER BY ws.started_at DESC, ws.id DESC, wse.order_index ASC`,
     )
-    .all(excludeSessionId) as {
+    .all(...pageSessionIds) as {
     sessionId: number;
     startedAt: number;
     workoutSessionExerciseId: number;
@@ -433,23 +459,18 @@ function getPastTrainingSessionsSql(
     category: string;
   }[];
 
-  if (cards.length === 0) return [];
-
   const cardIds = cards.map((c) => c.workoutSessionExerciseId);
-  const placeholders = cardIds.map(() => '?').join(',');
+  const cardPlaceholders = cardIds.map(() => '?').join(',');
   const confirmed = db
     .prepare(
       `SELECT DISTINCT workout_session_exercise_id AS workoutSessionExerciseId
        FROM sets
-       WHERE workout_session_exercise_id IN (${placeholders}) AND completed_at IS NOT NULL`,
+       WHERE workout_session_exercise_id IN (${cardPlaceholders}) AND completed_at IS NOT NULL`,
     )
     .all(...cardIds) as { workoutSessionExerciseId: number }[];
   const confirmedIds = new Set(confirmed.map((c) => c.workoutSessionExerciseId));
 
-  const sessionsById = new Map<
-    number,
-    { sessionId: number; startedAt: number; exercises: { exerciseId: number; name: string; category: string }[] }
-  >();
+  const sessionsById = new Map<number, PastTrainingSessionSql>();
   for (const c of cards) {
     if (!confirmedIds.has(c.workoutSessionExerciseId)) continue;
     let entry = sessionsById.get(c.sessionId);
@@ -459,7 +480,13 @@ function getPastTrainingSessionsSql(
     }
     entry.exercises.push({ exerciseId: c.exerciseId, name: c.name, category: c.category });
   }
-  return Array.from(sessionsById.values());
+  return { sessions: Array.from(sessionsById.values()), hasMore };
+}
+
+// 既存テストの多くは「1ページに収まる件数」を前提に全件取得したいだけなので、
+// 呼び出し側の意図を明確にするため大きめのlimitで1ページ目を取るヘルパーを用意する
+function getAllPastTrainingSessionsSql(db: Database.Database, excludeSessionId: number): PastTrainingSessionSql[] {
+  return getPastTrainingSessionsSql(db, excludeSessionId, { limit: 1000, offset: 0 }).sessions;
 }
 
 describe('getPastTrainingSessions（実SQLite）', () => {
@@ -477,7 +504,7 @@ describe('getPastTrainingSessions（実SQLite）', () => {
 
   it('過去の記録が無ければ空配列を返す', () => {
     const currentSession = insertSession(db, Date.now());
-    expect(getPastTrainingSessionsSql(db, currentSession)).toEqual([]);
+    expect(getAllPastTrainingSessionsSql(db, currentSession)).toEqual([]);
   });
 
   it('終了済みセッションを新しい順（startedAt降順）で返し、各セッション内の種目はorderIndex順', () => {
@@ -496,7 +523,7 @@ describe('getPastTrainingSessions（実SQLite）', () => {
     insertSet(db, newer, squat, newerCard0, 1, 100, 5, true);
 
     const currentSession = insertSession(db, 3000);
-    const result = getPastTrainingSessionsSql(db, currentSession);
+    const result = getAllPastTrainingSessionsSql(db, currentSession);
 
     expect(result.map((d) => d.sessionId)).toEqual([newer, older]);
     // newerセッション内はDBの追加順(orderIndex)に関わらずorderIndex=0のsquatが先
@@ -511,7 +538,7 @@ describe('getPastTrainingSessions（実SQLite）', () => {
     insertSet(db, inProgress, exerciseId, card, 1, 60, 10, true);
     const currentSession = insertSession(db, 2000);
 
-    expect(getPastTrainingSessionsSql(db, currentSession)).toEqual([]);
+    expect(getAllPastTrainingSessionsSql(db, currentSession)).toEqual([]);
   });
 
   it('✓確定セットが1件も無いカードは種目一覧から除外し、全カードがそれに該当すればセッション自体も除外する', () => {
@@ -525,7 +552,7 @@ describe('getPastTrainingSessions（実SQLite）', () => {
     insertSet(db, past, squat, squatCard, 1, 100, 5, false); // ✓未確定のまま
     const currentSession = insertSession(db, 2000);
 
-    const result = getPastTrainingSessionsSql(db, currentSession);
+    const result = getAllPastTrainingSessionsSql(db, currentSession);
     expect(result).toHaveLength(1);
     expect(result[0].exercises.map((e) => e.name)).toEqual(['ベンチプレス']);
   });
@@ -537,7 +564,7 @@ describe('getPastTrainingSessions（実SQLite）', () => {
     insertCard(db, past, exerciseId, 0); // insertSetを一度も呼ばない
     const currentSession = insertSession(db, 2000);
 
-    expect(getPastTrainingSessionsSql(db, currentSession)).toEqual([]);
+    expect(getAllPastTrainingSessionsSql(db, currentSession)).toEqual([]);
   });
 
   it('excludeSessionId自身のセッションは除外する', () => {
@@ -546,7 +573,7 @@ describe('getPastTrainingSessions（実SQLite）', () => {
     const card = insertCard(db, currentSession, exerciseId, 0);
     insertSet(db, currentSession, exerciseId, card, 1, 60, 10, true);
 
-    expect(getPastTrainingSessionsSql(db, currentSession)).toEqual([]);
+    expect(getAllPastTrainingSessionsSql(db, currentSession)).toEqual([]);
   });
 
   it('1つのセッションに複数カテゴリの種目があれば、それぞれのカテゴリ情報を保持したまま返す', () => {
@@ -562,7 +589,7 @@ describe('getPastTrainingSessions（実SQLite）', () => {
     insertSet(db, past, squat, squatCard, 1, 100, 5, true);
     const currentSession = insertSession(db, 2000);
 
-    const result = getPastTrainingSessionsSql(db, currentSession);
+    const result = getAllPastTrainingSessionsSql(db, currentSession);
     expect(result[0].exercises.map((e) => e.category)).toEqual(['chest', 'leg']);
   });
 
@@ -576,7 +603,7 @@ describe('getPastTrainingSessions（実SQLite）', () => {
     insertSet(db, past, bench, mainCard, 1, 80, 5, true);
     const currentSession = insertSession(db, 2000);
 
-    const result = getPastTrainingSessionsSql(db, currentSession);
+    const result = getAllPastTrainingSessionsSql(db, currentSession);
     expect(result[0].exercises.map((e) => e.name)).toEqual(['ベンチプレス', 'ベンチプレス']);
   });
 
@@ -593,10 +620,125 @@ describe('getPastTrainingSessions（実SQLite）', () => {
     insertSet(db, evening, bench, eveningCard, 1, 80, 5, true);
 
     const currentSession = insertSession(db, new Date(2026, 6, 4).getTime());
-    const result = getPastTrainingSessionsSql(db, currentSession);
+    const result = getAllPastTrainingSessionsSql(db, currentSession);
 
     expect(result).toHaveLength(2);
     expect(result.map((d) => d.sessionId)).toEqual([evening, morning]);
+  });
+
+  it('セッション数がlimit以内ならhasMore=falseで全件を返す', () => {
+    const exerciseId = insertExercise(db, 'ベンチプレス');
+    for (let i = 0; i < 3; i++) {
+      const past = insertSession(db, 1000 + i);
+      endSession(db, past, 1500 + i);
+      const card = insertCard(db, past, exerciseId, 0);
+      insertSet(db, past, exerciseId, card, 1, 60, 10, true);
+    }
+    const currentSession = insertSession(db, 5000);
+
+    const { sessions, hasMore } = getPastTrainingSessionsSql(db, currentSession, { limit: 3, offset: 0 });
+    expect(sessions).toHaveLength(3);
+    expect(hasMore).toBe(false);
+  });
+
+  it('セッション数がlimitを超えるとhasMore=trueになり、limit件だけ新しい順に返す', () => {
+    const exerciseId = insertExercise(db, 'ベンチプレス');
+    const sessionIds: number[] = [];
+    for (let i = 0; i < 5; i++) {
+      const past = insertSession(db, 1000 + i);
+      endSession(db, past, 1500 + i);
+      const card = insertCard(db, past, exerciseId, 0);
+      insertSet(db, past, exerciseId, card, 1, 60, 10, true);
+      sessionIds.push(past);
+    }
+    const currentSession = insertSession(db, 5000);
+
+    const { sessions, hasMore } = getPastTrainingSessionsSql(db, currentSession, { limit: 3, offset: 0 });
+    expect(hasMore).toBe(true);
+    // 新しい順（insertSession呼び出し順の逆）に3件
+    expect(sessions.map((s) => s.sessionId)).toEqual([sessionIds[4], sessionIds[3], sessionIds[2]]);
+  });
+
+  it('offsetを進めると、それより新しいページで既に返した分を除いた続きが返る', () => {
+    const exerciseId = insertExercise(db, 'ベンチプレス');
+    const sessionIds: number[] = [];
+    for (let i = 0; i < 5; i++) {
+      const past = insertSession(db, 1000 + i);
+      endSession(db, past, 1500 + i);
+      const card = insertCard(db, past, exerciseId, 0);
+      insertSet(db, past, exerciseId, card, 1, 60, 10, true);
+      sessionIds.push(past);
+    }
+    const currentSession = insertSession(db, 5000);
+
+    const { sessions, hasMore } = getPastTrainingSessionsSql(db, currentSession, { limit: 3, offset: 3 });
+    expect(hasMore).toBe(false);
+    expect(sessions.map((s) => s.sessionId)).toEqual([sessionIds[1], sessionIds[0]]);
+  });
+
+  it('offsetがセッション総数ちょうど、または超過する場合は空配列・hasMore=falseを返す', () => {
+    const exerciseId = insertExercise(db, 'ベンチプレス');
+    for (let i = 0; i < 3; i++) {
+      const past = insertSession(db, 1000 + i);
+      endSession(db, past, 1500 + i);
+      const card = insertCard(db, past, exerciseId, 0);
+      insertSet(db, past, exerciseId, card, 1, 60, 10, true);
+    }
+    const currentSession = insertSession(db, 5000);
+
+    expect(getPastTrainingSessionsSql(db, currentSession, { limit: 3, offset: 3 })).toEqual({
+      sessions: [],
+      hasMore: false,
+    });
+    expect(getPastTrainingSessionsSql(db, currentSession, { limit: 3, offset: 10 })).toEqual({
+      sessions: [],
+      hasMore: false,
+    });
+  });
+
+  it('excludeSessionIdが終了済みでページ境界にある場合、除外分だけ後続ページが繰り上がる', () => {
+    const exerciseId = insertExercise(db, 'ベンチプレス');
+    const sessionIds: number[] = [];
+    for (let i = 0; i < 5; i++) {
+      const past = insertSession(db, 1000 + i);
+      endSession(db, past, 1500 + i);
+      const card = insertCard(db, past, exerciseId, 0);
+      insertSet(db, past, exerciseId, card, 1, 60, 10, true);
+      sessionIds.push(past);
+    }
+    // 新しい順で2番目（本来はoffset=0のページに含まれるはず）を除外対象にする
+    const excludeTarget = sessionIds[3];
+
+    const page0 = getPastTrainingSessionsSql(db, excludeTarget, { limit: 3, offset: 0 });
+    expect(page0.sessions.map((s) => s.sessionId)).toEqual([sessionIds[4], sessionIds[2], sessionIds[1]]);
+    expect(page0.hasMore).toBe(true);
+
+    const page1 = getPastTrainingSessionsSql(db, excludeTarget, { limit: 3, offset: 3 });
+    expect(page1.sessions.map((s) => s.sessionId)).toEqual([sessionIds[0]]);
+    expect(page1.hasMore).toBe(false);
+  });
+
+  it('startedAtが同値のセッションが複数あっても、id降順のタイブレークで重複・欠落なくページングできる', () => {
+    const exerciseId = insertExercise(db, 'ベンチプレス');
+    const sessionIds: number[] = [];
+    for (let i = 0; i < 5; i++) {
+      // 全セッションを同一startedAtにして、id以外にソートの手がかりが無い状態を作る
+      const past = insertSession(db, 1000);
+      endSession(db, past, 1500);
+      const card = insertCard(db, past, exerciseId, 0);
+      insertSet(db, past, exerciseId, card, 1, 60, 10, true);
+      sessionIds.push(past);
+    }
+    const currentSession = insertSession(db, 5000);
+
+    const page0 = getPastTrainingSessionsSql(db, currentSession, { limit: 3, offset: 0 });
+    const page1 = getPastTrainingSessionsSql(db, currentSession, { limit: 3, offset: 3 });
+
+    // id降順で安定的に並び、2ページ分を合わせると重複・欠落なく全件を1回ずつカバーする
+    expect(page0.sessions.map((s) => s.sessionId)).toEqual([...sessionIds].reverse().slice(0, 3));
+    expect(page1.sessions.map((s) => s.sessionId)).toEqual([...sessionIds].reverse().slice(3, 5));
+    expect(page0.hasMore).toBe(true);
+    expect(page1.hasMore).toBe(false);
   });
 });
 
