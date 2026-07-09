@@ -20,6 +20,7 @@ const Palette = {
   slate600: '#475569',
   slate700: '#334155',
   slate800: '#1E293B',
+  slate900: '#0F172A',
 
   blue50: '#EFF6FF',
   blue600: '#2563EB',
@@ -67,7 +68,21 @@ export const Colors = {
   tabIconDefault: Palette.slate500,
   tabIconSelected: Palette.blue600,
   tint: Palette.blue600,
+
+  shadow: Palette.slate900,
 };
+
+/** シャドウトークン。各キーがスタイルオブジェクト。`{...Shadows.switchKnob}` のようにスプレッドして使う */
+export const Shadows = {
+  /** Switchのノブ（つまみ）に落とす影。0 1px 3px rgba(15,23,42,0.25)相当 */
+  switchKnob: {
+    shadowColor: Colors.shadow,
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.25,
+    shadowRadius: 3,
+    elevation: 2,
+  },
+} as const;
 
 /**
  * タイポグラフィトークン。役割ごとに基本{fontSize, lineHeight, fontWeight}を定義する

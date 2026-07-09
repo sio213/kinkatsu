@@ -29,6 +29,7 @@ export default function RemindersScreen() {
   const keyboardInset = useKeyboardInset();
   const [showForm, setShowForm] = useState(false);
   const [editTargetId, setEditTargetId] = useState<number | null>(null);
+  const [togglingIds, setTogglingIds] = useState<Set<number>>(new Set());
 
   useEffect(() => {
     getPermissionState().then(setPermState);
@@ -82,6 +83,25 @@ export default function RemindersScreen() {
     [removeReminder],
   );
 
+  const handleToggle = useCallback(
+    async (id: number, enabled: boolean) => {
+      setTogglingIds((prev) => new Set(prev).add(id));
+      try {
+        await toggleReminder(id, enabled);
+      } catch (e) {
+        console.error('[reminder toggle]', e);
+        Alert.alert('エラー', 'リマインダーの設定変更に失敗しました。');
+      } finally {
+        setTogglingIds((prev) => {
+          const next = new Set(prev);
+          next.delete(id);
+          return next;
+        });
+      }
+    },
+    [toggleReminder],
+  );
+
   const handleRequestPermission = useCallback(async () => {
     const r = await ensurePermission();
     setPermState(r);
@@ -121,7 +141,8 @@ export default function RemindersScreen() {
                 onEdit={() => openEdit(r.id)}
                 onCloseEdit={closeForm}
                 onDelete={() => handleDelete(r.id)}
-                onToggle={(enabled) => toggleReminder(r.id, enabled)}
+                onToggle={(enabled) => handleToggle(r.id, enabled)}
+                isToggling={togglingIds.has(r.id)}
                 onSubmit={handleSubmit}
                 getNextFire={getNextFire}
                 now={now}

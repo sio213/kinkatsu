@@ -1,6 +1,7 @@
 import React from 'react';
 import { act, create, type ReactTestInstance } from 'react-test-renderer';
-import { Switch, Text, TextInput, TouchableOpacity } from 'react-native';
+import { Text, TextInput, TouchableOpacity } from 'react-native';
+import { Switch } from '@/components/ui/switch';
 import { ExerciseForm, type ExerciseFormHandle } from '@/components/exercises/exercise-form';
 
 function getInputs(root: ReactTestInstance) {

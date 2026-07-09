@@ -1,13 +1,15 @@
+import { Switch } from '@/components/ui/switch';
 import { Colors, Typography } from '@/constants/theme';
 import type { Reminder } from '@/db/schema';
 import { formatKindSummary, formatNextFire } from '@/lib/notifications/format';
 import type { ReminderInput, ReminderKind } from '@/lib/notifications/types';
-import { StyleSheet, Switch, Text, TouchableOpacity, View } from 'react-native';
+import { StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import { ReminderForm } from './reminder-form';
 
 type Props = {
   reminder: Reminder;
   isEditing: boolean;
+  isToggling?: boolean;
   onEdit: () => void;
   onCloseEdit: () => void;
   onDelete: () => void;
@@ -38,6 +40,7 @@ function buildEditInput(r: Reminder): ReminderInput {
 export function ReminderCard({
   reminder: r,
   isEditing,
+  isToggling,
   onEdit,
   onCloseEdit,
   onDelete,
@@ -58,7 +61,8 @@ export function ReminderCard({
           <Switch
             value={r.enabled}
             onValueChange={onToggle}
-            accessibilityLabel={`${r.title}を${r.enabled ? '無効' : '有効'}にする`}
+            disabled={isToggling}
+            accessibilityLabel={r.title}
           />
         </View>
         <View style={styles.actions}>

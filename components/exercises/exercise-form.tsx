@@ -1,6 +1,7 @@
 import { chipStyles } from '@/components/exercises/chip-styles';
 import { FormLabel } from '@/components/ui/form-label';
 import { SectionHeading } from '@/components/ui/section-heading';
+import { Switch } from '@/components/ui/switch';
 import { Colors, Typography } from '@/constants/theme';
 import {
   EXERCISE_CATEGORIES,
@@ -16,7 +17,6 @@ import { forwardRef, useEffect, useImperativeHandle, useRef } from 'react';
 import { Controller, useForm } from 'react-hook-form';
 import {
   StyleSheet,
-  Switch,
   Text,
   TextInput,
   TouchableOpacity,
@@ -209,8 +209,6 @@ export const ExerciseForm = forwardRef<ExerciseFormHandle, Props>(function Exerc
             <Switch
               value={value}
               onValueChange={onChange}
-              trackColor={{ true: Colors.accent, false: Colors.borderStrong }}
-              thumbColor={Colors.surface}
               accessibilityLabel="お気に入りに追加"
             />
           )}
