@@ -27,3 +27,11 @@ export type ParsedReminder = Omit<Reminder, 'weekdays' | 'monthdays'> & {
   weekdays: number[] | null;
   monthdays: number[] | null;
 };
+
+// 通知タップ時の遷移先判定に使う識別子。scheduler側（生成）とタップハンドラ側（消費）で共有する
+export const REMINDER_NOTIFICATION_TYPE = 'reminder' as const;
+
+export type ReminderNotificationData = {
+  type: typeof REMINDER_NOTIFICATION_TYPE;
+  reminderId: number;
+};

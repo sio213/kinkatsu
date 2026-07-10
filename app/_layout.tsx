@@ -9,6 +9,7 @@ import {
   pruneExpiredNotifications,
   refillAllReminders,
 } from '@/lib/notifications/scheduler';
+import { resolveReminderTapRoute } from '@/lib/notifications/tap-handler';
 import {
   DarkTheme,
   DefaultTheme,
@@ -17,7 +18,7 @@ import {
 import { useMigrations } from 'drizzle-orm/expo-sqlite/migrator';
 import { useDrizzleStudio } from 'expo-drizzle-studio-plugin';
 import * as Notifications from 'expo-notifications';
-import { Stack } from 'expo-router';
+import { Stack, useRouter } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
 import { useEffect, useRef } from 'react';
 import {
@@ -58,12 +59,14 @@ async function onAppStart() {
 
 export default function RootLayout() {
   const colorScheme = useColorScheme();
+  const router = useRouter();
   const { success, error: migrationError } = useMigrations(db, migrations);
   // DBをブラウザから閲覧できるようにする
   //　http://192.168.8.135:8081/_expo/plugins/expo-drizzle-studio-plugin
   useDrizzleStudio(__DEV__ ? expoDb : null);
 
   const appState = useRef<AppStateStatus>(AppState.currentState);
+  const lastNotificationResponse = Notifications.useLastNotificationResponse();
 
   useEffect(() => {
     if (!success) return;
@@ -78,6 +81,25 @@ export default function RootLayout() {
     });
     return () => sub.remove();
   }, [success]);
+
+  // 通知タップ → 記録タブへ遷移。cold start／background／foregroundのいずれのタップも
+  // useLastNotificationResponseが横断して拾うため、リスナーの手動組み合わせは不要。
+  useEffect(() => {
+    if (!success || !lastNotificationResponse) return;
+    const route = resolveReminderTapRoute(lastNotificationResponse);
+    // タブの切り替えを伴うため、replace/dismissToではなくnavigateを使う。
+    // navigateは「対象ルートが既にスタック内にあればそこまで戻る」動作なので、
+    // workout/[id]・exercise-picker等の下層画面が積まれていても記録タブまで
+    // 正しく畳まれ、かつ(tabs)グループ内のタブ切り替え（index⇔reminders）も
+    // 効く。dismissToはスタックのpopのみを行いタブ切り替えには効かなかった
+    // （実機検証済み）。replaceは下層画面が残ったままになるため使わない。
+    if (route) router.navigate(route);
+    // ネイティブの繰り返し通知（daily/weekly/monthly）は毎回発火してもrequest.identifierが
+    // 同一のため、useLastNotificationResponseの内部dedupがidentifier一致を理由に
+    // 2回目以降のタップを無視してしまう。処理後にclearしてstateをリセットすることで、
+    // 同じリマインダーの次回タップも新規レスポンスとして検知できるようにする。
+    Notifications.clearLastNotificationResponse();
+  }, [success, lastNotificationResponse, router]);
 
   if (migrationError) {
     console.error('[migration error]', migrationError);

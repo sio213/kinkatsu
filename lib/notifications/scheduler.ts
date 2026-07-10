@@ -10,9 +10,11 @@ import * as Notifications from 'expo-notifications';
 import { REMINDER_CHANNEL_ID } from './channels';
 import {
   MONTH_END,
+  REMINDER_NOTIFICATION_TYPE,
   type ParsedReminder,
   type ReminderInput,
   type ReminderKind,
+  type ReminderNotificationData,
   type TriggerType,
 } from './types';
 
@@ -399,10 +401,15 @@ async function scheduleNative(r: ParsedReminder): Promise<void> {
   const now = Date.now();
   const ids: string[] = [];
 
+  const data: ReminderNotificationData = {
+    type: REMINDER_NOTIFICATION_TYPE,
+    reminderId: r.id,
+  };
   const content = {
     title: r.title,
     body: r.body,
     sound: true as const,
+    data,
     ...(REMINDER_CHANNEL_ID ? { channelId: REMINDER_CHANNEL_ID } : {}),
   };
 
@@ -519,11 +526,16 @@ async function scheduleQueue(r: ParsedReminder, depth: number): Promise<void> {
   const nowMs = Date.now();
   const scheduled: { osId: string; date: Date }[] = [];
   for (const date of dates) {
+    const queueData: ReminderNotificationData = {
+      type: REMINDER_NOTIFICATION_TYPE,
+      reminderId: r.id,
+    };
     const osId = await Notifications.scheduleNotificationAsync({
       content: {
         title: r.title,
         body: r.body,
         sound: true,
+        data: queueData,
         ...(REMINDER_CHANNEL_ID ? { channelId: REMINDER_CHANNEL_ID } : {}),
       },
       trigger: {
