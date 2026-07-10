@@ -8,7 +8,7 @@ import { Colors } from '@/constants/theme';
 export default function TabLayout() {
   return (
     <Tabs
-      initialRouteName="reminders"
+      initialRouteName="index"
       screenOptions={{
         tabBarActiveTintColor: Colors.tint,
         headerShown: false,

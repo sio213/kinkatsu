@@ -87,10 +87,13 @@ export default function RootLayout() {
   useEffect(() => {
     if (!success || !lastNotificationResponse) return;
     const route = resolveReminderTapRoute(lastNotificationResponse);
-    // dismissToでworkout/exercise-picker等、途中の画面を全て畳んでから記録タブへ着地させる。
-    // replaceだと最上位画面しか置き換わらず、下層のスタックが残って「戻る」で古い画面に
-    // 迷い込む問題があるため使わない（@designerレビュー指摘）。
-    if (route) router.dismissTo(route);
+    // タブの切り替えを伴うため、replace/dismissToではなくnavigateを使う。
+    // navigateは「対象ルートが既にスタック内にあればそこまで戻る」動作なので、
+    // workout/[id]・exercise-picker等の下層画面が積まれていても記録タブまで
+    // 正しく畳まれ、かつ(tabs)グループ内のタブ切り替え（index⇔reminders）も
+    // 効く。dismissToはスタックのpopのみを行いタブ切り替えには効かなかった
+    // （実機検証済み）。replaceは下層画面が残ったままになるため使わない。
+    if (route) router.navigate(route);
     // ネイティブの繰り返し通知（daily/weekly/monthly）は毎回発火してもrequest.identifierが
     // 同一のため、useLastNotificationResponseの内部dedupがidentifier一致を理由に
     // 2回目以降のタップを無視してしまう。処理後にclearしてstateをリセットすることで、
