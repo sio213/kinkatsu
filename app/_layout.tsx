@@ -9,6 +9,7 @@ import {
   pruneExpiredNotifications,
   refillAllReminders,
 } from '@/lib/notifications/scheduler';
+import { resolveReminderTapRoute } from '@/lib/notifications/tap-handler';
 import {
   DarkTheme,
   DefaultTheme,
@@ -17,7 +18,7 @@ import {
 import { useMigrations } from 'drizzle-orm/expo-sqlite/migrator';
 import { useDrizzleStudio } from 'expo-drizzle-studio-plugin';
 import * as Notifications from 'expo-notifications';
-import { Stack } from 'expo-router';
+import { Stack, useRouter } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
 import { useEffect, useRef } from 'react';
 import {
@@ -58,12 +59,14 @@ async function onAppStart() {
 
 export default function RootLayout() {
   const colorScheme = useColorScheme();
+  const router = useRouter();
   const { success, error: migrationError } = useMigrations(db, migrations);
   // DBをブラウザから閲覧できるようにする
   //　http://192.168.8.135:8081/_expo/plugins/expo-drizzle-studio-plugin
   useDrizzleStudio(__DEV__ ? expoDb : null);
 
   const appState = useRef<AppStateStatus>(AppState.currentState);
+  const lastNotificationResponse = Notifications.useLastNotificationResponse();
 
   useEffect(() => {
     if (!success) return;
@@ -78,6 +81,22 @@ export default function RootLayout() {
     });
     return () => sub.remove();
   }, [success]);
+
+  // 通知タップ → 記録タブへ遷移。cold start／background／foregroundのいずれのタップも
+  // useLastNotificationResponseが横断して拾うため、リスナーの手動組み合わせは不要。
+  useEffect(() => {
+    if (!success || !lastNotificationResponse) return;
+    const route = resolveReminderTapRoute(lastNotificationResponse);
+    // dismissToでworkout/exercise-picker等、途中の画面を全て畳んでから記録タブへ着地させる。
+    // replaceだと最上位画面しか置き換わらず、下層のスタックが残って「戻る」で古い画面に
+    // 迷い込む問題があるため使わない（@designerレビュー指摘）。
+    if (route) router.dismissTo(route);
+    // ネイティブの繰り返し通知（daily/weekly/monthly）は毎回発火してもrequest.identifierが
+    // 同一のため、useLastNotificationResponseの内部dedupがidentifier一致を理由に
+    // 2回目以降のタップを無視してしまう。処理後にclearしてstateをリセットすることで、
+    // 同じリマインダーの次回タップも新規レスポンスとして検知できるようにする。
+    Notifications.clearLastNotificationResponse();
+  }, [success, lastNotificationResponse, router]);
 
   if (migrationError) {
     console.error('[migration error]', migrationError);
