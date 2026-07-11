@@ -208,15 +208,10 @@ const styles = StyleSheet.create({
   number: { width: 52, textAlign: 'center', ...Typography.caption, fontWeight: '600', color: Colors.textPlaceholder },
   cellWrapper: { flex: 1 },
   // 重量・回数欄は箱(背景・枠線・角丸・横padding)とTextInput本体をBoxedTextInputで
-  // 分離している。詳細はcomponents/ui/boxed-text-input.tsxのコメント参照
-  cellBox: {
-    backgroundColor: Colors.surface,
-    borderWidth: 1,
-    borderColor: Colors.borderStrong,
-    borderRadius: 7,
-    paddingHorizontal: 10,
-  },
-  cellText: { ...Typography.metric, color: Colors.textPrimary },
+  // 分離している。背景・枠線は既定値のままなので、既定(8)より小さいborderRadiusと
+  // paddingHorizontalの差分だけ持つ。詳細はcomponents/ui/boxed-text-input.tsxのコメント参照
+  cellBox: { borderRadius: 7, paddingHorizontal: 10 },
+  cellText: Typography.metric,
   // ✓未確定のまま値が入っている行の見た目（ゴースト表示）。文字色だけでなく背景・枠線も
   // 変えることで、色の濃淡だけに頼らないようにする（WCAG 1.4.1対応）。文字色はtextMutedだと
   // このaccentSurface背景ではコントラスト比がWCAG AA(4.5:1)にわずかに届かないため、

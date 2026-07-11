@@ -237,15 +237,10 @@ const styles = StyleSheet.create({
   container: { gap: 16 },
 
   // 種目名・フォームのポイントは箱(枠線・背景・角丸・横padding)とTextInput本体を
-  // BoxedTextInputで分離している。詳細はcomponents/ui/boxed-text-input.tsxのコメント参照
-  inputBox: {
-    borderWidth: 1,
-    borderColor: Colors.borderStrong,
-    borderRadius: 8,
-    paddingHorizontal: 11,
-    backgroundColor: Colors.surface,
-  },
-  inputText: { ...Typography.body, color: Colors.textPrimary },
+  // BoxedTextInputで分離している。border/borderColor/borderRadius/文字色は既定値の
+  // ままなのでここではpaddingHorizontalの差分だけ持つ。詳細はcomponents/ui/boxed-text-input.tsxのコメント参照
+  inputBox: { paddingHorizontal: 11 },
+  inputText: Typography.body,
   pointBox: { flex: 1 },
 
   // メモ欄は複数行で伸びる仕様のためBoxedTextInputを使わず、そのままの高さ可変で表示する

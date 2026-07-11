@@ -551,15 +551,10 @@ const styles = StyleSheet.create({
   labelSpacing: { marginTop: 12, marginBottom: 4 },
   errorText: { ...Typography.caption, color: Colors.danger, marginBottom: 4 },
   // タイトルは箱(枠線・背景・角丸・横padding)とTextInput本体をBoxedTextInputで分離
-  // している。詳細はcomponents/ui/boxed-text-input.tsxのコメント参照
-  inputBox: {
-    borderWidth: 1,
-    borderColor: Colors.borderStrong,
-    borderRadius: 8,
-    paddingHorizontal: 12,
-    backgroundColor: Colors.surface,
-  },
-  inputText: { ...Typography.body, color: Colors.textPrimary },
+  // している。border/borderColor/borderRadius/文字色は既定値のままなのでここでは
+  // paddingHorizontalの差分だけ持つ。詳細はcomponents/ui/boxed-text-input.tsxのコメント参照
+  inputBox: { paddingHorizontal: 12 },
+  inputText: Typography.body,
 
   // 通知内容欄は複数行で伸びる仕様のためBoxedTextInputを使わず、そのままの高さ可変で表示する
   inputMulti: {

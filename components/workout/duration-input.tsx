@@ -67,6 +67,7 @@ export const DurationInput = forwardRef<DurationInputHandle, DurationInputProps>
       <BoxedTextInput
         ref={minInputRef}
         height={18}
+        bare
         boxStyle={styles.durationMinPart}
         style={[styles.durationPart, ghost && styles.durationPartGhost]}
         value={min}
@@ -92,6 +93,7 @@ export const DurationInput = forwardRef<DurationInputHandle, DurationInputProps>
       <BoxedTextInput
         ref={secInputRef}
         height={18}
+        bare
         boxStyle={styles.durationSecPart}
         style={[styles.durationPart, ghost && styles.durationPartGhost]}
         value={sec}
@@ -133,12 +135,10 @@ const styles = StyleSheet.create({
   // 幅の中央に寄ってしまい、間が間延びして見える。固定幅にして「分:秒」をひとまとまりの
   // 塊にし、左右のdurationSpacer（flex:1の余白）で挟むことで中央寄せしつつ、その余白
   // 部分もタップで隣接する入力欄へフォーカスできるようにする
-  // 分・秒はBoxedTextInputで箱(幅)とTextInput本体を分離している。
+  // 分・秒はBoxedTextInputで箱(幅)とTextInput本体を分離している(bare指定で枠線・背景は
+  // 持たせず、親durationCellの枠内に収める)。文字色は既定値のままなのでここでは持たない。
   // 詳細はcomponents/ui/boxed-text-input.tsxのコメント参照
-  durationPart: {
-    ...Typography.metric,
-    color: Colors.textPrimary,
-  },
+  durationPart: Typography.metric,
   durationPartGhost: { color: Colors.textSecondary },
   durationSpacer: {
     flex: 1,

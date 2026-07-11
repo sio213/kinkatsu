@@ -1,3 +1,4 @@
+import { Colors } from '@/constants/theme';
 import { forwardRef } from 'react';
 import {
   StyleSheet,
@@ -11,8 +12,12 @@ import {
 
 type Props = TextInputProps & {
   height: number;
-  // 枠線・背景・角丸・横paddingなど「箱」側の見た目
+  // 枠線・背景・角丸など「箱」側で共通デフォルトから変える差分だけを書く
+  // (paddingHorizontal・borderRadius・backgroundColorの上書き等)
   boxStyle?: StyleProp<ViewStyle>;
+  // 枠線・背景・角丸を持たない「素の」入力欄にしたい場合はtrueにする
+  // (例: 分:秒のように複数の入力欄を1つの外枠でまとめて囲む場合)
+  bare?: boolean;
 };
 
 // 単一行入力欄を、見た目の箱(高さ固定・overflow hidden)とTextInput本体を分離して描画する。
@@ -28,15 +33,19 @@ type Props = TextInputProps & {
 // フォント内部の基準位置(ascent/descent)が異なる文字が混在すると、字体ごとに縦位置が
 // 数pt単位でずれて見える（例:「あアプリ」であ→アで見た目の下端が下にずれる）。lineHeightを
 // 指定せず文字ごとの自然な行の高さに任せることで、この字体差によるベースラインのズレを防ぐ。
+//
+// 枠線・背景・角丸・文字色は、アプリ内のほぼ全ての入力欄で同じ値（border/surface/8/textPrimary）
+// になっているため既定値として持たせ、呼び出し側はradius・paddingHorizontal・ghost時の色など
+// 実際に異なる差分だけをboxStyle/styleで上書きする。
 export const BoxedTextInput = forwardRef<TextInput, Props>(function BoxedTextInput(
-  { height, boxStyle, style, ...rest }: Props,
+  { height, boxStyle, bare, style, ...rest }: Props,
   ref,
 ) {
   return (
-    <View style={[styles.box, { height }, boxStyle]}>
+    <View style={[bare ? styles.bareBox : styles.box, { height }, boxStyle]}>
       <TextInput
         ref={ref}
-        style={[style as StyleProp<TextStyle>, styles.text]}
+        style={[styles.text, style as StyleProp<TextStyle>, styles.forced]}
         {...rest}
       />
     </View>
@@ -44,8 +53,18 @@ export const BoxedTextInput = forwardRef<TextInput, Props>(function BoxedTextInp
 });
 
 const styles = StyleSheet.create({
-  box: { justifyContent: 'center', overflow: 'hidden' },
+  bareBox: { justifyContent: 'center', overflow: 'hidden' },
+  box: {
+    justifyContent: 'center',
+    overflow: 'hidden',
+    borderWidth: 1,
+    borderColor: Colors.borderStrong,
+    borderRadius: 8,
+    backgroundColor: Colors.surface,
+  },
+  text: { color: Colors.textPrimary },
   // includeFontPadding: Androidの文字種によるボックス高さの変動対策
-  // lineHeight: undefinedでcallerのTypography由来の値を必ず打ち消す(下部コメント参照)
-  text: { includeFontPadding: false, lineHeight: undefined },
+  // lineHeight: undefinedでcallerのTypography由来の値を必ず打ち消す(上部コメント参照)
+  // styleより後に置き、callerが誤って上書きできないようにする
+  forced: { includeFontPadding: false, lineHeight: undefined },
 });
