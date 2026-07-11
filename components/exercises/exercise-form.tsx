@@ -235,13 +235,18 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: Colors.borderStrong,
     borderRadius: 8,
+    height: 40,
     paddingHorizontal: 11,
-    paddingVertical: 9,
     ...Typography.body,
     color: Colors.textPrimary,
     backgroundColor: Colors.surface,
+    // Androidはグリフ種によってincludeFontPaddingの余白が変動し、入力するたびに
+    // BOXの高さが揺れて見えるため、明示heightと合わせて無効化して固定する
+    includeFontPadding: false,
+    textAlignVertical: 'center',
   },
-  inputMultiline: { minHeight: 56, textAlignVertical: 'top' },
+  // メモ欄は複数行で伸びる仕様のため、単一行用のheight固定を解除しminHeightのみにする
+  inputMultiline: { height: undefined, minHeight: 56, paddingVertical: 9, textAlignVertical: 'top' },
 
   errorText: { ...Typography.caption, color: Colors.danger, marginTop: -4 },
 

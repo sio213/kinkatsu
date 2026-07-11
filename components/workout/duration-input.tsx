@@ -130,8 +130,13 @@ const styles = StyleSheet.create({
   // 部分もタップで隣接する入力欄へフォーカスできるようにする
   durationPart: {
     padding: 0,
+    height: 18,
     ...Typography.metric,
     color: Colors.textPrimary,
+    // Androidはグリフ種によってincludeFontPaddingの余白が変動し、入力するたびに
+    // BOXの高さが揺れて見えるため、明示heightと合わせて無効化して固定する
+    includeFontPadding: false,
+    textAlignVertical: 'center',
   },
   durationPartGhost: { color: Colors.textSecondary },
   durationSpacer: {

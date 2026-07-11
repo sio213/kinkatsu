@@ -61,11 +61,15 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: Colors.borderStrong,
     borderRadius: 8,
+    height: 40,
     paddingLeft: 36,
     paddingRight: 36,
-    paddingVertical: 9,
     ...Typography.body,
     color: Colors.textPrimary,
     backgroundColor: Colors.surfaceMuted,
+    // Androidはグリフ種によってincludeFontPaddingの余白が変動し、入力するたびに
+    // BOXの高さが揺れて見えるため、明示heightと合わせて無効化して固定する
+    includeFontPadding: false,
+    textAlignVertical: 'center',
   },
 });

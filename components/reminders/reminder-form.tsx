@@ -551,13 +551,18 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: Colors.borderStrong,
     borderRadius: 8,
+    height: 38,
     paddingHorizontal: 12,
-    paddingVertical: 8,
     ...Typography.body,
     color: Colors.textPrimary,
     backgroundColor: Colors.surface,
+    // Androidはグリフ種によってincludeFontPaddingの余白が変動し、入力するたびに
+    // BOXの高さが揺れて見えるため、明示heightと合わせて無効化して固定する
+    includeFontPadding: false,
+    textAlignVertical: 'center',
   },
-  inputMulti: { minHeight: 80, textAlignVertical: 'top' },
+  // 通知内容欄は複数行で伸びる仕様のため、単一行用のheight固定を解除しminHeightのみにする
+  inputMulti: { height: undefined, minHeight: 80, paddingVertical: 8, textAlignVertical: 'top' },
 
   timeButton: {
     backgroundColor: Colors.surface,

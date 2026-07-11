@@ -209,10 +209,14 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: Colors.borderStrong,
     borderRadius: 7,
-    paddingVertical: 7,
+    height: 32,
     paddingHorizontal: 10,
     ...Typography.metric,
     color: Colors.textPrimary,
+    // Androidはグリフ種によってincludeFontPaddingの余白が変動し、入力するたびに
+    // BOXの高さが揺れて見えるため、明示heightと合わせて無効化して固定する
+    includeFontPadding: false,
+    textAlignVertical: 'center',
   },
   // ✓未確定のまま値が入っている行の見た目（ゴースト表示）。文字色だけでなく背景・枠線も
   // 変えることで、色の濃淡だけに頼らないようにする（WCAG 1.4.1対応）。文字色はtextMutedだと
