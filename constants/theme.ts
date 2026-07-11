@@ -96,16 +96,6 @@ export const Typography = {
   navTitle: { fontSize: 18, lineHeight: 22, fontWeight: '700' },
   /** 種目名・セッション名などカードの主題テキスト */
   cardTitle: { fontSize: 15, lineHeight: 22, fontWeight: '700' },
-  /**
-   * セクションラベル（「使う筋肉」等）。あえてbodyより小さい太字＋字間広めにした
-   * Eyebrow/Overline見出し（本文の前に置く小さな道しるべ）。本文の代わりに使わないこと。
-   */
-  sectionHeading: {
-    fontSize: 13,
-    lineHeight: 18,
-    fontWeight: '700',
-    letterSpacing: 0.2,
-  },
   /** 標準本文。フォーム入力・ボタン・Dropdownメニュー項目など「操作・確認する」テキスト全般 */
   body: { fontSize: 15, lineHeight: 22, fontWeight: '400' },
   /** ボタンラベル等、強調する本文 */
@@ -116,13 +106,6 @@ export const Typography = {
    * 操作系テキストにはbodyを使い、こちらは転用しない。
    */
   longform: { fontSize: 14, lineHeight: 22, fontWeight: '400' },
-  /** やや大きめの補助テキスト（エラーメッセージ・チップ文言・要約1行など）。fontWeightは用途に応じ都度上書きしてよい */
-  footnote: { fontSize: 13, lineHeight: 18, fontWeight: '400' },
-  /**
-   * 最小の一般テキスト（相対日付・件数・列見出しラベルなど）。fontWeightは用途に応じ都度上書きしてよい
-   * （前身のmetricLabelトークンをここに統合したため、太字での使用頻度が高い）。
-   */
-  caption: { fontSize: 12, lineHeight: 16, fontWeight: '500' },
   /**
    * トレーニング中に一瞬で読む太字の数値（重量・回数の入力欄、タイマー表示など）。
    * 前身のtimerトークンをここに統合したため、役割は「重要な数値」全般を指す。
@@ -130,6 +113,23 @@ export const Typography = {
    * fontWeightが700のため、呼び出し側(app/workout/[id].tsx)で個別に上書きしている。
    */
   metric: { fontSize: 14, lineHeight: 18, fontWeight: '600' },
+  /**
+   * セクションラベル（「使う筋肉」等）。あえてbodyより小さい太字＋字間広めにした
+   * Eyebrow/Overline見出し（本文の前に置く小さな道しるべ）。本文の代わりに使わないこと。
+   */
+  sectionHeading: {
+    fontSize: 13,
+    lineHeight: 18,
+    fontWeight: '700',
+    letterSpacing: 0.2,
+  },
+  /** やや大きめの補助テキスト（エラーメッセージ・チップ文言・要約1行など）。fontWeightは用途に応じ都度上書きしてよい */
+  footnote: { fontSize: 13, lineHeight: 18, fontWeight: '400' },
+  /**
+   * 最小の一般テキスト（相対日付・件数・列見出しラベルなど）。fontWeightは用途に応じ都度上書きしてよい
+   * （前身のmetricLabelトークンをここに統合したため、太字での使用頻度が高い）。
+   */
+  caption: { fontSize: 12, lineHeight: 16, fontWeight: '500' },
   /** NEW/BESTなどの小バッジ */
   badge: { fontSize: 11, fontWeight: '700' },
 } as const;
