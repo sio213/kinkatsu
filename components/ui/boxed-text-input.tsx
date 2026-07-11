@@ -22,18 +22,30 @@ type Props = TextInputProps & {
 // TextInputには高さを持たせず内容に応じて自然にレンダリングさせ、箱側のjustifyContent:
 // centerで常に中央に据え、overflow:hiddenではみ出た分だけ切り詰めることで、箱の見た目の
 // 高さと縦位置を常に固定する（Androidの文字種によるincludeFontPadding変動対策も兼ねる）。
+//
+// さらにstyleに渡されたlineHeightは強制的に無効化する。RNのカスタムlineHeightはiOSでは
+// 文字列全体に対して単一のベースライン補正しか計算しないため、ひらがな・カタカナ・漢字で
+// フォント内部の基準位置(ascent/descent)が異なる文字が混在すると、字体ごとに縦位置が
+// 数pt単位でずれて見える（例:「あアプリ」であ→アで見た目の下端が下にずれる）。lineHeightを
+// 指定せず文字ごとの自然な行の高さに任せることで、この字体差によるベースラインのズレを防ぐ。
 export const BoxedTextInput = forwardRef<TextInput, Props>(function BoxedTextInput(
   { height, boxStyle, style, ...rest }: Props,
   ref,
 ) {
   return (
     <View style={[styles.box, { height }, boxStyle]}>
-      <TextInput ref={ref} style={[styles.text, style as StyleProp<TextStyle>]} {...rest} />
+      <TextInput
+        ref={ref}
+        style={[style as StyleProp<TextStyle>, styles.text]}
+        {...rest}
+      />
     </View>
   );
 });
 
 const styles = StyleSheet.create({
   box: { justifyContent: 'center', overflow: 'hidden' },
-  text: { includeFontPadding: false },
+  // includeFontPadding: Androidの文字種によるボックス高さの変動対策
+  // lineHeight: undefinedでcallerのTypography由来の値を必ず打ち消す(下部コメント参照)
+  text: { includeFontPadding: false, lineHeight: undefined },
 });
