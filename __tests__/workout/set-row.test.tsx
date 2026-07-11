@@ -2,6 +2,7 @@ import React from 'react';
 import { act, create, type ReactTestInstance } from 'react-test-renderer';
 import { Alert, TextInput } from 'react-native';
 import { SetRow } from '@/components/workout/set-row';
+import { BoxedTextInput } from '@/components/ui/boxed-text-input';
 
 function render(
   props: Omit<Parameters<typeof SetRow>[0], 'exerciseName' | 'isPrefilledSet' | 'cardReviewed'> & {
@@ -536,9 +537,9 @@ describe('ゴースト表示（isPrefilledSetの行で、値はあるが✓未�
     const set = { id: 1, setNumber: 1, weight: 60, reps: 10, completedAt: null } as any;
     const root = render({ set, measurementType: 'weight_reps', onSave: jest.fn(), onReopen: jest.fn() });
 
-    const inputs = root.findAllByType(TextInput);
+    const boxedInputs = root.findAllByType(BoxedTextInput);
     const flatStyle = (style: unknown) => (Array.isArray(style) ? Object.assign({}, ...style.filter(Boolean)) : style);
-    expect(flatStyle(inputs[0].props.style).backgroundColor).not.toBeUndefined();
+    expect(flatStyle(boxedInputs[0].props.boxStyle).backgroundColor).not.toBeUndefined();
     expect(getCheck(root).props.accessibilityLabel).toContain('未確認');
   });
 

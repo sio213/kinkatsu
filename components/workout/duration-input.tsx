@@ -1,3 +1,4 @@
+import { BoxedTextInput } from '@/components/ui/boxed-text-input';
 import { Colors, Typography } from '@/constants/theme';
 import { combineDurationDisplay, splitDurationDisplay } from '@/lib/workout/set-format';
 import { forwardRef, useImperativeHandle, useRef, useState } from 'react';
@@ -63,9 +64,11 @@ export const DurationInput = forwardRef<DurationInputHandle, DurationInputProps>
         accessibilityElementsHidden
         importantForAccessibility="no-hide-descendants"
       />
-      <TextInput
+      <BoxedTextInput
         ref={minInputRef}
-        style={[styles.durationPart, ghost && styles.durationPartGhost, styles.durationMinPart]}
+        height={18}
+        boxStyle={styles.durationMinPart}
+        style={[styles.durationPart, ghost && styles.durationPartGhost]}
         value={min}
         onChangeText={handleMinChange}
         keyboardType="number-pad"
@@ -86,9 +89,11 @@ export const DurationInput = forwardRef<DurationInputHandle, DurationInputProps>
       >
         <Text style={styles.durationColon}>:</Text>
       </TouchableOpacity>
-      <TextInput
+      <BoxedTextInput
         ref={secInputRef}
-        style={[styles.durationPart, ghost && styles.durationPartGhost, styles.durationSecPart]}
+        height={18}
+        boxStyle={styles.durationSecPart}
+        style={[styles.durationPart, ghost && styles.durationPartGhost]}
         value={sec}
         onChangeText={handleSecChange}
         keyboardType="number-pad"
@@ -128,15 +133,11 @@ const styles = StyleSheet.create({
   // 幅の中央に寄ってしまい、間が間延びして見える。固定幅にして「分:秒」をひとまとまりの
   // 塊にし、左右のdurationSpacer（flex:1の余白）で挟むことで中央寄せしつつ、その余白
   // 部分もタップで隣接する入力欄へフォーカスできるようにする
+  // 分・秒はBoxedTextInputで箱(幅)とTextInput本体を分離している。
+  // 詳細はcomponents/ui/boxed-text-input.tsxのコメント参照
   durationPart: {
-    padding: 0,
-    height: 18,
     ...Typography.metric,
     color: Colors.textPrimary,
-    // Androidはグリフ種によってincludeFontPaddingの余白が変動し、入力するたびに
-    // BOXの高さが揺れて見えるため、明示heightと合わせて無効化して固定する
-    includeFontPadding: false,
-    textAlignVertical: 'center',
   },
   durationPartGhost: { color: Colors.textSecondary },
   durationSpacer: {
