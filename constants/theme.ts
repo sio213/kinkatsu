@@ -95,7 +95,7 @@ export const Typography = {
   /** ネイティブヘッダーのタイトル（タブ画面・push画面共通） */
   navTitle: { fontSize: 18, lineHeight: 22, fontWeight: '700' },
   /** 種目名・セッション名などカードの主題テキスト */
-  cardTitle: { fontSize: 16, lineHeight: 22, fontWeight: '700' },
+  cardTitle: { fontSize: 15, lineHeight: 22, fontWeight: '700' },
   /**
    * セクションラベル（「使う筋肉」等）。あえてbodyより小さい太字＋字間広めにした
    * Eyebrow/Overline見出し（本文の前に置く小さな道しるべ）。本文の代わりに使わないこと。
