@@ -1,4 +1,5 @@
 import { chipStyles } from '@/components/exercises/chip-styles';
+import { BoxedTextInput } from '@/components/ui/boxed-text-input';
 import { FormLabel } from '@/components/ui/form-label';
 import { SectionGroup } from '@/components/ui/section-group';
 import { SectionHeading } from '@/components/ui/section-heading';
@@ -96,9 +97,11 @@ export const ExerciseForm = forwardRef<ExerciseFormHandle, Props>(function Exerc
           control={control}
           name="name"
           render={({ field: { value, onChange } }) => (
-            <TextInput
+            <BoxedTextInput
               ref={nameInputRef}
-              style={styles.input}
+              height={40}
+              boxStyle={styles.inputBox}
+              style={styles.inputText}
               value={value}
               onChangeText={onChange}
               placeholder="種目名"
@@ -154,8 +157,10 @@ export const ExerciseForm = forwardRef<ExerciseFormHandle, Props>(function Exerc
                 {value.map((point, index) => (
                   <View key={index} style={styles.pointRow}>
                     <Text style={styles.pointNumber}>{index + 1}</Text>
-                    <TextInput
-                      style={[styles.input, styles.pointInput]}
+                    <BoxedTextInput
+                      height={40}
+                      boxStyle={[styles.inputBox, styles.pointBox]}
+                      style={styles.inputText}
                       value={point}
                       onChangeText={(text) => {
                         const next = [...value];
@@ -195,7 +200,7 @@ export const ExerciseForm = forwardRef<ExerciseFormHandle, Props>(function Exerc
           name="note"
           render={({ field: { value, onChange } }) => (
             <TextInput
-              style={[styles.input, styles.inputMultiline]}
+              style={styles.inputMultiline}
               value={value ?? ''}
               onChangeText={onChange}
               placeholder="メモ"
@@ -231,17 +236,26 @@ const styles = StyleSheet.create({
   // フィールド間gap15〜16に合わせて16にしている（種目詳細画面のグループ間はgap20で別値）
   container: { gap: 16 },
 
-  input: {
+  // 種目名・フォームのポイントは箱(枠線・背景・角丸・横padding)とTextInput本体を
+  // BoxedTextInputで分離している。border/borderColor/borderRadius/文字色は既定値の
+  // ままなのでここではpaddingHorizontalの差分だけ持つ。詳細はcomponents/ui/boxed-text-input.tsxのコメント参照
+  inputBox: { paddingHorizontal: 11 },
+  inputText: Typography.body,
+  pointBox: { flex: 1 },
+
+  // メモ欄は複数行で伸びる仕様のためBoxedTextInputを使わず、そのままの高さ可変で表示する
+  inputMultiline: {
     borderWidth: 1,
     borderColor: Colors.borderStrong,
     borderRadius: 8,
+    minHeight: 56,
     paddingHorizontal: 11,
     paddingVertical: 9,
     ...Typography.body,
     color: Colors.textPrimary,
     backgroundColor: Colors.surface,
+    textAlignVertical: 'top',
   },
-  inputMultiline: { minHeight: 56, textAlignVertical: 'top' },
 
   errorText: { ...Typography.caption, color: Colors.danger, marginTop: -4 },
 
@@ -259,7 +273,6 @@ const styles = StyleSheet.create({
     lineHeight: 22,
     textAlign: 'center',
   },
-  pointInput: { flex: 1 },
   pointRemoveBtn: {
     width: 28,
     height: 28,

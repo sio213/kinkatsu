@@ -1,4 +1,5 @@
 import { DurationInput, type DurationInputHandle } from '@/components/workout/duration-input';
+import { BoxedTextInput } from '@/components/ui/boxed-text-input';
 import { IconSymbol } from '@/components/ui/icon-symbol';
 import { Colors, Typography } from '@/constants/theme';
 import type { Set } from '@/db/schema';
@@ -164,9 +165,11 @@ export const SetRow = memo(
             ghost={ghost}
           />
         ) : (
-          <TextInput
+          <BoxedTextInput
             ref={isFirstColumn ? firstTextInputRef : undefined}
-            style={[styles.cell, ghost && styles.cellGhost]}
+            height={32}
+            boxStyle={[styles.cellBox, ghost && styles.cellGhost]}
+            style={[styles.cellText, ghost && styles.cellTextGhost]}
             value={values[c.key]}
             onChangeText={(text) => handleFieldChange(c.key, text)}
             keyboardType={c.keyboardType}
@@ -204,16 +207,11 @@ const styles = StyleSheet.create({
   row: { flexDirection: 'row', alignItems: 'center', gap: 7, paddingVertical: 5 },
   number: { width: 52, textAlign: 'center', ...Typography.caption, fontWeight: '600', color: Colors.textPlaceholder },
   cellWrapper: { flex: 1 },
-  cell: {
-    backgroundColor: Colors.surface,
-    borderWidth: 1,
-    borderColor: Colors.borderStrong,
-    borderRadius: 7,
-    paddingVertical: 7,
-    paddingHorizontal: 10,
-    ...Typography.metric,
-    color: Colors.textPrimary,
-  },
+  // 重量・回数欄は箱(背景・枠線・角丸・横padding)とTextInput本体をBoxedTextInputで
+  // 分離している。背景・枠線は既定値のままなので、既定(8)より小さいborderRadiusと
+  // paddingHorizontalの差分だけ持つ。詳細はcomponents/ui/boxed-text-input.tsxのコメント参照
+  cellBox: { borderRadius: 7, paddingHorizontal: 10 },
+  cellText: Typography.metric,
   // ✓未確定のまま値が入っている行の見た目（ゴースト表示）。文字色だけでなく背景・枠線も
   // 変えることで、色の濃淡だけに頼らないようにする（WCAG 1.4.1対応）。文字色はtextMutedだと
   // このaccentSurface背景ではコントラスト比がWCAG AA(4.5:1)にわずかに届かないため、
@@ -221,8 +219,8 @@ const styles = StyleSheet.create({
   cellGhost: {
     backgroundColor: Colors.accentSurface,
     borderColor: Colors.accent,
-    color: Colors.textSecondary,
   },
+  cellTextGhost: { color: Colors.textSecondary },
   check: {
     width: 24,
     height: 24,

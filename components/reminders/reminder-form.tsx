@@ -1,3 +1,4 @@
+import { BoxedTextInput } from '@/components/ui/boxed-text-input';
 import { FormLabel } from '@/components/ui/form-label';
 import { Colors, Typography } from '@/constants/theme';
 import { WEEKDAY_LABELS } from '@/lib/format';
@@ -215,8 +216,10 @@ export function ReminderForm({ initial = DEFAULT_INPUT, onSubmit, onCancel, subm
       )}
 
       <FormLabel required containerStyle={styles.labelSpacing}>タイトル</FormLabel>
-      <TextInput
-        style={styles.input}
+      <BoxedTextInput
+        height={38}
+        boxStyle={styles.inputBox}
+        style={styles.inputText}
         value={form.title}
         onChangeText={(v) => set('title', v)}
         placeholder="タイトル"
@@ -227,7 +230,7 @@ export function ReminderForm({ initial = DEFAULT_INPUT, onSubmit, onCancel, subm
 
       <FormLabel required containerStyle={styles.labelSpacing}>通知内容</FormLabel>
       <TextInput
-        style={[styles.input, styles.inputMulti]}
+        style={styles.inputMulti}
         value={form.body}
         onChangeText={(v) => set('body', v)}
         placeholder="通知内容"
@@ -547,17 +550,25 @@ const styles = StyleSheet.create({
   container: { gap: 0 },
   labelSpacing: { marginTop: 12, marginBottom: 4 },
   errorText: { ...Typography.caption, color: Colors.danger, marginBottom: 4 },
-  input: {
+  // タイトルは箱(枠線・背景・角丸・横padding)とTextInput本体をBoxedTextInputで分離
+  // している。border/borderColor/borderRadius/文字色は既定値のままなのでここでは
+  // paddingHorizontalの差分だけ持つ。詳細はcomponents/ui/boxed-text-input.tsxのコメント参照
+  inputBox: { paddingHorizontal: 12 },
+  inputText: Typography.body,
+
+  // 通知内容欄は複数行で伸びる仕様のためBoxedTextInputを使わず、そのままの高さ可変で表示する
+  inputMulti: {
     borderWidth: 1,
     borderColor: Colors.borderStrong,
     borderRadius: 8,
+    minHeight: 80,
     paddingHorizontal: 12,
     paddingVertical: 8,
     ...Typography.body,
     color: Colors.textPrimary,
     backgroundColor: Colors.surface,
+    textAlignVertical: 'top',
   },
-  inputMulti: { minHeight: 80, textAlignVertical: 'top' },
 
   timeButton: {
     backgroundColor: Colors.surface,

@@ -1,6 +1,7 @@
+import { BoxedTextInput } from '@/components/ui/boxed-text-input';
 import { IconSymbol } from '@/components/ui/icon-symbol';
 import { Colors, Typography } from '@/constants/theme';
-import { Platform, StyleSheet, TextInput, TouchableOpacity, View } from 'react-native';
+import { Platform, StyleSheet, TouchableOpacity, View } from 'react-native';
 
 type Props = {
   value: string;
@@ -14,8 +15,10 @@ export function ExerciseSearchBar({ value, onChangeText, onSubmitEditing }: Prop
       <View style={styles.searchIconWrapper}>
         <IconSymbol name="magnifyingglass" size={18} color={Colors.textPlaceholder} />
       </View>
-      <TextInput
-        style={styles.searchInput}
+      <BoxedTextInput
+        height={40}
+        boxStyle={styles.searchBox}
+        style={styles.searchText}
         value={value}
         onChangeText={onChangeText}
         onSubmitEditing={onSubmitEditing}
@@ -57,15 +60,12 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     zIndex: 1,
   },
-  searchInput: {
-    borderWidth: 1,
-    borderColor: Colors.borderStrong,
-    borderRadius: 8,
+  // border/borderColor/borderRadiusはBoxedTextInputの既定値のまま。背景色だけ
+  // 検索欄用のsurfaceMutedに上書きする
+  searchBox: {
     paddingLeft: 36,
     paddingRight: 36,
-    paddingVertical: 9,
-    ...Typography.body,
-    color: Colors.textPrimary,
     backgroundColor: Colors.surfaceMuted,
   },
+  searchText: Typography.body,
 });
