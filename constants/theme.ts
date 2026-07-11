@@ -93,14 +93,19 @@ export const Shadows = {
  */
 export const Typography = {
   /** ネイティブヘッダーのタイトル（タブ画面・push画面共通） */
-  navTitle: { fontSize: 17, lineHeight: 22, fontWeight: '700' },
+  navTitle: { fontSize: 18, lineHeight: 22, fontWeight: '700' },
   /** 種目名・セッション名などカードの主題テキスト */
   cardTitle: { fontSize: 16, lineHeight: 22, fontWeight: '700' },
   /**
    * セクションラベル（「使う筋肉」等）。あえてbodyより小さい太字＋字間広めにした
    * Eyebrow/Overline見出し（本文の前に置く小さな道しるべ）。本文の代わりに使わないこと。
    */
-  sectionHeading: { fontSize: 13, lineHeight: 18, fontWeight: '700', letterSpacing: 0.2 },
+  sectionHeading: {
+    fontSize: 13,
+    lineHeight: 18,
+    fontWeight: '700',
+    letterSpacing: 0.2,
+  },
   /** 標準本文。フォーム入力・ボタン・Dropdownメニュー項目など「操作・確認する」テキスト全般 */
   body: { fontSize: 15, lineHeight: 22, fontWeight: '400' },
   /** ボタンラベル等、強調する本文 */
@@ -183,7 +188,8 @@ export const Fonts = Platform.select({
   web: {
     sans: "system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif",
     serif: "Georgia, 'Times New Roman', serif",
-    rounded: "'SF Pro Rounded', 'Hiragino Maru Gothic ProN', Meiryo, 'MS PGothic', sans-serif",
+    rounded:
+      "'SF Pro Rounded', 'Hiragino Maru Gothic ProN', Meiryo, 'MS PGothic', sans-serif",
     mono: "SFMono-Regular, Menlo, Monaco, Consolas, 'Liberation Mono', 'Courier New', monospace",
   },
 });
