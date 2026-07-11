@@ -118,7 +118,7 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: Colors.borderStrong,
     borderRadius: 7,
-    paddingVertical: 11,
+    paddingVertical: 7,
     paddingHorizontal: 6,
   },
   // 前回の値がまだ未確認（ゴースト表示）の間、背景・枠線・文字色の3点を変えることで
