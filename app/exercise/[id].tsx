@@ -1,6 +1,7 @@
 import { Colors, Typography } from '@/constants/theme';
 import { HeaderMenu, type DropdownMenuItem } from '@/components/ui/dropdown-menu';
 import { NotFoundState } from '@/components/ui/not-found-state';
+import { SectionGroup } from '@/components/ui/section-group';
 import { SectionHeading } from '@/components/ui/section-heading';
 import { getGuide } from '@/lib/exercises/guides';
 import { parseFormPoints } from '@/lib/exercises/form-points';
@@ -153,51 +154,51 @@ export default function ExerciseDetailScreen() {
         </View>
 
         <View style={styles.body}>
-          <View style={styles.section}>
+          <SectionGroup>
             <SectionHeading>カテゴリ</SectionHeading>
             <View style={styles.categoryChip}>
               <Text style={styles.categoryText}>{getCategoryLabel(exercise.category)}</Text>
             </View>
-          </View>
+          </SectionGroup>
 
           {guide && (
             <>
-              <View style={styles.section}>
+              <SectionGroup>
                 <SectionHeading>使う筋肉</SectionHeading>
                 <Text style={styles.sectionBody}>{guide.muscle}</Text>
-              </View>
+              </SectionGroup>
 
-              <View style={styles.section}>
+              <SectionGroup>
                 <SectionHeading>フォームのポイント</SectionHeading>
                 <FormPointsList points={guide.points} />
-              </View>
+              </SectionGroup>
 
-              <View style={styles.section}>
+              <SectionGroup>
                 <SectionHeading>よくあるミス</SectionHeading>
                 <View style={styles.cautionBox}>
                   <Text style={styles.cautionText}>⚠️ {guide.caution}</Text>
                 </View>
-              </View>
+              </SectionGroup>
 
-              <View style={styles.section}>
+              <SectionGroup>
                 <SectionHeading>呼吸法</SectionHeading>
                 <Text style={styles.sectionBody}>{guide.breath}</Text>
-              </View>
+              </SectionGroup>
             </>
           )}
 
           {!guide && formPoints.length > 0 && (
-            <View style={styles.section}>
+            <SectionGroup>
               <SectionHeading>フォームのポイント</SectionHeading>
               <FormPointsList points={formPoints} />
-            </View>
+            </SectionGroup>
           )}
 
           {exercise.note && (
-            <View style={styles.section}>
+            <SectionGroup>
               <SectionHeading>メモ</SectionHeading>
               <Text style={styles.sectionBody}>{exercise.note}</Text>
-            </View>
+            </SectionGroup>
           )}
 
           {!guide && !exercise.note && formPoints.length === 0 && (
@@ -294,7 +295,6 @@ const styles = StyleSheet.create({
   },
   youtubeBtnText: { ...Typography.footnote, fontWeight: '600', color: Colors.accent },
 
-  section: { gap: 8 },
   sectionBody: { ...Typography.longform, color: Colors.textBody },
 
   pointRow: { flexDirection: 'row', gap: 10, alignItems: 'flex-start' },

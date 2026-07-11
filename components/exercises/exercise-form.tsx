@@ -1,5 +1,6 @@
 import { chipStyles } from '@/components/exercises/chip-styles';
 import { FormLabel } from '@/components/ui/form-label';
+import { SectionGroup } from '@/components/ui/section-group';
 import { SectionHeading } from '@/components/ui/section-heading';
 import { Switch } from '@/components/ui/switch';
 import { Colors, Typography } from '@/constants/theme';
@@ -89,7 +90,7 @@ export const ExerciseForm = forwardRef<ExerciseFormHandle, Props>(function Exerc
 
   return (
     <View style={styles.container}>
-      <View style={styles.field}>
+      <SectionGroup>
         <FormLabel required>種目名</FormLabel>
         <Controller
           control={control}
@@ -109,9 +110,9 @@ export const ExerciseForm = forwardRef<ExerciseFormHandle, Props>(function Exerc
         {errors.name ? (
           <Text style={styles.errorText}>{errors.name.message}</Text>
         ) : null}
-      </View>
+      </SectionGroup>
 
-      <View style={styles.field}>
+      <SectionGroup>
         <FormLabel required>カテゴリ</FormLabel>
         <Controller
           control={control}
@@ -140,10 +141,10 @@ export const ExerciseForm = forwardRef<ExerciseFormHandle, Props>(function Exerc
         {errors.category ? (
           <Text style={styles.errorText}>{errors.category.message}</Text>
         ) : null}
-      </View>
+      </SectionGroup>
 
       {!isPreset && (
-        <View style={styles.field}>
+        <SectionGroup>
           <FormLabel>フォームのポイント</FormLabel>
           <Controller
             control={control}
@@ -184,10 +185,10 @@ export const ExerciseForm = forwardRef<ExerciseFormHandle, Props>(function Exerc
               </View>
             )}
           />
-        </View>
+        </SectionGroup>
       )}
 
-      <View style={styles.field}>
+      <SectionGroup>
         <FormLabel>メモ</FormLabel>
         <Controller
           control={control}
@@ -204,7 +205,7 @@ export const ExerciseForm = forwardRef<ExerciseFormHandle, Props>(function Exerc
             />
           )}
         />
-      </View>
+      </SectionGroup>
 
       <View style={styles.favoriteRow}>
         <SectionHeading>お気に入りに追加</SectionHeading>
@@ -225,12 +226,10 @@ export const ExerciseForm = forwardRef<ExerciseFormHandle, Props>(function Exerc
 });
 
 const styles = StyleSheet.create({
-  // 種目詳細画面(app/exercise/[id].tsx)のsectionと同じ「見出し+本文を1グループにして
-  // グループ内/グループ間で余白を分ける」という2階層構成。値は詳細画面と揃えているわけではなく
-  // （詳細画面はグループ間20）、デザイン案(04新規作成/06編集フレーム)のフィールド間gap15〜16に
-  // 合わせて16にしている。fieldのgap8は詳細画面のsection gapと同じ値
+  // 各フィールドはSectionGroup(見出しと本文の間gap8)でグルーピングし、フィールド間は
+  // このcontainerのgapで区切る2階層構成。値はデザイン案(04新規作成/06編集フレーム)の
+  // フィールド間gap15〜16に合わせて16にしている（種目詳細画面のグループ間はgap20で別値）
   container: { gap: 16 },
-  field: { gap: 8 },
 
   input: {
     borderWidth: 1,
