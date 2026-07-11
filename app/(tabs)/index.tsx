@@ -1,12 +1,13 @@
-import { SessionCard } from '@/components/workout/session-card';
+import { HeaderActionButton } from '@/components/ui/header-action-button';
 import { IconSymbol } from '@/components/ui/icon-symbol';
 import { PrimaryButton } from '@/components/ui/primary-button';
+import { SessionCard } from '@/components/workout/session-card';
 import { Colors, Typography } from '@/constants/theme';
 import type { WorkoutSession } from '@/db/schema';
 import { useSessionStats, useWorkoutSessions } from '@/hooks/use-workout-session';
 import { startWorkoutSession } from '@/lib/workout/session';
 import { groupSessionsByDate } from '@/lib/workout/summary';
-import { useRouter } from 'expo-router';
+import { Stack, useRouter } from 'expo-router';
 import { useCallback, useRef } from 'react';
 import { Alert, SectionList, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
@@ -45,23 +46,21 @@ export default function RecordScreen() {
   }, [activeSession, router]);
 
   return (
-    <SafeAreaView style={styles.safeArea} edges={['top']}>
+    <SafeAreaView style={styles.safeArea} edges={[]}>
+      <Stack.Screen
+        options={{
+          headerRight: () =>
+            showHistory ? (
+              <HeaderActionButton
+                icon="play.fill"
+                label="開始"
+                onPress={handleStart}
+                accessibilityLabel="トレーニングを開始"
+              />
+            ) : null,
+        }}
+      />
       <View style={styles.container}>
-        <View style={styles.sectionHeader}>
-          <Text style={styles.title} numberOfLines={1}>記録</Text>
-          {!activeSession && endedSessions.length > 0 && (
-            <TouchableOpacity
-              style={styles.addBtn}
-              onPress={handleStart}
-              accessibilityRole="button"
-              accessibilityLabel="トレーニングを開始"
-              hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
-            >
-              <Text style={styles.addBtnText}>＋ 開始</Text>
-            </TouchableOpacity>
-          )}
-        </View>
-
         {activeSession ? (
           <TouchableOpacity
             style={styles.resumeBanner}
@@ -114,16 +113,6 @@ const styles = StyleSheet.create({
   safeArea: { flex: 1, backgroundColor: Colors.background },
   container: { flex: 1, padding: 16 },
 
-  sectionHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
-  title: { ...Typography.screenTitle, color: Colors.textPrimary },
-  addBtn: {
-    backgroundColor: Colors.accent,
-    borderRadius: 8,
-    paddingHorizontal: 16,
-    paddingVertical: 12,
-  },
-  addBtnText: { color: Colors.onAccent, ...Typography.bodyStrong },
-
   resumeBanner: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -131,7 +120,6 @@ const styles = StyleSheet.create({
     backgroundColor: Colors.accentSurface,
     borderRadius: 10,
     padding: 12,
-    marginTop: 12,
   },
   resumeBannerText: { color: Colors.accent, ...Typography.bodyStrong },
 

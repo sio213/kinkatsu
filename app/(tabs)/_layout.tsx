@@ -3,7 +3,7 @@ import React from 'react';
 
 import { HapticTab } from '@/components/haptic-tab';
 import { IconSymbol } from '@/components/ui/icon-symbol';
-import { Colors } from '@/constants/theme';
+import { Colors, tabHeaderOptions } from '@/constants/theme';
 
 export default function TabLayout() {
   return (
@@ -11,8 +11,8 @@ export default function TabLayout() {
       initialRouteName="index"
       screenOptions={{
         tabBarActiveTintColor: Colors.tint,
-        headerShown: false,
         tabBarButton: HapticTab,
+        ...tabHeaderOptions,
       }}
     >
       <Tabs.Screen
@@ -27,7 +27,8 @@ export default function TabLayout() {
       <Tabs.Screen
         name="exercises"
         options={{
-          title: '種目',
+          tabBarLabel: '種目',
+          headerTitle: '種目ライブラリ',
           tabBarIcon: ({ color }) => (
             <IconSymbol size={28} name="dumbbell.fill" color={color} />
           ),
@@ -36,7 +37,8 @@ export default function TabLayout() {
       <Tabs.Screen
         name="reminders"
         options={{
-          title: 'リマインダー',
+          tabBarLabel: 'リマインダー',
+          headerTitle: '筋トレリマインダー',
           tabBarIcon: ({ color }) => (
             <IconSymbol size={28} name="bell.fill" color={color} />
           ),
