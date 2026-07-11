@@ -315,7 +315,8 @@ const styles = StyleSheet.create({
     paddingHorizontal: 12,
     paddingVertical: 6,
   },
-  timerText: { ...Typography.metric, color: Colors.textPrimary },
+  // デザイン案のタイマーチップはfontWeight 700（セット入力欄の600より太い）
+  timerText: { ...Typography.metric, fontWeight: '700', color: Colors.textPrimary },
 
   body: { flex: 1, alignItems: 'center', justifyContent: 'center', gap: 16, paddingHorizontal: 16 },
   emptyText: { ...Typography.footnote, color: Colors.textMuted },

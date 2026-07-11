@@ -431,7 +431,7 @@ const styles = StyleSheet.create({
   bodyHidden: { display: 'none' },
   columnHeader: { flexDirection: 'row', alignItems: 'center', gap: 7, paddingBottom: 6 },
   numberLabel: {
-    width: 32,
+    width: 52,
     textAlign: 'center',
     ...Typography.caption,
     fontWeight: '600',

@@ -126,8 +126,10 @@ export const Typography = {
   /**
    * トレーニング中に一瞬で読む太字の数値（重量・回数の入力欄、タイマー表示など）。
    * 前身のtimerトークンをここに統合したため、役割は「重要な数値」全般を指す。
+   * デザイン案のセット入力欄(.setrow .cell)に合わせた値。タイマー表示だけはデザイン上
+   * fontWeightが700のため、呼び出し側(app/workout/[id].tsx)で個別に上書きしている。
    */
-  metric: { fontSize: 17, lineHeight: 20, fontWeight: '700' },
+  metric: { fontSize: 14, lineHeight: 18, fontWeight: '600' },
   /** NEW/BESTなどの小バッジ */
   badge: { fontSize: 11, fontWeight: '700' },
 } as const;
