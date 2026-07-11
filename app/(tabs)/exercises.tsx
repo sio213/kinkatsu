@@ -2,6 +2,7 @@ import { CategoryFilterChips } from '@/components/exercises/category-filter-chip
 import { ExerciseCard } from '@/components/exercises/exercise-card';
 import { ExerciseSearchBar } from '@/components/exercises/exercise-search-bar';
 import { ExerciseSortDropdown } from '@/components/exercises/exercise-sort-dropdown';
+import { HeaderActionButton } from '@/components/ui/header-action-button';
 import { ListErrorBoundary } from '@/components/ui/list-error-boundary';
 import { Colors, Typography } from '@/constants/theme';
 import type { Exercise } from '@/db/schema';
@@ -11,7 +12,7 @@ import { useKeyboardInset } from '@/hooks/use-keyboard-inset';
 import { CATEGORY_ALL } from '@/lib/exercises/constants';
 import { filterExercises } from '@/lib/exercises/filter';
 import { useExerciseSortStore } from '@/lib/exercises/sort-store';
-import { useFocusEffect, useRouter } from 'expo-router';
+import { Stack, useFocusEffect, useRouter } from 'expo-router';
 import { useCallback, useMemo, useState } from 'react';
 import { FlatList, Keyboard, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
@@ -58,13 +59,6 @@ export default function ExercisesScreen() {
 
   const listHeader = (
     <View style={styles.headerArea}>
-      <View style={styles.sectionHeader}>
-        <Text style={styles.title} numberOfLines={1}>種目ライブラリ</Text>
-        <TouchableOpacity style={styles.addBtn} onPress={() => openCreate()}>
-          <Text style={styles.addBtnText}>＋ 追加</Text>
-        </TouchableOpacity>
-      </View>
-
       <ExerciseSearchBar value={search} onChangeText={setSearch} />
       <CategoryFilterChips activeCategory={activeCategory} onChange={setActiveCategory} />
       <ExerciseSortDropdown sortBy={sortBy} onChange={setSortBy} />
@@ -94,7 +88,19 @@ export default function ExercisesScreen() {
   );
 
   return (
-    <SafeAreaView style={styles.safeArea} edges={['top']}>
+    <SafeAreaView style={styles.safeArea} edges={[]}>
+      <Stack.Screen
+        options={{
+          headerRight: () => (
+            <HeaderActionButton
+              icon="plus"
+              label="追加"
+              onPress={() => openCreate()}
+              accessibilityLabel="種目を追加"
+            />
+          ),
+        }}
+      />
       <FlatList
         style={styles.list}
         data={filtered}
@@ -118,19 +124,6 @@ const styles = StyleSheet.create({
   content: { paddingHorizontal: 16, paddingBottom: 40 },
 
   headerArea: { paddingTop: 16, gap: 8, marginBottom: 4 },
-  sectionHeader: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-  },
-  title: { ...Typography.screenTitle, color: Colors.textPrimary },
-  addBtn: {
-    backgroundColor: Colors.accent,
-    borderRadius: 8,
-    paddingHorizontal: 14,
-    paddingVertical: 6,
-  },
-  addBtnText: { color: Colors.onAccent, ...Typography.bodyStrong },
 
   separator: { height: 8 },
 

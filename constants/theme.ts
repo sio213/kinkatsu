@@ -5,6 +5,7 @@
  * 将来ダークモードをやるなら、その時に light/dark で出し分ける構造に戻す。
  */
 
+import type { BottomTabNavigationOptions } from '@react-navigation/bottom-tabs';
 import type { NativeStackNavigationOptions } from '@react-navigation/native-stack';
 import { Platform } from 'react-native';
 
@@ -91,12 +92,7 @@ export const Shadows = {
  * 既存箇所への適用は段階的に行うため、この定義自体は既存の見た目を変えない。
  */
 export const Typography = {
-  /**
-   * タブ画面のH1（「記録」「種目ライブラリ」等）。
-   * 将来タブ画面にもpush画面と同じデザインのヘッダーを追加したら、この役割は無くなりnavTitleに一本化する想定。
-   */
-  screenTitle: { fontSize: 20, lineHeight: 26, fontWeight: '700' },
-  /** push画面のネイティブヘッダー・疑似ヘッダー */
+  /** ネイティブヘッダーのタイトル（タブ画面・push画面共通） */
   navTitle: { fontSize: 17, lineHeight: 22, fontWeight: '700' },
   /** 種目名・セッション名などカードの主題テキスト */
   cardTitle: { fontSize: 16, lineHeight: 22, fontWeight: '700' },
@@ -132,17 +128,39 @@ export const Typography = {
 } as const;
 
 /**
- * プッシュ画面共通のネイティブヘッダー設定（戻るアイコン最小表示・中央揃えタイトル・影なし）。
+ * push画面・タブ画面で共通のヘッダーの見た目（中央揃えタイトル・影なし）。
+ * native-stackとbottom-tabsはヘッダー関連オプションの型が別々（後者はheaderBackButtonDisplayModeを
+ * 持たない）なので、値はここで一元管理しつつ`headerOptions`/`tabHeaderOptions`それぞれの型で
+ * スプレッドして使う。
+ */
+const sharedHeaderStyle = {
+  headerTintColor: Colors.textPlaceholder,
+  headerTitleAlign: 'center' as const,
+  headerTitleStyle: { ...Typography.navTitle, color: Colors.textPrimary },
+  headerShadowVisible: false,
+  headerStyle: { backgroundColor: Colors.background },
+};
+
+/**
+ * プッシュ画面共通のネイティブヘッダー設定（戻るアイコン最小表示）。
  * `<Stack screenOptions={headerOptions}>` に一度だけ渡し、各画面はtitle等の差分のみoptionsで指定する。
  * 戻るアイコンの色とタイトルの色を分けるため headerTintColor と headerTitleStyle.color を別々に指定している。
  */
 export const headerOptions: NativeStackNavigationOptions = {
   headerBackButtonDisplayMode: 'minimal',
-  headerTintColor: Colors.textPlaceholder,
-  headerTitleAlign: 'center',
-  headerTitleStyle: { ...Typography.navTitle, color: Colors.textPrimary },
-  headerShadowVisible: false,
-  headerStyle: { backgroundColor: Colors.background },
+  ...sharedHeaderStyle,
+};
+
+/**
+ * タブ画面（記録・種目ライブラリ・リマインダー）共通のヘッダー設定。
+ * Tabsナビゲータ自身のヘッダー（@react-navigation/bottom-tabs）が対象。
+ * push画面はネイティブのUINavigationBarが右端に標準マージンを自動で入れるが、
+ * bottom-tabsのヘッダーはJS実装で自動マージンを持たないため、headerRightContainerStyleで
+ * 明示的に右端の余白を入れないとheaderRightのボタンが画面端に張り付いて見える。
+ */
+export const tabHeaderOptions: BottomTabNavigationOptions = {
+  ...sharedHeaderStyle,
+  headerRightContainerStyle: { paddingEnd: 16 },
 };
 
 export const Fonts = Platform.select({

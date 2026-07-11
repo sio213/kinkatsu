@@ -11,6 +11,14 @@ jest.mock('expo-router', () => ({
   useFocusEffect: (effect: () => (() => void) | void) => {
     focusEffectCleanup = effect() ?? undefined;
   },
+  // Stack.Screen はナビゲーターのoptionsを設定するコンポーネントで本来は見た目を持たないが、
+  // headerRightの中身（追加ボタン）をテストで検証できるよう、そのレンダー関数だけ実行してやる
+  Stack: {
+    Screen: ({ options }: { options?: { headerRight?: () => unknown } }) => {
+      const { createElement, Fragment } = require('react');
+      return createElement(Fragment, null, options?.headerRight?.());
+    },
+  },
 }));
 
 jest.mock('@/hooks/use-exercises', () => ({
@@ -59,10 +67,10 @@ beforeEach(() => {
   useExerciseSortStore.setState({ listSortBy: 'category' });
 });
 
-test('「＋ 追加」ボタンで名前を空にして/exercise/newへ遷移する', () => {
+test('「追加」ボタンで名前を空にして/exercise/newへ遷移する', () => {
   const root = render();
 
-  const addBtn = findButtonByLabel(root, '＋ 追加')!;
+  const addBtn = findButtonByLabel(root, '追加')!;
   act(() => {
     addBtn.props.onPress();
   });
