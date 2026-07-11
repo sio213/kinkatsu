@@ -115,7 +115,7 @@ export const Typography = {
    * 命名衝突を避けるためreadingは使わない）。行間を広めにして読了体験を優先する。フォーム・ボタン等の
    * 操作系テキストにはbodyを使い、こちらは転用しない。
    */
-  longform: { fontSize: 16, lineHeight: 25, fontWeight: '400' },
+  longform: { fontSize: 14, lineHeight: 22, fontWeight: '400' },
   /** やや大きめの補助テキスト（エラーメッセージ・チップ文言・要約1行など）。fontWeightは用途に応じ都度上書きしてよい */
   footnote: { fontSize: 13, lineHeight: 18, fontWeight: '400' },
   /**

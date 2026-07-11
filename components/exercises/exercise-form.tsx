@@ -89,57 +89,61 @@ export const ExerciseForm = forwardRef<ExerciseFormHandle, Props>(function Exerc
 
   return (
     <View style={styles.container}>
-      <FormLabel required>種目名</FormLabel>
-      <Controller
-        control={control}
-        name="name"
-        render={({ field: { value, onChange } }) => (
-          <TextInput
-            ref={nameInputRef}
-            style={styles.input}
-            value={value}
-            onChangeText={onChange}
-            placeholder="種目名"
-            returnKeyType="done"
-            accessibilityLabel="種目名"
-          />
-        )}
-      />
-      {errors.name ? (
-        <Text style={styles.errorText}>{errors.name.message}</Text>
-      ) : null}
+      <View style={styles.field}>
+        <FormLabel required>種目名</FormLabel>
+        <Controller
+          control={control}
+          name="name"
+          render={({ field: { value, onChange } }) => (
+            <TextInput
+              ref={nameInputRef}
+              style={styles.input}
+              value={value}
+              onChangeText={onChange}
+              placeholder="種目名"
+              returnKeyType="done"
+              accessibilityLabel="種目名"
+            />
+          )}
+        />
+        {errors.name ? (
+          <Text style={styles.errorText}>{errors.name.message}</Text>
+        ) : null}
+      </View>
 
-      <FormLabel required>カテゴリ</FormLabel>
-      <Controller
-        control={control}
-        name="category"
-        render={({ field: { value, onChange } }) => (
-          <View style={styles.chipRow}>
-            {EXERCISE_CATEGORIES.map((cat) => {
-              const isActive = value === cat;
-              const label = getCategoryLabel(cat);
-              return (
-                <TouchableOpacity
-                  key={cat}
-                  style={[chipStyles.chip, isActive && chipStyles.chipActive]}
-                  onPress={() => onChange(cat)}
-                  accessibilityRole="radio"
-                  accessibilityState={{ checked: isActive }}
-                  accessibilityLabel={label}
-                >
-                  <Text style={[chipStyles.chipText, isActive && chipStyles.chipTextActive]}>{label}</Text>
-                </TouchableOpacity>
-              );
-            })}
-          </View>
-        )}
-      />
-      {errors.category ? (
-        <Text style={styles.errorText}>{errors.category.message}</Text>
-      ) : null}
+      <View style={styles.field}>
+        <FormLabel required>カテゴリ</FormLabel>
+        <Controller
+          control={control}
+          name="category"
+          render={({ field: { value, onChange } }) => (
+            <View style={styles.chipRow}>
+              {EXERCISE_CATEGORIES.map((cat) => {
+                const isActive = value === cat;
+                const label = getCategoryLabel(cat);
+                return (
+                  <TouchableOpacity
+                    key={cat}
+                    style={[chipStyles.chip, isActive && chipStyles.chipActive]}
+                    onPress={() => onChange(cat)}
+                    accessibilityRole="radio"
+                    accessibilityState={{ checked: isActive }}
+                    accessibilityLabel={label}
+                  >
+                    <Text style={[chipStyles.chipText, isActive && chipStyles.chipTextActive]}>{label}</Text>
+                  </TouchableOpacity>
+                );
+              })}
+            </View>
+          )}
+        />
+        {errors.category ? (
+          <Text style={styles.errorText}>{errors.category.message}</Text>
+        ) : null}
+      </View>
 
       {!isPreset && (
-        <>
+        <View style={styles.field}>
           <FormLabel>フォームのポイント</FormLabel>
           <Controller
             control={control}
@@ -180,25 +184,27 @@ export const ExerciseForm = forwardRef<ExerciseFormHandle, Props>(function Exerc
               </View>
             )}
           />
-        </>
+        </View>
       )}
 
-      <FormLabel>メモ</FormLabel>
-      <Controller
-        control={control}
-        name="note"
-        render={({ field: { value, onChange } }) => (
-          <TextInput
-            style={[styles.input, styles.inputMultiline]}
-            value={value ?? ''}
-            onChangeText={onChange}
-            placeholder="メモ"
-            multiline
-            numberOfLines={2}
-            accessibilityLabel="メモ"
-          />
-        )}
-      />
+      <View style={styles.field}>
+        <FormLabel>メモ</FormLabel>
+        <Controller
+          control={control}
+          name="note"
+          render={({ field: { value, onChange } }) => (
+            <TextInput
+              style={[styles.input, styles.inputMultiline]}
+              value={value ?? ''}
+              onChangeText={onChange}
+              placeholder="メモ"
+              multiline
+              numberOfLines={2}
+              accessibilityLabel="メモ"
+            />
+          )}
+        />
+      </View>
 
       <View style={styles.favoriteRow}>
         <SectionHeading>お気に入りに追加</SectionHeading>
@@ -219,7 +225,12 @@ export const ExerciseForm = forwardRef<ExerciseFormHandle, Props>(function Exerc
 });
 
 const styles = StyleSheet.create({
-  container: { gap: 8 },
+  // 種目詳細画面(app/exercise/[id].tsx)のsectionと同じ「見出し+本文を1グループにして
+  // グループ内/グループ間で余白を分ける」という2階層構成。値は詳細画面と揃えているわけではなく
+  // （詳細画面はグループ間20）、デザイン案(04新規作成/06編集フレーム)のフィールド間gap15〜16に
+  // 合わせて16にしている。fieldのgap8は詳細画面のsection gapと同じ値
+  container: { gap: 16 },
+  field: { gap: 8 },
 
   input: {
     borderWidth: 1,
