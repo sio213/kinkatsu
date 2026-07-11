@@ -64,12 +64,17 @@ const styles = StyleSheet.create({
     height: 40,
     paddingLeft: 36,
     paddingRight: 36,
+    // heightに加えてpaddingVerticalも残し、テキストの縦位置をUIKit任せの自動センタリング
+    // ではなくpaddingで固定する。iOSでは日本語IME変換中(カタカナ変換候補の下線表示等)の
+    // 未確定文字がこちらの指定lineHeightより自然に背が高く描画されることがあり、
+    // paddingを取り去ってheightだけで自動センタリングさせると、その一瞬だけ表示位置が
+    // 下にずれて見えるため、paddingで位置を固定して吸収する
+    paddingVertical: 9,
     ...Typography.body,
     color: Colors.textPrimary,
     backgroundColor: Colors.surfaceMuted,
     // Androidはグリフ種によってincludeFontPaddingの余白が変動し、入力するたびに
     // BOXの高さが揺れて見えるため、明示heightと合わせて無効化して固定する
     includeFontPadding: false,
-    textAlignVertical: 'center',
   },
 });
