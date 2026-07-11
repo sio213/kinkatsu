@@ -1,3 +1,4 @@
+import { BoxedTextInput } from '@/components/ui/boxed-text-input';
 import { FormLabel } from '@/components/ui/form-label';
 import { Colors, Typography } from '@/constants/theme';
 import { WEEKDAY_LABELS } from '@/lib/format';
@@ -215,8 +216,10 @@ export function ReminderForm({ initial = DEFAULT_INPUT, onSubmit, onCancel, subm
       )}
 
       <FormLabel required containerStyle={styles.labelSpacing}>タイトル</FormLabel>
-      <TextInput
-        style={styles.input}
+      <BoxedTextInput
+        height={38}
+        boxStyle={styles.inputBox}
+        style={styles.inputText}
         value={form.title}
         onChangeText={(v) => set('title', v)}
         placeholder="タイトル"
@@ -227,7 +230,7 @@ export function ReminderForm({ initial = DEFAULT_INPUT, onSubmit, onCancel, subm
 
       <FormLabel required containerStyle={styles.labelSpacing}>通知内容</FormLabel>
       <TextInput
-        style={[styles.input, styles.inputMulti]}
+        style={styles.inputMulti}
         value={form.body}
         onChangeText={(v) => set('body', v)}
         placeholder="通知内容"
@@ -547,27 +550,30 @@ const styles = StyleSheet.create({
   container: { gap: 0 },
   labelSpacing: { marginTop: 12, marginBottom: 4 },
   errorText: { ...Typography.caption, color: Colors.danger, marginBottom: 4 },
-  input: {
+  // タイトルは箱(枠線・背景・角丸・横padding)とTextInput本体をBoxedTextInputで分離
+  // している。詳細はcomponents/ui/boxed-text-input.tsxのコメント参照
+  inputBox: {
     borderWidth: 1,
     borderColor: Colors.borderStrong,
     borderRadius: 8,
-    height: 38,
     paddingHorizontal: 12,
-    // heightに加えてpaddingVerticalも残し、テキストの縦位置をUIKit任せの自動センタリング
-    // ではなくpaddingで固定する。iOSでは日本語IME変換中(カタカナ変換候補の下線表示等)の
-    // 未確定文字がこちらの指定lineHeightより自然に背が高く描画されることがあり、
-    // paddingを取り去ってheightだけで自動センタリングさせると、その一瞬だけ表示位置が
-    // 下にずれて見えるため、paddingで位置を固定して吸収する
+    backgroundColor: Colors.surface,
+  },
+  inputText: { ...Typography.body, color: Colors.textPrimary },
+
+  // 通知内容欄は複数行で伸びる仕様のためBoxedTextInputを使わず、そのままの高さ可変で表示する
+  inputMulti: {
+    borderWidth: 1,
+    borderColor: Colors.borderStrong,
+    borderRadius: 8,
+    minHeight: 80,
+    paddingHorizontal: 12,
     paddingVertical: 8,
     ...Typography.body,
     color: Colors.textPrimary,
     backgroundColor: Colors.surface,
-    // Androidはグリフ種によってincludeFontPaddingの余白が変動し、入力するたびに
-    // BOXの高さが揺れて見えるため、明示heightと合わせて無効化して固定する
-    includeFontPadding: false,
+    textAlignVertical: 'top',
   },
-  // 通知内容欄は複数行で伸びる仕様のため、単一行用のheight固定を解除しminHeightのみにする
-  inputMulti: { height: undefined, minHeight: 80, textAlignVertical: 'top' },
 
   timeButton: {
     backgroundColor: Colors.surface,
