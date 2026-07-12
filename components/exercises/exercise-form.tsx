@@ -2,7 +2,6 @@ import { chipStyles } from '@/components/exercises/chip-styles';
 import { BoxedTextInput } from '@/components/ui/boxed-text-input';
 import { FormLabel } from '@/components/ui/form-label';
 import { SectionGroup } from '@/components/ui/section-group';
-import { SectionHeading } from '@/components/ui/section-heading';
 import { Switch } from '@/components/ui/switch';
 import { Colors, Typography } from '@/constants/theme';
 import {
@@ -213,7 +212,7 @@ export const ExerciseForm = forwardRef<ExerciseFormHandle, Props>(function Exerc
       </SectionGroup>
 
       <View style={styles.favoriteRow}>
-        <SectionHeading>お気に入りに追加</SectionHeading>
+        <FormLabel>お気に入りに追加</FormLabel>
         <Controller
           control={control}
           name="favorite"
