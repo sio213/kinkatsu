@@ -320,7 +320,7 @@ export function ReminderForm({ initial = DEFAULT_INPUT, onSubmit, onCancel, subm
               <Text style={styles.stepperBtnText}>＋</Text>
             </TouchableOpacity>
           </View>
-          <FormLabel containerStyle={styles.labelSpacing}>曜日</FormLabel>
+          <FormLabel required containerStyle={styles.labelSpacing}>曜日</FormLabel>
           <View style={styles.wdRow}>
             {WEEKDAY_LABELS.map((label, i) => {
               const selected = form.weekdays?.includes(i) ?? false;
@@ -379,7 +379,7 @@ export function ReminderForm({ initial = DEFAULT_INPUT, onSubmit, onCancel, subm
 
           {monthDayMode === 'day' && intervalMonths === 1 && (
             <>
-              <FormLabel containerStyle={styles.labelSpacing}>日付（複数選択可）</FormLabel>
+              <FormLabel required containerStyle={styles.labelSpacing}>日付（複数選択可）</FormLabel>
               <View style={styles.mdGrid}>
                 {Array.from({ length: 31 }, (_, i) => i + 1).map((day) => {
                   const selected = form.monthdays?.includes(day) ?? false;

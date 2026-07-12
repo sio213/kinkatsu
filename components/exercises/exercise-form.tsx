@@ -148,7 +148,7 @@ export const ExerciseForm = forwardRef<ExerciseFormHandle, Props>(function Exerc
 
       {!isPreset && (
         <SectionGroup>
-          <FormLabel>フォームのポイント</FormLabel>
+          <FormLabel optional>フォームのポイント</FormLabel>
           <Controller
             control={control}
             name="formPoints"
@@ -194,7 +194,7 @@ export const ExerciseForm = forwardRef<ExerciseFormHandle, Props>(function Exerc
       )}
 
       <SectionGroup>
-        <FormLabel>メモ</FormLabel>
+        <FormLabel optional>メモ</FormLabel>
         <Controller
           control={control}
           name="note"
