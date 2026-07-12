@@ -75,6 +75,17 @@ export function ReminderForm({ initial = DEFAULT_INPUT, onSubmit, onCancel, subm
     initial.kind === 'monthly' ? (initial.nthWeekday ?? 1) : 1,
   );
 
+  // 週次の曜日・毎月の日付はデフォルト値のない複数選択のため、0件のまま保存すると
+  // 二度と発火しないリマインダーになってしまう（getNextFireDateがnullを返す）。
+  // 他のkind・指定方法・intervalMonths>1（単一選択で常に値を持つ）では常にtrueになる
+  const weekdaysValid = form.kind !== 'weekly' || (form.weekdays?.length ?? 0) > 0;
+  const monthdaysValid =
+    form.kind !== 'monthly' ||
+    monthDayMode !== 'day' ||
+    intervalMonths > 1 ||
+    (form.monthdays?.length ?? 0) > 0;
+  const formValid = titleValid && bodyValid && weekdaysValid && monthdaysValid;
+
   function set<K extends keyof ReminderInput>(key: K, val: ReminderInput[K]) {
     setForm((f) => ({ ...f, [key]: val }));
   }
@@ -130,7 +141,7 @@ export function ReminderForm({ initial = DEFAULT_INPUT, onSubmit, onCancel, subm
   }
 
   function handleSubmit() {
-    if (!titleValid || !bodyValid) {
+    if (!formValid) {
       setAttemptedSubmit(true);
       return;
     }
@@ -337,6 +348,9 @@ export function ReminderForm({ initial = DEFAULT_INPUT, onSubmit, onCancel, subm
               );
             })}
           </View>
+          {attemptedSubmit && !weekdaysValid ? (
+            <Text style={styles.errorText}>曜日を1つ以上選択してください</Text>
+          ) : null}
         </>
       )}
 
@@ -413,6 +427,9 @@ export function ReminderForm({ initial = DEFAULT_INPUT, onSubmit, onCancel, subm
                   </Text>
                 </TouchableOpacity>
               </View>
+              {attemptedSubmit && !monthdaysValid ? (
+                <Text style={styles.errorText}>日付を1つ以上選択してください</Text>
+              ) : null}
             </>
           )}
 
@@ -533,10 +550,10 @@ export function ReminderForm({ initial = DEFAULT_INPUT, onSubmit, onCancel, subm
         <TouchableOpacity
           style={[
             styles.submitBtn,
-            attemptedSubmit && (!titleValid || !bodyValid) && styles.submitBtnDisabled,
+            attemptedSubmit && !formValid && styles.submitBtnDisabled,
           ]}
           onPress={handleSubmit}
-          disabled={attemptedSubmit && (!titleValid || !bodyValid)}
+          disabled={attemptedSubmit && !formValid}
           accessibilityLabel={submitLabel}
         >
           <Text style={styles.submitBtnText}>{submitLabel}</Text>
