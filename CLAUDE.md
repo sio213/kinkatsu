@@ -82,6 +82,12 @@ kinkatsu用のGoogle Driveフォルダが `仕事 > Webサービス > 🏋️ ki
 - `useMigrations` の `error` は必ずハンドリングし、失敗時はクラッシュさせずエラー画面を表示する
 - 楽観的UIを使う場合はエラー時に状態を元に戻す
 
+### フォーム実装
+- 入力を伴うフォーム（複数フィールドがあり送信・バリデーションを行う画面）は必ず `react-hook-form` の `useForm`/`Controller` と `zodResolver` + Zodスキーマで実装する。`useState` + 手書きのbooleanバリデーション（`xxxValid`変数を並べる方式）は使わない
+- Zodスキーマは対象ドメインの `lib/**/validation.ts` に置く（例: `lib/exercises/validation.ts`）。フォーム独自の状態（UIモード切り替えなど、送信先の型に直接存在しないフィールド）もスキーマに含めてよく、送信時に確定した型（例: `ReminderInput`）へ変換する関数を同じファイルに用意する
+- チップ選択・トグルなど標準的な `TextInput` 以外のカスタムコントロールも `Controller` の `render={({ field: { value, onChange } }) => ...}` でRHFに繋ぐ
+- エラーメッセージは `formState.errors` を使い、`formState.isSubmitted`（またはisSubmittedと同等のフラグ）で「送信を試みた後だけ表示する」ガードを掛ける
+
 ### タイポグラフィ・共通コンポーネント
 - フォントサイズ・ウェイト・行間は、必ず共通トークン（theme.ts等で一元管理するFontSize/Typography定義）を参照する。画面やコンポーネント個別に`fontSize`の値をハードコードしない
 - 本文・見出し・カード見出し・画面タイトル・Dropdownメニュー項目など、役割が同じテキスト/コンポーネントは、実装場所が違っても同じトークン・同じスタイルを使い、サイズやウェイトを揃える

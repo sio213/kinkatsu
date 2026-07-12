@@ -7,10 +7,17 @@ import {
   DEFAULT_REMINDER_TITLE,
 } from '@/lib/notifications/messages';
 import { KIND_LABELS, MONTH_LABELS, NTH_WEEK_OPTIONS, REMINDER_PRESETS } from '@/lib/notifications/format';
-import { resolveMonthDay } from '@/lib/notifications/scheduler';
 import { MONTH_END, type ReminderInput, type ReminderKind } from '@/lib/notifications/types';
+import {
+  reminderFormSchema,
+  toFormValues,
+  toReminderInput,
+  type ReminderFormValues,
+} from '@/lib/notifications/validation';
+import { zodResolver } from '@hookform/resolvers/zod';
 import DateTimePicker from '@react-native-community/datetimepicker';
 import { useState } from 'react';
+import { Controller, useForm } from 'react-hook-form';
 import {
   Platform,
   StyleSheet,
@@ -39,166 +46,98 @@ type Props = {
 };
 
 export function ReminderForm({ initial = DEFAULT_INPUT, onSubmit, onCancel, submitLabel, showPresets = true }: Props) {
-  const [form, setForm] = useState<ReminderInput>(initial);
   const [showAndroidTimePicker, setShowAndroidTimePicker] = useState(false);
-  const [attemptedSubmit, setAttemptedSubmit] = useState(false);
 
-  const titleValid = form.title.trim().length > 0;
-  const bodyValid = form.body.trim().length > 0;
+  const {
+    control,
+    handleSubmit,
+    watch,
+    setValue,
+    formState: { errors, isSubmitted },
+  } = useForm<ReminderFormValues>({
+    resolver: zodResolver(reminderFormSchema),
+    defaultValues: toFormValues(initial),
+  });
+  const hasErrors = Object.keys(errors).length > 0;
+  const submitDisabled = isSubmitted && hasErrors;
 
-  const [intervalWeeks, setIntervalWeeks] = useState<number>(
-    initial.kind === 'weekly' ? Math.max(1, Math.round((initial.intervalDays ?? 7) / 7)) : 1,
-  );
-  const [intervalMonths, setIntervalMonths] = useState<number>(
-    initial.kind === 'monthly' ? (initial.intervalMonths ?? 1) : 1,
-  );
-  const [monthIntervalDay, setMonthIntervalDay] = useState<number>(
-    initial.kind === 'monthly' && (initial.intervalMonths ?? 1) > 1
-      ? (initial.monthdays?.[0] ?? 1)
-      : 1,
-  );
+  const kind = watch('kind');
+  const hour = watch('hour');
+  const minute = watch('minute');
+  const intervalDays = watch('intervalDays');
+  const intervalWeeks = watch('intervalWeeks');
+  const weekdays = watch('weekdays');
+  const intervalMonths = watch('intervalMonths');
+  const monthDayMode = watch('monthDayMode');
+  const monthdays = watch('monthdays');
+  const monthIntervalDay = watch('monthIntervalDay');
+  const monthNthWeek = watch('monthNthWeek');
+  const monthNthWeekday = watch('monthNthWeekday');
+  const yearlyMonth = watch('yearlyMonth');
+  const yearlyDay = watch('yearlyDay');
+  const yearlyEom = watch('yearlyEom');
 
-  const initAnchor = initial.anchorDate ? new Date(initial.anchorDate) : null;
-  const [yearlyMonth, setYearlyMonth] = useState<number>(initAnchor?.getMonth() ?? 0);
-  const [yearlyDay, setYearlyDay] = useState<number>(initAnchor?.getDate() ?? 1);
-  const [yearlyEom, setYearlyEom] = useState<boolean>(
-    initial.kind === 'yearly' && (initial.monthdays?.includes(MONTH_END) ?? false),
-  );
-
-  const [monthDayMode, setMonthDayMode] = useState<'day' | 'nth'>(
-    initial.kind === 'monthly' && initial.nthWeek != null ? 'nth' : 'day',
-  );
-  const [monthNthWeek, setMonthNthWeek] = useState<number>(
-    initial.kind === 'monthly' ? (initial.nthWeek ?? 1) : 1,
-  );
-  const [monthNthWeekday, setMonthNthWeekday] = useState<number>(
-    initial.kind === 'monthly' ? (initial.nthWeekday ?? 1) : 1,
-  );
-
-  // 週次の曜日・毎月の日付はデフォルト値のない複数選択のため、0件のまま保存すると
-  // 二度と発火しないリマインダーになってしまう（getNextFireDateがnullを返す）。
-  // 他のkind・指定方法・intervalMonths>1（単一選択で常に値を持つ）では常にtrueになる
-  const weekdaysValid = form.kind !== 'weekly' || (form.weekdays?.length ?? 0) > 0;
-  const monthdaysValid =
-    form.kind !== 'monthly' ||
-    monthDayMode !== 'day' ||
-    intervalMonths > 1 ||
-    (form.monthdays?.length ?? 0) > 0;
-  const formValid = titleValid && bodyValid && weekdaysValid && monthdaysValid;
-
-  function set<K extends keyof ReminderInput>(key: K, val: ReminderInput[K]) {
-    setForm((f) => ({ ...f, [key]: val }));
-  }
+  // 月次「日付（複数選択）」の入力欄が表示されるのはこの条件のときだけなので、
+  // バリデーション側もこれに合わせる（表示条件と検証条件がずれないよう一箇所にまとめる）
+  const isMultiMonthdaySelection = kind === 'monthly' && monthDayMode === 'day' && intervalMonths === 1;
 
   function applyPreset(preset: (typeof REMINDER_PRESETS)[number]) {
     if (preset.weekdays) {
-      setForm((f) => ({ ...f, kind: 'weekly', weekdays: preset.weekdays! }));
-      setIntervalWeeks(1);
+      setValue('kind', 'weekly');
+      setValue('weekdays', preset.weekdays);
+      setValue('intervalWeeks', 1);
     } else {
-      setForm((f) => ({ ...f, kind: 'interval', intervalDays: 1 }));
+      setValue('kind', 'interval');
+      setValue('intervalDays', 1);
     }
   }
 
   const activePreset = REMINDER_PRESETS.find((p) => {
     if (p.weekdays) {
       return (
-        form.kind === 'weekly' &&
+        kind === 'weekly' &&
         intervalWeeks === 1 &&
-        JSON.stringify(form.weekdays ?? []) === JSON.stringify(p.weekdays)
+        JSON.stringify(weekdays ?? []) === JSON.stringify(p.weekdays)
       );
     }
-    return form.kind === 'interval' && (form.intervalDays ?? 1) === 1;
+    return kind === 'interval' && intervalDays === 1;
   });
 
   function toggleWeekday(wd: number) {
-    const current = form.weekdays ?? [];
-    const next = current.includes(wd)
-      ? current.filter((d) => d !== wd)
-      : [...current, wd].sort((a, b) => a - b);
-    set('weekdays', next);
+    const next = weekdays.includes(wd)
+      ? weekdays.filter((d) => d !== wd)
+      : [...weekdays, wd].sort((a, b) => a - b);
+    setValue('weekdays', next, { shouldValidate: isSubmitted });
   }
 
   function toggleMonthday(day: number) {
-    const current = form.monthdays ?? [];
     let next: number[];
-    if (current.includes(day)) {
-      next = current.filter((d) => d !== day);
+    if (monthdays.includes(day)) {
+      next = monthdays.filter((d) => d !== day);
     } else if (day === MONTH_END) {
-      next = [...current.filter((d) => d !== 31), MONTH_END];
+      next = [...monthdays.filter((d) => d !== 31), MONTH_END];
     } else if (day === 31) {
-      next = [...current.filter((d) => d !== MONTH_END), 31];
+      next = [...monthdays.filter((d) => d !== MONTH_END), 31];
     } else {
-      next = [...current, day];
+      next = [...monthdays, day];
     }
-    set('monthdays', next.sort((a, b) => a - b));
+    setValue('monthdays', next.sort((a, b) => a - b), { shouldValidate: isSubmitted });
   }
 
   function handleTimeChange(_: unknown, date?: Date) {
     if (Platform.OS === 'android') setShowAndroidTimePicker(false);
     if (!date) return;
-    set('hour', date.getHours());
-    set('minute', date.getMinutes());
+    setValue('hour', date.getHours());
+    setValue('minute', date.getMinutes());
   }
 
-  function handleSubmit() {
-    if (!formValid) {
-      setAttemptedSubmit(true);
-      return;
-    }
-
-    const out = { ...form };
-
-    if (out.kind === 'interval') {
-      const n = out.intervalDays ?? 1;
-      out.intervalDays = n;
-      if (n > 1) out.anchorDate = out.anchorDate ?? Date.now();
-    }
-
-    if (out.kind === 'weekly') {
-      out.intervalDays = intervalWeeks * 7;
-      if (intervalWeeks > 1) out.anchorDate = out.anchorDate ?? Date.now();
-    }
-
-    if (out.kind === 'yearly') {
-      const now = new Date();
-      const yr = now.getFullYear();
-      if (yearlyEom) {
-        out.anchorDate = new Date(yr, yearlyMonth, 1).getTime();
-        out.monthdays = [MONTH_END];
-      } else {
-        out.monthdays = undefined;
-        const day = resolveMonthDay(yr, yearlyMonth, yearlyDay);
-        let d = new Date(yr, yearlyMonth, day);
-        if (d <= now) {
-          const dayNext = resolveMonthDay(yr + 1, yearlyMonth, yearlyDay);
-          d = new Date(yr + 1, yearlyMonth, dayNext);
-        }
-        out.anchorDate = d.getTime();
-      }
-    }
-
-    if (out.kind === 'monthly') {
-      out.intervalMonths = intervalMonths;
-      if (monthDayMode === 'nth') {
-        out.nthWeek = monthNthWeek;
-        out.nthWeekday = monthNthWeekday;
-        out.monthdays = undefined;
-      } else {
-        out.nthWeek = undefined;
-        out.nthWeekday = undefined;
-        if (intervalMonths > 1) {
-          out.monthdays = [monthIntervalDay];
-          out.anchorDate = out.anchorDate ?? Date.now();
-        }
-      }
-    }
-
-    onSubmit(out);
+  function handleValid(values: ReminderFormValues) {
+    onSubmit(toReminderInput(values));
   }
 
   const timeDate = new Date();
-  timeDate.setHours(form.hour, form.minute, 0, 0);
-  const timeLabel = `${String(form.hour).padStart(2, '0')}:${String(form.minute).padStart(2, '0')}`;
+  timeDate.setHours(hour, minute, 0, 0);
+  const timeLabel = `${String(hour).padStart(2, '0')}:${String(minute).padStart(2, '0')}`;
   const showTimePicker = Platform.OS === 'ios' || showAndroidTimePicker;
 
   return (
@@ -227,29 +166,41 @@ export function ReminderForm({ initial = DEFAULT_INPUT, onSubmit, onCancel, subm
       )}
 
       <FormLabel required containerStyle={styles.labelSpacing}>タイトル</FormLabel>
-      <BoxedTextInput
-        height={38}
-        boxStyle={styles.inputBox}
-        style={styles.inputText}
-        value={form.title}
-        onChangeText={(v) => set('title', v)}
-        placeholder="タイトル"
+      <Controller
+        control={control}
+        name="title"
+        render={({ field: { value, onChange } }) => (
+          <BoxedTextInput
+            height={38}
+            boxStyle={styles.inputBox}
+            style={styles.inputText}
+            value={value}
+            onChangeText={onChange}
+            placeholder="タイトル"
+          />
+        )}
       />
-      {attemptedSubmit && !titleValid ? (
-        <Text style={styles.errorText}>タイトルを入力してください</Text>
+      {isSubmitted && errors.title ? (
+        <Text style={styles.errorText}>{errors.title.message}</Text>
       ) : null}
 
       <FormLabel required containerStyle={styles.labelSpacing}>通知内容</FormLabel>
-      <TextInput
-        style={styles.inputMulti}
-        value={form.body}
-        onChangeText={(v) => set('body', v)}
-        placeholder="通知内容"
-        multiline
-        scrollEnabled={false}
+      <Controller
+        control={control}
+        name="body"
+        render={({ field: { value, onChange } }) => (
+          <TextInput
+            style={styles.inputMulti}
+            value={value}
+            onChangeText={onChange}
+            placeholder="通知内容"
+            multiline
+            scrollEnabled={false}
+          />
+        )}
       />
-      {attemptedSubmit && !bodyValid ? (
-        <Text style={styles.errorText}>通知内容を入力してください</Text>
+      {isSubmitted && errors.body ? (
+        <Text style={styles.errorText}>{errors.body.message}</Text>
       ) : null}
 
       <FormLabel containerStyle={styles.labelSpacing}>時刻</FormLabel>
@@ -276,10 +227,10 @@ export function ReminderForm({ initial = DEFAULT_INPUT, onSubmit, onCancel, subm
         {(Object.keys(KIND_LABELS) as ReminderKind[]).map((k) => (
           <TouchableOpacity
             key={k}
-            style={[styles.chip, form.kind === k && styles.chipActive]}
-            onPress={() => set('kind', k)}
+            style={[styles.chip, kind === k && styles.chipActive]}
+            onPress={() => setValue('kind', k)}
           >
-            <Text style={[styles.chipText, form.kind === k && styles.chipTextActive]}>
+            <Text style={[styles.chipText, kind === k && styles.chipTextActive]}>
               {KIND_LABELS[k]}
             </Text>
           </TouchableOpacity>
@@ -287,22 +238,22 @@ export function ReminderForm({ initial = DEFAULT_INPUT, onSubmit, onCancel, subm
       </View>
 
       {/* 日単位 */}
-      {form.kind === 'interval' && (
+      {kind === 'interval' && (
         <>
           <FormLabel containerStyle={styles.labelSpacing}>間隔</FormLabel>
           <View style={styles.stepperRow}>
             <TouchableOpacity
               style={styles.stepperBtn}
-              onPress={() => set('intervalDays', Math.max(1, (form.intervalDays ?? 1) - 1))}
+              onPress={() => setValue('intervalDays', Math.max(1, intervalDays - 1))}
             >
               <Text style={styles.stepperBtnText}>−</Text>
             </TouchableOpacity>
             <Text style={styles.stepperNum}>
-              {(form.intervalDays ?? 1) === 1 ? '毎日' : `${form.intervalDays}日ごと`}
+              {intervalDays === 1 ? '毎日' : `${intervalDays}日ごと`}
             </Text>
             <TouchableOpacity
               style={styles.stepperBtn}
-              onPress={() => set('intervalDays', Math.min(365, (form.intervalDays ?? 1) + 1))}
+              onPress={() => setValue('intervalDays', Math.min(365, intervalDays + 1))}
             >
               <Text style={styles.stepperBtnText}>＋</Text>
             </TouchableOpacity>
@@ -311,13 +262,13 @@ export function ReminderForm({ initial = DEFAULT_INPUT, onSubmit, onCancel, subm
       )}
 
       {/* 週単位 */}
-      {form.kind === 'weekly' && (
+      {kind === 'weekly' && (
         <>
           <FormLabel containerStyle={styles.labelSpacing}>間隔</FormLabel>
           <View style={styles.stepperRow}>
             <TouchableOpacity
               style={styles.stepperBtn}
-              onPress={() => setIntervalWeeks((w) => Math.max(1, w - 1))}
+              onPress={() => setValue('intervalWeeks', Math.max(1, intervalWeeks - 1))}
             >
               <Text style={styles.stepperBtnText}>−</Text>
             </TouchableOpacity>
@@ -326,7 +277,7 @@ export function ReminderForm({ initial = DEFAULT_INPUT, onSubmit, onCancel, subm
             </Text>
             <TouchableOpacity
               style={styles.stepperBtn}
-              onPress={() => setIntervalWeeks((w) => Math.min(8, w + 1))}
+              onPress={() => setValue('intervalWeeks', Math.min(8, intervalWeeks + 1))}
             >
               <Text style={styles.stepperBtnText}>＋</Text>
             </TouchableOpacity>
@@ -334,12 +285,15 @@ export function ReminderForm({ initial = DEFAULT_INPUT, onSubmit, onCancel, subm
           <FormLabel required containerStyle={styles.labelSpacing}>曜日</FormLabel>
           <View style={styles.wdRow}>
             {WEEKDAY_LABELS.map((label, i) => {
-              const selected = form.weekdays?.includes(i) ?? false;
+              const selected = weekdays.includes(i);
               return (
                 <TouchableOpacity
                   key={i}
                   style={[styles.wdChip, selected && styles.chipActive]}
                   onPress={() => toggleWeekday(i)}
+                  accessibilityRole="checkbox"
+                  accessibilityState={{ checked: selected }}
+                  accessibilityLabel={label}
                 >
                   <Text style={[styles.wdChipText, selected && styles.chipTextActive]}>
                     {label}
@@ -348,20 +302,20 @@ export function ReminderForm({ initial = DEFAULT_INPUT, onSubmit, onCancel, subm
               );
             })}
           </View>
-          {attemptedSubmit && !weekdaysValid ? (
-            <Text style={styles.errorText}>曜日を1つ以上選択してください</Text>
+          {isSubmitted && errors.weekdays ? (
+            <Text style={styles.errorText}>{errors.weekdays.message}</Text>
           ) : null}
         </>
       )}
 
       {/* 月単位 */}
-      {form.kind === 'monthly' && (
+      {kind === 'monthly' && (
         <>
           <FormLabel containerStyle={styles.labelSpacing}>間隔</FormLabel>
           <View style={styles.stepperRow}>
             <TouchableOpacity
               style={styles.stepperBtn}
-              onPress={() => setIntervalMonths((m) => Math.max(1, m - 1))}
+              onPress={() => setValue('intervalMonths', Math.max(1, intervalMonths - 1))}
             >
               <Text style={styles.stepperBtnText}>−</Text>
             </TouchableOpacity>
@@ -370,7 +324,7 @@ export function ReminderForm({ initial = DEFAULT_INPUT, onSubmit, onCancel, subm
             </Text>
             <TouchableOpacity
               style={styles.stepperBtn}
-              onPress={() => setIntervalMonths((m) => Math.min(12, m + 1))}
+              onPress={() => setValue('intervalMonths', Math.min(12, intervalMonths + 1))}
             >
               <Text style={styles.stepperBtnText}>＋</Text>
             </TouchableOpacity>
@@ -382,7 +336,7 @@ export function ReminderForm({ initial = DEFAULT_INPUT, onSubmit, onCancel, subm
               <TouchableOpacity
                 key={mode}
                 style={[styles.chip, monthDayMode === mode && styles.chipActive]}
-                onPress={() => setMonthDayMode(mode)}
+                onPress={() => setValue('monthDayMode', mode)}
               >
                 <Text style={[styles.chipText, monthDayMode === mode && styles.chipTextActive]}>
                   {mode === 'day' ? '日付' : '第N曜日'}
@@ -391,17 +345,20 @@ export function ReminderForm({ initial = DEFAULT_INPUT, onSubmit, onCancel, subm
             ))}
           </View>
 
-          {monthDayMode === 'day' && intervalMonths === 1 && (
+          {isMultiMonthdaySelection && (
             <>
               <FormLabel required containerStyle={styles.labelSpacing}>日付（複数選択可）</FormLabel>
               <View style={styles.mdGrid}>
                 {Array.from({ length: 31 }, (_, i) => i + 1).map((day) => {
-                  const selected = form.monthdays?.includes(day) ?? false;
+                  const selected = monthdays.includes(day);
                   return (
                     <TouchableOpacity
                       key={day}
                       style={[styles.mdChip, selected && styles.chipActive]}
                       onPress={() => toggleMonthday(day)}
+                      accessibilityRole="checkbox"
+                      accessibilityState={{ checked: selected }}
+                      accessibilityLabel={`${day}日`}
                     >
                       <Text style={[styles.mdChipText, selected && styles.chipTextActive]}>
                         {day}
@@ -413,22 +370,25 @@ export function ReminderForm({ initial = DEFAULT_INPUT, onSubmit, onCancel, subm
                   style={[
                     styles.mdChip,
                     styles.mdChipEom,
-                    (form.monthdays?.includes(MONTH_END) ?? false) && styles.chipActive,
+                    monthdays.includes(MONTH_END) && styles.chipActive,
                   ]}
                   onPress={() => toggleMonthday(MONTH_END)}
+                  accessibilityRole="checkbox"
+                  accessibilityState={{ checked: monthdays.includes(MONTH_END) }}
+                  accessibilityLabel="月末"
                 >
                   <Text
                     style={[
                       styles.mdChipText,
-                      (form.monthdays?.includes(MONTH_END) ?? false) && styles.chipTextActive,
+                      monthdays.includes(MONTH_END) && styles.chipTextActive,
                     ]}
                   >
                     月末
                   </Text>
                 </TouchableOpacity>
               </View>
-              {attemptedSubmit && !monthdaysValid ? (
-                <Text style={styles.errorText}>日付を1つ以上選択してください</Text>
+              {isSubmitted && errors.monthdays ? (
+                <Text style={styles.errorText}>{errors.monthdays.message}</Text>
               ) : null}
             </>
           )}
@@ -441,7 +401,7 @@ export function ReminderForm({ initial = DEFAULT_INPUT, onSubmit, onCancel, subm
                   <TouchableOpacity
                     key={day}
                     style={[styles.mdChip, monthIntervalDay === day && styles.chipActive]}
-                    onPress={() => setMonthIntervalDay(day)}
+                    onPress={() => setValue('monthIntervalDay', day)}
                   >
                     <Text style={[styles.mdChipText, monthIntervalDay === day && styles.chipTextActive]}>
                       {day}
@@ -454,7 +414,7 @@ export function ReminderForm({ initial = DEFAULT_INPUT, onSubmit, onCancel, subm
                     styles.mdChipEom,
                     monthIntervalDay === MONTH_END && styles.chipActive,
                   ]}
-                  onPress={() => setMonthIntervalDay(MONTH_END)}
+                  onPress={() => setValue('monthIntervalDay', MONTH_END)}
                 >
                   <Text style={[styles.mdChipText, monthIntervalDay === MONTH_END && styles.chipTextActive]}>
                     月末
@@ -472,7 +432,7 @@ export function ReminderForm({ initial = DEFAULT_INPUT, onSubmit, onCancel, subm
                   <TouchableOpacity
                     key={value}
                     style={[styles.chip, monthNthWeek === value && styles.chipActive]}
-                    onPress={() => setMonthNthWeek(value)}
+                    onPress={() => setValue('monthNthWeek', value)}
                   >
                     <Text style={[styles.chipText, monthNthWeek === value && styles.chipTextActive]}>
                       {label}
@@ -486,7 +446,7 @@ export function ReminderForm({ initial = DEFAULT_INPUT, onSubmit, onCancel, subm
                   <TouchableOpacity
                     key={i}
                     style={[styles.wdChip, monthNthWeekday === i && styles.chipActive]}
-                    onPress={() => setMonthNthWeekday(i)}
+                    onPress={() => setValue('monthNthWeekday', i)}
                   >
                     <Text style={[styles.wdChipText, monthNthWeekday === i && styles.chipTextActive]}>
                       {label}
@@ -500,7 +460,7 @@ export function ReminderForm({ initial = DEFAULT_INPUT, onSubmit, onCancel, subm
       )}
 
       {/* 年単位 */}
-      {form.kind === 'yearly' && (
+      {kind === 'yearly' && (
         <>
           <FormLabel containerStyle={styles.labelSpacing}>月</FormLabel>
           <View style={styles.kindRow}>
@@ -508,7 +468,7 @@ export function ReminderForm({ initial = DEFAULT_INPUT, onSubmit, onCancel, subm
               <TouchableOpacity
                 key={i}
                 style={[styles.chip, yearlyMonth === i && styles.chipActive]}
-                onPress={() => setYearlyMonth(i)}
+                onPress={() => setValue('yearlyMonth', i)}
               >
                 <Text style={[styles.chipText, yearlyMonth === i && styles.chipTextActive]}>
                   {label}
@@ -522,7 +482,7 @@ export function ReminderForm({ initial = DEFAULT_INPUT, onSubmit, onCancel, subm
               <TouchableOpacity
                 key={day}
                 style={[styles.mdChip, !yearlyEom && yearlyDay === day && styles.chipActive]}
-                onPress={() => { setYearlyDay(day); setYearlyEom(false); }}
+                onPress={() => { setValue('yearlyDay', day); setValue('yearlyEom', false); }}
               >
                 <Text style={[styles.mdChipText, !yearlyEom && yearlyDay === day && styles.chipTextActive]}>
                   {day}
@@ -531,7 +491,7 @@ export function ReminderForm({ initial = DEFAULT_INPUT, onSubmit, onCancel, subm
             ))}
             <TouchableOpacity
               style={[styles.mdChip, styles.mdChipEom, yearlyEom && styles.chipActive]}
-              onPress={() => setYearlyEom(true)}
+              onPress={() => setValue('yearlyEom', true)}
             >
               <Text style={[styles.mdChipText, yearlyEom && styles.chipTextActive]}>月末</Text>
             </TouchableOpacity>
@@ -548,12 +508,9 @@ export function ReminderForm({ initial = DEFAULT_INPUT, onSubmit, onCancel, subm
           <Text style={styles.cancelBtnText}>キャンセル</Text>
         </TouchableOpacity>
         <TouchableOpacity
-          style={[
-            styles.submitBtn,
-            attemptedSubmit && !formValid && styles.submitBtnDisabled,
-          ]}
-          onPress={handleSubmit}
-          disabled={attemptedSubmit && !formValid}
+          style={[styles.submitBtn, submitDisabled && styles.submitBtnDisabled]}
+          onPress={handleSubmit(handleValid)}
+          disabled={submitDisabled}
           accessibilityLabel={submitLabel}
         >
           <Text style={styles.submitBtnText}>{submitLabel}</Text>
