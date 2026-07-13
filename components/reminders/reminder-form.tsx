@@ -37,6 +37,72 @@ const DEFAULT_INPUT: ReminderInput = {
   enabled: true,
 };
 
+// 日付選択チップの共通トグルロジック（毎月の日付・毎年の日で使う）。
+// 31日と月末(MONTH_END)は同じ実日付を指しうるため相互排他にする
+function toggleDayInArray(days: number[], day: number): number[] {
+  let next: number[];
+  if (days.includes(day)) {
+    next = days.filter((d) => d !== day);
+  } else if (day === MONTH_END) {
+    next = [...days.filter((d) => d !== 31), MONTH_END];
+  } else if (day === 31) {
+    next = [...days.filter((d) => d !== MONTH_END), 31];
+  } else {
+    next = [...days, day];
+  }
+  return next.sort((a, b) => a - b);
+}
+
+// 曜日選択チップの共通トグルロジック（毎週の曜日・第N曜日の曜日で使う）
+function toggleInArray(values: number[], value: number): number[] {
+  const next = values.includes(value)
+    ? values.filter((v) => v !== value)
+    : [...values, value];
+  return next.sort((a, b) => a - b);
+}
+
+// 1〜31日+月末チップの複数選択グリッド（毎月の日付・毎年の日で使う共通UI）
+function DayMultiSelectGrid({
+  selected,
+  onToggle,
+}: {
+  selected: number[];
+  onToggle: (day: number) => void;
+}) {
+  return (
+    <View style={styles.mdGrid}>
+      {Array.from({ length: 31 }, (_, i) => i + 1).map((day) => {
+        const isSelected = selected.includes(day);
+        return (
+          <TouchableOpacity
+            key={day}
+            style={[styles.mdChip, isSelected && styles.chipActive]}
+            onPress={() => onToggle(day)}
+            accessibilityRole="checkbox"
+            accessibilityState={{ checked: isSelected }}
+            accessibilityLabel={`${day}日`}
+          >
+            <Text style={[styles.mdChipText, isSelected && styles.chipTextActive]}>
+              {day}
+            </Text>
+          </TouchableOpacity>
+        );
+      })}
+      <TouchableOpacity
+        style={[styles.mdChip, styles.mdChipEom, selected.includes(MONTH_END) && styles.chipActive]}
+        onPress={() => onToggle(MONTH_END)}
+        accessibilityRole="checkbox"
+        accessibilityState={{ checked: selected.includes(MONTH_END) }}
+        accessibilityLabel="月末"
+      >
+        <Text style={[styles.mdChipText, selected.includes(MONTH_END) && styles.chipTextActive]}>
+          月末
+        </Text>
+      </TouchableOpacity>
+    </View>
+  );
+}
+
 type Props = {
   initial?: ReminderInput;
   onSubmit: (input: ReminderInput) => void;
@@ -73,8 +139,7 @@ export function ReminderForm({ initial = DEFAULT_INPUT, onSubmit, onCancel, subm
   const monthNthWeek = watch('monthNthWeek');
   const monthNthWeekdays = watch('monthNthWeekdays');
   const yearlyMonth = watch('yearlyMonth');
-  const yearlyDay = watch('yearlyDay');
-  const yearlyEom = watch('yearlyEom');
+  const yearlyDays = watch('yearlyDays');
 
   // 月次「日付（複数選択）」の入力欄が表示されるのはこの条件のときだけなので、
   // バリデーション側もこれに合わせる（表示条件と検証条件がずれないよう一箇所にまとめる）
@@ -103,31 +168,19 @@ export function ReminderForm({ initial = DEFAULT_INPUT, onSubmit, onCancel, subm
   });
 
   function toggleWeekday(wd: number) {
-    const next = weekdays.includes(wd)
-      ? weekdays.filter((d) => d !== wd)
-      : [...weekdays, wd].sort((a, b) => a - b);
-    setValue('weekdays', next, { shouldValidate: isSubmitted });
+    setValue('weekdays', toggleInArray(weekdays, wd), { shouldValidate: isSubmitted });
   }
 
   function toggleMonthday(day: number) {
-    let next: number[];
-    if (monthdays.includes(day)) {
-      next = monthdays.filter((d) => d !== day);
-    } else if (day === MONTH_END) {
-      next = [...monthdays.filter((d) => d !== 31), MONTH_END];
-    } else if (day === 31) {
-      next = [...monthdays.filter((d) => d !== MONTH_END), 31];
-    } else {
-      next = [...monthdays, day];
-    }
-    setValue('monthdays', next.sort((a, b) => a - b), { shouldValidate: isSubmitted });
+    setValue('monthdays', toggleDayInArray(monthdays, day), { shouldValidate: isSubmitted });
+  }
+
+  function toggleYearlyDay(day: number) {
+    setValue('yearlyDays', toggleDayInArray(yearlyDays, day), { shouldValidate: isSubmitted });
   }
 
   function toggleMonthNthWeekday(wd: number) {
-    const next = monthNthWeekdays.includes(wd)
-      ? monthNthWeekdays.filter((d) => d !== wd)
-      : [...monthNthWeekdays, wd].sort((a, b) => a - b);
-    setValue('monthNthWeekdays', next, { shouldValidate: isSubmitted });
+    setValue('monthNthWeekdays', toggleInArray(monthNthWeekdays, wd), { shouldValidate: isSubmitted });
   }
 
   function handleTimeChange(_: unknown, date?: Date) {
@@ -354,45 +407,7 @@ export function ReminderForm({ initial = DEFAULT_INPUT, onSubmit, onCancel, subm
           {isMultiMonthdaySelection && (
             <>
               <FormLabel required containerStyle={styles.labelSpacing}>日付（複数選択可）</FormLabel>
-              <View style={styles.mdGrid}>
-                {Array.from({ length: 31 }, (_, i) => i + 1).map((day) => {
-                  const selected = monthdays.includes(day);
-                  return (
-                    <TouchableOpacity
-                      key={day}
-                      style={[styles.mdChip, selected && styles.chipActive]}
-                      onPress={() => toggleMonthday(day)}
-                      accessibilityRole="checkbox"
-                      accessibilityState={{ checked: selected }}
-                      accessibilityLabel={`${day}日`}
-                    >
-                      <Text style={[styles.mdChipText, selected && styles.chipTextActive]}>
-                        {day}
-                      </Text>
-                    </TouchableOpacity>
-                  );
-                })}
-                <TouchableOpacity
-                  style={[
-                    styles.mdChip,
-                    styles.mdChipEom,
-                    monthdays.includes(MONTH_END) && styles.chipActive,
-                  ]}
-                  onPress={() => toggleMonthday(MONTH_END)}
-                  accessibilityRole="checkbox"
-                  accessibilityState={{ checked: monthdays.includes(MONTH_END) }}
-                  accessibilityLabel="月末"
-                >
-                  <Text
-                    style={[
-                      styles.mdChipText,
-                      monthdays.includes(MONTH_END) && styles.chipTextActive,
-                    ]}
-                  >
-                    月末
-                  </Text>
-                </TouchableOpacity>
-              </View>
+              <DayMultiSelectGrid selected={monthdays} onToggle={toggleMonthday} />
               {isSubmitted && errors.monthdays ? (
                 <Text style={styles.errorText}>{errors.monthdays.message}</Text>
               ) : null}
@@ -460,26 +475,11 @@ export function ReminderForm({ initial = DEFAULT_INPUT, onSubmit, onCancel, subm
               </TouchableOpacity>
             ))}
           </View>
-          <FormLabel containerStyle={styles.labelSpacing}>日</FormLabel>
-          <View style={styles.mdGrid}>
-            {Array.from({ length: 31 }, (_, i) => i + 1).map((day) => (
-              <TouchableOpacity
-                key={day}
-                style={[styles.mdChip, !yearlyEom && yearlyDay === day && styles.chipActive]}
-                onPress={() => { setValue('yearlyDay', day); setValue('yearlyEom', false); }}
-              >
-                <Text style={[styles.mdChipText, !yearlyEom && yearlyDay === day && styles.chipTextActive]}>
-                  {day}
-                </Text>
-              </TouchableOpacity>
-            ))}
-            <TouchableOpacity
-              style={[styles.mdChip, styles.mdChipEom, yearlyEom && styles.chipActive]}
-              onPress={() => setValue('yearlyEom', true)}
-            >
-              <Text style={[styles.mdChipText, yearlyEom && styles.chipTextActive]}>月末</Text>
-            </TouchableOpacity>
-          </View>
+          <FormLabel required containerStyle={styles.labelSpacing}>日（複数選択可）</FormLabel>
+          <DayMultiSelectGrid selected={yearlyDays} onToggle={toggleYearlyDay} />
+          {isSubmitted && errors.yearlyDays ? (
+            <Text style={styles.errorText}>{errors.yearlyDays.message}</Text>
+          ) : null}
         </>
       )}
 

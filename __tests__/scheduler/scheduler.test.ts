@@ -23,6 +23,7 @@ import {
   nextDailyFireDate,
   nextWeeklyFireDate,
   normalizeInput,
+  parseReminder,
   resolveMonthDay,
   resolveNthWeekdayDay,
   resolveTriggerType,
@@ -278,7 +279,7 @@ describe('2週間ごと月曜にリマインド', () => {
 // ─────────────────────────────────────────────
 describe('毎年1月1日にリマインド', () => {
   test('Jan 5 時点では当年 Jan 1 は過去 → 来年 Jan 1', () => {
-    const dates = computeYearlyFireDates(FROM, 0, 1, H, M, 3); // month=0 → January
+    const dates = computeYearlyFireDates(FROM, 0, [1], H, M, 3); // month=0 → January
     expect(dates[0]).toEqual(d('2027-01-01T07:00:00'));
     expect(dates[1]).toEqual(d('2028-01-01T07:00:00'));
     expect(dates[2]).toEqual(d('2029-01-01T07:00:00'));
@@ -286,7 +287,7 @@ describe('毎年1月1日にリマインド', () => {
 
   test('2月末日（月ごとに最終日が変わる）', () => {
     // Feb 29 → 2028年(閏年)は29日、2026/2027は28日
-    const dates = computeYearlyFireDates(FROM, 1, 29, H, M, 3); // Feb 29
+    const dates = computeYearlyFireDates(FROM, 1, [29], H, M, 3); // Feb 29
     expect(dates[0].getFullYear()).toBe(2026);
     expect(dates[0].getDate()).toBe(28); // 2026年は平年 → 28日
     expect(dates[1].getFullYear()).toBe(2027);
@@ -420,12 +421,23 @@ describe('getNextFireDate (統合)', () => {
       ...base,
       kind: 'yearly',
       weekdays: null,
-      monthdays: null,
+      monthdays: [1],
       anchorDate: d('2026-01-01').getTime(),
     };
     expect(getNextFireDate(r, FROM)?.getFullYear()).toBe(2027);
     expect(getNextFireDate(r, FROM)?.getMonth()).toBe(0);
     expect(getNextFireDate(r, FROM)?.getDate()).toBe(1);
+  });
+
+  test('yearly monthdaysが空配列ならnull', () => {
+    const r = {
+      ...base,
+      kind: 'yearly',
+      weekdays: null,
+      monthdays: [],
+      anchorDate: d('2026-01-01').getTime(),
+    };
+    expect(getNextFireDate(r, FROM)).toBeNull();
   });
 
   test('interval 2日ごと', () => {
@@ -532,6 +544,72 @@ describe('getNextFireDate (統合)', () => {
 });
 
 // ─────────────────────────────────────────────
+// parseReminder: 毎年の後方互換
+// ─────────────────────────────────────────────
+describe('parseReminder: 毎年(旧形式)の後方互換', () => {
+  const rawBase = {
+    id: 1,
+    title: 'test',
+    body: 'test',
+    hour: H,
+    minute: M,
+    weekdays: null,
+    intervalDays: null,
+    intervalMonths: null,
+    nthWeek: null,
+    nthWeekdays: null,
+    enabled: true,
+    createdAt: 0,
+    updatedAt: 0,
+  };
+
+  test('monthdays未設定(旧形式)の毎年は、anchorDateの日からmonthdaysを復元する', () => {
+    const raw = {
+      ...rawBase,
+      kind: 'yearly',
+      monthdays: null,
+      anchorDate: d('2026-03-15').getTime(), // 旧形式: anchorDateが発火日そのもの
+    };
+    const parsed = parseReminder(raw);
+    expect(parsed.monthdays).toEqual([15]);
+  });
+
+  test('復元したmonthdaysはgetNextFireDateでも正しく発火し続ける（後方互換の実効性を確認）', () => {
+    const raw = {
+      ...rawBase,
+      kind: 'yearly',
+      monthdays: null,
+      anchorDate: d('2026-03-15').getTime(),
+    };
+    const parsed = parseReminder(raw);
+    const next = getNextFireDate(parsed, FROM); // FROM = 2026-01-05
+    expect(next).toEqual(d('2026-03-15T07:00:00'));
+  });
+
+  test('monthdays設定済み(新形式)ならフォールバックは働かずそのまま使う', () => {
+    const raw = {
+      ...rawBase,
+      kind: 'yearly',
+      monthdays: '[1,15]',
+      anchorDate: d('2026-03-01').getTime(),
+    };
+    const parsed = parseReminder(raw);
+    expect(parsed.monthdays).toEqual([1, 15]);
+  });
+
+  test('yearly以外はmonthdays未設定のままnullで、フォールバックは効かない', () => {
+    const raw = {
+      ...rawBase,
+      kind: 'interval',
+      monthdays: null,
+      anchorDate: d('2026-03-15').getTime(),
+    };
+    const parsed = parseReminder(raw);
+    expect(parsed.monthdays).toBeNull();
+  });
+});
+
+// ─────────────────────────────────────────────
 // 月跨ぎ・年またぎ
 // ─────────────────────────────────────────────
 describe('月跨ぎ・年またぎ', () => {
@@ -561,7 +639,7 @@ describe('月跨ぎ・年またぎ', () => {
 
   test('yearly: 12月31日から毎年1月1日', () => {
     const from = d('2026-12-31T10:00:00');
-    const dates = computeYearlyFireDates(from, 0, 1, H, M, 2); // 1月1日
+    const dates = computeYearlyFireDates(from, 0, [1], H, M, 2); // 1月1日
     expect(dates[0]).toEqual(d('2027-01-01T07:00:00')); // 翌年
     expect(dates[1]).toEqual(d('2028-01-01T07:00:00'));
   });
@@ -569,11 +647,28 @@ describe('月跨ぎ・年またぎ', () => {
   test('yearly 月末: 2月末 閏年をまたぐ場合', () => {
     // 2025年から毎年2月末 → 2028年は29日
     const from = d('2025-01-01T10:00:00');
-    const dates = computeYearlyFireDates(from, 1, MONTH_END, H, M, 4); // 2月末
+    const dates = computeYearlyFireDates(from, 1, [MONTH_END], H, M, 4); // 2月末
     expect(dates[0].getDate()).toBe(28); // 2025: 平年
     expect(dates[1].getDate()).toBe(28); // 2026: 平年
     expect(dates[2].getDate()).toBe(28); // 2027: 平年
     expect(dates[3].getDate()).toBe(29); // 2028: 閏年!
+  });
+
+  test('yearly: 複数日付選択時は同じ年内で日付順に発火する', () => {
+    const from = d('2026-01-05T10:00:00');
+    // 3月に1日と15日を選択 → 同年内で1日→15日の順、その後翌年に繰り越す
+    const dates = computeYearlyFireDates(from, 2, [1, 15], H, M, 3);
+    expect(dates[0]).toEqual(d('2026-03-01T07:00:00'));
+    expect(dates[1]).toEqual(d('2026-03-15T07:00:00'));
+    expect(dates[2]).toEqual(d('2027-03-01T07:00:00'));
+  });
+
+  test('yearly: 選択日の一部が今年すでに過ぎている場合、残りの未来日付のみ今年分として採用される', () => {
+    const from = d('2026-03-10T10:00:00'); // 3/1は経過済み、3/15は未来
+    const dates = computeYearlyFireDates(from, 2, [1, 15], H, M, 3);
+    expect(dates[0]).toEqual(d('2026-03-15T07:00:00')); // 今年は3/15のみ
+    expect(dates[1]).toEqual(d('2027-03-01T07:00:00')); // 翌年は両方
+    expect(dates[2]).toEqual(d('2027-03-15T07:00:00'));
   });
 
   test('month_interval: 11月→翌2月(3ヶ月ごと)', () => {

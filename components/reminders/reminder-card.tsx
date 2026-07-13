@@ -19,7 +19,7 @@ type Props = {
   now: Date;
 };
 
-function buildEditInput(r: Reminder): ReminderInput {
+export function buildEditInput(r: Reminder): ReminderInput {
   return {
     title: r.title,
     body: r.body,
@@ -27,7 +27,12 @@ function buildEditInput(r: Reminder): ReminderInput {
     hour: r.hour,
     minute: r.minute,
     weekdays: r.weekdays ? JSON.parse(r.weekdays) : undefined,
-    monthdays: r.monthdays ? JSON.parse(r.monthdays) : undefined,
+    // monthdays未設定の毎年は、以前anchorDateに発火日そのものをエンコードしていた旧形式のデータ
+    monthdays: r.monthdays
+      ? JSON.parse(r.monthdays)
+      : r.kind === 'yearly' && r.anchorDate
+        ? [new Date(r.anchorDate).getDate()]
+        : undefined,
     anchorDate: r.anchorDate ?? undefined,
     intervalDays: r.intervalDays ?? undefined,
     intervalMonths: r.intervalMonths ?? undefined,

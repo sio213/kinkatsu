@@ -1,6 +1,5 @@
 import { z } from 'zod';
-import { resolveMonthDay } from './scheduler';
-import { MONTH_END, type ReminderInput } from './types';
+import type { ReminderInput } from './types';
 
 // ReminderFormは「日単位/週単位/月単位/年単位」の4モードを1画面で切り替える構造上、
 // 選択中でないモードのフィールドも常にフォーム値として保持する（例: 週単位を選んでいる間も
@@ -34,8 +33,8 @@ export const reminderFormSchema = z
 
     // 年単位
     yearlyMonth: z.number(),
-    yearlyDay: z.number(),
-    yearlyEom: z.boolean(),
+    // 「日」指定（複数選択可）。毎月の日付選択と同じくデフォルト値のない複数選択
+    yearlyDays: z.array(z.number()),
   })
   // 週次の曜日・毎月の日付はデフォルト値のない複数選択のため、0件のまま保存すると
   // getNextFireDateがnullを返し二度と発火しないリマインダーになってしまう
@@ -50,7 +49,11 @@ export const reminderFormSchema = z
   .refine(
     (v) => v.kind !== 'monthly' || v.monthDayMode !== 'nth' || v.monthNthWeekdays.length > 0,
     { message: '曜日を1つ以上選択してください', path: ['monthNthWeekdays'] },
-  );
+  )
+  .refine((v) => v.kind !== 'yearly' || v.yearlyDays.length > 0, {
+    message: '日付を1つ以上選択してください',
+    path: ['yearlyDays'],
+  });
 
 export type ReminderFormValues = z.infer<typeof reminderFormSchema>;
 
@@ -79,8 +82,7 @@ export function toFormValues(input: ReminderInput): ReminderFormValues {
     monthNthWeekdays: input.kind === 'monthly' && input.nthWeek != null ? (input.nthWeekdays ?? []) : [],
 
     yearlyMonth: anchor?.getMonth() ?? 0,
-    yearlyDay: anchor?.getDate() ?? 1,
-    yearlyEom: input.kind === 'yearly' && (input.monthdays?.includes(MONTH_END) ?? false),
+    yearlyDays: input.kind === 'yearly' ? (input.monthdays ?? []) : [],
   };
 }
 
@@ -107,20 +109,9 @@ export function toReminderInput(values: ReminderFormValues): ReminderInput {
   }
 
   if (values.kind === 'yearly') {
-    const now = new Date();
-    const yr = now.getFullYear();
-    if (values.yearlyEom) {
-      out.anchorDate = new Date(yr, values.yearlyMonth, 1).getTime();
-      out.monthdays = [MONTH_END];
-    } else {
-      const day = resolveMonthDay(yr, values.yearlyMonth, values.yearlyDay);
-      let d = new Date(yr, values.yearlyMonth, day);
-      if (d <= now) {
-        const dayNext = resolveMonthDay(yr + 1, values.yearlyMonth, values.yearlyDay);
-        d = new Date(yr + 1, values.yearlyMonth, dayNext);
-      }
-      out.anchorDate = d.getTime();
-    }
+    // 実際の発火日はmonthdays(複数選択可)側で持つため、anchorDateは月の特定にのみ使う
+    out.anchorDate = new Date(new Date().getFullYear(), values.yearlyMonth, 1).getTime();
+    out.monthdays = values.yearlyDays;
   }
 
   if (values.kind === 'monthly') {
