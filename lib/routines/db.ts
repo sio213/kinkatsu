@@ -1,5 +1,6 @@
 import { db, type Tx } from '@/db/client';
 import {
+  exercises,
   reminders,
   routineExercises,
   routines,
@@ -29,9 +30,20 @@ export type RoutineInput = {
   exercises: RoutineExerciseInput[];
 };
 
+// ルーティンフォームの種目行（サムネイル・名前・部位タグ・代表セット）表示に必要な
+// 種目メタ情報込みの1件分
+export type RoutineDetailExercise = RoutineExercise & {
+  name: string;
+  category: string;
+  measurementType: string;
+  source: string;
+  slug: string | null;
+  sets: RoutineSet[];
+};
+
 export type RoutineDetail = {
   routine: Routine;
-  exercises: (RoutineExercise & { sets: RoutineSet[] })[];
+  exercises: RoutineDetailExercise[];
 };
 
 // 種目追加ピッカーで選ばれた種目をルーティンの下書きに加える際の初期セット値。
@@ -144,8 +156,20 @@ export async function getRoutineDetail(routineId: number): Promise<RoutineDetail
   if (!routine) return null;
 
   const exerciseRows = await db
-    .select()
+    .select({
+      id: routineExercises.id,
+      routineId: routineExercises.routineId,
+      exerciseId: routineExercises.exerciseId,
+      orderIndex: routineExercises.orderIndex,
+      createdAt: routineExercises.createdAt,
+      name: exercises.name,
+      category: exercises.category,
+      measurementType: exercises.measurementType,
+      source: exercises.source,
+      slug: exercises.slug,
+    })
     .from(routineExercises)
+    .innerJoin(exercises, eq(routineExercises.exerciseId, exercises.id))
     .where(eq(routineExercises.routineId, routineId))
     .orderBy(routineExercises.orderIndex);
 

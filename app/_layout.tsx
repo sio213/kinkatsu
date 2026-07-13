@@ -127,6 +127,9 @@ export default function RootLayout() {
         />
         <Stack.Screen name="exercise/new" options={{ title: '種目を作成' }} />
         <Stack.Screen name="routine/index" options={{ title: 'ルーティン' }} />
+        <Stack.Screen name="routine/new" options={{ title: 'ルーティンを作成' }} />
+        <Stack.Screen name="routine/edit/[id]" options={{ title: 'ルーティンを編集' }} />
+        <Stack.Screen name="routine/exercise-picker" options={{ title: '種目を追加' }} />
         <Stack.Screen name="workout/[id]" options={{ title: '' }} />
         <Stack.Screen
           name="workout/exercise-picker"

@@ -1,25 +1,39 @@
 import { RoutineCard } from '@/components/routines/routine-card';
 import { HeaderActionButton } from '@/components/ui/header-action-button';
 import { ListErrorBoundary } from '@/components/ui/list-error-boundary';
+import { PrimaryButton } from '@/components/ui/primary-button';
 import { Colors, Typography } from '@/constants/theme';
 import type { Routine } from '@/db/schema';
+import { useDebouncedPush } from '@/hooks/use-debounced-push';
 import { useRoutineExerciseSummaries, useRoutineReminders, useRoutines } from '@/hooks/use-routines';
+import { useRoutineDraftStore } from '@/lib/routines/draft-store';
 import { getRoutineScheduleDisplay } from '@/lib/routines/format';
 import { Stack } from 'expo-router';
 import { useCallback } from 'react';
 import { Alert, FlatList, StyleSheet, Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
-// ルーティンの新規作成・編集フォーム画面はまだ実装されていない（後続タスクで追加）。
-// それまでの間はこのAlertで導線だけ用意し、実装後にrouter.push等へ差し替える
-function showComingSoon() {
-  Alert.alert('準備中', 'この機能は近日公開予定です。');
-}
-
 export default function RoutineListScreen() {
   const { routines, removeRoutine, swapOrder } = useRoutines();
   const summaries = useRoutineExerciseSummaries();
   const routineReminders = useRoutineReminders();
+  const pushDebounced = useDebouncedPush();
+  const resetDraft = useRoutineDraftStore((state) => state.reset);
+
+  const handleCreate = useCallback(() => {
+    // app/routine/new.tsx自身のマウント時resetに加えてここでも空にしておくことで、
+    // 新規作成フォームの初回描画（defaultValuesの読み込み）がuseEffect実行より前に
+    // 走っても前回の下書きが一瞬表示される余地を無くす
+    resetDraft();
+    pushDebounced('/routine/new');
+  }, [resetDraft, pushDebounced]);
+
+  const handleEdit = useCallback(
+    (id: number) => {
+      pushDebounced(`/routine/edit/${id}`);
+    },
+    [pushDebounced],
+  );
 
   const handleDelete = useCallback(
     (routine: Routine) => {
@@ -67,8 +81,8 @@ export default function RoutineListScreen() {
             schedule={schedule}
             isFirst={index === 0}
             isLast={index === routines.length - 1}
-            onPress={showComingSoon}
-            onEdit={showComingSoon}
+            onPress={() => handleEdit(item.id)}
+            onEdit={() => handleEdit(item.id)}
             onMoveUp={() => {
               // isFirst/isLastのdisabled判定により通常はここに来ないが、メニュー展開中に
               // 他操作でroutinesが更新される競合を考慮し、配列外アクセスにしない
@@ -84,7 +98,7 @@ export default function RoutineListScreen() {
         </ListErrorBoundary>
       );
     },
-    [summaries, routineReminders, routines, handleSwap, handleDelete],
+    [summaries, routineReminders, routines, handleEdit, handleSwap, handleDelete],
   );
 
   return (
@@ -95,7 +109,7 @@ export default function RoutineListScreen() {
             <HeaderActionButton
               icon="plus"
               label="新規"
-              onPress={showComingSoon}
+              onPress={handleCreate}
               accessibilityLabel="ルーティンを作成"
             />
           ),
@@ -111,9 +125,7 @@ export default function RoutineListScreen() {
         ListEmptyComponent={
           <View style={styles.emptyWrapper}>
             <Text style={styles.empty}>ルーティンがありません</Text>
-            {/* 作成フォームがまだ無いため、押せそうで押せないボタンにはせず
-                控えめなテキストで近日公開であることを伝えるに留める */}
-            <Text style={styles.emptyNote}>ルーティンの作成機能は近日公開予定です</Text>
+            <PrimaryButton label="＋ 最初のルーティンを作成" onPress={handleCreate} style={styles.emptyAddBtn} />
           </View>
         }
       />
@@ -127,7 +139,7 @@ const styles = StyleSheet.create({
   content: { padding: 16, flexGrow: 1 },
   separator: { height: 11 },
 
-  emptyWrapper: { flex: 1, alignItems: 'center', justifyContent: 'center', gap: 8, paddingVertical: 32 },
+  emptyWrapper: { flex: 1, alignItems: 'center', justifyContent: 'center', gap: 12, paddingVertical: 32 },
   empty: { ...Typography.body, color: Colors.textMuted, textAlign: 'center' },
-  emptyNote: { ...Typography.footnote, color: Colors.textPlaceholder, textAlign: 'center' },
+  emptyAddBtn: { paddingHorizontal: 20 },
 });
