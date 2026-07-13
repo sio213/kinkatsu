@@ -1,5 +1,6 @@
 import { BoxedTextInput } from '@/components/ui/boxed-text-input';
-import { FormLabel } from '@/components/ui/form-label';
+import { FormField } from '@/components/ui/form-field';
+import { FormFieldStack } from '@/components/ui/form-field-stack';
 import { Colors, Typography } from '@/constants/theme';
 import { WEEKDAY_LABELS } from '@/lib/format';
 import {
@@ -200,245 +201,154 @@ export function ReminderForm({ initial = DEFAULT_INPUT, onSubmit, onCancel, subm
   const showTimePicker = Platform.OS === 'ios' || showAndroidTimePicker;
 
   return (
-    <View style={styles.container}>
-      {showPresets && (
-        <>
-          <FormLabel containerStyle={styles.labelSpacing}>クイック設定</FormLabel>
-          <View style={styles.kindRow}>
-            {REMINDER_PRESETS.map((preset) => {
-              const isActive = activePreset?.label === preset.label;
-              return (
-                <TouchableOpacity
-                  key={preset.label}
-                  style={[styles.chip, isActive && styles.chipActive]}
-                  onPress={() => applyPreset(preset)}
-                  accessibilityLabel={`${preset.label}プリセット`}
-                >
-                  <Text style={[styles.chipText, isActive && styles.chipTextActive]}>
-                    {preset.label}
-                  </Text>
-                </TouchableOpacity>
-              );
-            })}
-          </View>
-        </>
-      )}
-
-      <FormLabel required containerStyle={styles.labelSpacing}>タイトル</FormLabel>
-      <Controller
-        control={control}
-        name="title"
-        render={({ field: { value, onChange } }) => (
-          <BoxedTextInput
-            height={38}
-            boxStyle={styles.inputBox}
-            style={styles.inputText}
-            value={value}
-            onChangeText={onChange}
-            placeholder="タイトル"
-          />
+    <>
+      <FormFieldStack>
+        {showPresets && (
+          <FormField label="クイック設定">
+            <View style={styles.kindRow}>
+              {REMINDER_PRESETS.map((preset) => {
+                const isActive = activePreset?.label === preset.label;
+                return (
+                  <TouchableOpacity
+                    key={preset.label}
+                    style={[styles.chip, isActive && styles.chipActive]}
+                    onPress={() => applyPreset(preset)}
+                    accessibilityLabel={`${preset.label}プリセット`}
+                  >
+                    <Text style={[styles.chipText, isActive && styles.chipTextActive]}>
+                      {preset.label}
+                    </Text>
+                  </TouchableOpacity>
+                );
+              })}
+            </View>
+          </FormField>
         )}
-      />
-      {isSubmitted && errors.title ? (
-        <Text style={styles.errorText}>{errors.title.message}</Text>
-      ) : null}
 
-      <FormLabel required containerStyle={styles.labelSpacing}>通知内容</FormLabel>
-      <Controller
-        control={control}
-        name="body"
-        render={({ field: { value, onChange } }) => (
-          <TextInput
-            style={styles.inputMulti}
-            value={value}
-            onChangeText={onChange}
-            placeholder="通知内容"
-            multiline
-            scrollEnabled={false}
+        <FormField label="タイトル" required error={errors.title?.message}>
+          <Controller
+            control={control}
+            name="title"
+            render={({ field: { value, onChange } }) => (
+              <BoxedTextInput
+                height={38}
+                boxStyle={styles.inputBox}
+                style={styles.inputText}
+                value={value}
+                onChangeText={onChange}
+                placeholder="タイトル"
+              />
+            )}
           />
-        )}
-      />
-      {isSubmitted && errors.body ? (
-        <Text style={styles.errorText}>{errors.body.message}</Text>
-      ) : null}
+        </FormField>
 
-      <FormLabel containerStyle={styles.labelSpacing}>時刻</FormLabel>
-      {Platform.OS === 'android' && (
-        <TouchableOpacity
-          style={styles.timeButton}
-          onPress={() => setShowAndroidTimePicker(true)}
-        >
-          <Text style={styles.timeButtonText}>{timeLabel}</Text>
-        </TouchableOpacity>
-      )}
-      {showTimePicker && (
-        <DateTimePicker
-          value={timeDate}
-          mode="time"
-          is24Hour
-          display={Platform.OS === 'ios' ? 'spinner' : 'default'}
-          onChange={handleTimeChange}
-        />
-      )}
+        <FormField label="通知内容" required error={errors.body?.message}>
+          <Controller
+            control={control}
+            name="body"
+            render={({ field: { value, onChange } }) => (
+              <TextInput
+                style={styles.inputMulti}
+                value={value}
+                onChangeText={onChange}
+                placeholder="通知内容"
+                multiline
+                scrollEnabled={false}
+              />
+            )}
+          />
+        </FormField>
 
-      <FormLabel containerStyle={styles.labelSpacing}>繰り返し</FormLabel>
-      <View style={styles.kindRow}>
-        {(Object.keys(KIND_LABELS) as ReminderKind[]).map((k) => (
-          <TouchableOpacity
-            key={k}
-            style={[styles.chip, kind === k && styles.chipActive]}
-            onPress={() => setValue('kind', k)}
-          >
-            <Text style={[styles.chipText, kind === k && styles.chipTextActive]}>
-              {KIND_LABELS[k]}
-            </Text>
-          </TouchableOpacity>
-        ))}
-      </View>
+        <FormField label="時刻">
+          {Platform.OS === 'android' && (
+            <TouchableOpacity
+              style={styles.timeButton}
+              onPress={() => setShowAndroidTimePicker(true)}
+            >
+              <Text style={styles.timeButtonText}>{timeLabel}</Text>
+            </TouchableOpacity>
+          )}
+          {showTimePicker && (
+            <DateTimePicker
+              value={timeDate}
+              mode="time"
+              is24Hour
+              display={Platform.OS === 'ios' ? 'spinner' : 'default'}
+              onChange={handleTimeChange}
+            />
+          )}
+        </FormField>
 
-      {/* 日単位 */}
-      {kind === 'interval' && (
-        <>
-          <FormLabel containerStyle={styles.labelSpacing}>間隔</FormLabel>
-          <View style={styles.stepperRow}>
-            <TouchableOpacity
-              style={styles.stepperBtn}
-              onPress={() => setValue('intervalDays', Math.max(1, intervalDays - 1))}
-            >
-              <Text style={styles.stepperBtnText}>−</Text>
-            </TouchableOpacity>
-            <Text style={styles.stepperNum}>
-              {intervalDays === 1 ? '毎日' : `${intervalDays}日ごと`}
-            </Text>
-            <TouchableOpacity
-              style={styles.stepperBtn}
-              onPress={() => setValue('intervalDays', Math.min(365, intervalDays + 1))}
-            >
-              <Text style={styles.stepperBtnText}>＋</Text>
-            </TouchableOpacity>
-          </View>
-        </>
-      )}
-
-      {/* 週単位 */}
-      {kind === 'weekly' && (
-        <>
-          <FormLabel containerStyle={styles.labelSpacing}>間隔</FormLabel>
-          <View style={styles.stepperRow}>
-            <TouchableOpacity
-              style={styles.stepperBtn}
-              onPress={() => setValue('intervalWeeks', Math.max(1, intervalWeeks - 1))}
-            >
-              <Text style={styles.stepperBtnText}>−</Text>
-            </TouchableOpacity>
-            <Text style={styles.stepperNum}>
-              {intervalWeeks === 1 ? '毎週' : `${intervalWeeks}週ごと`}
-            </Text>
-            <TouchableOpacity
-              style={styles.stepperBtn}
-              onPress={() => setValue('intervalWeeks', Math.min(8, intervalWeeks + 1))}
-            >
-              <Text style={styles.stepperBtnText}>＋</Text>
-            </TouchableOpacity>
-          </View>
-          <FormLabel required containerStyle={styles.labelSpacing}>曜日</FormLabel>
-          <View style={styles.wdRow}>
-            {WEEKDAY_LABELS.map((label, i) => {
-              const selected = weekdays.includes(i);
-              return (
-                <TouchableOpacity
-                  key={i}
-                  style={[styles.wdChip, selected && styles.chipActive]}
-                  onPress={() => toggleWeekday(i)}
-                  accessibilityRole="checkbox"
-                  accessibilityState={{ checked: selected }}
-                  accessibilityLabel={label}
-                >
-                  <Text style={[styles.wdChipText, selected && styles.chipTextActive]}>
-                    {label}
-                  </Text>
-                </TouchableOpacity>
-              );
-            })}
-          </View>
-          {isSubmitted && errors.weekdays ? (
-            <Text style={styles.errorText}>{errors.weekdays.message}</Text>
-          ) : null}
-        </>
-      )}
-
-      {/* 月単位 */}
-      {kind === 'monthly' && (
-        <>
-          <FormLabel containerStyle={styles.labelSpacing}>間隔</FormLabel>
-          <View style={styles.stepperRow}>
-            <TouchableOpacity
-              style={styles.stepperBtn}
-              onPress={() => setValue('intervalMonths', Math.max(1, intervalMonths - 1))}
-            >
-              <Text style={styles.stepperBtnText}>−</Text>
-            </TouchableOpacity>
-            <Text style={styles.stepperNum}>
-              {intervalMonths === 1 ? '毎月' : `${intervalMonths}ヶ月ごと`}
-            </Text>
-            <TouchableOpacity
-              style={styles.stepperBtn}
-              onPress={() => setValue('intervalMonths', Math.min(12, intervalMonths + 1))}
-            >
-              <Text style={styles.stepperBtnText}>＋</Text>
-            </TouchableOpacity>
-          </View>
-
-          <FormLabel containerStyle={styles.labelSpacing}>指定方法</FormLabel>
+        <FormField label="繰り返し">
           <View style={styles.kindRow}>
-            {(['day', 'nth'] as const).map((mode) => (
+            {(Object.keys(KIND_LABELS) as ReminderKind[]).map((k) => (
               <TouchableOpacity
-                key={mode}
-                style={[styles.chip, monthDayMode === mode && styles.chipActive]}
-                onPress={() => setValue('monthDayMode', mode)}
+                key={k}
+                style={[styles.chip, kind === k && styles.chipActive]}
+                onPress={() => setValue('kind', k)}
               >
-                <Text style={[styles.chipText, monthDayMode === mode && styles.chipTextActive]}>
-                  {mode === 'day' ? '日付' : '第N曜日'}
+                <Text style={[styles.chipText, kind === k && styles.chipTextActive]}>
+                  {KIND_LABELS[k]}
                 </Text>
               </TouchableOpacity>
             ))}
           </View>
+        </FormField>
 
-          {isMultiMonthdaySelection && (
-            <>
-              <FormLabel required containerStyle={styles.labelSpacing}>日付（複数選択可）</FormLabel>
-              <DayMultiSelectGrid selected={monthdays} onToggle={toggleMonthday} />
-              {isSubmitted && errors.monthdays ? (
-                <Text style={styles.errorText}>{errors.monthdays.message}</Text>
-              ) : null}
-            </>
-          )}
+        {/* 日単位 */}
+        {kind === 'interval' && (
+          <FormField label="間隔">
+            <View style={styles.stepperRow}>
+              <TouchableOpacity
+                style={styles.stepperBtn}
+                onPress={() => setValue('intervalDays', Math.max(1, intervalDays - 1))}
+              >
+                <Text style={styles.stepperBtnText}>−</Text>
+              </TouchableOpacity>
+              <Text style={styles.stepperNum}>
+                {intervalDays === 1 ? '毎日' : `${intervalDays}日ごと`}
+              </Text>
+              <TouchableOpacity
+                style={styles.stepperBtn}
+                onPress={() => setValue('intervalDays', Math.min(365, intervalDays + 1))}
+              >
+                <Text style={styles.stepperBtnText}>＋</Text>
+              </TouchableOpacity>
+            </View>
+          </FormField>
+        )}
 
-          {monthDayMode === 'nth' && (
-            <>
-              <FormLabel containerStyle={styles.labelSpacing}>週</FormLabel>
-              <View style={styles.kindRow}>
-                {NTH_WEEK_OPTIONS.map(({ label, value }) => (
-                  <TouchableOpacity
-                    key={value}
-                    style={[styles.chip, monthNthWeek === value && styles.chipActive]}
-                    onPress={() => setValue('monthNthWeek', value)}
-                  >
-                    <Text style={[styles.chipText, monthNthWeek === value && styles.chipTextActive]}>
-                      {label}
-                    </Text>
-                  </TouchableOpacity>
-                ))}
+        {/* 週単位 */}
+        {kind === 'weekly' && (
+          <>
+            <FormField label="間隔">
+              <View style={styles.stepperRow}>
+                <TouchableOpacity
+                  style={styles.stepperBtn}
+                  onPress={() => setValue('intervalWeeks', Math.max(1, intervalWeeks - 1))}
+                >
+                  <Text style={styles.stepperBtnText}>−</Text>
+                </TouchableOpacity>
+                <Text style={styles.stepperNum}>
+                  {intervalWeeks === 1 ? '毎週' : `${intervalWeeks}週ごと`}
+                </Text>
+                <TouchableOpacity
+                  style={styles.stepperBtn}
+                  onPress={() => setValue('intervalWeeks', Math.min(8, intervalWeeks + 1))}
+                >
+                  <Text style={styles.stepperBtnText}>＋</Text>
+                </TouchableOpacity>
               </View>
-              <FormLabel required containerStyle={styles.labelSpacing}>曜日</FormLabel>
+            </FormField>
+            <FormField label="曜日" required error={errors.weekdays?.message}>
               <View style={styles.wdRow}>
                 {WEEKDAY_LABELS.map((label, i) => {
-                  const selected = monthNthWeekdays.includes(i);
+                  const selected = weekdays.includes(i);
                   return (
                     <TouchableOpacity
                       key={i}
                       style={[styles.wdChip, selected && styles.chipActive]}
-                      onPress={() => toggleMonthNthWeekday(i)}
+                      onPress={() => toggleWeekday(i)}
                       accessibilityRole="checkbox"
                       accessibilityState={{ checked: selected }}
                       accessibilityLabel={label}
@@ -450,38 +360,134 @@ export function ReminderForm({ initial = DEFAULT_INPUT, onSubmit, onCancel, subm
                   );
                 })}
               </View>
-              {isSubmitted && errors.monthNthWeekdays ? (
-                <Text style={styles.errorText}>{errors.monthNthWeekdays.message}</Text>
-              ) : null}
-            </>
-          )}
-        </>
-      )}
+            </FormField>
+          </>
+        )}
 
-      {/* 年単位 */}
-      {kind === 'yearly' && (
-        <>
-          <FormLabel containerStyle={styles.labelSpacing}>月</FormLabel>
-          <View style={styles.kindRow}>
-            {MONTH_LABELS.map((label, i) => (
-              <TouchableOpacity
-                key={i}
-                style={[styles.chip, yearlyMonth === i && styles.chipActive]}
-                onPress={() => setValue('yearlyMonth', i)}
-              >
-                <Text style={[styles.chipText, yearlyMonth === i && styles.chipTextActive]}>
-                  {label}
+        {/* 月単位 */}
+        {kind === 'monthly' && (
+          <>
+            <FormField label="間隔">
+              <View style={styles.stepperRow}>
+                <TouchableOpacity
+                  style={styles.stepperBtn}
+                  onPress={() => setValue('intervalMonths', Math.max(1, intervalMonths - 1))}
+                >
+                  <Text style={styles.stepperBtnText}>−</Text>
+                </TouchableOpacity>
+                <Text style={styles.stepperNum}>
+                  {intervalMonths === 1 ? '毎月' : `${intervalMonths}ヶ月ごと`}
                 </Text>
-              </TouchableOpacity>
-            ))}
-          </View>
-          <FormLabel required containerStyle={styles.labelSpacing}>日（複数選択可）</FormLabel>
-          <DayMultiSelectGrid selected={yearlyDays} onToggle={toggleYearlyDay} />
-          {isSubmitted && errors.yearlyDays ? (
-            <Text style={styles.errorText}>{errors.yearlyDays.message}</Text>
-          ) : null}
-        </>
-      )}
+                <TouchableOpacity
+                  style={styles.stepperBtn}
+                  onPress={() => setValue('intervalMonths', Math.min(12, intervalMonths + 1))}
+                >
+                  <Text style={styles.stepperBtnText}>＋</Text>
+                </TouchableOpacity>
+              </View>
+            </FormField>
+
+            <FormField label="指定方法">
+              <View style={styles.kindRow}>
+                {(['day', 'nth'] as const).map((mode) => (
+                  <TouchableOpacity
+                    key={mode}
+                    style={[styles.chip, monthDayMode === mode && styles.chipActive]}
+                    onPress={() => setValue('monthDayMode', mode)}
+                  >
+                    <Text style={[styles.chipText, monthDayMode === mode && styles.chipTextActive]}>
+                      {mode === 'day' ? '日付' : '第N曜日'}
+                    </Text>
+                  </TouchableOpacity>
+                ))}
+              </View>
+            </FormField>
+
+            {isMultiMonthdaySelection && (
+              <FormField
+                label="日付（複数選択可）"
+                required
+                error={errors.monthdays?.message}
+              >
+                <DayMultiSelectGrid selected={monthdays} onToggle={toggleMonthday} />
+              </FormField>
+            )}
+
+            {monthDayMode === 'nth' && (
+              <>
+                <FormField label="週">
+                  <View style={styles.kindRow}>
+                    {NTH_WEEK_OPTIONS.map(({ label, value }) => (
+                      <TouchableOpacity
+                        key={value}
+                        style={[styles.chip, monthNthWeek === value && styles.chipActive]}
+                        onPress={() => setValue('monthNthWeek', value)}
+                      >
+                        <Text style={[styles.chipText, monthNthWeek === value && styles.chipTextActive]}>
+                          {label}
+                        </Text>
+                      </TouchableOpacity>
+                    ))}
+                  </View>
+                </FormField>
+                <FormField
+                  label="曜日"
+                  required
+                  error={errors.monthNthWeekdays?.message}
+                >
+                  <View style={styles.wdRow}>
+                    {WEEKDAY_LABELS.map((label, i) => {
+                      const selected = monthNthWeekdays.includes(i);
+                      return (
+                        <TouchableOpacity
+                          key={i}
+                          style={[styles.wdChip, selected && styles.chipActive]}
+                          onPress={() => toggleMonthNthWeekday(i)}
+                          accessibilityRole="checkbox"
+                          accessibilityState={{ checked: selected }}
+                          accessibilityLabel={label}
+                        >
+                          <Text style={[styles.wdChipText, selected && styles.chipTextActive]}>
+                            {label}
+                          </Text>
+                        </TouchableOpacity>
+                      );
+                    })}
+                  </View>
+                </FormField>
+              </>
+            )}
+          </>
+        )}
+
+        {/* 年単位 */}
+        {kind === 'yearly' && (
+          <>
+            <FormField label="月">
+              <View style={styles.kindRow}>
+                {MONTH_LABELS.map((label, i) => (
+                  <TouchableOpacity
+                    key={i}
+                    style={[styles.chip, yearlyMonth === i && styles.chipActive]}
+                    onPress={() => setValue('yearlyMonth', i)}
+                  >
+                    <Text style={[styles.chipText, yearlyMonth === i && styles.chipTextActive]}>
+                      {label}
+                    </Text>
+                  </TouchableOpacity>
+                ))}
+              </View>
+            </FormField>
+            <FormField
+              label="日（複数選択可）"
+              required
+              error={errors.yearlyDays?.message}
+            >
+              <DayMultiSelectGrid selected={yearlyDays} onToggle={toggleYearlyDay} />
+            </FormField>
+          </>
+        )}
+      </FormFieldStack>
 
       <View style={styles.buttons}>
         <TouchableOpacity
@@ -500,14 +506,11 @@ export function ReminderForm({ initial = DEFAULT_INPUT, onSubmit, onCancel, subm
           <Text style={styles.submitBtnText}>{submitLabel}</Text>
         </TouchableOpacity>
       </View>
-    </View>
+    </>
   );
 }
 
 const styles = StyleSheet.create({
-  container: { gap: 0 },
-  labelSpacing: { marginTop: 12, marginBottom: 4 },
-  errorText: { ...Typography.caption, color: Colors.danger, marginBottom: 4 },
   // タイトルは箱(枠線・背景・角丸・横padding)とTextInput本体をBoxedTextInputで分離
   // している。border/borderColor/borderRadius/文字色は既定値のままなのでここでは
   // paddingHorizontalの差分だけ持つ。詳細はcomponents/ui/boxed-text-input.tsxのコメント参照
