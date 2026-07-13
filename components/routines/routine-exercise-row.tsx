@@ -1,5 +1,4 @@
 import { CategoryChip } from '@/components/exercises/category-chip';
-import { DesignIcon } from '@/components/ui/design-icon';
 import { IconSymbol } from '@/components/ui/icon-symbol';
 import { Colors, Typography } from '@/constants/theme';
 import { getCategoryLabel, resolveMeasurementType } from '@/lib/exercises/constants';
@@ -13,13 +12,12 @@ import { StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 type Props = {
   exercise: DraftExercise;
   onPress: () => void;
-  onRemove: () => void;
 };
 
 // ルーティンフォームの種目一覧に表示する1件分（サムネイル・名前・部位タグ・代表セット・chevron）。
-// タップするとテンプレートセット編集画面へ遷移する。誤って追加した種目をすぐ取り消せるよう
-// 削除ボタンも持つ（テンプレートセット編集画面が無い間、これが唯一の取り消し手段のため）
-export const RoutineExerciseRow = memo(function RoutineExerciseRow({ exercise, onPress, onRemove }: Props) {
+// タップするとテンプレートセット編集画面へ遷移する。誤って追加した種目の削除は、そちらの画面の
+// ⋮メニュー（デザイン案どおり）で行う想定のため、この行自体には削除ボタンを持たせない
+export const RoutineExerciseRow = memo(function RoutineExerciseRow({ exercise, onPress }: Props) {
   const images = getExerciseImages(exercise);
   const setsSummary = summarizeRoutineExerciseSets(resolveMeasurementType(exercise.measurementType), exercise.sets);
   const categoryLabel = getCategoryLabel(exercise.category);
@@ -39,14 +37,6 @@ export const RoutineExerciseRow = memo(function RoutineExerciseRow({ exercise, o
           <Text style={styles.setsSummary} numberOfLines={1}>{setsSummary}</Text>
         </View>
       </View>
-      <TouchableOpacity
-        onPress={onRemove}
-        hitSlop={{ top: 12, bottom: 12, left: 12, right: 12 }}
-        accessibilityRole="button"
-        accessibilityLabel={`${exercise.name}を削除`}
-      >
-        <DesignIcon name="delete-outline" size={18} color={Colors.textPlaceholder} />
-      </TouchableOpacity>
       <IconSymbol name="chevron.right" size={18} color={Colors.textPlaceholder} />
     </TouchableOpacity>
   );

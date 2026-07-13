@@ -31,7 +31,6 @@ export const RoutineForm = forwardRef<RoutineFormHandle, Props>(function Routine
   ref,
 ) {
   const draftExercises = useRoutineDraftStore((state) => state.exercises);
-  const removeExerciseAt = useRoutineDraftStore((state) => state.removeExerciseAt);
 
   const {
     control,
@@ -113,7 +112,6 @@ export const RoutineForm = forwardRef<RoutineFormHandle, Props>(function Routine
                 key={`${exercise.exerciseId}-${index}`}
                 exercise={exercise}
                 onPress={() => onPressExercise(index)}
-                onRemove={() => removeExerciseAt(index)}
               />
             ))}
             <TouchableOpacity
