@@ -11,6 +11,9 @@ type RoutineDraftState = {
   hydrate: (exercises: DraftExercise[]) => void;
   addExercises: (exercises: DraftExercise[]) => void;
   removeExerciseAt: (index: number) => void;
+  // テンプレートセット編集画面でのセット追加・削除・値変更をまとめて反映する
+  // （setNumberは配列の並び順から導出するため、DraftExercise側に別途保持しない）
+  updateExerciseSets: (index: number, sets: DraftExercise['sets']) => void;
   reset: () => void;
 };
 
@@ -19,5 +22,9 @@ export const useRoutineDraftStore = create<RoutineDraftState>((set) => ({
   hydrate: (exercises) => set({ exercises }),
   addExercises: (newExercises) => set((state) => ({ exercises: [...state.exercises, ...newExercises] })),
   removeExerciseAt: (index) => set((state) => ({ exercises: state.exercises.filter((_, i) => i !== index) })),
+  updateExerciseSets: (index, sets) =>
+    set((state) => ({
+      exercises: state.exercises.map((e, i) => (i === index ? { ...e, sets } : e)),
+    })),
   reset: () => set({ exercises: [] }),
 }));

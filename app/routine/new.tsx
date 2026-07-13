@@ -1,7 +1,6 @@
 import { RoutineFormScreen } from '@/components/routines/routine-form-screen';
 import { useRoutines } from '@/hooks/use-routines';
 import { useRoutineDraftStore } from '@/lib/routines/draft-store';
-import { showRoutineFeatureComingSoon } from '@/lib/routines/placeholders';
 import { toRoutineInput, type RoutineFormValues } from '@/lib/routines/validation';
 import { useRouter } from 'expo-router';
 import { useCallback, useEffect } from 'react';
@@ -39,11 +38,15 @@ export default function RoutineNewScreen() {
     router.push('/routine/exercise-picker');
   }, [router]);
 
+  const handlePressExercise = useCallback(() => {
+    router.push('/routine/exercise-edit');
+  }, [router]);
+
   return (
     <RoutineFormScreen
       onSubmit={handleSubmit}
       onAddExercise={handleAddExercise}
-      onPressExercise={showRoutineFeatureComingSoon}
+      onPressExercise={handlePressExercise}
     />
   );
 }

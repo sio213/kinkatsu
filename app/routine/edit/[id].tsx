@@ -4,7 +4,6 @@ import { Colors } from '@/constants/theme';
 import { useRoutines } from '@/hooks/use-routines';
 import { getRoutineDetail } from '@/lib/routines/db';
 import { useRoutineDraftStore } from '@/lib/routines/draft-store';
-import { showRoutineFeatureComingSoon } from '@/lib/routines/placeholders';
 import { toDraftExercises, toRoutineInput, type RoutineFormValues } from '@/lib/routines/validation';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { useCallback, useEffect, useState } from 'react';
@@ -70,6 +69,10 @@ export default function RoutineEditScreen() {
     router.push('/routine/exercise-picker');
   }, [router]);
 
+  const handlePressExercise = useCallback(() => {
+    router.push('/routine/exercise-edit');
+  }, [router]);
+
   if (status === 'loading') {
     return (
       <SafeAreaView style={styles.safe} edges={['bottom']}>
@@ -98,7 +101,7 @@ export default function RoutineEditScreen() {
       initialName={name}
       onSubmit={handleSubmit}
       onAddExercise={handleAddExercise}
-      onPressExercise={showRoutineFeatureComingSoon}
+      onPressExercise={handlePressExercise}
     />
   );
 }
