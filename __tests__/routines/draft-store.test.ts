@@ -50,6 +50,29 @@ test('removeExerciseAtは指定indexの1件だけを取り除く', () => {
   expect(useRoutineDraftStore.getState().exercises.map((e) => e.exerciseId)).toEqual([1, 3]);
 });
 
+test('updateExerciseSetsは指定indexの種目のsetsだけを置き換え、他の種目には影響しない', () => {
+  const { hydrate, updateExerciseSets } = useRoutineDraftStore.getState();
+  hydrate([
+    makeDraftExercise(1, { sets: [{ weight: 10, reps: 1, durationSeconds: null, distanceMeters: null }] }),
+    makeDraftExercise(2, { sets: [{ weight: 20, reps: 2, durationSeconds: null, distanceMeters: null }] }),
+  ]);
+
+  updateExerciseSets(0, [{ weight: 99, reps: 9, durationSeconds: null, distanceMeters: null }]);
+
+  const exercises = useRoutineDraftStore.getState().exercises;
+  expect(exercises[0].sets).toEqual([{ weight: 99, reps: 9, durationSeconds: null, distanceMeters: null }]);
+  expect(exercises[1].sets).toEqual([{ weight: 20, reps: 2, durationSeconds: null, distanceMeters: null }]);
+});
+
+test('updateExerciseSetsは空配列を渡せる（全セット削除）', () => {
+  const { hydrate, updateExerciseSets } = useRoutineDraftStore.getState();
+  hydrate([makeDraftExercise(1, { sets: [{ weight: 10, reps: 1, durationSeconds: null, distanceMeters: null }] })]);
+
+  updateExerciseSets(0, []);
+
+  expect(useRoutineDraftStore.getState().exercises[0].sets).toEqual([]);
+});
+
 test('resetはexercisesを空配列に戻す', () => {
   const { hydrate, reset } = useRoutineDraftStore.getState();
   hydrate([makeDraftExercise(1)]);

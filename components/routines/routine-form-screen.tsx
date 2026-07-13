@@ -10,7 +10,7 @@ type Props = {
   initialName?: string;
   onSubmit: (values: RoutineFormValues) => void;
   onAddExercise: () => void;
-  onPressExercise: (index: number) => void;
+  onPressExercise: () => void;
 };
 
 // ルーティンの新規作成・編集で共通の「フォーム＋下部固定の保存ボタン」の画面シェル。

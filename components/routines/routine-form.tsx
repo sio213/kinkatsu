@@ -1,16 +1,16 @@
+import { RoutineAddExerciseButton } from '@/components/routines/routine-add-exercise-button';
 import { RoutineExerciseRow } from '@/components/routines/routine-exercise-row';
 import { BoxedTextInput } from '@/components/ui/boxed-text-input';
-import { DesignIcon } from '@/components/ui/design-icon';
 import { FormField } from '@/components/ui/form-field';
 import { FormFieldStack } from '@/components/ui/form-field-stack';
-import { Colors, Typography } from '@/constants/theme';
+import { Typography } from '@/constants/theme';
 import { useRoutineDraftStore } from '@/lib/routines/draft-store';
 import { routineFormSchema, type RoutineFormValues } from '@/lib/routines/validation';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { useFocusEffect } from 'expo-router';
 import { forwardRef, useCallback, useEffect, useImperativeHandle } from 'react';
 import { Controller, useForm } from 'react-hook-form';
-import { Keyboard, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
+import { Keyboard, StyleSheet, View } from 'react-native';
 
 export type RoutineFormHandle = { submit: () => void };
 
@@ -19,7 +19,7 @@ type Props = {
   onSubmit: (values: RoutineFormValues) => void;
   onSubmitDisabledChange?: (disabled: boolean) => void;
   onAddExercise: () => void;
-  onPressExercise: (index: number) => void;
+  onPressExercise: () => void;
 };
 
 // ルーティンの新規作成(app/routine/new.tsx)・編集(app/routine/edit/[id].tsx)で共通のフォーム本体。
@@ -95,34 +95,17 @@ export const RoutineForm = forwardRef<RoutineFormHandle, Props>(function Routine
 
       <FormField label="種目" required error={errors.exercises?.message}>
         {exercises.length === 0 ? (
-          <TouchableOpacity
-            style={styles.addBtnEmpty}
-            onPress={onAddExercise}
-            accessibilityRole="button"
-            accessibilityLabel="種目を追加"
-          >
-            <DesignIcon name="add-circle" size={26} color={Colors.accent} />
-            <Text style={styles.addBtnEmptyTitle}>種目を追加</Text>
-            <Text style={styles.addBtnEmptyNote}>胸・肩・脚など自由に組み合わせ</Text>
-          </TouchableOpacity>
+          <RoutineAddExerciseButton variant="empty" onPress={onAddExercise} />
         ) : (
           <View style={styles.exerciseList}>
             {exercises.map((exercise, index) => (
               <RoutineExerciseRow
                 key={`${exercise.exerciseId}-${index}`}
                 exercise={exercise}
-                onPress={() => onPressExercise(index)}
+                onPress={onPressExercise}
               />
             ))}
-            <TouchableOpacity
-              style={styles.addBtnGhost}
-              onPress={onAddExercise}
-              accessibilityRole="button"
-              accessibilityLabel="種目を追加"
-            >
-              <DesignIcon name="add-circle" size={18} color={Colors.accent} />
-              <Text style={styles.addBtnGhostText}>種目を追加</Text>
-            </TouchableOpacity>
+            <RoutineAddExerciseButton variant="ghost" onPress={onAddExercise} />
           </View>
         )}
       </FormField>
@@ -133,31 +116,5 @@ export const RoutineForm = forwardRef<RoutineFormHandle, Props>(function Routine
 const styles = StyleSheet.create({
   inputBox: { paddingHorizontal: 12 },
   inputText: Typography.body,
-
-  addBtnEmpty: {
-    width: '100%',
-    borderWidth: 1.5,
-    borderStyle: 'dashed',
-    borderColor: Colors.borderStrong,
-    backgroundColor: Colors.surface,
-    borderRadius: 12,
-    paddingVertical: 20,
-    alignItems: 'center',
-    gap: 6,
-  },
-  addBtnEmptyTitle: { ...Typography.bodyStrong, color: Colors.textPrimary },
-  addBtnEmptyNote: { ...Typography.caption, color: Colors.textMuted },
-
   exerciseList: { gap: 10 },
-  addBtnGhost: {
-    flexDirection: 'row',
-    justifyContent: 'center',
-    alignItems: 'center',
-    gap: 6,
-    width: '100%',
-    backgroundColor: Colors.accentSurface,
-    borderRadius: 8,
-    paddingVertical: 11,
-  },
-  addBtnGhostText: { ...Typography.footnote, fontWeight: '600', color: Colors.accent },
 });
