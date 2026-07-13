@@ -60,8 +60,19 @@ export function formatKindSummary(r: Reminder): string {
   }
   if (kind === 'weekly') {
     const wds: number[] = r.weekdays ? JSON.parse(r.weekdays) : [];
-    const wdLabel = wds.map((d) => WEEKDAY_LABELS[d]).join('・');
     const n = Math.max(1, Math.round((r.intervalDays ?? 7) / 7));
+    // 曜日が6つ以上（ほぼ毎日〜毎日）のときは個別列挙せず頻度そのものを主役にする。
+    // ただしこの集約は「毎週」(n===1)のときだけ行う。N週ごと(n>1)まで集約すると、
+    // 例えば「2週ごと・全7曜日」（隔週の週は毎日鳴るが休む週もある設定）が、真の毎日設定
+    // （intervalKindの「毎日」）と同じ表記になり、カード表示だけでは区別できなくなる。
+    // monthly/yearlyも日付の個数によらず間隔の接頭辞を常に保持しているため、weeklyだけ
+    // 間隔情報を落とすのは非対称でもある。N週ごとのときは常に個別列挙にフォールバックする
+    if (n === 1 && wds.length >= 6) {
+      // wds.length>=7は上のガードに掛からないため、ここに来るのは常に6曜日のケースのみ
+      const label = wds.length >= 7 ? '毎日' : '週6回';
+      return `${label} ${time}`;
+    }
+    const wdLabel = wds.map((d) => WEEKDAY_LABELS[d]).join('・');
     return n === 1 ? `毎週 ${wdLabel} ${time}` : `${n}週ごと ${wdLabel} ${time}`;
   }
   if (kind === 'monthly') {
