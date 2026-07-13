@@ -31,8 +31,8 @@ export const MAX_OS_NOTIFICATIONS = 60;
 export function normalizeInput(input: ReminderInput): ReminderInput {
   let result = { ...input };
 
-  // monthly N=1: 月末(99)がある場合、29〜31 は月末と重複するため除外
-  if (result.kind === 'monthly' && (result.intervalMonths ?? 1) === 1 && result.monthdays) {
+  // monthly: 月末(99)がある場合、29〜31 は月末と重複するため除外
+  if (result.kind === 'monthly' && result.monthdays) {
     const hasEom = result.monthdays.includes(MONTH_END);
     if (hasEom) {
       result = {
@@ -266,7 +266,7 @@ export function computeMonthIntervalFireDates(
   from: Date,
   anchorDate: number,
   intervalMonths: number,
-  day: number,
+  days: number[],
   hour: number,
   minute: number,
   count: number,
@@ -276,20 +276,23 @@ export function computeMonthIntervalFireDates(
   const anchorMonth = anchor.getMonth();
   const monthsFromAnchor =
     (from.getFullYear() - anchorYear) * 12 + (from.getMonth() - anchorMonth);
-  let n = Math.floor(monthsFromAnchor / intervalMonths);
+  const startN = Math.floor(monthsFromAnchor / intervalMonths);
+  let n = startN;
 
   const results: Date[] = [];
   while (results.length < count) {
     const totalMonths = anchorMonth + n * intervalMonths;
     const year = anchorYear + Math.floor(totalMonths / 12);
     const month = ((totalMonths % 12) + 12) % 12;
-    const resolved = resolveMonthDay(year, month, day);
-    const candidate = new Date(year, month, resolved, hour, minute, 0, 0);
-    if (candidate > from) results.push(candidate);
+    for (const day of days) {
+      const resolved = resolveMonthDay(year, month, day);
+      const candidate = new Date(year, month, resolved, hour, minute, 0, 0);
+      if (candidate > from) results.push(candidate);
+    }
     n++;
-    if (n > Math.floor(monthsFromAnchor / intervalMonths) + count + 50) break;
+    if (n > startN + count + 50) break;
   }
-  return results;
+  return results.sort((a, b) => a.getTime() - b.getTime()).slice(0, count);
 }
 
 export function computeMonthlyQueueFireDates(
@@ -355,7 +358,7 @@ export function getNextFireDate(r: ParsedReminder, from: Date): Date | null {
       }
       if (!r.anchorDate) return null;
       return computeMonthIntervalFireDates(
-        from, r.anchorDate, intervalMonths, r.monthdays[0], hour, minute, 1,
+        from, r.anchorDate, intervalMonths, r.monthdays, hour, minute, 1,
       )[0] ?? null;
     }
     if (kind === 'yearly') {
@@ -513,7 +516,7 @@ async function scheduleQueue(r: ParsedReminder, depth: number): Promise<void> {
         dates = computeMonthlyQueueFireDates(from, r.monthdays, r.hour, r.minute, need);
       } else if (r.anchorDate) {
         dates = computeMonthIntervalFireDates(
-          from, r.anchorDate, intervalMonths, r.monthdays[0], r.hour, r.minute, need,
+          from, r.anchorDate, intervalMonths, r.monthdays, r.hour, r.minute, need,
         );
       }
     }

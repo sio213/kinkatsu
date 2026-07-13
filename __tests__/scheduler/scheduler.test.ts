@@ -23,6 +23,7 @@ import {
   nextWeeklyFireDate,
   normalizeInput,
   resolveMonthDay,
+  resolveTriggerType,
 } from '@/lib/notifications/scheduler';
 import { MONTH_END } from '@/lib/notifications/types';
 
@@ -110,6 +111,47 @@ describe('normalizeInput', () => {
       enabled: true,
     });
     expect(result.monthdays).toEqual([28, 29, 30, 31]);
+  });
+
+  test('Nヶ月ごと(intervalMonths>1)でも月末選択時に29〜31を除外する', () => {
+    const result = normalizeInput({
+      title: 'test',
+      body: 'test',
+      kind: 'monthly',
+      hour: 7,
+      minute: 0,
+      intervalMonths: 3,
+      monthdays: [1, 29, 30, 99],
+      enabled: true,
+    });
+    expect(result.monthdays).toEqual([1, 99]);
+  });
+});
+
+describe('resolveTriggerType: 月次', () => {
+  const base = {
+    id: 1,
+    title: 'test',
+    body: 'test',
+    kind: 'monthly' as const,
+    hour: 7,
+    minute: 0,
+    weekdays: null,
+    anchorDate: null,
+    intervalDays: null,
+    nthWeek: null,
+    nthWeekday: null,
+    enabled: true,
+    createdAt: 0,
+    updatedAt: 0,
+  };
+
+  test('intervalMonths>1は日付を複数選択していても常にqueue', () => {
+    expect(resolveTriggerType({ ...base, intervalMonths: 2, monthdays: [1, 15] })).toBe('queue');
+  });
+
+  test('intervalMonths===1・29日未満の通常日付のみならnative', () => {
+    expect(resolveTriggerType({ ...base, intervalMonths: 1, monthdays: [1, 15] })).toBe('native');
   });
 });
 
@@ -359,6 +401,56 @@ describe('getNextFireDate (統合)', () => {
     expect(next?.getMonth()).toBe(1); // February
     expect(next?.getDate()).toBe(28); // 平年
   });
+
+  test('monthly Nヶ月ごと・複数日付: 両方経過済みなら次サイクルの最初の日付を返す', () => {
+    const r = {
+      ...base,
+      kind: 'monthly',
+      weekdays: null,
+      intervalMonths: 3,
+      monthdays: [1, 15],
+      anchorDate: d('2026-11-01').getTime(),
+    };
+    // 11月20日時点: 11月サイクルの1日・15日はどちらも経過済み → 次は2月1日
+    expect(getNextFireDate(r, d('2026-11-20T10:00:00'))).toEqual(d('2027-02-01T07:00:00'));
+  });
+
+  test('monthly Nヶ月ごと・複数日付: サイクル内で一部だけ未経過ならその日付を返す', () => {
+    const r = {
+      ...base,
+      kind: 'monthly',
+      weekdays: null,
+      intervalMonths: 3,
+      monthdays: [1, 15],
+      anchorDate: d('2026-11-01').getTime(),
+    };
+    // 11月10日時点: 11/1は経過済みだが11/15は未来 → 11/15を返す
+    expect(getNextFireDate(r, d('2026-11-10T10:00:00'))).toEqual(d('2026-11-15T07:00:00'));
+  });
+
+  test('monthly Nヶ月ごと・anchorDateなしはnull', () => {
+    const r = {
+      ...base,
+      kind: 'monthly',
+      weekdays: null,
+      intervalMonths: 3,
+      monthdays: [1, 15],
+      anchorDate: null,
+    };
+    expect(getNextFireDate(r, FROM)).toBeNull();
+  });
+
+  test('monthly Nヶ月ごと・monthdaysが空配列ならnull', () => {
+    const r = {
+      ...base,
+      kind: 'monthly',
+      weekdays: null,
+      intervalMonths: 3,
+      monthdays: [],
+      anchorDate: d('2026-01-01').getTime(),
+    };
+    expect(getNextFireDate(r, FROM)).toBeNull();
+  });
 });
 
 // ─────────────────────────────────────────────
@@ -410,9 +502,35 @@ describe('月跨ぎ・年またぎ', () => {
     const anchor = d('2026-11-01').getTime(); // 11月起点
     // 11月15日を過ぎた後から → 次は2月15日
     const from = d('2026-11-20T10:00:00');
-    const dates = computeMonthIntervalFireDates(from, anchor, 3, 15, H, M, 2);
+    const dates = computeMonthIntervalFireDates(from, anchor, 3, [15], H, M, 2);
     expect(dates[0]).toEqual(d('2027-02-15T07:00:00')); // 3ヶ月後: 2月(年またぎ)
     expect(dates[1]).toEqual(d('2027-05-15T07:00:00')); // 6ヶ月後: 5月
+  });
+
+  test('month_interval: 複数日付選択時は該当サイクルの月内で日付順に発火する', () => {
+    const anchor = d('2026-11-01').getTime(); // 11月起点
+    const from = d('2026-11-20T10:00:00');
+    // 3ヶ月ごと・1日と15日を選択 → 次は2月1日, 2月15日
+    const dates = computeMonthIntervalFireDates(from, anchor, 3, [1, 15], H, M, 3);
+    expect(dates[0]).toEqual(d('2027-02-01T07:00:00'));
+    expect(dates[1]).toEqual(d('2027-02-15T07:00:00'));
+    expect(dates[2]).toEqual(d('2027-05-01T07:00:00')); // 6ヶ月後サイクル
+  });
+
+  test('month_interval: 起点サイクル内で一部の日付だけ経過済みなら残りだけ返す', () => {
+    const anchor = d('2026-11-01').getTime(); // 11月起点(3ヶ月ごと)
+    const from = d('2026-11-10T10:00:00'); // 11/1は経過済み・11/15は未来
+    const dates = computeMonthIntervalFireDates(from, anchor, 3, [1, 15], H, M, 2);
+    expect(dates[0]).toEqual(d('2026-11-15T07:00:00')); // 同サイクルの残り
+    expect(dates[1]).toEqual(d('2027-02-01T07:00:00')); // 次サイクル
+  });
+
+  test('month_interval: daysが非ソートでも昇順で返る', () => {
+    const anchor = d('2026-11-01').getTime();
+    const from = d('2026-11-20T10:00:00');
+    const dates = computeMonthIntervalFireDates(from, anchor, 3, [15, 1], H, M, 2); // 逆順で渡す
+    expect(dates[0]).toEqual(d('2027-02-01T07:00:00'));
+    expect(dates[1]).toEqual(d('2027-02-15T07:00:00'));
   });
 
   test('biweekly: 12月→1月 年またぎ', () => {

@@ -26,11 +26,8 @@ export const reminderFormSchema = z
     // 月単位
     intervalMonths: z.number().min(1).max(12),
     monthDayMode: z.enum(['day', 'nth']),
-    // 「毎月」（day・intervalMonths===1）の複数選択で使う
+    // 「日付」指定（intervalMonths===1の毎月・>1のNヶ月ごと共通）の複数選択で使う
     monthdays: z.array(z.number()),
-    // 「Nヶ月ごと」（day・intervalMonths>1）の単一選択で使う。scheduler.tsの
-    // computeMonthIntervalFireDatesがmonthdays[0]しか使わない実装のため単一選択のまま
-    monthIntervalDay: z.number(),
     monthNthWeek: z.number(),
     monthNthWeekday: z.number(),
 
@@ -46,7 +43,7 @@ export const reminderFormSchema = z
     path: ['weekdays'],
   })
   .refine(
-    (v) => v.kind !== 'monthly' || v.monthDayMode !== 'day' || v.intervalMonths > 1 || v.monthdays.length > 0,
+    (v) => v.kind !== 'monthly' || v.monthDayMode !== 'day' || v.monthdays.length > 0,
     { message: '日付を1つ以上選択してください', path: ['monthdays'] },
   );
 
@@ -72,8 +69,7 @@ export function toFormValues(input: ReminderInput): ReminderFormValues {
 
     intervalMonths,
     monthDayMode: input.kind === 'monthly' && input.nthWeek != null ? 'nth' : 'day',
-    monthdays: input.kind === 'monthly' && intervalMonths === 1 ? (input.monthdays ?? []) : [],
-    monthIntervalDay: input.kind === 'monthly' && intervalMonths > 1 ? (input.monthdays?.[0] ?? 1) : 1,
+    monthdays: input.kind === 'monthly' && input.nthWeek == null ? (input.monthdays ?? []) : [],
     monthNthWeek: input.kind === 'monthly' ? (input.nthWeek ?? 1) : 1,
     monthNthWeekday: input.kind === 'monthly' ? (input.nthWeekday ?? 1) : 1,
 
@@ -127,11 +123,9 @@ export function toReminderInput(values: ReminderFormValues): ReminderInput {
     if (values.monthDayMode === 'nth') {
       out.nthWeek = values.monthNthWeek;
       out.nthWeekday = values.monthNthWeekday;
-    } else if (values.intervalMonths > 1) {
-      out.monthdays = [values.monthIntervalDay];
-      out.anchorDate = out.anchorDate ?? Date.now();
     } else {
       out.monthdays = values.monthdays;
+      if (values.intervalMonths > 1) out.anchorDate = out.anchorDate ?? Date.now();
     }
   }
 

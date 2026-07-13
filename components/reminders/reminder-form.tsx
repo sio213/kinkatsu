@@ -70,7 +70,6 @@ export function ReminderForm({ initial = DEFAULT_INPUT, onSubmit, onCancel, subm
   const intervalMonths = watch('intervalMonths');
   const monthDayMode = watch('monthDayMode');
   const monthdays = watch('monthdays');
-  const monthIntervalDay = watch('monthIntervalDay');
   const monthNthWeek = watch('monthNthWeek');
   const monthNthWeekday = watch('monthNthWeekday');
   const yearlyMonth = watch('yearlyMonth');
@@ -79,7 +78,7 @@ export function ReminderForm({ initial = DEFAULT_INPUT, onSubmit, onCancel, subm
 
   // 月次「日付（複数選択）」の入力欄が表示されるのはこの条件のときだけなので、
   // バリデーション側もこれに合わせる（表示条件と検証条件がずれないよう一箇所にまとめる）
-  const isMultiMonthdaySelection = kind === 'monthly' && monthDayMode === 'day' && intervalMonths === 1;
+  const isMultiMonthdaySelection = kind === 'monthly' && monthDayMode === 'day';
 
   function applyPreset(preset: (typeof REMINDER_PRESETS)[number]) {
     if (preset.weekdays) {
@@ -390,37 +389,6 @@ export function ReminderForm({ initial = DEFAULT_INPUT, onSubmit, onCancel, subm
               {isSubmitted && errors.monthdays ? (
                 <Text style={styles.errorText}>{errors.monthdays.message}</Text>
               ) : null}
-            </>
-          )}
-
-          {monthDayMode === 'day' && intervalMonths > 1 && (
-            <>
-              <FormLabel containerStyle={styles.labelSpacing}>日付</FormLabel>
-              <View style={styles.mdGrid}>
-                {Array.from({ length: 31 }, (_, i) => i + 1).map((day) => (
-                  <TouchableOpacity
-                    key={day}
-                    style={[styles.mdChip, monthIntervalDay === day && styles.chipActive]}
-                    onPress={() => setValue('monthIntervalDay', day)}
-                  >
-                    <Text style={[styles.mdChipText, monthIntervalDay === day && styles.chipTextActive]}>
-                      {day}
-                    </Text>
-                  </TouchableOpacity>
-                ))}
-                <TouchableOpacity
-                  style={[
-                    styles.mdChip,
-                    styles.mdChipEom,
-                    monthIntervalDay === MONTH_END && styles.chipActive,
-                  ]}
-                  onPress={() => setValue('monthIntervalDay', MONTH_END)}
-                >
-                  <Text style={[styles.mdChipText, monthIntervalDay === MONTH_END && styles.chipTextActive]}>
-                    月末
-                  </Text>
-                </TouchableOpacity>
-              </View>
             </>
           )}
 

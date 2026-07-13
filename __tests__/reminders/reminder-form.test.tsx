@@ -4,7 +4,7 @@ import { Text, TouchableOpacity } from 'react-native';
 import { ReminderForm } from '@/components/reminders/reminder-form';
 
 // scheduler.tsはdb/client経由でexpo-sqliteを読み込みJest環境で解決できないため、
-// reminder-form.tsxが使うresolveMonthDay（純粋関数）のみ最小限モックする
+// validation.ts（toReminderInputのyearly変換）が使うresolveMonthDay（純粋関数）のみ最小限モックする
 jest.mock('@/lib/notifications/scheduler', () => ({
   resolveMonthDay: (year: number, month: number, day: number) => {
     const MONTH_END = 99;
@@ -102,21 +102,95 @@ test('月次(毎月)で日付を1つ選べば保存できる', async () => {
   );
 });
 
-test('月次(Nヶ月ごと)は単一選択で常に値を持つためバリデーションに引っかからない', async () => {
-  const { root, onSubmit } = await render();
-
-  await press(root, '毎月');
-  // 間隔の＋ボタンを押して「2ヶ月ごと」にする
+async function pressMonthlyIntervalPlus(root: ReactTestInstance) {
   const plusBtn = root
     .findAllByType(TouchableOpacity)
     .find((btn) => btn.findAllByType(Text).some((t) => t.props.children === '＋'));
   await act(async () => {
     plusBtn!.props.onPress();
   });
+}
+
+test('月次(Nヶ月ごと)は毎月と同じく日付を1つも選ばずに保存するとonSubmitは呼ばれずエラーが表示される', async () => {
+  const { root, onSubmit } = await render();
+
+  await press(root, '毎月');
+  // 間隔の＋ボタンを押して「2ヶ月ごと」にする
+  await pressMonthlyIntervalPlus(root);
+  await submit(root);
+
+  expect(onSubmit).not.toHaveBeenCalled();
+  expect(allTexts(root)).toContain('日付を1つ以上選択してください');
+});
+
+test('月次(Nヶ月ごと)は毎月と同じく日付を複数選択して保存でき、anchorDateも補完される', async () => {
+  const { root, onSubmit } = await render();
+
+  await press(root, '毎月');
+  await pressMonthlyIntervalPlus(root);
+  await press(root, 1);
+  await press(root, 15);
   await submit(root);
 
   expect(onSubmit).toHaveBeenCalledWith(
-    expect.objectContaining({ kind: 'monthly', intervalMonths: 2, monthdays: [1] }),
+    expect.objectContaining({
+      kind: 'monthly',
+      intervalMonths: 2,
+      monthdays: [1, 15],
+      anchorDate: expect.any(Number),
+    }),
+  );
+});
+
+test('月次(Nヶ月ごと)は毎月と同じく日付選択後にもう一度押すと選択解除できる', async () => {
+  const { root, onSubmit } = await render();
+
+  await press(root, '毎月');
+  await pressMonthlyIntervalPlus(root);
+  await press(root, 1);
+  await press(root, 15);
+  await press(root, 1); // 1日だけ解除
+  await submit(root);
+
+  expect(onSubmit).toHaveBeenCalledWith(
+    expect.objectContaining({ kind: 'monthly', intervalMonths: 2, monthdays: [15] }),
+  );
+});
+
+test('月次(Nヶ月ごと)は毎月と同じく31日と月末が相互排他になる', async () => {
+  const { root, onSubmit } = await render();
+
+  await press(root, '毎月');
+  await pressMonthlyIntervalPlus(root);
+  await press(root, 31);
+  await press(root, '月末'); // 月末を選ぶと31日は自動で外れる
+  await submit(root);
+
+  expect(onSubmit).toHaveBeenCalledWith(
+    expect.objectContaining({ kind: 'monthly', intervalMonths: 2, monthdays: [99] }),
+  );
+});
+
+test('月次(Nヶ月ごと)を編集で開くと選択済みの日付が復元される', async () => {
+  const { root, onSubmit } = await render({
+    initial: {
+      title: '既存のリマインダー',
+      body: '本文',
+      kind: 'monthly',
+      hour: 7,
+      minute: 0,
+      intervalMonths: 3,
+      monthdays: [1, 15],
+      anchorDate: Date.now(),
+      enabled: true,
+    },
+  });
+
+  // チップを操作せずそのまま保存し、復元された選択がそのまま送信されることを確認する
+  await submit(root);
+
+  expect(onSubmit).toHaveBeenCalledWith(
+    expect.objectContaining({ kind: 'monthly', intervalMonths: 3, monthdays: [1, 15] }),
   );
 });
 
