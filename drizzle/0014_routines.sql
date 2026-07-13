@@ -32,6 +32,6 @@ CREATE TABLE `routine_sets` (
 --> statement-breakpoint
 CREATE INDEX `idx_rs_routine_exercise` ON `routine_sets` (`routine_exercise_id`);
 --> statement-breakpoint
-ALTER TABLE `reminders` ADD `routine_id` integer REFERENCES routines(id) ON DELETE set null;
+ALTER TABLE `reminders` ADD `routine_id` integer REFERENCES `routines`(`id`) ON UPDATE no action ON DELETE set null;
 --> statement-breakpoint
 CREATE INDEX `idx_reminders_routine` ON `reminders` (`routine_id`);

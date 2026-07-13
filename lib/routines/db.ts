@@ -9,7 +9,7 @@ import {
   type RoutineSet,
 } from '@/db/schema';
 import { deleteReminder } from '@/lib/notifications/scheduler';
-import { getPreviousSets } from '@/lib/workout/history';
+import { getPreviousSets, hasAnyValue } from '@/lib/workout/history';
 import { eq, inArray } from 'drizzle-orm';
 
 export type RoutineSetInput = {
@@ -38,7 +38,10 @@ export type RoutineDetail = {
 // その種目の直近の実績（実際のトレーニング記録）をプリフィルし、記録が無ければ
 // 空欄1セットにフォールバックする（トレーニング中画面の新規カード追加時と同じ挙動をルーティンにも揃える）
 export async function buildInitialRoutineSets(exerciseId: number): Promise<RoutineSetInput[]> {
-  const previous = await getPreviousSets(db, exerciseId);
+  // lib/workout/session.tsのaddExercisesToSession等と同じくhasAnyValueで絞り込む。
+  // ✓未確定のまま全カラムnullで終わったセットは「前回入力した値」として意味が無く、
+  // そのままコピーするとテンプレートに余分な空セットが混入してしまうため
+  const previous = (await getPreviousSets(db, exerciseId)).filter(hasAnyValue);
   if (previous.length === 0) {
     return [{ weight: null, reps: null, durationSeconds: null, distanceMeters: null }];
   }
@@ -90,7 +93,10 @@ export async function createRoutine(input: RoutineInput): Promise<number> {
   });
 }
 
-// 種目・セットは編集のたびに全置換する（フォームが下書き全体を保持しており差分更新の必要が無いため）
+// 種目・セットは編集のたびに全置換する（フォームが下書き全体を保持しており差分更新の必要が無いため）。
+// そのためroutineExercises/routineSetsのidは保存のたびに新規採番される使い捨てで、
+// reminders.routineId以外にこれらのidを外部参照するものは無い前提。将来これらのidを
+// 安定参照したくなった場合（種目単位のメモ・セット単位の履歴リンク等）はこの方式が破綻するため設計し直しが必要
 export async function updateRoutine(routineId: number, input: RoutineInput): Promise<void> {
   const now = Date.now();
   await db.transaction(async (tx) => {
