@@ -1,6 +1,5 @@
-import { Colors, Typography } from '@/constants/theme';
 import type { ReactNode } from 'react';
-import { StyleSheet, Text } from 'react-native';
+import { FormErrorText } from './form-error-text';
 import { FormLabel } from './form-label';
 import { SectionGroup } from './section-group';
 
@@ -22,11 +21,7 @@ export function FormField({ label, required = false, optional = false, error, ch
         {label}
       </FormLabel>
       {children}
-      {error ? <Text style={styles.errorText}>{error}</Text> : null}
+      {error ? <FormErrorText>{error}</FormErrorText> : null}
     </SectionGroup>
   );
 }
-
-const styles = StyleSheet.create({
-  errorText: { ...Typography.caption, color: Colors.danger, marginTop: -4 },
-});
