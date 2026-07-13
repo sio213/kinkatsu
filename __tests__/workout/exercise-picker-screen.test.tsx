@@ -315,8 +315,12 @@ test('useExerciseUsageStatsに進行中セッションのsessionIdをexcludeSess
   expect(mockUseExerciseUsageStats).toHaveBeenCalledWith(5);
 });
 
-test('sessionIdが不正(NaN)なときはexcludeSessionIdをundefinedで呼ぶ', () => {
+test('sessionIdが不正(NaN)なときは「見つかりません」画面になり、ExercisePickerView自体がマウントされないためuseExerciseUsageStatsも呼ばれない', () => {
+  // exercise-picker-view.tsxへの切り出し後は、NotFoundState分岐でExercisePickerViewを
+  // 描画しなくなった（以前はコンポーネント冒頭で無条件にフックを呼んでいたための副作用で、
+  // 不正なsessionIdでも無駄にuseExerciseUsageStatsが呼ばれていた）。呼ばれないことの方が
+  // 正しい挙動のため、この切り出しに合わせて期待値を更新する
   mockUseLocalSearchParams.mockReturnValue({ sessionId: 'abc' });
   render();
-  expect(mockUseExerciseUsageStats).toHaveBeenCalledWith(undefined);
+  expect(mockUseExerciseUsageStats).not.toHaveBeenCalled();
 });
