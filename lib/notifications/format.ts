@@ -67,9 +67,11 @@ export function formatKindSummary(r: Reminder): string {
   if (kind === 'monthly') {
     const n = r.intervalMonths ?? 1;
     const prefix = n === 1 ? '毎月' : `${n}ヶ月ごと`;
-    if (r.nthWeek != null && r.nthWeekday != null) {
+    if (r.nthWeek != null && r.nthWeekdays != null) {
       const weekLabel = NTH_WEEK_OPTIONS.find((o) => o.value === r.nthWeek)?.label ?? `第${r.nthWeek}`;
-      return `${prefix}${weekLabel}${WEEKDAY_LABELS[r.nthWeekday]}曜日 ${time}`;
+      const nwds: number[] = JSON.parse(r.nthWeekdays);
+      const nwdLabel = nwds.map((d) => WEEKDAY_LABELS[d]).join('・');
+      return `${prefix}${weekLabel}${nwdLabel}曜日 ${time}`;
     }
     const mds: number[] = r.monthdays ? JSON.parse(r.monthdays) : [];
     const dayLabel = mds.map((d) => (d === MONTH_END ? '月末' : `${d}日`)).join('・');

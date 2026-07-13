@@ -1,4 +1,5 @@
-import { formatNextFire } from '@/lib/notifications/format';
+import type { Reminder } from '@/db/schema';
+import { formatKindSummary, formatNextFire } from '@/lib/notifications/format';
 
 describe('formatNextFire', () => {
   const now = new Date(2026, 6, 5, 8, 0);
@@ -25,5 +26,36 @@ describe('formatNextFire', () => {
   test('shows just the date further out', () => {
     const later = new Date(2026, 6, 10, 9, 0);
     expect(formatNextFire(later, now)).toBe('次回: 7/10 09:00');
+  });
+});
+
+describe('formatKindSummary: monthly 第N曜日', () => {
+  const base: Reminder = {
+    id: 1,
+    title: 't',
+    body: 'b',
+    kind: 'monthly',
+    hour: 7,
+    minute: 0,
+    weekdays: null,
+    monthdays: null,
+    anchorDate: null,
+    intervalDays: null,
+    intervalMonths: null,
+    nthWeek: null,
+    nthWeekdays: null,
+    enabled: true,
+    createdAt: 0,
+    updatedAt: 0,
+  };
+
+  test('複数曜日は「・」区切りで表示される', () => {
+    const r: Reminder = { ...base, nthWeek: 2, nthWeekdays: '[1,3]' };
+    expect(formatKindSummary(r)).toBe('毎月第2月・水曜日 07:00');
+  });
+
+  test('単一曜日でも従来通り表示される', () => {
+    const r: Reminder = { ...base, nthWeek: 1, nthWeekdays: '[0]' };
+    expect(formatKindSummary(r)).toBe('毎月第1日曜日 07:00');
   });
 });

@@ -111,7 +111,7 @@ export function resolveNthWeekdayDay(
 export function computeNthWeekdayFireDates(
   from: Date,
   nthWeek: number,
-  weekday: number,
+  weekdays: number[],
   hour: number,
   minute: number,
   count: number,
@@ -140,17 +140,19 @@ export function computeNthWeekdayFireDates(
   let guard = 0;
   while (results.length < count && guard < 200) {
     guard++;
-    const day = resolveNthWeekdayDay(year, month, nthWeek, weekday);
-    if (day !== null) {
-      const candidate = new Date(year, month, day, hour, minute, 0, 0);
-      if (candidate > from) results.push(candidate);
+    for (const weekday of weekdays) {
+      const day = resolveNthWeekdayDay(year, month, nthWeek, weekday);
+      if (day !== null) {
+        const candidate = new Date(year, month, day, hour, minute, 0, 0);
+        if (candidate > from) results.push(candidate);
+      }
     }
     const totalMonths = month + intervalMonths;
     year += Math.floor(totalMonths / 12);
     month = totalMonths % 12;
     if (year > from.getFullYear() + 20) break;
   }
-  return results;
+  return results.sort((a, b) => a.getTime() - b.getTime()).slice(0, count);
 }
 
 export function nextDailyFireDate(
@@ -347,9 +349,10 @@ export function getNextFireDate(r: ParsedReminder, from: Date): Date | null {
     }
     if (kind === 'monthly') {
       const intervalMonths = r.intervalMonths ?? 1;
-      if (r.nthWeek != null && r.nthWeekday != null) {
+      if (r.nthWeek != null) {
+        if (!r.nthWeekdays?.length) return null;
         return computeNthWeekdayFireDates(
-          from, r.nthWeek, r.nthWeekday, hour, minute, 1, intervalMonths, r.anchorDate ?? undefined,
+          from, r.nthWeek, r.nthWeekdays, hour, minute, 1, intervalMonths, r.anchorDate ?? undefined,
         )[0] ?? null;
       }
       if (!r.monthdays?.length) return null;
@@ -380,6 +383,7 @@ export function parseReminder(r: Reminder): ParsedReminder {
     ...r,
     weekdays: r.weekdays ? JSON.parse(r.weekdays) : null,
     monthdays: r.monthdays ? JSON.parse(r.monthdays) : null,
+    nthWeekdays: r.nthWeekdays ? JSON.parse(r.nthWeekdays) : null,
   };
 }
 
@@ -507,10 +511,14 @@ async function scheduleQueue(r: ParsedReminder, depth: number): Promise<void> {
     dates = allDates.sort((a, b) => a.getTime() - b.getTime()).slice(0, need);
   } else if (r.kind === 'monthly') {
     const intervalMonths = r.intervalMonths ?? 1;
-    if (r.nthWeek != null && r.nthWeekday != null) {
-      dates = computeNthWeekdayFireDates(
-        from, r.nthWeek, r.nthWeekday, r.hour, r.minute, need, intervalMonths, r.anchorDate ?? undefined,
-      );
+    if (r.nthWeek != null) {
+      // nthモードなのに曜日未選択の場合は他のmonthdaysロジックにフォールスルーさせない
+      // (getNextFireDateの分岐と同じ形に揃えている)
+      if (r.nthWeekdays?.length) {
+        dates = computeNthWeekdayFireDates(
+          from, r.nthWeek, r.nthWeekdays, r.hour, r.minute, need, intervalMonths, r.anchorDate ?? undefined,
+        );
+      }
     } else if (r.monthdays?.length) {
       if (intervalMonths === 1) {
         dates = computeMonthlyQueueFireDates(from, r.monthdays, r.hour, r.minute, need);
@@ -589,7 +597,7 @@ export async function createReminder(input: ReminderInput): Promise<number> {
     intervalDays: normalized.intervalDays ?? null,
     intervalMonths: normalized.intervalMonths ?? null,
     nthWeek: normalized.nthWeek ?? null,
-    nthWeekday: normalized.nthWeekday ?? null,
+    nthWeekdays: normalized.nthWeekdays ? JSON.stringify(normalized.nthWeekdays) : null,
     enabled: normalized.enabled,
     createdAt: now,
     updatedAt: now,
@@ -628,7 +636,7 @@ export async function updateReminder(
       intervalDays: normalized.intervalDays ?? null,
       intervalMonths: normalized.intervalMonths ?? null,
       nthWeek: normalized.nthWeek ?? null,
-      nthWeekday: normalized.nthWeekday ?? null,
+      nthWeekdays: normalized.nthWeekdays ? JSON.stringify(normalized.nthWeekdays) : null,
       enabled: normalized.enabled,
       updatedAt: now,
     })

@@ -29,7 +29,8 @@ export const reminderFormSchema = z
     // 「日付」指定（intervalMonths===1の毎月・>1のNヶ月ごと共通）の複数選択で使う
     monthdays: z.array(z.number()),
     monthNthWeek: z.number(),
-    monthNthWeekday: z.number(),
+    // 第N曜日の曜日指定（複数選択可）。毎週の曜日選択と同じくデフォルト値のない複数選択
+    monthNthWeekdays: z.array(z.number()),
 
     // 年単位
     yearlyMonth: z.number(),
@@ -45,6 +46,10 @@ export const reminderFormSchema = z
   .refine(
     (v) => v.kind !== 'monthly' || v.monthDayMode !== 'day' || v.monthdays.length > 0,
     { message: '日付を1つ以上選択してください', path: ['monthdays'] },
+  )
+  .refine(
+    (v) => v.kind !== 'monthly' || v.monthDayMode !== 'nth' || v.monthNthWeekdays.length > 0,
+    { message: '曜日を1つ以上選択してください', path: ['monthNthWeekdays'] },
   );
 
 export type ReminderFormValues = z.infer<typeof reminderFormSchema>;
@@ -71,7 +76,7 @@ export function toFormValues(input: ReminderInput): ReminderFormValues {
     monthDayMode: input.kind === 'monthly' && input.nthWeek != null ? 'nth' : 'day',
     monthdays: input.kind === 'monthly' && input.nthWeek == null ? (input.monthdays ?? []) : [],
     monthNthWeek: input.kind === 'monthly' ? (input.nthWeek ?? 1) : 1,
-    monthNthWeekday: input.kind === 'monthly' ? (input.nthWeekday ?? 1) : 1,
+    monthNthWeekdays: input.kind === 'monthly' && input.nthWeek != null ? (input.nthWeekdays ?? []) : [],
 
     yearlyMonth: anchor?.getMonth() ?? 0,
     yearlyDay: anchor?.getDate() ?? 1,
@@ -122,7 +127,7 @@ export function toReminderInput(values: ReminderFormValues): ReminderInput {
     out.intervalMonths = values.intervalMonths;
     if (values.monthDayMode === 'nth') {
       out.nthWeek = values.monthNthWeek;
-      out.nthWeekday = values.monthNthWeekday;
+      out.nthWeekdays = values.monthNthWeekdays;
     } else {
       out.monthdays = values.monthdays;
       if (values.intervalMonths > 1) out.anchorDate = out.anchorDate ?? Date.now();

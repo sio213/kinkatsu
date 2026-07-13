@@ -71,7 +71,7 @@ export function ReminderForm({ initial = DEFAULT_INPUT, onSubmit, onCancel, subm
   const monthDayMode = watch('monthDayMode');
   const monthdays = watch('monthdays');
   const monthNthWeek = watch('monthNthWeek');
-  const monthNthWeekday = watch('monthNthWeekday');
+  const monthNthWeekdays = watch('monthNthWeekdays');
   const yearlyMonth = watch('yearlyMonth');
   const yearlyDay = watch('yearlyDay');
   const yearlyEom = watch('yearlyEom');
@@ -121,6 +121,13 @@ export function ReminderForm({ initial = DEFAULT_INPUT, onSubmit, onCancel, subm
       next = [...monthdays, day];
     }
     setValue('monthdays', next.sort((a, b) => a - b), { shouldValidate: isSubmitted });
+  }
+
+  function toggleMonthNthWeekday(wd: number) {
+    const next = monthNthWeekdays.includes(wd)
+      ? monthNthWeekdays.filter((d) => d !== wd)
+      : [...monthNthWeekdays, wd].sort((a, b) => a - b);
+    setValue('monthNthWeekdays', next, { shouldValidate: isSubmitted });
   }
 
   function handleTimeChange(_: unknown, date?: Date) {
@@ -408,20 +415,29 @@ export function ReminderForm({ initial = DEFAULT_INPUT, onSubmit, onCancel, subm
                   </TouchableOpacity>
                 ))}
               </View>
-              <FormLabel containerStyle={styles.labelSpacing}>曜日</FormLabel>
+              <FormLabel required containerStyle={styles.labelSpacing}>曜日</FormLabel>
               <View style={styles.wdRow}>
-                {WEEKDAY_LABELS.map((label, i) => (
-                  <TouchableOpacity
-                    key={i}
-                    style={[styles.wdChip, monthNthWeekday === i && styles.chipActive]}
-                    onPress={() => setValue('monthNthWeekday', i)}
-                  >
-                    <Text style={[styles.wdChipText, monthNthWeekday === i && styles.chipTextActive]}>
-                      {label}
-                    </Text>
-                  </TouchableOpacity>
-                ))}
+                {WEEKDAY_LABELS.map((label, i) => {
+                  const selected = monthNthWeekdays.includes(i);
+                  return (
+                    <TouchableOpacity
+                      key={i}
+                      style={[styles.wdChip, selected && styles.chipActive]}
+                      onPress={() => toggleMonthNthWeekday(i)}
+                      accessibilityRole="checkbox"
+                      accessibilityState={{ checked: selected }}
+                      accessibilityLabel={label}
+                    >
+                      <Text style={[styles.wdChipText, selected && styles.chipTextActive]}>
+                        {label}
+                      </Text>
+                    </TouchableOpacity>
+                  );
+                })}
               </View>
+              {isSubmitted && errors.monthNthWeekdays ? (
+                <Text style={styles.errorText}>{errors.monthNthWeekdays.message}</Text>
+              ) : null}
             </>
           )}
         </>

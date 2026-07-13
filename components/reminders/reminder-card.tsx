@@ -32,7 +32,7 @@ function buildEditInput(r: Reminder): ReminderInput {
     intervalDays: r.intervalDays ?? undefined,
     intervalMonths: r.intervalMonths ?? undefined,
     nthWeek: r.nthWeek ?? undefined,
-    nthWeekday: r.nthWeekday ?? undefined,
+    nthWeekdays: r.nthWeekdays ? JSON.parse(r.nthWeekdays) : undefined,
     enabled: r.enabled,
   };
 }
