@@ -126,6 +126,7 @@ export default function RootLayout() {
           options={{ title: '種目を編集' }}
         />
         <Stack.Screen name="exercise/new" options={{ title: '種目を作成' }} />
+        <Stack.Screen name="routine/index" options={{ title: 'ルーティン' }} />
         <Stack.Screen name="workout/[id]" options={{ title: '' }} />
         <Stack.Screen
           name="workout/exercise-picker"
