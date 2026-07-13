@@ -594,6 +594,7 @@ export async function createReminder(input: ReminderInput): Promise<number> {
   const anchorDate = normalized.anchorDate ?? now;
 
   const row: NewReminder = {
+    routineId: normalized.routineId ?? null,
     title: normalized.title,
     body: normalized.body,
     kind: normalized.kind,
@@ -633,6 +634,7 @@ export async function updateReminder(
   await db
     .update(reminders)
     .set({
+      routineId: normalized.routineId ?? null,
       title: normalized.title,
       body: normalized.body,
       kind: normalized.kind,

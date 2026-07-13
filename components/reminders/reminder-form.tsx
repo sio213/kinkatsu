@@ -192,7 +192,10 @@ export function ReminderForm({ initial = DEFAULT_INPUT, onSubmit, onCancel, subm
   }
 
   function handleValid(values: ReminderFormValues) {
-    onSubmit(toReminderInput(values));
+    // routineIdはユーザーが編集するフォーム値ではない(reminderFormSchemaに含まれない)ため、
+    // toFormValues/toReminderInputの往復では引き継がれない。initialから直接引き継ぐことで、
+    // ルーティン由来のリマインダーを編集・保存してもルーティンとの紐付けが消えないようにする
+    onSubmit({ ...toReminderInput(values), routineId: initial.routineId ?? null });
   }
 
   const timeDate = new Date();

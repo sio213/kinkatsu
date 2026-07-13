@@ -21,6 +21,9 @@ export type ReminderInput = {
   nthWeek?: number; // monthly/month_interval: 第N週 (1〜4, -1=最終)
   nthWeekdays?: number[]; // monthly/month_interval: 曜日(複数選択可) 0=日〜6=土
   enabled: boolean;
+  // ルーティンフォームから作成/更新するリマインダーのみ設定する。単体リマインダー(通常の
+  // リマインダータブからの作成)ではundefined（=null保存）のまま
+  routineId?: number | null;
 };
 
 export type ParsedReminder = Omit<Reminder, 'weekdays' | 'monthdays' | 'nthWeekdays'> & {

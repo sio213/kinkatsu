@@ -21,6 +21,20 @@ const base: Reminder = {
   updatedAt: 0,
 };
 
+describe('buildEditInput: routineIdの引き継ぎ', () => {
+  // ルーティン由来のリマインダーをこの経路で編集・保存しても紐付けが消えないことの回帰テスト。
+  // updateReminderはinputにroutineIdが無ければnullとして保存するため、ここで引き継ぎ忘れると
+  // 保存のたびにルーティンとの紐付けが切れてしまう
+  test('routineIdが設定されたリマインダーはinputにもそのまま引き継がれる', () => {
+    const r: Reminder = { ...base, routineId: 42 };
+    expect(buildEditInput(r).routineId).toBe(42);
+  });
+
+  test('単体リマインダー(routineId: null)はnullのまま', () => {
+    expect(buildEditInput(base).routineId).toBeNull();
+  });
+});
+
 describe('buildEditInput: 毎年(旧形式)の後方互換', () => {
   test('monthdays未設定(旧形式)の毎年は、anchorDateの日から編集用inputを復元する', () => {
     const r: Reminder = { ...base, anchorDate: new Date(2026, 2, 15).getTime(), monthdays: null };
