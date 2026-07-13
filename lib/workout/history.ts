@@ -1,4 +1,4 @@
-import { db, type Tx } from '@/db/client';
+import { db, type DbOrTx } from '@/db/client';
 import { exercises, sets, workoutSessionExercises, workoutSessions } from '@/db/schema';
 import { UNKNOWN_CATEGORY_ORDER, CATEGORY_ORDER, type MeasurementType } from '@/lib/exercises/constants';
 import { and, desc, eq, inArray, isNotNull, ne } from 'drizzle-orm';
@@ -11,16 +11,27 @@ export type PreviousSetValues = {
   distanceMeters: number | null;
 };
 
+// 4つの値カラムのいずれかに実際の値が入っているか。前回セットが✓未確定のまま
+// 何も入力せずに終えたセッションの場合、getPreviousSets/getPreviousSetsForCardは
+// 全カラムnullの行を返しうる（「セット追加」だけ押されて未入力のまま終わった等）。
+// そのような行は「前回入力した値」として意味を持たないため、コピー元から除外する
+// （除外しないと新しいカードに余分な空行が増えたり、値の無い行が背景色だけゴースト表示される
+// ＝中身が空なのに「前回の値がある」ように見える、という2つの問題が起きる）
+export function hasAnyValue(s: PreviousSetValues): boolean {
+  return s.weight != null || s.reps != null || s.durationSeconds != null || s.distanceMeters != null;
+}
+
 // 種目の「前回の記録」を取得する。同じ種目が1セッション内に複数カード（ウォームアップ用＋本番用等）で
 // 追加できる仕様のため、セッション単位ではなくカード（workoutSessionExercises）単位で直近の1枚を
 // 特定してから、そのカードのセット列を返す。✓未確定（completedAt null）のセットも「前回入力した値」
 // として含める（✓を押し忘れて終了したセッションの入力も前回の記録として活かすため）。
 // excludeSessionIdには呼び出し元の（今まさに種目を追加している）セッションを渡し、
-// 自分自身を「前回」として参照しないようにする。
+// 自分自身を「前回」として参照しないようにする。セッションの外（ルーティンのテンプレートセット
+// プリフィル等）から呼ぶ場合は省略でき、その場合は全セッションが対象になる。
 export async function getPreviousSets(
-  tx: Tx,
+  tx: DbOrTx,
   exerciseId: number,
-  excludeSessionId: number,
+  excludeSessionId?: number,
 ): Promise<PreviousSetValues[]> {
   const [latestCard] = await tx
     .select({ workoutSessionExerciseId: sets.workoutSessionExerciseId })
@@ -28,7 +39,9 @@ export async function getPreviousSets(
     .innerJoin(workoutSessionExercises, eq(sets.workoutSessionExerciseId, workoutSessionExercises.id))
     .innerJoin(workoutSessions, eq(workoutSessionExercises.sessionId, workoutSessions.id))
     .where(
-      and(eq(sets.exerciseId, exerciseId), ne(workoutSessionExercises.sessionId, excludeSessionId)),
+      excludeSessionId != null
+        ? and(eq(sets.exerciseId, exerciseId), ne(workoutSessionExercises.sessionId, excludeSessionId))
+        : eq(sets.exerciseId, exerciseId),
     )
     // 同じ過去セッション内に同じ種目のカードが複数あるケース（ウォームアップ/本番等）の
     // タイブレークとしてカードid降順（＝そのセッション内で後から追加されたカード）も見る

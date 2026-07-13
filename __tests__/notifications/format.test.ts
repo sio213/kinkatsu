@@ -32,6 +32,7 @@ describe('formatNextFire', () => {
 describe('formatKindSummary: monthly 第N曜日', () => {
   const base: Reminder = {
     id: 1,
+    routineId: null,
     title: 't',
     body: 'b',
     kind: 'monthly',
@@ -63,6 +64,7 @@ describe('formatKindSummary: monthly 第N曜日', () => {
 describe('formatKindSummary: yearly', () => {
   const base: Reminder = {
     id: 1,
+    routineId: null,
     title: 't',
     body: 'b',
     kind: 'yearly',

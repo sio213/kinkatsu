@@ -3,6 +3,7 @@ import { buildEditInput } from '@/components/reminders/reminder-card';
 
 const base: Reminder = {
   id: 1,
+  routineId: null,
   title: 't',
   body: 'b',
   kind: 'yearly',

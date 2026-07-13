@@ -79,6 +79,9 @@ jest.mock('drizzle-orm', () => ({
 const mockGetPreviousSets = jest.fn();
 jest.mock('@/lib/workout/history', () => ({
   getPreviousSets: (...args: unknown[]) => mockGetPreviousSets(...args),
+  // hasAnyValueは値の絞り込みロジックそのものがこのファイルの検証対象なので、実装をモック化せず
+  // 本物をそのまま使う（jest.requireActualで元モジュールから取り出す）
+  hasAnyValue: jest.requireActual('@/lib/workout/history').hasAnyValue,
 }));
 
 import {

@@ -15,6 +15,7 @@ import m0010 from './0010_recording_feature_m1.sql';
 import m0011 from './0011_amused_night_nurse.sql';
 import m0012 from './0012_silky_purple_man.sql';
 import m0013 from './0013_nth_weekdays_multi_select.sql';
+import m0014 from './0014_routines.sql';
 
   export default {
     journal,
@@ -32,7 +33,7 @@ m0009,
 m0010,
 m0011,
 m0012,
-m0013
+m0013,
+m0014
     }
   }
-  
