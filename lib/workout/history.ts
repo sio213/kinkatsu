@@ -1,4 +1,4 @@
-import { db, type Tx } from '@/db/client';
+import { db, type DbOrTx } from '@/db/client';
 import { exercises, sets, workoutSessionExercises, workoutSessions } from '@/db/schema';
 import { UNKNOWN_CATEGORY_ORDER, CATEGORY_ORDER, type MeasurementType } from '@/lib/exercises/constants';
 import { and, desc, eq, inArray, isNotNull, ne } from 'drizzle-orm';
@@ -16,11 +16,12 @@ export type PreviousSetValues = {
 // 特定してから、そのカードのセット列を返す。✓未確定（completedAt null）のセットも「前回入力した値」
 // として含める（✓を押し忘れて終了したセッションの入力も前回の記録として活かすため）。
 // excludeSessionIdには呼び出し元の（今まさに種目を追加している）セッションを渡し、
-// 自分自身を「前回」として参照しないようにする。
+// 自分自身を「前回」として参照しないようにする。セッションの外（ルーティンのテンプレートセット
+// プリフィル等）から呼ぶ場合は省略でき、その場合は全セッションが対象になる。
 export async function getPreviousSets(
-  tx: Tx,
+  tx: DbOrTx,
   exerciseId: number,
-  excludeSessionId: number,
+  excludeSessionId?: number,
 ): Promise<PreviousSetValues[]> {
   const [latestCard] = await tx
     .select({ workoutSessionExerciseId: sets.workoutSessionExerciseId })
@@ -28,7 +29,9 @@ export async function getPreviousSets(
     .innerJoin(workoutSessionExercises, eq(sets.workoutSessionExerciseId, workoutSessionExercises.id))
     .innerJoin(workoutSessions, eq(workoutSessionExercises.sessionId, workoutSessions.id))
     .where(
-      and(eq(sets.exerciseId, exerciseId), ne(workoutSessionExercises.sessionId, excludeSessionId)),
+      excludeSessionId != null
+        ? and(eq(sets.exerciseId, exerciseId), ne(workoutSessionExercises.sessionId, excludeSessionId))
+        : eq(sets.exerciseId, exerciseId),
     )
     // 同じ過去セッション内に同じ種目のカードが複数あるケース（ウォームアップ/本番等）の
     // タイブレークとしてカードid降順（＝そのセッション内で後から追加されたカード）も見る

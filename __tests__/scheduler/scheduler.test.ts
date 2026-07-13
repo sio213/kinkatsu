@@ -134,6 +134,7 @@ describe('normalizeInput', () => {
 describe('resolveTriggerType: 月次', () => {
   const base = {
     id: 1,
+    routineId: null,
     title: 'test',
     body: 'test',
     kind: 'monthly' as const,
@@ -382,6 +383,7 @@ describe('resolveNthWeekdayDay 境界値', () => {
 describe('getNextFireDate (統合)', () => {
   const base = {
     id: 1,
+    routineId: null,
     title: 'test',
     body: 'test',
     hour: H,
@@ -549,6 +551,7 @@ describe('getNextFireDate (統合)', () => {
 describe('parseReminder: 毎年(旧形式)の後方互換', () => {
   const rawBase = {
     id: 1,
+    routineId: null,
     title: 'test',
     body: 'test',
     hour: H,

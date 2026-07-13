@@ -110,9 +110,71 @@ export const sets = sqliteTable(
 export type Set = typeof sets.$inferSelect;
 export type NewSet = typeof sets.$inferInsert;
 
+// ルーティン（種目のまとまりに名前を付けて保存したテンプレート）
+export const routines = sqliteTable('routines', {
+  id: integer('id').primaryKey({ autoIncrement: true }),
+  name: text('name').notNull(),
+  // 一覧での並び順（⋮メニューの上へ/下へ移動で更新）
+  orderIndex: integer('order_index').notNull(),
+  createdAt: integer('created_at').notNull(),
+  updatedAt: integer('updated_at').notNull(),
+});
+
+export type Routine = typeof routines.$inferSelect;
+export type NewRoutine = typeof routines.$inferInsert;
+
+// ルーティンに含まれる種目とその並び順（workoutSessionExercisesと同じ理由でセットとは独立させる）
+export const routineExercises = sqliteTable(
+  'routine_exercises',
+  {
+    id: integer('id').primaryKey({ autoIncrement: true }),
+    routineId: integer('routine_id')
+      .notNull()
+      .references(() => routines.id, { onDelete: 'cascade' }),
+    exerciseId: integer('exercise_id')
+      .notNull()
+      .references(() => exercises.id, { onDelete: 'restrict' }),
+    orderIndex: integer('order_index').notNull(),
+    createdAt: integer('created_at').notNull(),
+  },
+  (t) => ({
+    byRoutine: index('idx_re_routine').on(t.routineId),
+  }),
+);
+
+export type RoutineExercise = typeof routineExercises.$inferSelect;
+export type NewRoutineExercise = typeof routineExercises.$inferInsert;
+
+// ルーティンの目標セット（実施記録ではなくテンプレート値のため、sets と違い completedAt を持たない）
+export const routineSets = sqliteTable(
+  'routine_sets',
+  {
+    id: integer('id').primaryKey({ autoIncrement: true }),
+    routineExerciseId: integer('routine_exercise_id')
+      .notNull()
+      .references(() => routineExercises.id, { onDelete: 'cascade' }),
+    setNumber: integer('set_number').notNull(),
+    weight: real('weight'),
+    reps: integer('reps'),
+    durationSeconds: integer('duration_seconds'),
+    distanceMeters: real('distance_meters'),
+    createdAt: integer('created_at').notNull(),
+  },
+  (t) => ({
+    byRoutineExercise: index('idx_rs_routine_exercise').on(t.routineExerciseId),
+  }),
+);
+
+export type RoutineSet = typeof routineSets.$inferSelect;
+export type NewRoutineSet = typeof routineSets.$inferInsert;
+
 // リマインダー設定
 export const reminders = sqliteTable('reminders', {
   id: integer('id').primaryKey({ autoIncrement: true }),
+  // ルーティン由来のリマインダーはここにルーティンを指す。単体リマインダーはnull。
+  // ルーティン削除時はアプリ層のdeleteReminder()経由でOS通知キャンセル込みで先に消すため、
+  // ここでのset nullはあくまで安全網（削除漏れでリマインダー行だけ残っても孤児参照にしない）
+  routineId: integer('routine_id').references(() => routines.id, { onDelete: 'set null' }),
   title: text('title').notNull(),
   body: text('body').notNull(),
   // 'interval' | 'weekly' | 'monthly' | 'yearly'
@@ -136,7 +198,9 @@ export const reminders = sqliteTable('reminders', {
   enabled: integer('enabled', { mode: 'boolean' }).notNull().default(true),
   createdAt: integer('created_at').notNull(),
   updatedAt: integer('updated_at').notNull(),
-});
+}, (t) => ({
+  byRoutine: index('idx_reminders_routine').on(t.routineId),
+}));
 
 export type Reminder = typeof reminders.$inferSelect;
 export type NewReminder = typeof reminders.$inferInsert;
