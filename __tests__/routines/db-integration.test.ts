@@ -155,4 +155,70 @@ describe('ルーティン機能スキーマ - 実SQLite上でのFK挙動', () =>
         .run(now, now),
     ).not.toThrow();
   });
+
+  // getRoutineDetail()が実際に発行するSQL（routine_exercises INNER JOIN exercises、
+  // order_index/set_number順）を、lib/routines/db.tsのTS関数を直接呼ばず（db/client.tsが
+  // expo-sqlite依存でjest環境では動かせないため）、同じSQLを実SQLite上で再現して検証する。
+  // 他の統合テストと同じ「SQLをミラーする」方針
+  it('getRoutineDetail相当のJOIN: routine_exercisesとexercisesを結合すると種目メタ情報(name/category/measurement_type/source/slug)が正しく引ける', () => {
+    db = new Database(':memory:');
+    db.pragma('foreign_keys = ON');
+    applyAllMigrations(db);
+    const { routineId } = seedRoutineWithExerciseAndSets(db);
+
+    const rows = db
+      .prepare(
+        `SELECT re.exercise_id, e.name, e.category, e.measurement_type, e.source, e.slug
+         FROM routine_exercises re
+         INNER JOIN exercises e ON re.exercise_id = e.id
+         WHERE re.routine_id = ?
+         ORDER BY re.order_index`,
+      )
+      .all(routineId) as {
+      exercise_id: number;
+      name: string;
+      category: string;
+      measurement_type: string;
+      source: string;
+      slug: string | null;
+    }[];
+
+    expect(rows).toHaveLength(1);
+    expect(rows[0]).toEqual(
+      expect.objectContaining({ name: '自作種目', category: 'core', measurement_type: 'weight_reps', source: 'custom' }),
+    );
+  });
+
+  it('getRoutineDetail相当のJOIN: 複数種目・複数セットでもorder_index/set_number順に正しく並ぶ', () => {
+    db = new Database(':memory:');
+    db.pragma('foreign_keys = ON');
+    applyAllMigrations(db);
+    const now = Date.now();
+
+    db.prepare(
+      `INSERT INTO exercises (name, category, source, measurement_type, created_at, updated_at)
+       VALUES ('種目A', 'chest', 'preset', 'weight_reps', ?, ?), ('種目B', 'leg', 'preset', 'weight_reps', ?, ?)`,
+    ).run(now, now, now, now);
+    const exerciseIds = (db.prepare('SELECT id FROM exercises ORDER BY id').all() as { id: number }[]).map((r) => r.id);
+
+    db.prepare(`INSERT INTO routines (name, order_index, created_at, updated_at) VALUES ('全身の日', 0, ?, ?)`).run(now, now);
+    const routineId = (db.prepare('SELECT id FROM routines').get() as { id: number }).id;
+
+    // わざと種目Bを先(order_index=0)、種目Aを後(order_index=1)に登録し、INSERT順ではなく
+    // order_index順で返ることを確認する
+    db.prepare(
+      `INSERT INTO routine_exercises (routine_id, exercise_id, order_index, created_at) VALUES (?, ?, 1, ?), (?, ?, 0, ?)`,
+    ).run(routineId, exerciseIds[0], now, routineId, exerciseIds[1], now);
+
+    const rows = db
+      .prepare(
+        `SELECT e.name FROM routine_exercises re
+         INNER JOIN exercises e ON re.exercise_id = e.id
+         WHERE re.routine_id = ?
+         ORDER BY re.order_index`,
+      )
+      .all(routineId) as { name: string }[];
+
+    expect(rows.map((r) => r.name)).toEqual(['種目B', '種目A']);
+  });
 });

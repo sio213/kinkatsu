@@ -1,0 +1,61 @@
+import type { RoutineDetail, RoutineInput } from '@/lib/routines/db';
+import { z } from 'zod';
+
+const draftSetSchema = z.object({
+  weight: z.number().nullable(),
+  reps: z.number().nullable(),
+  durationSeconds: z.number().nullable(),
+  distanceMeters: z.number().nullable(),
+});
+
+// フォーム内部で持ち回る種目1件分の表示用データ。DB保存に必要なexerciseId/setsに加え、
+// 一覧行の表示（サムネイル・名前・カテゴリ・代表セット）に必要な情報も含める
+const draftExerciseSchema = z.object({
+  exerciseId: z.number(),
+  name: z.string(),
+  category: z.string(),
+  measurementType: z.string(),
+  source: z.string(),
+  slug: z.string().nullable(),
+  sets: z.array(draftSetSchema),
+});
+
+export type DraftExercise = z.infer<typeof draftExerciseSchema>;
+
+// exercisesは種目追加ピッカー・ドラフトストア経由でのみ増減し、ユーザーが直接編集する
+// フィールドではないため、エラーメッセージは「1件も無い」の1点のみで十分
+export const routineFormSchema = z.object({
+  name: z.string().trim().min(1, 'ルーティン名を入力してください'),
+  exercises: z.array(draftExerciseSchema).min(1, '種目を1つ以上追加してください'),
+});
+
+export type RoutineFormValues = z.infer<typeof routineFormSchema>;
+
+export function toRoutineInput(values: RoutineFormValues): RoutineInput {
+  return {
+    name: values.name,
+    exercises: values.exercises.map((e) => ({
+      exerciseId: e.exerciseId,
+      sets: e.sets,
+    })),
+  };
+}
+
+// 編集フォームの初期値読み込み用。getRoutineDetail()のDB行（種目メタ情報+セット）を
+// フォーム/ドラフトストアが扱うDraftExercise[]に変換する
+export function toDraftExercises(detail: RoutineDetail): DraftExercise[] {
+  return detail.exercises.map((e) => ({
+    exerciseId: e.exerciseId,
+    name: e.name,
+    category: e.category,
+    measurementType: e.measurementType,
+    source: e.source,
+    slug: e.slug,
+    sets: e.sets.map((s) => ({
+      weight: s.weight,
+      reps: s.reps,
+      durationSeconds: s.durationSeconds,
+      distanceMeters: s.distanceMeters,
+    })),
+  }));
+}

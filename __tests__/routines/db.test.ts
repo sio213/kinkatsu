@@ -26,11 +26,13 @@ jest.mock('@/db/client', () => {
     then: (resolve: (v: unknown) => void) => Promise<unknown>;
     where: (...args: unknown[]) => ReturnType<typeof makeSelectChain>;
     orderBy: (...args: unknown[]) => Promise<unknown>;
+    innerJoin: (...args: unknown[]) => ReturnType<typeof makeSelectChain>;
   } {
     return {
       then: (resolve: (v: unknown) => void) => Promise.resolve(mockSelectWhere(table, ...priorArgs)).then(resolve),
       where: (...args: unknown[]) => makeSelectChain(table, [...priorArgs, ...args]),
       orderBy: (...args: unknown[]) => Promise.resolve(mockSelectWhere(table, ...priorArgs, ...args)),
+      innerJoin: (...args: unknown[]) => makeSelectChain(table, [...priorArgs, ...args]),
     };
   }
   mockSelectFrom = jest.fn((table: unknown) => makeSelectChain(table, []));
@@ -79,6 +81,14 @@ jest.mock('@/db/schema', () => ({
     setNumber: 'routineSets.setNumber',
   },
   reminders: { id: 'reminders.id', routineId: 'reminders.routineId' },
+  exercises: {
+    id: 'exercises.id',
+    name: 'exercises.name',
+    category: 'exercises.category',
+    measurementType: 'exercises.measurementType',
+    source: 'exercises.source',
+    slug: 'exercises.slug',
+  },
 }));
 
 jest.mock('drizzle-orm', () => ({
