@@ -1,7 +1,8 @@
 import { chipStyles } from '@/components/exercises/chip-styles';
 import { BoxedTextInput } from '@/components/ui/boxed-text-input';
+import { FormField } from '@/components/ui/form-field';
+import { FormFieldStack } from '@/components/ui/form-field-stack';
 import { FormLabel } from '@/components/ui/form-label';
-import { SectionGroup } from '@/components/ui/section-group';
 import { Switch } from '@/components/ui/switch';
 import { Colors, Typography } from '@/constants/theme';
 import {
@@ -89,9 +90,8 @@ export const ExerciseForm = forwardRef<ExerciseFormHandle, Props>(function Exerc
   }, [submitDisabled, onSubmitDisabledChange]);
 
   return (
-    <View style={styles.container}>
-      <SectionGroup>
-        <FormLabel required>種目名</FormLabel>
+    <FormFieldStack>
+      <FormField label="種目名" required error={errors.name?.message}>
         <Controller
           control={control}
           name="name"
@@ -109,13 +109,9 @@ export const ExerciseForm = forwardRef<ExerciseFormHandle, Props>(function Exerc
             />
           )}
         />
-        {errors.name ? (
-          <Text style={styles.errorText}>{errors.name.message}</Text>
-        ) : null}
-      </SectionGroup>
+      </FormField>
 
-      <SectionGroup>
-        <FormLabel required>カテゴリ</FormLabel>
+      <FormField label="カテゴリ" required error={errors.category?.message}>
         <Controller
           control={control}
           name="category"
@@ -140,14 +136,10 @@ export const ExerciseForm = forwardRef<ExerciseFormHandle, Props>(function Exerc
             </View>
           )}
         />
-        {errors.category ? (
-          <Text style={styles.errorText}>{errors.category.message}</Text>
-        ) : null}
-      </SectionGroup>
+      </FormField>
 
       {!isPreset && (
-        <SectionGroup>
-          <FormLabel optional>フォームのポイント</FormLabel>
+        <FormField label="フォームのポイント" optional>
           <Controller
             control={control}
             name="formPoints"
@@ -189,11 +181,10 @@ export const ExerciseForm = forwardRef<ExerciseFormHandle, Props>(function Exerc
               </View>
             )}
           />
-        </SectionGroup>
+        </FormField>
       )}
 
-      <SectionGroup>
-        <FormLabel optional>メモ</FormLabel>
+      <FormField label="メモ" optional>
         <Controller
           control={control}
           name="note"
@@ -209,7 +200,7 @@ export const ExerciseForm = forwardRef<ExerciseFormHandle, Props>(function Exerc
             />
           )}
         />
-      </SectionGroup>
+      </FormField>
 
       <View style={styles.favoriteRow}>
         <FormLabel>お気に入りに追加</FormLabel>
@@ -225,16 +216,11 @@ export const ExerciseForm = forwardRef<ExerciseFormHandle, Props>(function Exerc
           )}
         />
       </View>
-    </View>
+    </FormFieldStack>
   );
 });
 
 const styles = StyleSheet.create({
-  // 各フィールドはSectionGroup(見出しと本文の間gap8)でグルーピングし、フィールド間は
-  // このcontainerのgapで区切る2階層構成。値はデザイン案(04新規作成/06編集フレーム)の
-  // フィールド間gap15〜16に合わせて16にしている（種目詳細画面のグループ間はgap20で別値）
-  container: { gap: 16 },
-
   // 種目名・フォームのポイントは箱(枠線・背景・角丸・横padding)とTextInput本体を
   // BoxedTextInputで分離している。border/borderColor/borderRadius/文字色は既定値の
   // ままなのでここではpaddingHorizontalの差分だけ持つ。詳細はcomponents/ui/boxed-text-input.tsxのコメント参照
@@ -255,8 +241,6 @@ const styles = StyleSheet.create({
     backgroundColor: Colors.surface,
     textAlignVertical: 'top',
   },
-
-  errorText: { ...Typography.caption, color: Colors.danger, marginTop: -4 },
 
   chipRow: { flexDirection: 'row', flexWrap: 'wrap', gap: 6 },
 
