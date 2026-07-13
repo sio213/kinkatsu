@@ -1,5 +1,19 @@
 import { useRoutineDraftStore } from '@/lib/routines/draft-store';
+import type { ReminderInput } from '@/lib/notifications/types';
 import type { DraftExercise } from '@/lib/routines/validation';
+
+function makeReminderInput(overrides: Partial<ReminderInput> = {}): ReminderInput {
+  return {
+    title: '胸の日',
+    body: '後でじゃなく、今やる。',
+    kind: 'interval',
+    hour: 18,
+    minute: 0,
+    intervalDays: 1,
+    enabled: true,
+    ...overrides,
+  };
+}
 
 function makeDraftExercise(exerciseId: number, overrides: Partial<DraftExercise> = {}): DraftExercise {
   return {
@@ -78,4 +92,55 @@ test('resetはexercisesを空配列に戻す', () => {
   hydrate([makeDraftExercise(1)]);
   reset();
   expect(useRoutineDraftStore.getState().exercises).toEqual([]);
+});
+
+describe('リマインダー関連の状態', () => {
+  test('初期状態はreminderEnabled:true・reminder:null(デフォルトON・未設定)', () => {
+    expect(useRoutineDraftStore.getState().reminderEnabled).toBe(true);
+    expect(useRoutineDraftStore.getState().reminder).toBeNull();
+  });
+
+  test('setReminderEnabledはトグル状態だけを変え、reminderの中身は消さない', () => {
+    const { setReminder, setReminderEnabled } = useRoutineDraftStore.getState();
+    const reminder = makeReminderInput();
+    setReminder(reminder);
+
+    setReminderEnabled(false);
+    expect(useRoutineDraftStore.getState().reminderEnabled).toBe(false);
+    expect(useRoutineDraftStore.getState().reminder).toEqual(reminder);
+
+    setReminderEnabled(true);
+    expect(useRoutineDraftStore.getState().reminderEnabled).toBe(true);
+    expect(useRoutineDraftStore.getState().reminder).toEqual(reminder);
+  });
+
+  test('setReminderは設定内容を置き換える', () => {
+    const { setReminder } = useRoutineDraftStore.getState();
+    setReminder(makeReminderInput({ kind: 'weekly', weekdays: [1, 3] }));
+
+    expect(useRoutineDraftStore.getState().reminder).toEqual(
+      expect.objectContaining({ kind: 'weekly', weekdays: [1, 3] }),
+    );
+  });
+
+  test('hydrateReminderは既存ルーティンのリマインダー設定を読み込む', () => {
+    const { hydrateReminder } = useRoutineDraftStore.getState();
+    const reminder = makeReminderInput({ enabled: false });
+
+    hydrateReminder({ enabled: false, reminder });
+
+    expect(useRoutineDraftStore.getState().reminderEnabled).toBe(false);
+    expect(useRoutineDraftStore.getState().reminder).toEqual(reminder);
+  });
+
+  test('resetはreminderEnabled:true・reminder:nullに戻す', () => {
+    const { setReminder, setReminderEnabled, reset } = useRoutineDraftStore.getState();
+    setReminder(makeReminderInput());
+    setReminderEnabled(false);
+
+    reset();
+
+    expect(useRoutineDraftStore.getState().reminderEnabled).toBe(true);
+    expect(useRoutineDraftStore.getState().reminder).toBeNull();
+  });
 });

@@ -1,7 +1,7 @@
 import React from 'react';
 import { act, create, type ReactTestInstance } from 'react-test-renderer';
 import { Text, TouchableOpacity } from 'react-native';
-import { ReminderForm } from '@/components/reminders/reminder-form';
+import { ReminderForm, type ReminderFormHandle } from '@/components/reminders/reminder-form';
 
 function findChipByLabel(root: ReactTestInstance, label: string | number) {
   return root
@@ -475,5 +475,73 @@ describe('showTitleBody: タイトル・通知内容欄の表示切り替え', (
     await press(root, '月');
     await submit(root);
     expect(onSubmit).toHaveBeenCalledWith(expect.objectContaining({ kind: 'weekly', weekdays: [1] }));
+  });
+});
+
+describe('hideButtons: 呼び出し側が独自フッターを持つ場合', () => {
+  // app/routine/reminder.tsxのように、内蔵のキャンセル/確定ボタンを消してrefのsubmit()経由で
+  // 呼ぶ使い方(RoutineFormScreen等の固定フッター型に合わせるため)の回帰テスト
+  test('trueにすると内蔵のキャンセル/確定ボタンが表示されない', async () => {
+    const { root } = await render({ hideButtons: true });
+
+    expect(() => findChipByLabel(root, '保存')).not.toThrow();
+    expect(findChipByLabel(root, '保存')).toBeUndefined();
+    expect(findChipByLabel(root, 'キャンセル')).toBeUndefined();
+  });
+
+  test('refのsubmit()経由でonSubmitが呼べる', async () => {
+    const onSubmit = jest.fn();
+    const formRef = React.createRef<ReminderFormHandle>();
+    await act(async () => {
+      create(
+        React.createElement(ReminderForm, {
+          ref: formRef,
+          onSubmit,
+          onCancel: jest.fn(),
+          submitLabel: '保存',
+          hideButtons: true,
+        }),
+      );
+    });
+
+    await act(async () => {
+      formRef.current?.submit();
+    });
+
+    expect(onSubmit).toHaveBeenCalled();
+  });
+
+  test('onSubmitDisabledChangeで送信不可の状態変化を呼び出し側に伝える', async () => {
+    const onSubmitDisabledChange = jest.fn();
+    const formRef = React.createRef<ReminderFormHandle>();
+    await act(async () => {
+      create(
+        React.createElement(ReminderForm, {
+          ref: formRef,
+          onSubmit: jest.fn(),
+          onCancel: jest.fn(),
+          submitLabel: '保存',
+          hideButtons: true,
+          onSubmitDisabledChange,
+          initial: {
+            title: '',
+            body: '',
+            kind: 'weekly',
+            hour: 18,
+            minute: 0,
+            weekdays: [],
+            intervalDays: 7,
+            enabled: true,
+          },
+        }),
+      );
+    });
+    onSubmitDisabledChange.mockClear();
+
+    await act(async () => {
+      formRef.current?.submit();
+    });
+
+    expect(onSubmitDisabledChange).toHaveBeenCalledWith(true);
   });
 });

@@ -11,12 +11,13 @@ type Props = {
   onSubmit: (values: RoutineFormValues) => void;
   onAddExercise: () => void;
   onPressExercise: () => void;
+  onPressReminder: () => void;
 };
 
 // ルーティンの新規作成・編集で共通の「フォーム＋下部固定の保存ボタン」の画面シェル。
 // components/exercises/exercise-form-screen.tsxと同じ構造。保存ボタンはこの中で完結するため
 // （呼び出し側から外部トリガーで保存する必要が無いため）forwardRefは持たない
-export function RoutineFormScreen({ initialName, onSubmit, onAddExercise, onPressExercise }: Props) {
+export function RoutineFormScreen({ initialName, onSubmit, onAddExercise, onPressExercise, onPressReminder }: Props) {
   const formRef = useRef<RoutineFormHandle>(null);
   const [submitDisabled, setSubmitDisabled] = useState(false);
 
@@ -31,6 +32,7 @@ export function RoutineFormScreen({ initialName, onSubmit, onAddExercise, onPres
             onSubmitDisabledChange={setSubmitDisabled}
             onAddExercise={onAddExercise}
             onPressExercise={onPressExercise}
+            onPressReminder={onPressReminder}
           />
         </ScrollView>
         <View style={styles.footer}>

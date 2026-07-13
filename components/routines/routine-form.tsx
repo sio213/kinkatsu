@@ -1,14 +1,16 @@
 import { RoutineAddExerciseButton } from '@/components/routines/routine-add-exercise-button';
 import { RoutineExerciseRow } from '@/components/routines/routine-exercise-row';
+import { RoutineReminderField } from '@/components/routines/routine-reminder-field';
 import { BoxedTextInput } from '@/components/ui/boxed-text-input';
 import { FormField } from '@/components/ui/form-field';
 import { FormFieldStack } from '@/components/ui/form-field-stack';
 import { Typography } from '@/constants/theme';
 import { useRoutineDraftStore } from '@/lib/routines/draft-store';
+import { ensurePermission, getPermissionState, type PermissionState } from '@/lib/notifications/permissions';
 import { routineFormSchema, type RoutineFormValues } from '@/lib/routines/validation';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { useFocusEffect } from 'expo-router';
-import { forwardRef, useCallback, useEffect, useImperativeHandle } from 'react';
+import { forwardRef, useCallback, useEffect, useImperativeHandle, useState } from 'react';
 import { Controller, useForm } from 'react-hook-form';
 import { Keyboard, StyleSheet, View } from 'react-native';
 
@@ -20,6 +22,7 @@ type Props = {
   onSubmitDisabledChange?: (disabled: boolean) => void;
   onAddExercise: () => void;
   onPressExercise: () => void;
+  onPressReminder: () => void;
 };
 
 // ルーティンの新規作成(app/routine/new.tsx)・編集(app/routine/edit/[id].tsx)で共通のフォーム本体。
@@ -27,10 +30,14 @@ type Props = {
 // テンプレートセット編集画面を行き来しても消えないよう useRoutineDraftStore（zustand）を
 // 唯一の情報源にし、画面がフォーカスを取り戻すたびにフォーム値へ同期する
 export const RoutineForm = forwardRef<RoutineFormHandle, Props>(function RoutineForm(
-  { initialName = '', onSubmit, onSubmitDisabledChange, onAddExercise, onPressExercise },
+  { initialName = '', onSubmit, onSubmitDisabledChange, onAddExercise, onPressExercise, onPressReminder },
   ref,
 ) {
   const draftExercises = useRoutineDraftStore((state) => state.exercises);
+  const reminderEnabled = useRoutineDraftStore((state) => state.reminderEnabled);
+  const reminder = useRoutineDraftStore((state) => state.reminder);
+  const setReminderEnabled = useRoutineDraftStore((state) => state.setReminderEnabled);
+  const [permState, setPermState] = useState<PermissionState | null>(null);
 
   const {
     control,
@@ -40,12 +47,28 @@ export const RoutineForm = forwardRef<RoutineFormHandle, Props>(function Routine
     formState: { errors, isSubmitted, isSubmitting },
   } = useForm<RoutineFormValues>({
     resolver: zodResolver(routineFormSchema),
-    defaultValues: { name: initialName, exercises: draftExercises },
+    defaultValues: { name: initialName, exercises: draftExercises, reminderEnabled, reminder },
   });
 
   const exercises = watch('exercises');
   const hasErrors = Object.keys(errors).length > 0;
   const submitDisabled = isSubmitting || (isSubmitted && hasErrors);
+
+  useEffect(() => {
+    getPermissionState().then(setPermState);
+  }, []);
+
+  const handleRequestPermission = useCallback(async () => {
+    const r = await ensurePermission();
+    setPermState(r);
+  }, []);
+
+  const handleToggleReminderEnabled = useCallback(
+    (next: boolean) => {
+      setReminderEnabled(next);
+    },
+    [setReminderEnabled],
+  );
 
   useImperativeHandle(ref, () => ({ submit: () => handleSubmit(onSubmit)() }), [handleSubmit, onSubmit]);
 
@@ -72,6 +95,18 @@ export const RoutineForm = forwardRef<RoutineFormHandle, Props>(function Routine
     // 同期したいのはdraftExercisesが変わったときだけでよい
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [draftExercises]);
+
+  // リマインダー設定画面(app/routine/reminder.tsx)を行き来しても消えないよう、exercisesと
+  // 同じくドラフトストアを唯一の情報源にしてフォーム値へ同期する
+  useEffect(() => {
+    setValue('reminderEnabled', reminderEnabled, { shouldValidate: isSubmitted });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [reminderEnabled]);
+
+  useEffect(() => {
+    setValue('reminder', reminder, { shouldValidate: isSubmitted });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [reminder]);
 
   return (
     <FormFieldStack>
@@ -108,6 +143,18 @@ export const RoutineForm = forwardRef<RoutineFormHandle, Props>(function Routine
             <RoutineAddExerciseButton variant="ghost" onPress={onAddExercise} />
           </View>
         )}
+      </FormField>
+
+      <FormField label="リマインダー" error={errors.reminder?.message}>
+        <RoutineReminderField
+          enabled={reminderEnabled}
+          onToggleEnabled={handleToggleReminderEnabled}
+          reminder={reminder}
+          onPressConfigure={onPressReminder}
+          permState={permState}
+          onRequestPermission={handleRequestPermission}
+          now={new Date()}
+        />
       </FormField>
     </FormFieldStack>
   );

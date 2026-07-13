@@ -23,7 +23,7 @@ export default function RoutineNewScreen() {
   const handleSubmit = useCallback(
     async (values: RoutineFormValues) => {
       try {
-        await createRoutine(toRoutineInput(values));
+        await createRoutine(toRoutineInput(values), { enabled: values.reminderEnabled, input: values.reminder });
         resetDraft();
         router.back();
       } catch (e) {
@@ -42,11 +42,16 @@ export default function RoutineNewScreen() {
     router.push('/routine/exercise-edit');
   }, [router]);
 
+  const handlePressReminder = useCallback(() => {
+    router.push('/routine/reminder');
+  }, [router]);
+
   return (
     <RoutineFormScreen
       onSubmit={handleSubmit}
       onAddExercise={handleAddExercise}
       onPressExercise={handlePressExercise}
+      onPressReminder={handlePressReminder}
     />
   );
 }

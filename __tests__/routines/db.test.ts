@@ -97,8 +97,12 @@ jest.mock('drizzle-orm', () => ({
 }));
 
 const mockDeleteReminder = jest.fn();
+const mockCreateReminder = jest.fn();
+const mockUpdateReminder = jest.fn();
 jest.mock('@/lib/notifications/scheduler', () => ({
   deleteReminder: (...args: unknown[]) => mockDeleteReminder(...args),
+  createReminder: (...args: unknown[]) => mockCreateReminder(...args),
+  updateReminder: (...args: unknown[]) => mockUpdateReminder(...args),
 }));
 
 const mockGetPreviousSets = jest.fn();
@@ -128,6 +132,8 @@ beforeEach(() => {
   mockDeleteWhere.mockReset().mockResolvedValue(undefined);
   mockSelectWhere.mockReset().mockResolvedValue([]);
   mockDeleteReminder.mockReset().mockResolvedValue(undefined);
+  mockCreateReminder.mockReset().mockResolvedValue(1);
+  mockUpdateReminder.mockReset().mockResolvedValue(undefined);
   mockGetPreviousSets.mockReset().mockResolvedValue([]);
 });
 
@@ -247,6 +253,122 @@ describe('updateRoutine', () => {
   });
 });
 
+describe('createRoutine/updateRoutine: reminderPlanの反映', () => {
+  test('createRoutineはreminderPlan未指定なら、紐づくリマインダーの検索すら行わない', async () => {
+    mockSelectWhere.mockResolvedValueOnce([]); // existing routines一覧のみ
+    await createRoutine({ name: '胸の日', exercises: [] });
+
+    expect(mockCreateReminder).not.toHaveBeenCalled();
+    expect(mockUpdateReminder).not.toHaveBeenCalled();
+    expect(mockSelectWhere).toHaveBeenCalledTimes(1);
+  });
+
+  test('createRoutineはreminderPlan.inputがあれば、新しいroutineIdとルーティン名でcreateReminderを呼ぶ', async () => {
+    mockSelectWhere
+      .mockResolvedValueOnce([]) // existing routines一覧
+      .mockResolvedValueOnce([]); // 紐づくリマインダー検索(新規なので無し)
+
+    await createRoutine(
+      { name: '胸の日', exercises: [] },
+      { enabled: true, input: { title: 'x', body: 'y', kind: 'interval', hour: 18, minute: 0, intervalDays: 1, enabled: true } },
+    );
+
+    expect(mockCreateReminder).toHaveBeenCalledWith(
+      expect.objectContaining({ routineId: 1, title: '胸の日', enabled: true }),
+    );
+    expect(mockUpdateReminder).not.toHaveBeenCalled();
+  });
+
+  test('createRoutineはreminderPlan.inputがnullなら、createReminderは呼ばれない', async () => {
+    mockSelectWhere.mockResolvedValueOnce([]).mockResolvedValueOnce([]);
+
+    await createRoutine({ name: '有酸素', exercises: [] }, { enabled: false, input: null });
+
+    expect(mockCreateReminder).not.toHaveBeenCalled();
+    expect(mockDeleteReminder).not.toHaveBeenCalled();
+  });
+
+  test('updateRoutineは既存の紐づくリマインダーがあれば、そのidでupdateReminderを呼ぶ(createReminderは呼ばれない)', async () => {
+    mockSelectWhere.mockResolvedValueOnce([{ id: 42 }]); // 紐づくリマインダー検索
+
+    await updateRoutine(
+      1,
+      { name: '胸の日(改)', exercises: [] },
+      { enabled: false, input: { title: 'x', body: 'y', kind: 'weekly', hour: 7, minute: 0, weekdays: [1], intervalDays: 7, enabled: true } },
+    );
+
+    expect(mockUpdateReminder).toHaveBeenCalledWith(
+      42,
+      expect.objectContaining({ routineId: 1, title: '胸の日(改)', enabled: false }),
+    );
+    expect(mockCreateReminder).not.toHaveBeenCalled();
+  });
+
+  test('updateRoutineは既存の紐づくリマインダーが無ければ、createReminderを呼ぶ', async () => {
+    mockSelectWhere.mockResolvedValueOnce([]);
+
+    await updateRoutine(
+      1,
+      { name: '胸の日', exercises: [] },
+      { enabled: true, input: { title: 'x', body: 'y', kind: 'interval', hour: 18, minute: 0, intervalDays: 1, enabled: true } },
+    );
+
+    expect(mockCreateReminder).toHaveBeenCalledWith(expect.objectContaining({ routineId: 1 }));
+    expect(mockUpdateReminder).not.toHaveBeenCalled();
+  });
+
+  test('updateRoutineはreminderPlan.inputがnullで既存のリマインダーが残っていれば、防御的にdeleteReminderする', async () => {
+    mockSelectWhere.mockResolvedValueOnce([{ id: 42 }]);
+
+    await updateRoutine(1, { name: '胸の日', exercises: [] }, { enabled: false, input: null });
+
+    expect(mockDeleteReminder).toHaveBeenCalledWith(42);
+    expect(mockCreateReminder).not.toHaveBeenCalled();
+    expect(mockUpdateReminder).not.toHaveBeenCalled();
+  });
+
+  test('createRoutineはplan.enabled:falseでもreminderPlan.inputが設定済みなら、enabled:falseでcreateReminderを呼ぶ', async () => {
+    mockSelectWhere.mockResolvedValueOnce([]).mockResolvedValueOnce([]);
+
+    await createRoutine(
+      { name: '胸の日', exercises: [] },
+      { enabled: false, input: { title: 'x', body: 'y', kind: 'interval', hour: 18, minute: 0, intervalDays: 1, enabled: true } },
+    );
+
+    expect(mockCreateReminder).toHaveBeenCalledWith(expect.objectContaining({ enabled: false }));
+  });
+
+  // ルーティン本体(routines/routineExercises)は既にトランザクションで確定した後にリマインダーの
+  // create/update/deleteを行うため、そこで失敗してもルーティン保存自体は失敗扱いにしない
+  // (失敗扱いにすると、ユーザーが保存をリトライして既に保存済みのルーティンが重複作成されてしまう)
+  test('createRoutineはリマインダーの登録(createReminder)が失敗しても例外を投げず、routineIdを返す', async () => {
+    mockSelectWhere.mockResolvedValueOnce([]).mockResolvedValueOnce([]);
+    mockCreateReminder.mockRejectedValueOnce(new Error('scheduling failed'));
+    jest.spyOn(console, 'error').mockImplementation(() => {});
+
+    const routineId = await createRoutine(
+      { name: '胸の日', exercises: [] },
+      { enabled: true, input: { title: 'x', body: 'y', kind: 'interval', hour: 18, minute: 0, intervalDays: 1, enabled: true } },
+    );
+
+    expect(routineId).toBe(1);
+  });
+
+  test('updateRoutineはリマインダーの登録(updateReminder)が失敗しても例外を投げない', async () => {
+    mockSelectWhere.mockResolvedValueOnce([{ id: 42 }]);
+    mockUpdateReminder.mockRejectedValueOnce(new Error('scheduling failed'));
+    jest.spyOn(console, 'error').mockImplementation(() => {});
+
+    await expect(
+      updateRoutine(
+        1,
+        { name: '胸の日', exercises: [] },
+        { enabled: true, input: { title: 'x', body: 'y', kind: 'interval', hour: 18, minute: 0, intervalDays: 1, enabled: true } },
+      ),
+    ).resolves.toBeUndefined();
+  });
+});
+
 describe('deleteRoutine', () => {
   test('紐づくリマインダーが無ければdeleteReminderは呼ばれず、routinesだけ削除される', async () => {
     mockSelectWhere.mockResolvedValueOnce([]); // linked reminders検索
@@ -362,6 +484,29 @@ describe('getRoutineDetail', () => {
     const ex20 = result?.exercises.find((e) => e.id === 20);
     expect(ex10?.sets.map((s) => s.id)).toEqual([1, 3]);
     expect(ex20?.sets.map((s) => s.id)).toEqual([2]);
+  });
+
+  test('紐づくリマインダーが無ければreminder: nullを返す', async () => {
+    mockSelectWhere
+      .mockResolvedValueOnce([{ id: 1, name: '胸の日' }]) // routines
+      .mockResolvedValueOnce([]) // routineExercises
+      .mockResolvedValueOnce([]); // reminders検索
+
+    const result = await getRoutineDetail(1);
+
+    expect(result?.reminder).toBeNull();
+  });
+
+  test('紐づくリマインダーがあればその行を返す', async () => {
+    const reminderRow = { id: 42, routineId: 1, title: '胸の日', enabled: true };
+    mockSelectWhere
+      .mockResolvedValueOnce([{ id: 1, name: '胸の日' }]) // routines
+      .mockResolvedValueOnce([]) // routineExercises
+      .mockResolvedValueOnce([reminderRow]); // reminders検索
+
+    const result = await getRoutineDetail(1);
+
+    expect(result?.reminder).toEqual(reminderRow);
   });
 });
 

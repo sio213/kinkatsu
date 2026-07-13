@@ -1,5 +1,6 @@
+import type { Reminder } from '@/db/schema';
 import { z } from 'zod';
-import type { ReminderInput } from './types';
+import type { ReminderInput, ReminderKind } from './types';
 
 // ReminderFormは「日単位/週単位/月単位/年単位」の4モードを1画面で切り替える構造上、
 // 選択中でないモードのフィールドも常にフォーム値として保持する（例: 週単位を選んでいる間も
@@ -56,6 +57,36 @@ export const reminderFormSchema = z
   });
 
 export type ReminderFormValues = z.infer<typeof reminderFormSchema>;
+
+// DB行(Reminder)をReminderForm/toFormValuesが読めるReminderInputへ変換する。
+// components/reminders/reminder-card.tsxの編集フォーム、ルーティンフォームの
+// リマインダーセクション(既存ルーティン編集時の初期値復元)の両方から使う
+export function buildEditInput(r: Reminder): ReminderInput {
+  return {
+    // ルーティン由来のリマインダー(routineId有り)を編集・保存する経路がここに来た場合でも
+    // 紐付けを保つため引き継ぐ。省略するとupdateReminder側でnull扱いになり、保存のたびに
+    // ルーティンとの紐付けが切れてしまう
+    routineId: r.routineId,
+    title: r.title,
+    body: r.body,
+    kind: r.kind as ReminderKind,
+    hour: r.hour,
+    minute: r.minute,
+    weekdays: r.weekdays ? JSON.parse(r.weekdays) : undefined,
+    // monthdays未設定の毎年は、以前anchorDateに発火日そのものをエンコードしていた旧形式のデータ
+    monthdays: r.monthdays
+      ? JSON.parse(r.monthdays)
+      : r.kind === 'yearly' && r.anchorDate
+        ? [new Date(r.anchorDate).getDate()]
+        : undefined,
+    anchorDate: r.anchorDate ?? undefined,
+    intervalDays: r.intervalDays ?? undefined,
+    intervalMonths: r.intervalMonths ?? undefined,
+    nthWeek: r.nthWeek ?? undefined,
+    nthWeekdays: r.nthWeekdays ? JSON.parse(r.nthWeekdays) : undefined,
+    enabled: r.enabled,
+  };
+}
 
 export function toFormValues(input: ReminderInput): ReminderFormValues {
   const anchor = input.anchorDate ? new Date(input.anchorDate) : null;

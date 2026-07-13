@@ -17,7 +17,7 @@ import {
 } from '@/lib/notifications/validation';
 import { zodResolver } from '@hookform/resolvers/zod';
 import DateTimePicker from '@react-native-community/datetimepicker';
-import { useState } from 'react';
+import { forwardRef, useEffect, useImperativeHandle, useState } from 'react';
 import { Controller, useForm } from 'react-hook-form';
 import {
   Platform,
@@ -104,6 +104,8 @@ function DayMultiSelectGrid({
   );
 }
 
+export type ReminderFormHandle = { submit: () => void };
+
 type Props = {
   initial?: ReminderInput;
   onSubmit: (input: ReminderInput) => void;
@@ -116,16 +118,28 @@ type Props = {
   // 呼び出し側は必ず非空のinitial.title/bodyを渡すこと(欄が無いためエラー表示のしようがなく、
   // 空のままだとバリデーションに引っかかって保存ボタンが理由不明のまま押せなくなる)
   showTitleBody?: boolean;
+  // ルーティンフォームのリマインダー設定画面(app/routine/reminder.tsx)のように、呼び出し側が
+  // 独自の固定フッター(RoutineFormScreen等と同じ型)を持つ場合、内蔵のキャンセル/確定ボタンを
+  // 非表示にしrefのsubmit()経由で呼べるようにする
+  hideButtons?: boolean;
+  // hideButtons使用時、外部フッターの確定ボタンのdisabled状態をRoutineForm等と同じ形で
+  // 呼び出し側に伝える
+  onSubmitDisabledChange?: (disabled: boolean) => void;
 };
 
-export function ReminderForm({
-  initial = DEFAULT_INPUT,
-  onSubmit,
-  onCancel,
-  submitLabel,
-  showPresets = true,
-  showTitleBody = true,
-}: Props) {
+export const ReminderForm = forwardRef<ReminderFormHandle, Props>(function ReminderForm(
+  {
+    initial = DEFAULT_INPUT,
+    onSubmit,
+    onCancel,
+    submitLabel,
+    showPresets = true,
+    showTitleBody = true,
+    hideButtons = false,
+    onSubmitDisabledChange,
+  }: Props,
+  ref,
+) {
   const [showAndroidTimePicker, setShowAndroidTimePicker] = useState(false);
 
   const {
@@ -140,6 +154,10 @@ export function ReminderForm({
   });
   const hasErrors = Object.keys(errors).length > 0;
   const submitDisabled = isSubmitted && hasErrors;
+
+  useEffect(() => {
+    onSubmitDisabledChange?.(submitDisabled);
+  }, [submitDisabled, onSubmitDisabledChange]);
 
   const kind = watch('kind');
   const hour = watch('hour');
@@ -210,6 +228,8 @@ export function ReminderForm({
     // ルーティン由来のリマインダーを編集・保存してもルーティンとの紐付けが消えないようにする
     onSubmit({ ...toReminderInput(values), routineId: initial.routineId ?? null });
   }
+
+  useImperativeHandle(ref, () => ({ submit: () => handleSubmit(handleValid)() }));
 
   const timeDate = new Date();
   timeDate.setHours(hour, minute, 0, 0);
@@ -509,26 +529,28 @@ export function ReminderForm({
         )}
       </FormFieldStack>
 
-      <View style={styles.buttons}>
-        <TouchableOpacity
-          style={styles.cancelBtn}
-          onPress={onCancel}
-          accessibilityLabel="キャンセル"
-        >
-          <Text style={styles.cancelBtnText}>キャンセル</Text>
-        </TouchableOpacity>
-        <TouchableOpacity
-          style={[styles.submitBtn, submitDisabled && styles.submitBtnDisabled]}
-          onPress={handleSubmit(handleValid)}
-          disabled={submitDisabled}
-          accessibilityLabel={submitLabel}
-        >
-          <Text style={styles.submitBtnText}>{submitLabel}</Text>
-        </TouchableOpacity>
-      </View>
+      {!hideButtons && (
+        <View style={styles.buttons}>
+          <TouchableOpacity
+            style={styles.cancelBtn}
+            onPress={onCancel}
+            accessibilityLabel="キャンセル"
+          >
+            <Text style={styles.cancelBtnText}>キャンセル</Text>
+          </TouchableOpacity>
+          <TouchableOpacity
+            style={[styles.submitBtn, submitDisabled && styles.submitBtnDisabled]}
+            onPress={handleSubmit(handleValid)}
+            disabled={submitDisabled}
+            accessibilityLabel={submitLabel}
+          >
+            <Text style={styles.submitBtnText}>{submitLabel}</Text>
+          </TouchableOpacity>
+        </View>
+      )}
     </>
   );
-}
+});
 
 const styles = StyleSheet.create({
   // タイトルは箱(枠線・背景・角丸・横padding)とTextInput本体をBoxedTextInputで分離

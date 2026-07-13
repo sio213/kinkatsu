@@ -4,7 +4,7 @@ import { Colors } from '@/constants/theme';
 import { useRoutines } from '@/hooks/use-routines';
 import { getRoutineDetail } from '@/lib/routines/db';
 import { useRoutineDraftStore } from '@/lib/routines/draft-store';
-import { toDraftExercises, toRoutineInput, type RoutineFormValues } from '@/lib/routines/validation';
+import { toDraftExercises, toDraftReminder, toRoutineInput, type RoutineFormValues } from '@/lib/routines/validation';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { useCallback, useEffect, useState } from 'react';
 import { ActivityIndicator, Alert, StyleSheet, View } from 'react-native';
@@ -18,6 +18,7 @@ export default function RoutineEditScreen() {
   const router = useRouter();
   const { updateRoutine } = useRoutines();
   const hydrateDraft = useRoutineDraftStore((state) => state.hydrate);
+  const hydrateReminderDraft = useRoutineDraftStore((state) => state.hydrateReminder);
 
   // getRoutineDetailはlive queryではなく一度きりの取得。以降の編集内容はドラフトストアが
   // 唯一の情報源になり、保存時にupdateRoutineへまとめて書き戻す
@@ -40,6 +41,7 @@ export default function RoutineEditScreen() {
         }
         setName(detail.routine.name);
         hydrateDraft(toDraftExercises(detail));
+        hydrateReminderDraft(toDraftReminder(detail));
         setStatus('ready');
       })
       .catch((e) => {
@@ -50,12 +52,15 @@ export default function RoutineEditScreen() {
     return () => {
       cancelled = true;
     };
-  }, [routineId, hydrateDraft]);
+  }, [routineId, hydrateDraft, hydrateReminderDraft]);
 
   const handleSubmit = useCallback(
     async (values: RoutineFormValues) => {
       try {
-        await updateRoutine(routineId, toRoutineInput(values));
+        await updateRoutine(routineId, toRoutineInput(values), {
+          enabled: values.reminderEnabled,
+          input: values.reminder,
+        });
         router.back();
       } catch (e) {
         console.error('[routine update]', e);
@@ -71,6 +76,10 @@ export default function RoutineEditScreen() {
 
   const handlePressExercise = useCallback(() => {
     router.push('/routine/exercise-edit');
+  }, [router]);
+
+  const handlePressReminder = useCallback(() => {
+    router.push('/routine/reminder');
   }, [router]);
 
   if (status === 'loading') {
@@ -102,6 +111,7 @@ export default function RoutineEditScreen() {
       onSubmit={handleSubmit}
       onAddExercise={handleAddExercise}
       onPressExercise={handlePressExercise}
+      onPressReminder={handlePressReminder}
     />
   );
 }

@@ -2,7 +2,8 @@ import type { Reminder } from '@/db/schema';
 
 export type ReminderKind = 'interval' | 'weekly' | 'monthly' | 'yearly';
 
-export type TriggerType = 'native' | 'queue';
+// トリガー種別(native/queue)はスケジュール計算(lib/notifications/schedule-math.ts)側の
+// 概念のためそちらで定義する。ここでは持たない
 
 // monthdays 内で月末を表す番兵値
 export const MONTH_END = 99 as const;
