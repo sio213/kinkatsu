@@ -19,13 +19,14 @@ export type ReminderInput = {
   intervalDays?: number; // interval のみ
   intervalMonths?: number; // month_interval のみ
   nthWeek?: number; // monthly/month_interval: 第N週 (1〜4, -1=最終)
-  nthWeekday?: number; // monthly/month_interval: 曜日 (0=日〜6=土)
+  nthWeekdays?: number[]; // monthly/month_interval: 曜日(複数選択可) 0=日〜6=土
   enabled: boolean;
 };
 
-export type ParsedReminder = Omit<Reminder, 'weekdays' | 'monthdays'> & {
+export type ParsedReminder = Omit<Reminder, 'weekdays' | 'monthdays' | 'nthWeekdays'> & {
   weekdays: number[] | null;
   monthdays: number[] | null;
+  nthWeekdays: number[] | null;
 };
 
 // 通知タップ時の遷移先判定に使う識別子。scheduler側（生成）とタップハンドラ側（消費）で共有する

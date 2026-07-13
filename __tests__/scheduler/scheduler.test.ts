@@ -17,12 +17,14 @@ import {
   computeIntervalFireDates,
   computeMonthIntervalFireDates,
   computeMonthlyQueueFireDates,
+  computeNthWeekdayFireDates,
   computeYearlyFireDates,
   getNextFireDate,
   nextDailyFireDate,
   nextWeeklyFireDate,
   normalizeInput,
   resolveMonthDay,
+  resolveNthWeekdayDay,
   resolveTriggerType,
 } from '@/lib/notifications/scheduler';
 import { MONTH_END } from '@/lib/notifications/types';
@@ -140,7 +142,7 @@ describe('resolveTriggerType: 月次', () => {
     anchorDate: null,
     intervalDays: null,
     nthWeek: null,
-    nthWeekday: null,
+    nthWeekdays: null,
     enabled: true,
     createdAt: 0,
     updatedAt: 0,
@@ -152,6 +154,12 @@ describe('resolveTriggerType: 月次', () => {
 
   test('intervalMonths===1・29日未満の通常日付のみならnative', () => {
     expect(resolveTriggerType({ ...base, intervalMonths: 1, monthdays: [1, 15] })).toBe('native');
+  });
+
+  test('第N曜日(複数曜日選択)は常にqueue', () => {
+    expect(
+      resolveTriggerType({ ...base, intervalMonths: 1, nthWeek: 2, nthWeekdays: [1, 3], monthdays: null }),
+    ).toBe('queue');
   });
 });
 
@@ -323,6 +331,51 @@ describe('月末にリマインド', () => {
 });
 
 // ─────────────────────────────────────────────
+// 第N曜日にリマインド (monthly, nth week)
+// ─────────────────────────────────────────────
+describe('第N曜日にリマインド', () => {
+  test('単一曜日選択(後方互換): 第2月曜のみ返す', () => {
+    const dates = computeNthWeekdayFireDates(FROM, 2, [1], H, M, 1);
+    expect(dates[0]).toEqual(d('2026-01-12T07:00:00')); // 第2月曜
+  });
+
+  test('複数曜日選択: 同じ月内で日付順に複数返す', () => {
+    // 第2週の月・水 → 2026年1月は第2月曜=1/12, 第2水曜=1/14
+    const dates = computeNthWeekdayFireDates(FROM, 2, [1, 3], H, M, 2);
+    expect(dates[0]).toEqual(d('2026-01-12T07:00:00'));
+    expect(dates[1]).toEqual(d('2026-01-14T07:00:00'));
+  });
+
+  test('複数曜日選択かつNヶ月ごと(intervalMonths>1)でもサイクル通りに複数返す', () => {
+    const anchor = d('2026-11-01').getTime(); // 11月起点・3ヶ月ごと
+    const from = d('2026-11-20T10:00:00'); // 11月サイクルの第1週は経過済み
+    const dates = computeNthWeekdayFireDates(from, 1, [1, 3], H, M, 2, 3, anchor);
+    // 次サイクルは2027年2月: 第1月曜=2/1, 第1水曜=2/3
+    expect(dates[0]).toEqual(d('2027-02-01T07:00:00'));
+    expect(dates[1]).toEqual(d('2027-02-03T07:00:00'));
+  });
+
+  test('最終週(nthWeek=-1)×複数曜日: 月によって曜日間の日付差が変わる', () => {
+    // 2026年1月: 最終月曜=1/26, 最終水曜=1/28
+    const dates = computeNthWeekdayFireDates(FROM, -1, [1, 3], H, M, 2);
+    expect(dates[0]).toEqual(d('2026-01-26T07:00:00'));
+    expect(dates[1]).toEqual(d('2026-01-28T07:00:00'));
+  });
+});
+
+describe('resolveNthWeekdayDay 境界値', () => {
+  test('存在しない週はnullを返す', () => {
+    // 2026年2月(28日)には「第5月曜」は存在しない
+    expect(resolveNthWeekdayDay(2026, 1, 5, 1)).toBeNull();
+  });
+
+  test('nthWeek=-1(最終週)は月によって実日付が変わる', () => {
+    expect(resolveNthWeekdayDay(2026, 0, -1, 1)).toBe(26); // 2026年1月最終月曜
+    expect(resolveNthWeekdayDay(2026, 1, -1, 1)).toBe(23); // 2026年2月最終月曜
+  });
+});
+
+// ─────────────────────────────────────────────
 // getNextFireDate (統合)
 // ─────────────────────────────────────────────
 describe('getNextFireDate (統合)', () => {
@@ -336,7 +389,7 @@ describe('getNextFireDate (統合)', () => {
     intervalDays: null,
     intervalMonths: null,
     nthWeek: null,
-    nthWeekday: null,
+    nthWeekdays: null,
     enabled: true,
     createdAt: 0,
     updatedAt: 0,
@@ -448,6 +501,31 @@ describe('getNextFireDate (統合)', () => {
       intervalMonths: 3,
       monthdays: [],
       anchorDate: d('2026-01-01').getTime(),
+    };
+    expect(getNextFireDate(r, FROM)).toBeNull();
+  });
+
+  test('monthly 第N曜日・複数曜日選択時は直近1件を返す', () => {
+    const r = {
+      ...base,
+      kind: 'monthly',
+      weekdays: null,
+      monthdays: null,
+      nthWeek: 2,
+      nthWeekdays: [1, 3],
+    };
+    // 2026年1月: 第2月曜=1/12, 第2水曜=1/14 → 直近は1/12
+    expect(getNextFireDate(r, FROM)).toEqual(d('2026-01-12T07:00:00'));
+  });
+
+  test('monthly 第N曜日・nthWeekdaysが空配列ならnull(monthdaysにフォールバックしない)', () => {
+    const r = {
+      ...base,
+      kind: 'monthly',
+      weekdays: null,
+      monthdays: [1, 15], // 万一残っていてもnthモードでは参照されないはず
+      nthWeek: 2,
+      nthWeekdays: [],
     };
     expect(getNextFireDate(r, FROM)).toBeNull();
   });

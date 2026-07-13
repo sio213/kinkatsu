@@ -247,4 +247,35 @@ describe('recording feature M1 スキーマ - 実SQLite上でのFK挙動', () =>
     expect(session2ExerciseASets).toHaveLength(1);
     expect(session2ExerciseASets[0].workout_session_exercise_id).toBe(wseSession2ExerciseA);
   });
+
+  it('nth_weekday(単一値)→nth_weekdays(JSON配列)のリネーム+変換: 0013適用前の既存データを正しく配列化する', () => {
+    db = new Database(':memory:');
+    db.pragma('foreign_keys = ON');
+
+    // 0012までを適用した「第N曜日が単一値だった」既存インストールを再現する
+    const files = migrationFiles();
+    const migration0013 = files.find((f) => f.startsWith('0013_'))!;
+    const upToPrevious = files.filter((f) => f < migration0013);
+    for (const file of upToPrevious) applyMigration(db, file);
+
+    const now = Date.now();
+    db.prepare(
+      `INSERT INTO reminders (title, body, kind, hour, minute, nth_week, nth_weekday, enabled, created_at, updated_at)
+       VALUES ('第2月曜', '本文', 'monthly', 7, 0, 2, 1, 1, ?, ?)`,
+    ).run(now, now);
+    db.prepare(
+      `INSERT INTO reminders (title, body, kind, hour, minute, enabled, created_at, updated_at)
+       VALUES ('曜日未設定の毎日', '本文', 'interval', 7, 0, 1, ?, ?)`,
+    ).run(now, now);
+
+    // ここで0013を適用し、リネーム+配列化バックフィルが正しく効くか確認する
+    applyMigration(db, migration0013);
+
+    const rows = db
+      .prepare('SELECT title, nth_weekdays FROM reminders ORDER BY id')
+      .all() as { title: string; nth_weekdays: string | null }[];
+
+    expect(rows[0].nth_weekdays).toBe('[1]'); // 単一値1がJSON配列文字列に変換される
+    expect(rows[1].nth_weekdays).toBeNull(); // NULLはNULLのまま
+  });
 });
