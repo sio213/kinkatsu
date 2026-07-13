@@ -79,8 +79,9 @@ export function formatKindSummary(r: Reminder): string {
   }
   if (kind === 'yearly' && r.anchorDate) {
     const a = new Date(r.anchorDate);
-    const mds: number[] = r.monthdays ? JSON.parse(r.monthdays) : [];
-    const dayLabel = mds.includes(MONTH_END) ? '月末' : `${a.getDate()}日`;
+    // monthdays未設定の毎年は、以前anchorDateに発火日そのものをエンコードしていた旧形式のデータ
+    const mds: number[] = r.monthdays ? JSON.parse(r.monthdays) : [a.getDate()];
+    const dayLabel = mds.map((d) => (d === MONTH_END ? '月末' : `${d}日`)).join('・');
     return `毎年 ${a.getMonth() + 1}月${dayLabel} ${time}`;
   }
   return time;

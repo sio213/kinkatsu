@@ -59,3 +59,39 @@ describe('formatKindSummary: monthly 第N曜日', () => {
     expect(formatKindSummary(r)).toBe('毎月第1日曜日 07:00');
   });
 });
+
+describe('formatKindSummary: yearly', () => {
+  const base: Reminder = {
+    id: 1,
+    title: 't',
+    body: 'b',
+    kind: 'yearly',
+    hour: 7,
+    minute: 0,
+    weekdays: null,
+    monthdays: null,
+    anchorDate: new Date(2026, 2, 1).getTime(), // 3月
+    intervalDays: null,
+    intervalMonths: null,
+    nthWeek: null,
+    nthWeekdays: null,
+    enabled: true,
+    createdAt: 0,
+    updatedAt: 0,
+  };
+
+  test('複数日付は「・」区切りで表示される', () => {
+    const r: Reminder = { ...base, monthdays: '[1,15]' };
+    expect(formatKindSummary(r)).toBe('毎年 3月1日・15日 07:00');
+  });
+
+  test('単一日付でも従来通り表示される', () => {
+    const r: Reminder = { ...base, monthdays: '[1]' };
+    expect(formatKindSummary(r)).toBe('毎年 3月1日 07:00');
+  });
+
+  test('月末を含む場合は「月末」と表示される', () => {
+    const r: Reminder = { ...base, monthdays: '[99]' };
+    expect(formatKindSummary(r)).toBe('毎年 3月月末 07:00');
+  });
+});

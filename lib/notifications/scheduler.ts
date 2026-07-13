@@ -31,8 +31,8 @@ export const MAX_OS_NOTIFICATIONS = 60;
 export function normalizeInput(input: ReminderInput): ReminderInput {
   let result = { ...input };
 
-  // monthly: 月末(99)がある場合、29〜31 は月末と重複するため除外
-  if (result.kind === 'monthly' && result.monthdays) {
+  // monthly/yearly: 月末(99)がある場合、29〜31 は月末と重複するため除外
+  if ((result.kind === 'monthly' || result.kind === 'yearly') && result.monthdays) {
     const hasEom = result.monthdays.includes(MONTH_END);
     if (hasEom) {
       result = {
@@ -247,7 +247,7 @@ export function computeIntervalFireDates(
 export function computeYearlyFireDates(
   from: Date,
   anchorMonth: number, // 0-indexed
-  anchorDay: number,
+  anchorDays: number[],
   hour: number,
   minute: number,
   count: number,
@@ -255,13 +255,15 @@ export function computeYearlyFireDates(
   const results: Date[] = [];
   let year = from.getFullYear();
   while (results.length < count) {
-    const day = resolveMonthDay(year, anchorMonth, anchorDay);
-    const candidate = new Date(year, anchorMonth, day, hour, minute, 0, 0);
-    if (candidate > from) results.push(candidate);
+    for (const anchorDay of anchorDays) {
+      const day = resolveMonthDay(year, anchorMonth, anchorDay);
+      const candidate = new Date(year, anchorMonth, day, hour, minute, 0, 0);
+      if (candidate > from) results.push(candidate);
+    }
     year++;
     if (year > from.getFullYear() + 10) break;
   }
-  return results;
+  return results.sort((a, b) => a.getTime() - b.getTime()).slice(0, count);
 }
 
 export function computeMonthIntervalFireDates(
@@ -365,10 +367,9 @@ export function getNextFireDate(r: ParsedReminder, from: Date): Date | null {
       )[0] ?? null;
     }
     if (kind === 'yearly') {
-      if (!r.anchorDate) return null;
+      if (!r.anchorDate || !r.monthdays?.length) return null;
       const a = new Date(r.anchorDate);
-      const anchorDay = r.monthdays?.includes(MONTH_END) ? MONTH_END : a.getDate();
-      return computeYearlyFireDates(from, a.getMonth(), anchorDay, hour, minute, 1)[0] ?? null;
+      return computeYearlyFireDates(from, a.getMonth(), r.monthdays, hour, minute, 1)[0] ?? null;
     }
   } catch {
     return null;
@@ -382,9 +383,17 @@ export function parseReminder(r: Reminder): ParsedReminder {
   return {
     ...r,
     weekdays: r.weekdays ? JSON.parse(r.weekdays) : null,
-    monthdays: r.monthdays ? JSON.parse(r.monthdays) : null,
+    monthdays: r.monthdays ? JSON.parse(r.monthdays) : resolveLegacyYearlyMonthdays(r),
     nthWeekdays: r.nthWeekdays ? JSON.parse(r.nthWeekdays) : null,
   };
+}
+
+// 毎年(日付指定・月末以外)は以前monthdaysを保存せずanchorDateに発火日そのものを
+// エンコードしていた。当時保存された既存データが二度と発火しなくなるのを防ぐため、
+// monthdays未設定のyearlyだけanchorDateの日から復元する
+function resolveLegacyYearlyMonthdays(r: Reminder): number[] | null {
+  if (r.kind === 'yearly' && r.anchorDate) return [new Date(r.anchorDate).getDate()];
+  return null;
 }
 
 async function cancelReminderOsNotifications(reminderId: number): Promise<void> {
@@ -528,10 +537,9 @@ async function scheduleQueue(r: ParsedReminder, depth: number): Promise<void> {
         );
       }
     }
-  } else if (r.kind === 'yearly' && r.anchorDate) {
+  } else if (r.kind === 'yearly' && r.anchorDate && r.monthdays?.length) {
     const a = new Date(r.anchorDate);
-    const anchorDay = r.monthdays?.includes(MONTH_END) ? MONTH_END : a.getDate();
-    dates = computeYearlyFireDates(from, a.getMonth(), anchorDay, r.hour, r.minute, need);
+    dates = computeYearlyFireDates(from, a.getMonth(), r.monthdays, r.hour, r.minute, need);
   }
 
   const nowMs = Date.now();
