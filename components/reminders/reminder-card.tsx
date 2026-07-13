@@ -21,6 +21,10 @@ type Props = {
 
 export function buildEditInput(r: Reminder): ReminderInput {
   return {
+    // ルーティン由来のリマインダー(routineId有り)を編集・保存する経路がここに来た場合でも
+    // 紐付けを保つため引き継ぐ。省略するとupdateReminder側でnull扱いになり、保存のたびに
+    // ルーティンとの紐付けが切れてしまう
+    routineId: r.routineId,
     title: r.title,
     body: r.body,
     kind: r.kind as ReminderKind,
