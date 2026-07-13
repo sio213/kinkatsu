@@ -101,6 +101,11 @@ export function ReminderCard({
             onSubmit={onSubmit}
             onCancel={onCloseEdit}
             submitLabel="保存"
+            // ルーティン由来のリマインダー(routineId有り)はタイトル・本文をルーティン名から
+            // 自動生成する(lib/routines/reminder-input.tsのwithRoutineReminderContent)。
+            // ここで編集可能にしてしまうと、次にルーティンを保存したタイミングで無言で
+            // 上書きされてしまうため、この一覧タブ経由の編集でも隠して一貫させる
+            showTitleBody={r.routineId == null}
           />
         </View>
       )}
