@@ -7,6 +7,11 @@ const mockGetRoutineDetail = jest.fn();
 jest.mock('expo-router', () => ({
   useRouter: () => ({ back: mockBack, push: mockPush }),
   useLocalSearchParams: () => mockUseLocalSearchParams(),
+  // RoutineFormはキーボードを閉じるためだけにuseFocusEffectを使う(setValue等の状態更新は
+  // 無いので、exercise-picker-screen.test.tsxと同じ「毎レンダーで即実行」の単純なモックで安全)
+  useFocusEffect: (effect: () => (() => void) | void) => {
+    effect();
+  },
 }));
 
 jest.mock('@/hooks/use-routines', () => ({
