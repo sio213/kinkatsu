@@ -7,9 +7,10 @@ import { Colors, Typography } from '@/constants/theme';
 import { useRoutineDraftStore } from '@/lib/routines/draft-store';
 import { routineFormSchema, type RoutineFormValues } from '@/lib/routines/validation';
 import { zodResolver } from '@hookform/resolvers/zod';
-import { forwardRef, useEffect, useImperativeHandle } from 'react';
+import { useFocusEffect } from 'expo-router';
+import { forwardRef, useCallback, useEffect, useImperativeHandle } from 'react';
 import { Controller, useForm } from 'react-hook-form';
-import { StyleSheet, Text, TouchableOpacity, View } from 'react-native';
+import { Keyboard, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 
 export type RoutineFormHandle = { submit: () => void };
 
@@ -52,6 +53,14 @@ export const RoutineForm = forwardRef<RoutineFormHandle, Props>(function Routine
   useEffect(() => {
     onSubmitDisabledChange?.(submitDisabled);
   }, [submitDisabled, onSubmitDisabledChange]);
+
+  // 名前欄にフォーカスが残ったまま種目追加ピッカー等へ遷移してこの画面がフォーカスを失うと、
+  // 戻ってきたときにキーボードが開いたままになる（exercises.tsxと同じ既知の問題への対応）
+  useFocusEffect(
+    useCallback(() => {
+      return () => Keyboard.dismiss();
+    }, []),
+  );
 
   // draftExercises(zustandストアの現在値)はストアが更新されるたびに新しい配列参照になるため、
   // 通常のuseEffectで十分同期できる。種目追加ピッカーがpushされて戻ってきた場合（この画面は
