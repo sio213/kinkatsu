@@ -198,3 +198,15 @@ test('過去の記録カードをタップすると、そのセッションIDの
 
   expect(mockPush).toHaveBeenCalledWith('/workout/7');
 });
+
+test('ルーティン一覧への導線ボタンは常に表示され、タップするとルーティン一覧へ遷移する(タブ構成に専用入口が無い間の暫定の橋渡し)', () => {
+  mockUseWorkoutSessions.mockReturnValue(baseSessions());
+  const root = render();
+
+  const routineLink = findButtonByLabel(root, 'ルーティン一覧')!;
+  act(() => {
+    routineLink.props.onPress();
+  });
+
+  expect(mockPush).toHaveBeenCalledWith('/routine');
+});
