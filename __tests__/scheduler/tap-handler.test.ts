@@ -120,14 +120,23 @@ describe('resolveReminderTapDestination', () => {
       expect(route).toBe('/');
     });
 
-    test('既に別のトレーニングが進行中の場合、無言でそちらへ遷移させず記録タブへの遷移を返す(ワークアウトは新規開始しない)', async () => {
+    test('既にトレーニングが進行中の場合、新規セッションは開始せずその進行中のセッション画面への遷移を返す', async () => {
       mockWhere.mockResolvedValue([{ routineId: 42 }]);
       mockGetActiveSession.mockResolvedValue({ id: 9, startedAt: 0, endedAt: null });
 
       const route = await resolveReminderTapDestination(makeResponse({ type: 'reminder', reminderId: 1 }));
 
       expect(mockStartWorkoutFromRoutine).not.toHaveBeenCalled();
-      expect(route).toBe('/');
+      expect(route).toBe('/workout/9');
+    });
+
+    test('進行中セッションのidが0でも正しく遷移先に使われる(truthy判定でobjectそのものを見ていることの回帰防止)', async () => {
+      mockWhere.mockResolvedValue([{ routineId: 42 }]);
+      mockGetActiveSession.mockResolvedValue({ id: 0, startedAt: 0, endedAt: null });
+
+      const route = await resolveReminderTapDestination(makeResponse({ type: 'reminder', reminderId: 1 }));
+
+      expect(route).toBe('/workout/0');
     });
 
     test('進行中セッションの確認が失敗した場合、握りつぶさずそのままrejectする', async () => {
