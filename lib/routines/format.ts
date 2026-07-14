@@ -83,8 +83,9 @@ export type CategorySummary = {
   overflowCount: number;
 };
 
-// ルーティンカードのカテゴリタグ表示。種目追加順で重複除去済みのcategories配列を受け取り、
-// 4つ以上なら先頭3つ+overflowCountにする（並び順は呼び出し側=種目追加順のまま維持する）
+// ルーティンカードのカテゴリタグ表示。重複除去済みのcategories配列を受け取り、
+// 4つ以上なら先頭3つ+overflowCountにする（並び順は呼び出し側=種目数の多い順のまま維持する。
+// hooks/use-routines.tsのuseRoutineExerciseSummariesが並べ替え済みで渡してくる）
 export function summarizeCategories(categories: string[]): CategorySummary {
   if (categories.length <= MAX_VISIBLE_CATEGORIES) {
     return { visible: categories, overflowCount: 0 };
