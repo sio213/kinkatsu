@@ -6,8 +6,11 @@ import { Colors, Typography } from '@/constants/theme';
 import type { Routine } from '@/db/schema';
 import { useDebouncedPush } from '@/hooks/use-debounced-push';
 import { useRoutineExerciseSummaries, useRoutineReminders, useRoutines } from '@/hooks/use-routines';
+import { useWorkoutSessions } from '@/hooks/use-workout-session';
+import { useWorkoutStarter } from '@/hooks/use-workout-starter';
 import { useRoutineDraftStore } from '@/lib/routines/draft-store';
 import { getRoutineScheduleDisplay } from '@/lib/routines/format';
+import { startWorkoutFromRoutine } from '@/lib/workout/session';
 import { Stack } from 'expo-router';
 import { useCallback } from 'react';
 import { Alert, FlatList, StyleSheet, Text, View } from 'react-native';
@@ -17,8 +20,10 @@ export default function RoutineListScreen() {
   const { routines, removeRoutine, swapOrder } = useRoutines();
   const summaries = useRoutineExerciseSummaries();
   const routineReminders = useRoutineReminders();
+  const { activeSession } = useWorkoutSessions();
   const pushDebounced = useDebouncedPush();
   const resetDraft = useRoutineDraftStore((state) => state.reset);
+  const startWorkout = useWorkoutStarter((sessionId) => pushDebounced(`/workout/${sessionId}`));
 
   const handleCreate = useCallback(() => {
     // app/routine/new.tsx自身のマウント時resetに加えてここでも空にしておくことで、
@@ -33,6 +38,25 @@ export default function RoutineListScreen() {
       pushDebounced(`/routine/edit/${id}`);
     },
     [pushDebounced],
+  );
+
+  // カード本体タップ=ワークアウト即開始（編集は⋮メニューに一本化）。ただし記録タブの「開始/再開」
+  // ボタンと違い、ここでのタップは「(タップした)このルーティンを始めたい」という意図なので、
+  // 別のトレーニングが既に進行中の場合に無言でそちらへ遷移すると「押したのに違うものが開いた」
+  // という違和感になる（実機フィードバックで指摘）。そのため一旦確認を挟み、続けるか
+  // 進行中のトレーニングを開くかをユーザーに選んでもらう
+  const handleStartWorkout = useCallback(
+    (routineId: number) => {
+      if (activeSession) {
+        Alert.alert('別のトレーニングが進行中です', 'このルーティンを開始するには、先に進行中のトレーニングを終了してください。', [
+          { text: 'キャンセル', style: 'cancel' },
+          { text: '進行中のトレーニングを開く', onPress: () => pushDebounced(`/workout/${activeSession.id}`) },
+        ]);
+        return;
+      }
+      startWorkout(async () => (await startWorkoutFromRoutine(routineId))?.sessionId ?? null);
+    },
+    [activeSession, startWorkout, pushDebounced],
   );
 
   const handleDelete = useCallback(
@@ -81,7 +105,7 @@ export default function RoutineListScreen() {
             schedule={schedule}
             isFirst={index === 0}
             isLast={index === routines.length - 1}
-            onPress={() => handleEdit(item.id)}
+            onPress={() => handleStartWorkout(item.id)}
             onEdit={() => handleEdit(item.id)}
             onMoveUp={() => {
               // isFirst/isLastのdisabled判定により通常はここに来ないが、メニュー展開中に
@@ -98,7 +122,7 @@ export default function RoutineListScreen() {
         </ListErrorBoundary>
       );
     },
-    [summaries, routineReminders, routines, handleEdit, handleSwap, handleDelete],
+    [summaries, routineReminders, routines, handleStartWorkout, handleEdit, handleSwap, handleDelete],
   );
 
   return (
