@@ -1,7 +1,8 @@
 import { db, type Tx } from '@/db/client';
-import { sets, workoutSessionExercises, workoutSessions } from '@/db/schema';
+import { sets, workoutSessionExercises, workoutSessions, type WorkoutSession } from '@/db/schema';
+import { getRoutineDetail } from '@/lib/routines/db';
 import { getPreviousSets, hasAnyValue, type PreviousSetValues } from '@/lib/workout/history';
-import { eq } from 'drizzle-orm';
+import { desc, eq, isNull } from 'drizzle-orm';
 
 // 種目カードが新規追加/入れ替えされたことを呼び出し側（画面）に伝える情報。
 // kindは新規追加(常にリスト末尾に増える)か種目入れ替え(既存カードの位置のまま)かを表し、
@@ -88,6 +89,20 @@ export async function endWorkoutSession(id: number) {
     .update(workoutSessions)
     .set({ endedAt: now, updatedAt: now })
     .where(eq(workoutSessions.id, id));
+}
+
+// 進行中(endedAtがnull)のセッションを1件返す。endedAtがnullの行は高々1件のはずだが、
+// 念のためstartedAt降順にして万一複数あっても最新の1件を返す。useWorkoutSessions()の
+// activeSessionと同じ判定だが、通知タップハンドラ等Reactフックを使えない場所からも
+// 呼べるようDB直読みの関数として用意する
+export async function getActiveSession(): Promise<WorkoutSession | null> {
+  const [session] = await db
+    .select()
+    .from(workoutSessions)
+    .where(isNull(workoutSessions.endedAt))
+    .orderBy(desc(workoutSessions.startedAt))
+    .limit(1);
+  return session ?? null;
 }
 
 type ExerciseCardSpec = { exerciseId: number };
@@ -206,6 +221,52 @@ export async function addHistoryCardsToSession(
       getPreviousSetsForCard(t, spec.sourceWorkoutSessionExerciseId),
     ),
   );
+}
+
+type RoutineExerciseCardSpec = ExerciseCardSpec & { routineExerciseId: number };
+
+// ルーティン一覧のカードタップ・ルーティン由来リマインダーの通知タップ用。新規セッションを作り、
+// そのルーティンに登録済みの種目・目標セット(routineSets)を最初から入れた状態で返す。
+// completedAtは常にnull・prefilledSetIdsで返すことで、他のプリフィル経路と同じ「値はあるが
+// ✓未確定」のゴースト表示にする(実績値ではなく目標値であることが伝わり、誤って「今日もう
+// このセットをやった」ように見えることを防ぐ)
+export async function startWorkoutFromRoutine(
+  routineId: number,
+): Promise<{ sessionId: number; cards: PrefilledCard[] } | null> {
+  const detail = await getRoutineDetail(routineId);
+  // ルーティンは種目1件以上が保存時の必須条件(zodバリデーション)のため通常は起こらないが、
+  // 万一0件のまま保存されていた場合に、種目の無い空のセッションだけを作ってしまわないための防御
+  if (!detail || detail.exercises.length === 0) return null;
+
+  const now = Date.now();
+  const routineSetsByExerciseId = new Map(detail.exercises.map((e) => [e.id, e.sets]));
+
+  return db.transaction(async (tx) => {
+    const [session] = await tx
+      .insert(workoutSessions)
+      .values({ startedAt: now, createdAt: now, updatedAt: now })
+      .returning();
+
+    const cards = await insertSessionExerciseCards(
+      tx,
+      session.id,
+      detail.exercises.map((e) => ({ exerciseId: e.exerciseId, routineExerciseId: e.id })),
+      now,
+      'new',
+      // setNumberはPreviousSetValues型を満たすためだけに渡している。実際の番号はこの後
+      // buildInitialSetsが1から振り直すため、routineSets側の値(欠番/重複があり得る)は使われない
+      async (_tx, spec: RoutineExerciseCardSpec) =>
+        (routineSetsByExerciseId.get(spec.routineExerciseId) ?? []).map((s) => ({
+          setNumber: s.setNumber,
+          weight: s.weight,
+          reps: s.reps,
+          durationSeconds: s.durationSeconds,
+          distanceMeters: s.distanceMeters,
+        })),
+    );
+
+    return { sessionId: session.id, cards };
+  });
 }
 
 // 種目カードの「⋮」メニューの「削除」。sets側はworkoutSessionExerciseIdにonDelete cascadeが
