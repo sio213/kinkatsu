@@ -7,7 +7,13 @@ import { useExercise } from '@/hooks/use-exercises';
 import { resolveMeasurementType } from '@/lib/exercises/constants';
 import { useRoutineDraftStore } from '@/lib/routines/draft-store';
 import type { DraftExercise } from '@/lib/routines/validation';
-import { computePersonalBestIds, getExerciseHistoryEntries, hasAnyValue, type HistoryEntry } from '@/lib/workout/history';
+import {
+  computePersonalBestIds,
+  getExerciseHistoryEntries,
+  hasAnyValue,
+  NO_SESSION_TO_EXCLUDE,
+  type HistoryEntry,
+} from '@/lib/workout/history';
 import { MEASUREMENT_COLUMNS } from '@/lib/workout/set-format';
 import { formatSessionDateGroup, groupByMonth } from '@/lib/workout/summary';
 import { Stack, useLocalSearchParams, useRouter } from 'expo-router';
@@ -16,10 +22,8 @@ import { Alert, SectionList, StyleSheet, Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 // app/workout/history-picker.tsxのルーティン版。「進行中セッション」の概念が無いため
-// excludeSessionIdには除外不要を意味する番兵値(-1)を渡し、全ての実績を対象にする。
+// excludeSessionIdには除外不要を意味する番兵値を渡し、全ての実績を対象にする。
 // 読み込み先もDB(loadHistoryIntoSessionExercise)ではなくuseRoutineDraftStoreの下書き配列
-const NO_SESSION_TO_EXCLUDE = -1;
-
 export default function RoutineHistoryPickerScreen() {
   const {
     index: indexParam,

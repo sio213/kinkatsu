@@ -5,14 +5,11 @@ import { Colors } from '@/constants/theme';
 import { useKeyboardInset } from '@/hooks/use-keyboard-inset';
 import { useExercisesWithHistory } from '@/hooks/use-workout-session';
 import { useRoutineDraftStore } from '@/lib/routines/draft-store';
+import { NO_SESSION_TO_EXCLUDE } from '@/lib/workout/history';
 import { useRouter } from 'expo-router';
 import { useCallback } from 'react';
 import { ScrollView, StyleSheet, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-
-// 「進行中セッション」の概念が無いルーティン編集では除外対象が無いため、
-// useExercisesWithHistory(excludeSessionId)には該当し得ない番兵値を渡す
-const NO_SESSION_TO_EXCLUDE = -1;
 
 // ルーティンの下書き（useRoutineDraftStore）にある全種目をまとめて編集する画面。
 // 種目の追加・並び順はルーティンフォーム側で行い、この画面はセットの追加・削除・値編集と

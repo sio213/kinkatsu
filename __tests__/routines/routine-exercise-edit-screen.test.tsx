@@ -10,6 +10,10 @@ jest.mock('@/hooks/use-workout-session', () => ({
   useExercisesWithHistory: (...args: unknown[]) => mockUseExercisesWithHistory(...args),
 }));
 
+// lib/workout/history.tsはトップレベルで@/db/client(expo-sqlite依存)を読み込むため、
+// このスクリーンが使うNO_SESSION_TO_EXCLUDE(単なる定数)だけを差し替える
+jest.mock('@/lib/workout/history', () => ({ NO_SESSION_TO_EXCLUDE: -1 }));
+
 import { useRoutineDraftStore } from '@/lib/routines/draft-store';
 import type { DraftExercise } from '@/lib/routines/validation';
 import RoutineExerciseEditScreen from '@/app/routine/exercise-edit';

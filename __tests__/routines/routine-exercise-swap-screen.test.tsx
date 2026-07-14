@@ -358,7 +358,7 @@ test('ⓘボタンを押すと種目詳細へ遷移する', () => {
 
 test('useExerciseUsageStatsはexcludeSessionId無しで呼ばれる(ルーティン編集には進行中セッションが無いため)', () => {
   render();
-  expect(mockUseExerciseUsageStats).toHaveBeenCalledWith();
+  expect(mockUseExerciseUsageStats).toHaveBeenCalledWith(undefined);
 });
 
 function findMenuItem(root: ReactTestInstance, label: string) {

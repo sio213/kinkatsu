@@ -11,6 +11,12 @@ export type PreviousSetValues = {
   distanceMeters: number | null;
 };
 
+// excludeSessionIdは通常「今まさに編集中のセッション」を渡し自分自身を実績として参照しない
+// ようにするためのものだが、ルーティン編集にはそもそも「セッション」という概念が無い。
+// どのセッションidとも一致し得ないこの番兵値を渡すことで「何も除外しない」を表現する
+// (app/routine/exercise-edit.tsx・app/routine/history-picker.tsxで共有)
+export const NO_SESSION_TO_EXCLUDE = -1;
+
 // 4つの値カラムのいずれかに実際の値が入っているか。前回セットが✓未確定のまま
 // 何も入力せずに終えたセッションの場合、getPreviousSets/getPreviousSetsForCardは
 // 全カラムnullの行を返しうる（「セット追加」だけ押されて未入力のまま終わった等）。
