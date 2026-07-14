@@ -18,7 +18,7 @@ export default function RecordScreen() {
   const router = useRouter();
   const { sessions, activeSession } = useWorkoutSessions();
   const summaryBySession = useSessionStats();
-  const startWorkout = useWorkoutStarter(activeSession, (sessionId) => router.push(`/workout/${sessionId}`));
+  const startWorkout = useWorkoutStarter((sessionId) => router.push(`/workout/${sessionId}`));
 
   // 進行中セッションは履歴に出さず、開始/再開ボタンから直接遷移する対象にする
   const endedSessions = sessions.filter((s) => s.endedAt != null);
@@ -28,10 +28,16 @@ export default function RecordScreen() {
     data: group.sessions,
   }));
 
-  const handleStart = useCallback(
-    () => startWorkout(async () => (await startWorkoutSession()).id),
-    [startWorkout],
-  );
+  // このボタン自体が「開始/再開」を兼ねるため、進行中セッションがあれば無条件でそちらへ合流する
+  // (ルーティン一覧のカードタップと違い、ここでは「進行中のトレーニングへ戻る」ことが期待される
+  // 挙動そのものなので確認は挟まない)
+  const handleStart = useCallback(() => {
+    if (activeSession) {
+      router.push(`/workout/${activeSession.id}`);
+      return;
+    }
+    startWorkout(async () => (await startWorkoutSession()).id);
+  }, [activeSession, startWorkout, router]);
 
   return (
     <SafeAreaView style={styles.safeArea} edges={[]}>

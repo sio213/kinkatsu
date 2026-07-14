@@ -2,7 +2,6 @@ import { RoutineCard } from '@/components/routines/routine-card';
 import { HeaderActionButton } from '@/components/ui/header-action-button';
 import { ListErrorBoundary } from '@/components/ui/list-error-boundary';
 import { PrimaryButton } from '@/components/ui/primary-button';
-import { ResumeWorkoutBanner } from '@/components/workout/resume-workout-banner';
 import { Colors, Typography } from '@/constants/theme';
 import type { Routine } from '@/db/schema';
 import { useDebouncedPush } from '@/hooks/use-debounced-push';
@@ -24,7 +23,7 @@ export default function RoutineListScreen() {
   const { activeSession } = useWorkoutSessions();
   const pushDebounced = useDebouncedPush();
   const resetDraft = useRoutineDraftStore((state) => state.reset);
-  const startWorkout = useWorkoutStarter(activeSession, (sessionId) => pushDebounced(`/workout/${sessionId}`));
+  const startWorkout = useWorkoutStarter((sessionId) => pushDebounced(`/workout/${sessionId}`));
 
   const handleCreate = useCallback(() => {
     // app/routine/new.tsx自身のマウント時resetに加えてここでも空にしておくことで、
@@ -41,12 +40,23 @@ export default function RoutineListScreen() {
     [pushDebounced],
   );
 
-  // カード本体タップ=ワークアウト即開始（編集は⋮メニューに一本化）。進行中セッションへの合流・
-  // 二重タップ防止・失敗時のAlertはuseWorkoutStarterに共通化済み(記録タブの「開始」と同じ土台)
+  // カード本体タップ=ワークアウト即開始（編集は⋮メニューに一本化）。ただし記録タブの「開始/再開」
+  // ボタンと違い、ここでのタップは「(タップした)このルーティンを始めたい」という意図なので、
+  // 別のトレーニングが既に進行中の場合に無言でそちらへ遷移すると「押したのに違うものが開いた」
+  // という違和感になる（実機フィードバックで指摘）。そのため一旦確認を挟み、続けるか
+  // 進行中のトレーニングを開くかをユーザーに選んでもらう
   const handleStartWorkout = useCallback(
-    (routineId: number) =>
-      startWorkout(async () => (await startWorkoutFromRoutine(routineId))?.sessionId ?? null),
-    [startWorkout],
+    (routineId: number) => {
+      if (activeSession) {
+        Alert.alert('別のトレーニングが進行中です', '先に進行中のトレーニングを終了してから開始してください。', [
+          { text: 'キャンセル', style: 'cancel' },
+          { text: '進行中のトレーニングを開く', onPress: () => pushDebounced(`/workout/${activeSession.id}`) },
+        ]);
+        return;
+      }
+      startWorkout(async () => (await startWorkoutFromRoutine(routineId))?.sessionId ?? null);
+    },
+    [activeSession, startWorkout, pushDebounced],
   );
 
   const handleDelete = useCallback(
@@ -136,14 +146,6 @@ export default function RoutineListScreen() {
         renderItem={renderItem}
         ItemSeparatorComponent={() => <View style={styles.separator} />}
         contentContainerStyle={styles.content}
-        ListHeaderComponent={
-          activeSession ? (
-            <ResumeWorkoutBanner
-              onPress={() => pushDebounced(`/workout/${activeSession.id}`)}
-              style={styles.resumeBanner}
-            />
-          ) : null
-        }
         ListEmptyComponent={
           <View style={styles.emptyWrapper}>
             <Text style={styles.empty}>ルーティンがありません</Text>
@@ -160,8 +162,6 @@ const styles = StyleSheet.create({
   list: { flex: 1 },
   content: { padding: 16, flexGrow: 1 },
   separator: { height: 11 },
-
-  resumeBanner: { marginBottom: 11 },
 
   emptyWrapper: { flex: 1, alignItems: 'center', justifyContent: 'center', gap: 12, paddingVertical: 32 },
   empty: { ...Typography.body, color: Colors.textMuted, textAlign: 'center' },
