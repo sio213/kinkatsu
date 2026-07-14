@@ -28,18 +28,24 @@ export default function RoutineExerciseEditScreen() {
   // 各カードの実際のレイアウトはonLayoutでしか分からないため、行(list)自体とタップされた
   // 種目カードの両方のY座標が判明した時点で一度だけscrollToする
   const scrollRef = useRef<ScrollView>(null);
-  const listOffsetRef = useRef(0);
+  // list・item(親子)のonLayoutは発火順序が保証されないため、初期値をnullにして
+  // 「まだ測定されていない」ことと「実際にy=0」を区別できるようにする
+  const listOffsetRef = useRef<number | null>(null);
   const itemOffsetsRef = useRef<Record<number, number>>({});
   const scrolledToFocusRef = useRef(false);
 
   const tryScrollToFocus = useCallback(() => {
     if (scrolledToFocusRef.current || focusIndex == null) return;
+    const listY = listOffsetRef.current;
     const itemY = itemOffsetsRef.current[focusIndex];
-    if (itemY == null) return;
+    if (listY == null || itemY == null) return;
     scrolledToFocusRef.current = true;
     // 画面遷移のスライドが終わる前に確定させ、遷移完了時には既にその位置にいるように見せる
-    // (遷移後に改めてスクロールするとジャンプが二重に見えてしまう)
-    scrollRef.current?.scrollTo({ y: listOffsetRef.current + itemY, animated: false });
+    // (遷移後に改めてスクロールするとジャンプが二重に見えてしまう)。
+    // 対象カードの上端をそのまま画面上端に合わせるとcontentのpaddingTop分だけ他の画面より
+    // 詰まって見えるため、通常スクロール時と同じ見た目のリズムになるよう差し引く
+    const y = Math.max(0, listY + itemY - styles.content.paddingTop);
+    scrollRef.current?.scrollTo({ y, animated: false });
   }, [focusIndex]);
 
   const handleListLayout = useCallback(
