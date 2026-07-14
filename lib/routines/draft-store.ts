@@ -16,8 +16,8 @@ type RoutineDraftState = {
   reminder: ReminderInput | null;
   // 編集開始時に既存ルーティンの種目一覧を読み込む。新規作成時は空配列で呼ぶ
   hydrate: (exercises: DraftExercise[]) => void;
-  // 編集開始時に既存ルーティンのリマインダー設定を読み込む。新規作成時は
-  // {enabled: true, reminder: null}で呼ぶ(デフォルトON・未設定)
+  // 編集開始時に既存ルーティンのリマインダー設定を読み込む。新規作成時はこれを呼ばず、
+  // reset()の既定値(reminderEnabled: true, reminder: null)をそのまま使う
   hydrateReminder: (state: { enabled: boolean; reminder: ReminderInput | null }) => void;
   addExercises: (exercises: DraftExercise[]) => void;
   removeExerciseAt: (index: number) => void;
