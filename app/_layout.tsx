@@ -139,6 +139,9 @@ export default function RootLayout() {
         <Stack.Screen name="routine/edit/[id]" options={{ title: 'ルーティンを編集' }} />
         <Stack.Screen name="routine/exercise-picker" options={{ title: '種目を追加' }} />
         <Stack.Screen name="routine/exercise-edit" options={{ title: '種目を編集' }} />
+        <Stack.Screen name="routine/exercise-swap" options={{ title: '種目を入れ替え' }} />
+        {/* デザイン上、単体種目版のhistory-pickerと同じヘッダー文言（過去の記録から読み込み）を使う */}
+        <Stack.Screen name="routine/history-picker" options={{ title: '過去の記録から読み込み' }} />
         <Stack.Screen name="routine/reminder" options={{ title: 'リマインダー' }} />
         <Stack.Screen name="workout/[id]" options={{ title: '' }} />
         <Stack.Screen

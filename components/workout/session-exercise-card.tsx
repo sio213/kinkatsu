@@ -1,4 +1,5 @@
 import { CategoryChip } from '@/components/exercises/category-chip';
+import { ExerciseCardMenu } from '@/components/exercises/exercise-card-menu';
 import { IconSymbol } from '@/components/ui/icon-symbol';
 import { Colors, Typography } from '@/constants/theme';
 import type { Set } from '@/db/schema';
@@ -12,7 +13,6 @@ import { addSet, deleteLastSet, reopenSet, saveDraft, saveSet, type SetValues } 
 import { Image } from 'expo-image';
 import { forwardRef, memo, useCallback, useImperativeHandle, useRef, useState } from 'react';
 import { Alert, LayoutAnimation, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
-import { ExerciseCardMenu } from './exercise-card-menu';
 import { SetRow, type SetRowHandle } from './set-row';
 
 type Props = {

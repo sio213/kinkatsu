@@ -21,9 +21,26 @@ type RoutineDraftState = {
   hydrateReminder: (state: { enabled: boolean; reminder: ReminderInput | null }) => void;
   addExercises: (exercises: DraftExercise[]) => void;
   removeExerciseAt: (index: number) => void;
+  // テンプレートセット編集画面の⋮メニュー「上へ移動」「下へ移動」。DBのswapExerciseOrder
+  // （orderIndexを持つ行同士の入れ替え）と違い、配列そのものの並び順が順序を表すため、
+  // 隣接する2要素をそのまま入れ替える。範囲外(先頭で上へ/末尾で下へ)は何もしない
+  // （呼び出し側のExerciseCardMenuがisFirst/isLastでボタン自体を無効化する前提の防御）
+  moveExerciseAt: (index: number, direction: 'up' | 'down') => void;
+  // テンプレートセット編集画面の⋮メニュー「種目を入れ替え」。既存の種目メタ情報・セットを
+  // まとめて別の種目のものに差し替える（DBのreplaceSessionExerciseと同じ「丸ごと置き換え」の
+  // 考え方だが、こちらはDBではなく下書き配列を直接書き換える）
+  replaceExerciseAt: (index: number, exercise: DraftExercise) => void;
   // テンプレートセット編集画面でのセット追加・削除・値変更をまとめて反映する
   // （setNumberは配列の並び順から導出するため、DraftExercise側に別途保持しない）
   updateExerciseSets: (index: number, sets: DraftExercise['sets']) => void;
+  // ⋮メニューの「過去の記録から読み込む」専用。updateExerciseSetsと処理自体は同じだが、
+  // RoutineTemplateExerciseCard側で「このカード自身の追加/削除/値編集を経ない、外部からの
+  // 丸ごと差し替え」であることを検知できるようlastSetsReplacement(index+token)を別途更新する。
+  // カード側は行ごとの安定id(DBのset.idに相当するもの)を持たずローカルなrowKeysで代用しているため、
+  // この検知が無いと、既存のRoutineTemplateSetRowインスタンス(propsをマウント時にしか
+  // 取り込まない設計)が使い回されて読み込んだ新しい値が画面に反映されないバグになる
+  loadSetsIntoExerciseAt: (index: number, sets: DraftExercise['sets']) => void;
+  lastSetsReplacement: { index: number; token: number } | null;
   setReminderEnabled: (enabled: boolean) => void;
   setReminder: (reminder: ReminderInput) => void;
   reset: () => void;
@@ -37,11 +54,31 @@ export const useRoutineDraftStore = create<RoutineDraftState>((set) => ({
   hydrateReminder: ({ enabled, reminder }) => set({ reminderEnabled: enabled, reminder }),
   addExercises: (newExercises) => set((state) => ({ exercises: [...state.exercises, ...newExercises] })),
   removeExerciseAt: (index) => set((state) => ({ exercises: state.exercises.filter((_, i) => i !== index) })),
+  moveExerciseAt: (index, direction) =>
+    set((state) => {
+      const targetIndex = direction === 'up' ? index - 1 : index + 1;
+      if (targetIndex < 0 || targetIndex >= state.exercises.length) return state;
+      const exercises = [...state.exercises];
+      [exercises[index], exercises[targetIndex]] = [exercises[targetIndex], exercises[index]];
+      return { exercises };
+    }),
+  replaceExerciseAt: (index, exercise) =>
+    set((state) => ({
+      exercises: state.exercises.map((e, i) => (i === index ? exercise : e)),
+    })),
   updateExerciseSets: (index, sets) =>
     set((state) => ({
       exercises: state.exercises.map((e, i) => (i === index ? { ...e, sets } : e)),
     })),
+  lastSetsReplacement: null,
+  loadSetsIntoExerciseAt: (index, sets) =>
+    set((state) => ({
+      exercises: state.exercises.map((e, i) => (i === index ? { ...e, sets } : e)),
+      // Date.now()だけだと同一ミリ秒内の連続呼び出しで値が衝突しうるため、Math.random()を足して
+      // 「前回と同じトークンではない」ことをカード側が確実に検知できるようにする
+      lastSetsReplacement: { index, token: Date.now() + Math.random() },
+    })),
   setReminderEnabled: (enabled) => set({ reminderEnabled: enabled }),
   setReminder: (reminder) => set({ reminder }),
-  reset: () => set({ exercises: [], reminderEnabled: true, reminder: null }),
+  reset: () => set({ exercises: [], reminderEnabled: true, reminder: null, lastSetsReplacement: null }),
 }));
