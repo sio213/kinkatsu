@@ -9,7 +9,7 @@ import {
   pruneExpiredNotifications,
   refillAllReminders,
 } from '@/lib/notifications/scheduler';
-import { resolveReminderTapRoute } from '@/lib/notifications/tap-handler';
+import { resolveReminderTapDestination } from '@/lib/notifications/tap-handler';
 import {
   DarkTheme,
   DefaultTheme,
@@ -82,18 +82,25 @@ export default function RootLayout() {
     return () => sub.remove();
   }, [success]);
 
-  // 通知タップ → 記録タブへ遷移。cold start／background／foregroundのいずれのタップも
-  // useLastNotificationResponseが横断して拾うため、リスナーの手動組み合わせは不要。
+  // 通知タップ → 記録タブ(単体リマインダー)またはルーティン編集画面(ルーティン由来のリマインダー)
+  // へ遷移。cold start／background／foregroundのいずれのタップもuseLastNotificationResponseが
+  // 横断して拾うため、リスナーの手動組み合わせは不要。
   useEffect(() => {
     if (!success || !lastNotificationResponse) return;
-    const route = resolveReminderTapRoute(lastNotificationResponse);
-    // タブの切り替えを伴うため、replace/dismissToではなくnavigateを使う。
-    // navigateは「対象ルートが既にスタック内にあればそこまで戻る」動作なので、
-    // workout/[id]・exercise-picker等の下層画面が積まれていても記録タブまで
-    // 正しく畳まれ、かつ(tabs)グループ内のタブ切り替え（index⇔reminders）も
-    // 効く。dismissToはスタックのpopのみを行いタブ切り替えには効かなかった
-    // （実機検証済み）。replaceは下層画面が残ったままになるため使わない。
-    if (route) router.navigate(route);
+    (async () => {
+      try {
+        const route = await resolveReminderTapDestination(lastNotificationResponse);
+        // タブの切り替えを伴うため、replace/dismissToではなくnavigateを使う。
+        // navigateは「対象ルートが既にスタック内にあればそこまで戻る」動作なので、
+        // workout/[id]・exercise-picker等の下層画面が積まれていても記録タブまで
+        // 正しく畳まれ、かつ(tabs)グループ内のタブ切り替え（index⇔reminders）も
+        // 効く。dismissToはスタックのpopのみを行いタブ切り替えには効かなかった
+        // （実機検証済み）。replaceは下層画面が残ったままになるため使わない。
+        if (route) router.navigate(route);
+      } catch (e) {
+        console.error('[notification tap]', e);
+      }
+    })();
     // ネイティブの繰り返し通知（daily/weekly/monthly）は毎回発火してもrequest.identifierが
     // 同一のため、useLastNotificationResponseの内部dedupがidentifier一致を理由に
     // 2回目以降のタップを無視してしまう。処理後にclearしてstateをリセットすることで、
