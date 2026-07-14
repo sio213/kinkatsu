@@ -32,6 +32,8 @@ export function computeMenuPositionStyle(
   const opensUpward = menuHeight != null && menuHeight + MENU_GAP > spaceBelow;
   const right = SCREEN_WIDTH - (anchor.x + anchor.width);
 
+  // 上開きになるのはトリガーが画面下部にある時だけなので、上方の余白は常に十分にある前提。
+  // メニューが今より大幅に長くなる場合は上端はみ出しのクランプが別途必要になる
   return opensUpward
     ? { minWidth, bottom: SCREEN_HEIGHT - anchor.y + MENU_GAP, right }
     : { minWidth, top: anchor.y + anchor.height + MENU_GAP, right };
@@ -113,9 +115,10 @@ export function DropdownMenu({ groups, renderTrigger, minWidth = 160, backdropTe
         <Pressable testID={backdropTestID} style={styles.backdrop} onPress={handleClose} />
         {anchor && (
           <View
-            testID="dropdown-menu"
             onLayout={handleMenuLayout}
             style={[styles.menu, menuPositionStyle, menuHeight == null && styles.menuMeasuring]}
+            // 高さ確定前(opacity:0)は暫定位置に描画されているため、見えない状態でのタップを防ぐ
+            pointerEvents={menuHeight == null ? 'none' : 'auto'}
           >
             {groups.map((group, index) => (
               <View key={group.map((item) => item.key).join('-')}>
