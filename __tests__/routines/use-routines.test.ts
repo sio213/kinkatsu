@@ -99,6 +99,52 @@ describe('useRoutineExerciseSummaries', () => {
     expect(result.get(2)).toEqual({ exerciseCount: 1, categories: ['leg'] });
   });
 
+  it('カテゴリは種目数の多い順に並ぶ(胸3・脚1・腹筋2なら胸,腹筋,脚)', () => {
+    mockLiveQueryQueue = [
+      {
+        data: [
+          { routineId: 1, category: 'chest' },
+          { routineId: 1, category: 'leg' },
+          { routineId: 1, category: 'chest' },
+          { routineId: 1, category: 'abs' },
+          { routineId: 1, category: 'chest' },
+          { routineId: 1, category: 'abs' },
+        ],
+      },
+    ];
+    const result = mount();
+    expect(result.get(1)).toEqual({ exerciseCount: 6, categories: ['chest', 'abs', 'leg'] });
+  });
+
+  it('件数が同じカテゴリ同士は初登場順(=種目追加順)のまま安定して並ぶ', () => {
+    mockLiveQueryQueue = [
+      {
+        data: [
+          { routineId: 1, category: 'leg' },
+          { routineId: 1, category: 'chest' },
+          { routineId: 1, category: 'arm' },
+        ],
+      },
+    ];
+    const result = mount();
+    // 3カテゴリとも1件ずつなのでタイブレークが働き、登場順(leg→chest→arm)がそのまま維持される
+    expect(result.get(1)?.categories).toEqual(['leg', 'chest', 'arm']);
+  });
+
+  it('先に登場したカテゴリでも、後から登場したカテゴリの件数が多ければ追い抜かれる(単純な追加順キープではないことの確認)', () => {
+    mockLiveQueryQueue = [
+      {
+        data: [
+          { routineId: 1, category: 'leg' }, // 先に登場するが1件のみ
+          { routineId: 1, category: 'chest' },
+          { routineId: 1, category: 'chest' },
+        ],
+      },
+    ];
+    const result = mount();
+    expect(result.get(1)?.categories).toEqual(['chest', 'leg']);
+  });
+
   it('liveQueryのdataの参照が変わらなければ、再レンダーしても同じMap参照を返す', () => {
     const rows = [{ routineId: 1, category: 'chest' }];
     const captured: Map<number, unknown>[] = [];
