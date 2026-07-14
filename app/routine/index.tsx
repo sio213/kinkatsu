@@ -48,7 +48,7 @@ export default function RoutineListScreen() {
   const handleStartWorkout = useCallback(
     (routineId: number) => {
       if (activeSession) {
-        Alert.alert('別のトレーニングが進行中です', '先に進行中のトレーニングを終了してから開始してください。', [
+        Alert.alert('別のトレーニングが進行中です', 'このルーティンを開始するには、先に進行中のトレーニングを終了してください。', [
           { text: 'キャンセル', style: 'cancel' },
           { text: '進行中のトレーニングを開く', onPress: () => pushDebounced(`/workout/${activeSession.id}`) },
         ]);

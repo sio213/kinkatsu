@@ -1,17 +1,17 @@
 import { IconSymbol } from '@/components/ui/icon-symbol';
 import { Colors, Typography } from '@/constants/theme';
-import { StyleSheet, Text, TouchableOpacity, type StyleProp, type ViewStyle } from 'react-native';
+import { StyleSheet, Text, TouchableOpacity } from 'react-native';
 
 type Props = {
   onPress: () => void;
-  style?: StyleProp<ViewStyle>;
 };
 
-// 「進行中のトレーニングを再開する」バナー。記録タブ・ルーティン一覧で見た目・文言を揃えるため共通化
-export function ResumeWorkoutBanner({ onPress, style }: Props) {
+// 記録タブの「進行中のトレーニングを再開する」バナー。単体で切り出しているのは
+// このバナーの見た目・文言をロジック(handleStart等)から独立して読めるようにするため
+export function ResumeWorkoutBanner({ onPress }: Props) {
   return (
     <TouchableOpacity
-      style={[styles.resumeBanner, style]}
+      style={styles.resumeBanner}
       onPress={onPress}
       accessibilityRole="button"
       accessibilityLabel="進行中のトレーニングを再開する"
