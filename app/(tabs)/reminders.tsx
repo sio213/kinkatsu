@@ -5,14 +5,12 @@ import { HeaderActionButton } from '@/components/ui/header-action-button';
 import { ListErrorBoundary } from '@/components/ui/list-error-boundary';
 import { Colors, Typography } from '@/constants/theme';
 import { useKeyboardInset } from '@/hooks/use-keyboard-inset';
+import { usePermissionState } from '@/hooks/use-permission-state';
 import { useReminders } from '@/hooks/use-reminders';
-import {
-  ensurePermission,
-  getPermissionState,
-} from '@/lib/notifications/permissions';
+import { ensurePermission } from '@/lib/notifications/permissions';
 import type { ReminderInput } from '@/lib/notifications/types';
 import { Stack } from 'expo-router';
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useState } from 'react';
 import {
   Alert,
   ScrollView,
@@ -26,15 +24,11 @@ export default function RemindersScreen() {
   const { reminders, createReminder, updateReminder, toggleReminder, removeReminder, getNextFire, now } =
     useReminders();
 
-  const [permState, setPermState] = useState<'granted' | 'denied' | 'undetermined' | null>(null);
+  const [permState, setPermState] = usePermissionState();
   const keyboardInset = useKeyboardInset();
   const [showForm, setShowForm] = useState(false);
   const [editTargetId, setEditTargetId] = useState<number | null>(null);
   const [togglingIds, setTogglingIds] = useState<Set<number>>(new Set());
-
-  useEffect(() => {
-    getPermissionState().then(setPermState);
-  }, []);
 
   const openCreate = useCallback(() => {
     setEditTargetId(null);
@@ -71,7 +65,7 @@ export default function RemindersScreen() {
         Alert.alert('エラー', 'リマインダーの保存に失敗しました。');
       }
     },
-    [editTargetId, createReminder, updateReminder, closeForm],
+    [editTargetId, createReminder, updateReminder, closeForm, setPermState],
   );
 
   const handleDelete = useCallback(
@@ -106,7 +100,7 @@ export default function RemindersScreen() {
   const handleRequestPermission = useCallback(async () => {
     const r = await ensurePermission();
     setPermState(r);
-  }, []);
+  }, [setPermState]);
 
   return (
     <SafeAreaView style={styles.safeArea} edges={[]}>

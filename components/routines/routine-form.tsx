@@ -5,12 +5,13 @@ import { BoxedTextInput } from '@/components/ui/boxed-text-input';
 import { FormField } from '@/components/ui/form-field';
 import { FormFieldStack } from '@/components/ui/form-field-stack';
 import { Typography } from '@/constants/theme';
+import { usePermissionState } from '@/hooks/use-permission-state';
 import { useRoutineDraftStore } from '@/lib/routines/draft-store';
-import { ensurePermission, getPermissionState, type PermissionState } from '@/lib/notifications/permissions';
+import { ensurePermission } from '@/lib/notifications/permissions';
 import { routineFormSchema, type RoutineFormValues } from '@/lib/routines/validation';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { useFocusEffect } from 'expo-router';
-import { forwardRef, useCallback, useEffect, useImperativeHandle, useState } from 'react';
+import { forwardRef, useCallback, useEffect, useImperativeHandle } from 'react';
 import { Controller, useForm } from 'react-hook-form';
 import { Keyboard, StyleSheet, View } from 'react-native';
 
@@ -37,7 +38,7 @@ export const RoutineForm = forwardRef<RoutineFormHandle, Props>(function Routine
   const reminderEnabled = useRoutineDraftStore((state) => state.reminderEnabled);
   const reminder = useRoutineDraftStore((state) => state.reminder);
   const setReminderEnabled = useRoutineDraftStore((state) => state.setReminderEnabled);
-  const [permState, setPermState] = useState<PermissionState | null>(null);
+  const [permState, setPermState] = usePermissionState();
 
   const {
     control,
@@ -55,14 +56,10 @@ export const RoutineForm = forwardRef<RoutineFormHandle, Props>(function Routine
   const hasErrors = Object.keys(errors).length > 0;
   const submitDisabled = isSubmitting || (isSubmitted && hasErrors);
 
-  useEffect(() => {
-    getPermissionState().then(setPermState);
-  }, []);
-
   const handleRequestPermission = useCallback(async () => {
     const r = await ensurePermission();
     setPermState(r);
-  }, []);
+  }, [setPermState]);
 
   const handleToggleReminderEnabled = useCallback(
     (next: boolean) => {
