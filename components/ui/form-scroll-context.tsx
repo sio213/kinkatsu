@@ -13,6 +13,13 @@ import { Keyboard, type ScrollView, View } from 'react-native';
 // エラー項目の直上に少し余白を残す(画面の一番上ぎりぎりに張り付くと窮屈に見えるため)
 const SCROLL_TOP_MARGIN = 16;
 
+// ScrollView.getInnerViewRef()は実装(react-native/Libraries/Components/ScrollView/ScrollView.js)
+// には存在するが、この時点のReact Nativeの型定義には含まれていない(型定義にあるのは
+// ノードハンドル(number)を返すgetInnerViewNode()のみ)。measureLayoutはノードハンドルも
+// 受け付けるが非推奨扱いのため、New Architecture(Fabric)でも安定するHostInstance版を
+// 型を補ってでも使う
+type ScrollViewWithInnerViewRef = ScrollView & { getInnerViewRef(): View | null };
+
 // 実測したY座標群から「一番上にある項目」を選ぶ純粋関数。react-hook-formのerrorsの
 // キー順は登録順であり画面上の表示順と必ずしも一致しない(リマインダーフォームのようにkindで
 // フィールドの出し分けが変わるフォームは特に)ため、キー順ではなく実測値の最小値で判定する。
@@ -63,11 +70,11 @@ export function FormScrollProvider({ scrollRef, children }: ProviderProps) {
   const scrollToError = useCallback(
     (names: string[]) => {
       const scrollView = scrollRef.current;
-      // getInnerViewNode()はScrollViewの「中身(コンテンツ)」を基準にした座標を得るために使う。
+      // getInnerViewRef()はScrollViewの「中身(コンテンツ)」を基準にした座標を得るために使う。
       // ScrollView自身を基準にすると現在のスクロール位置に依存した値になってしまい、
       // scrollTo({y})が期待する絶対オフセットと噛み合わなくなる
-      const containerNode = scrollView?.getInnerViewNode();
-      if (containerNode == null) return;
+      const containerRef = (scrollView as ScrollViewWithInnerViewRef | null)?.getInnerViewRef();
+      if (containerRef == null) return;
 
       // フォーカスが残ったTextInputとスクロールが競合しないよう、先にキーボードを閉じる。
       // dismiss直後はまだレイアウトが安定していないことがあるため1フレーム待ってから測定する
@@ -83,7 +90,7 @@ export function FormScrollProvider({ scrollRef, children }: ProviderProps) {
             (ref) =>
               new Promise<number | null>((resolve) => {
                 ref.current?.measureLayout(
-                  containerNode,
+                  containerRef,
                   (_x: number, y: number) => resolve(y),
                   () => resolve(null),
                 );

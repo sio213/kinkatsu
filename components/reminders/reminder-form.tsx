@@ -242,7 +242,11 @@ export const ReminderForm = forwardRef<ReminderFormHandle, Props>(function Remin
     onSubmit({ ...toReminderInput(values), routineId: initial.routineId ?? null });
   }
 
-  useImperativeHandle(ref, () => ({ submit: () => handleSubmit(handleValid, scrollToFirstError)() }));
+  useImperativeHandle(
+    ref,
+    () => ({ submit: () => handleSubmit(handleValid, scrollToFirstError)() }),
+    [handleSubmit, handleValid, scrollToFirstError],
+  );
 
   const timeDate = new Date();
   timeDate.setHours(hour, minute, 0, 0);

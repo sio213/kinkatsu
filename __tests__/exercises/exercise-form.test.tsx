@@ -1,3 +1,11 @@
+const mockScrollToFirstError = jest.fn();
+
+jest.mock('@/components/ui/form-scroll-context', () => ({
+  useScrollToFirstError: () => mockScrollToFirstError,
+  // FormFieldが内部で呼ぶ。このテストでは自動スクロールの位置登録自体は検証対象外のためno-opでよい
+  useFormScrollRegistration: () => {},
+}));
+
 import React from 'react';
 import { act, create, type ReactTestInstance } from 'react-test-renderer';
 import { Text, TextInput, TouchableOpacity } from 'react-native';
@@ -44,6 +52,40 @@ test('未入力で送信するとバリデーションエラーが表示され o
   expect(texts).toContain('種目名を入力してください');
   expect(texts).toContain('カテゴリを選択してください');
   expect(onSubmit).not.toHaveBeenCalled();
+});
+
+test('未入力で送信するとscrollToFirstErrorがエラーのフィールド名付きで呼ばれる(自動スクロール機能の配線確認)', async () => {
+  mockScrollToFirstError.mockClear();
+  const { ref } = await renderForm();
+
+  await act(async () => {
+    ref.current!.submit();
+  });
+
+  // react-hook-formのonInvalidは(errors, event)の2引数で呼ばれるため、1つ目の引数だけ見る
+  expect(mockScrollToFirstError.mock.calls[0][0]).toEqual(
+    expect.objectContaining({ name: expect.anything(), category: expect.anything() }),
+  );
+});
+
+test('有効な値で送信が成功した場合はscrollToFirstErrorは呼ばれない', async () => {
+  mockScrollToFirstError.mockClear();
+  const { root, ref } = await renderForm();
+
+  const [nameInput] = getInputs(root);
+  await act(async () => {
+    nameInput.props.onChangeText('ベンチプレス');
+  });
+  const chestChip = findButtonByLabel(root, '胸')!;
+  await act(async () => {
+    chestChip.props.onPress();
+  });
+
+  await act(async () => {
+    ref.current!.submit();
+  });
+
+  expect(mockScrollToFirstError).not.toHaveBeenCalled();
 });
 
 test('name・categoryを入力して送信すると trim・null化された値で onSubmit が呼ばれる', async () => {

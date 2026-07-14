@@ -35,4 +35,8 @@ describe('computeScrollTarget', () => {
   test('マージン省略時は既定値(16)が使われる', () => {
     expect(computeScrollTarget(100)).toBe(84);
   });
+
+  test('境界値: topmostYがマージンとちょうど同じ場合は自然に0になる(クランプではなく減算結果として)', () => {
+    expect(computeScrollTarget(16, 16)).toBe(0);
+  });
 });
