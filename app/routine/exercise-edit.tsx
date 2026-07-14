@@ -23,7 +23,10 @@ export default function RoutineExerciseEditScreen() {
   const historyExerciseIds = useExercisesWithHistory(NO_SESSION_TO_EXCLUDE);
 
   const handleAddExercise = useCallback(() => {
-    router.push('/routine/exercise-picker');
+    // この画面自身から開いた場合は、確定後にこのままこの画面へ戻ればよい(ドラフトストアは
+    // 共有なので新しい種目は自動で反映される)。ルーティンフォーム画面から開いた場合(この画面を
+    // 経由しない)と区別するため、returnToパラメータで「既にこの画面を経由している」ことを伝える
+    router.push({ pathname: '/routine/exercise-picker', params: { returnTo: 'exercise-edit' } });
   }, [router]);
 
   return (

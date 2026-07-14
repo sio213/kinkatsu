@@ -6,7 +6,7 @@ import { useExercises } from '@/hooks/use-exercises';
 import { useRoutineDraftStore } from '@/lib/routines/draft-store';
 import { buildInitialRoutineSets } from '@/lib/routines/db';
 import type { DraftExercise } from '@/lib/routines/validation';
-import { useRouter } from 'expo-router';
+import { useLocalSearchParams, useRouter } from 'expo-router';
 import { useCallback, useRef } from 'react';
 import { Alert, StyleSheet } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
@@ -17,6 +17,11 @@ export default function RoutineExercisePickerScreen() {
   const { exercises } = useExercises();
   const addExercises = useRoutineDraftStore((state) => state.addExercises);
   const isAddingRef = useRef(false);
+  // ルーティンフォーム画面から開いた場合(returnTo無し)は、テンプレートセット編集画面が
+  // まだスタックに無いためreplaceで置き換える。テンプレートセット編集画面自身の
+  // 「種目を追加」から開いた場合(returnTo==='exercise-edit')は、その画面が既にスタックに
+  // あるので単に戻るだけでよい(replaceすると同じ画面がスタックに二重に積まれてしまう)
+  const { returnTo } = useLocalSearchParams<{ returnTo?: string }>();
 
   const handlePressInfo = useCallback(
     (id: number) => {
@@ -50,7 +55,14 @@ export default function RoutineExercisePickerScreen() {
         }));
 
         addExercises(draftExercises);
-        router.back();
+        if (returnTo === 'exercise-edit') {
+          router.back();
+        } else {
+          // ルーティンフォームへ戻さず、追加した種目のセット数・重量をその場で編集できるよう
+          // テンプレートセット編集画面へ遷移する(replaceでこの種目追加ピッカー自体を履歴から
+          // 置き換えることで、編集画面から戻ったときにフォーム画面へ正しく戻る)
+          router.replace('/routine/exercise-edit');
+        }
       } catch (e) {
         console.error('[routine draft add exercises]', e);
         Alert.alert('エラー', '種目を追加できませんでした。');
@@ -58,7 +70,7 @@ export default function RoutineExercisePickerScreen() {
         isAddingRef.current = false;
       }
     },
-    [exercises, addExercises, router],
+    [exercises, addExercises, router, returnTo],
   );
 
   return (
