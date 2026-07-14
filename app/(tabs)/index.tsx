@@ -55,21 +55,19 @@ export default function RecordScreen() {
         }}
       />
       <View style={styles.container}>
-        {/* 暫定の導線。ルーティン一覧へアクセスする手段がまだ無いためここに仮置きする。
-            本番ビルドで一般ユーザーの目に触れる主要導線（トレーニング開始）の上を
-            占有しないよう開発ビルドのみに表示する。ルーティンから記録を開始する導線が
-            実装されたら、そちらに差し替えて撤去する想定 */}
-        {__DEV__ && (
-          <TouchableOpacity
-            style={styles.routineLinkBanner}
-            onPress={() => router.push('/routine')}
-            accessibilityRole="button"
-            accessibilityLabel="ルーティン一覧を見る"
-          >
-            <IconSymbol name="dumbbell.fill" size={16} color={Colors.textSecondary} />
-            <Text style={styles.routineLinkBannerText}>ルーティン一覧を見る（仮）</Text>
-          </TouchableOpacity>
-        )}
+        {/* ルーティン一覧への暫定の橋渡し。タブ構成にルーティン専用の入り口が無いため、
+            本実装(専用タブ等)ができるまでのつなぎとしてここに置く */}
+        <TouchableOpacity
+          style={styles.routineLinkBanner}
+          onPress={() => router.push('/routine')}
+          accessibilityRole="button"
+          accessibilityLabel="ルーティン一覧を見る"
+          hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+        >
+          <IconSymbol name="dumbbell.fill" size={16} color={Colors.textBody} />
+          <Text style={styles.routineLinkBannerText}>ルーティン一覧</Text>
+          <IconSymbol name="chevron.right" size={14} color={Colors.textPlaceholder} />
+        </TouchableOpacity>
 
         {activeSession ? (
           <ResumeWorkoutBanner onPress={handleStart} />
@@ -120,9 +118,13 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     gap: 6,
     alignSelf: 'flex-start',
+    backgroundColor: Colors.surfaceSubtle,
+    borderRadius: 7,
+    paddingVertical: 6,
+    paddingHorizontal: 9,
     marginBottom: 12,
   },
-  routineLinkBannerText: { ...Typography.footnote, color: Colors.textSecondary, textDecorationLine: 'underline' },
+  routineLinkBannerText: { ...Typography.footnote, fontWeight: '600', color: Colors.textBody },
 
   empty: { flex: 1, alignItems: 'center', justifyContent: 'center', gap: 12 },
   emptyText: { ...Typography.body, color: Colors.textMuted, textAlign: 'center' },
