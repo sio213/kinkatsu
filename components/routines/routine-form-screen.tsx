@@ -1,4 +1,5 @@
 import { RoutineForm, type RoutineFormHandle } from '@/components/routines/routine-form';
+import { FormScrollProvider } from '@/components/ui/form-scroll-context';
 import { PrimaryButton } from '@/components/ui/primary-button';
 import { Colors } from '@/constants/theme';
 import type { RoutineFormValues } from '@/lib/routines/validation';
@@ -19,22 +20,25 @@ type Props = {
 // （呼び出し側から外部トリガーで保存する必要が無いため）forwardRefは持たない
 export function RoutineFormScreen({ initialName, onSubmit, onAddExercise, onPressExercise, onPressReminder }: Props) {
   const formRef = useRef<RoutineFormHandle>(null);
+  const scrollRef = useRef<ScrollView>(null);
   const [submitDisabled, setSubmitDisabled] = useState(false);
 
   return (
     <SafeAreaView style={styles.safe} edges={['bottom']}>
       <KeyboardAvoidingView style={styles.flex} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
-        <ScrollView contentContainerStyle={styles.content} keyboardShouldPersistTaps="handled">
-          <RoutineForm
-            ref={formRef}
-            initialName={initialName}
-            onSubmit={onSubmit}
-            onSubmitDisabledChange={setSubmitDisabled}
-            onAddExercise={onAddExercise}
-            onPressExercise={onPressExercise}
-            onPressReminder={onPressReminder}
-          />
-        </ScrollView>
+        <FormScrollProvider scrollRef={scrollRef}>
+          <ScrollView ref={scrollRef} contentContainerStyle={styles.content} keyboardShouldPersistTaps="handled">
+            <RoutineForm
+              ref={formRef}
+              initialName={initialName}
+              onSubmit={onSubmit}
+              onSubmitDisabledChange={setSubmitDisabled}
+              onAddExercise={onAddExercise}
+              onPressExercise={onPressExercise}
+              onPressReminder={onPressReminder}
+            />
+          </ScrollView>
+        </FormScrollProvider>
         <View style={styles.footer}>
           <PrimaryButton label="保存" onPress={() => formRef.current?.submit()} disabled={submitDisabled} />
         </View>

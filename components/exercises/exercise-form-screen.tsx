@@ -1,4 +1,5 @@
 import { ExerciseForm, type ExerciseFormHandle } from '@/components/exercises/exercise-form';
+import { FormScrollProvider } from '@/components/ui/form-scroll-context';
 import { PrimaryButton } from '@/components/ui/primary-button';
 import { Colors } from '@/constants/theme';
 import type { ExerciseFormValues } from '@/lib/exercises/validation';
@@ -22,6 +23,7 @@ export const ExerciseFormScreen = forwardRef<ExerciseFormScreenHandle, Props>(fu
   ref,
 ) {
   const formRef = useRef<ExerciseFormHandle>(null);
+  const scrollRef = useRef<ScrollView>(null);
   const [submitDisabled, setSubmitDisabled] = useState(false);
 
   useImperativeHandle(
@@ -38,14 +40,16 @@ export const ExerciseFormScreen = forwardRef<ExerciseFormScreenHandle, Props>(fu
         style={styles.flex}
         behavior={Platform.OS === 'ios' ? 'padding' : undefined}
       >
-        <ScrollView contentContainerStyle={styles.content} keyboardShouldPersistTaps="handled">
-          <ExerciseForm
-            ref={formRef}
-            initial={initial}
-            onSubmit={onSubmit}
-            onSubmitDisabledChange={setSubmitDisabled}
-          />
-        </ScrollView>
+        <FormScrollProvider scrollRef={scrollRef}>
+          <ScrollView ref={scrollRef} contentContainerStyle={styles.content} keyboardShouldPersistTaps="handled">
+            <ExerciseForm
+              ref={formRef}
+              initial={initial}
+              onSubmit={onSubmit}
+              onSubmitDisabledChange={setSubmitDisabled}
+            />
+          </ScrollView>
+        </FormScrollProvider>
         <View style={styles.footer}>
           <PrimaryButton
             label="保存"

@@ -1,6 +1,7 @@
 import { BoxedTextInput } from '@/components/ui/boxed-text-input';
 import { FormField } from '@/components/ui/form-field';
 import { FormFieldStack } from '@/components/ui/form-field-stack';
+import { useScrollToFirstError } from '@/components/ui/form-scroll-context';
 import { Colors, Typography } from '@/constants/theme';
 import { WEEKDAY_LABELS } from '@/lib/format';
 import {
@@ -154,6 +155,7 @@ export const ReminderForm = forwardRef<ReminderFormHandle, Props>(function Remin
     defaultValues: toFormValues(initial),
   });
   const hasErrors = Object.keys(errors).length > 0;
+  const scrollToFirstError = useScrollToFirstError();
   const submitDisabled = isSubmitted && hasErrors;
 
   useEffect(() => {
@@ -240,7 +242,7 @@ export const ReminderForm = forwardRef<ReminderFormHandle, Props>(function Remin
     onSubmit({ ...toReminderInput(values), routineId: initial.routineId ?? null });
   }
 
-  useImperativeHandle(ref, () => ({ submit: () => handleSubmit(handleValid)() }));
+  useImperativeHandle(ref, () => ({ submit: () => handleSubmit(handleValid, scrollToFirstError)() }));
 
   const timeDate = new Date();
   timeDate.setHours(hour, minute, 0, 0);
@@ -274,7 +276,7 @@ export const ReminderForm = forwardRef<ReminderFormHandle, Props>(function Remin
 
         {showTitleBody && (
           <>
-            <FormField label="タイトル" required error={errors.title?.message}>
+            <FormField name="title" label="タイトル" required error={errors.title?.message}>
               <Controller
                 control={control}
                 name="title"
@@ -291,7 +293,7 @@ export const ReminderForm = forwardRef<ReminderFormHandle, Props>(function Remin
               />
             </FormField>
 
-            <FormField label="通知内容" required error={errors.body?.message}>
+            <FormField name="body" label="通知内容" required error={errors.body?.message}>
               <Controller
                 control={control}
                 name="body"
@@ -330,7 +332,7 @@ export const ReminderForm = forwardRef<ReminderFormHandle, Props>(function Remin
           )}
         </FormField>
 
-        <FormField label="繰り返し">
+        <FormField name="kind" label="繰り返し">
           <View style={styles.kindRow}>
             {(Object.keys(KIND_LABELS) as ReminderKind[]).map((k) => (
               <TouchableOpacity
@@ -351,7 +353,7 @@ export const ReminderForm = forwardRef<ReminderFormHandle, Props>(function Remin
 
         {/* 日単位 */}
         {kind === 'interval' && (
-          <FormField label="間隔">
+          <FormField name="intervalDays" label="間隔">
             <View style={styles.stepperRow}>
               <TouchableOpacity
                 style={styles.stepperBtn}
@@ -375,7 +377,7 @@ export const ReminderForm = forwardRef<ReminderFormHandle, Props>(function Remin
         {/* 週単位 */}
         {kind === 'weekly' && (
           <>
-            <FormField label="間隔">
+            <FormField name="intervalWeeks" label="間隔">
               <View style={styles.stepperRow}>
                 <TouchableOpacity
                   style={styles.stepperBtn}
@@ -394,7 +396,7 @@ export const ReminderForm = forwardRef<ReminderFormHandle, Props>(function Remin
                 </TouchableOpacity>
               </View>
             </FormField>
-            <FormField label="曜日" required error={errors.weekdays?.message}>
+            <FormField name="weekdays" label="曜日" required error={errors.weekdays?.message}>
               <View style={styles.wdRow}>
                 {WEEKDAY_LABELS.map((label, i) => {
                   const selected = weekdays.includes(i);
@@ -421,7 +423,7 @@ export const ReminderForm = forwardRef<ReminderFormHandle, Props>(function Remin
         {/* 月単位 */}
         {kind === 'monthly' && (
           <>
-            <FormField label="間隔">
+            <FormField name="intervalMonths" label="間隔">
               <View style={styles.stepperRow}>
                 <TouchableOpacity
                   style={styles.stepperBtn}
@@ -441,7 +443,7 @@ export const ReminderForm = forwardRef<ReminderFormHandle, Props>(function Remin
               </View>
             </FormField>
 
-            <FormField label="指定方法">
+            <FormField name="monthDayMode" label="指定方法">
               <View style={styles.kindRow}>
                 {(['day', 'nth'] as const).map((mode) => (
                   <TouchableOpacity
@@ -462,6 +464,7 @@ export const ReminderForm = forwardRef<ReminderFormHandle, Props>(function Remin
 
             {isMultiMonthdaySelection && (
               <FormField
+                name="monthdays"
                 label="日付（複数選択可）"
                 required
                 error={errors.monthdays?.message}
@@ -472,7 +475,7 @@ export const ReminderForm = forwardRef<ReminderFormHandle, Props>(function Remin
 
             {monthDayMode === 'nth' && (
               <>
-                <FormField label="週">
+                <FormField name="monthNthWeek" label="週">
                   <View style={styles.kindRow}>
                     {NTH_WEEK_OPTIONS.map(({ label, value }) => (
                       <TouchableOpacity
@@ -488,6 +491,7 @@ export const ReminderForm = forwardRef<ReminderFormHandle, Props>(function Remin
                   </View>
                 </FormField>
                 <FormField
+                  name="monthNthWeekdays"
                   label="曜日"
                   required
                   error={errors.monthNthWeekdays?.message}
@@ -520,7 +524,7 @@ export const ReminderForm = forwardRef<ReminderFormHandle, Props>(function Remin
         {/* 年単位 */}
         {kind === 'yearly' && (
           <>
-            <FormField label="月">
+            <FormField name="yearlyMonth" label="月">
               <View style={styles.kindRow}>
                 {MONTH_LABELS.map((label, i) => (
                   <TouchableOpacity
@@ -536,6 +540,7 @@ export const ReminderForm = forwardRef<ReminderFormHandle, Props>(function Remin
               </View>
             </FormField>
             <FormField
+              name="yearlyDays"
               label="日（複数選択可）"
               required
               error={errors.yearlyDays?.message}
@@ -557,7 +562,7 @@ export const ReminderForm = forwardRef<ReminderFormHandle, Props>(function Remin
           </TouchableOpacity>
           <TouchableOpacity
             style={[styles.submitBtn, submitDisabled && styles.submitBtnDisabled]}
-            onPress={handleSubmit(handleValid)}
+            onPress={handleSubmit(handleValid, scrollToFirstError)}
             disabled={submitDisabled}
             accessibilityLabel={submitLabel}
           >
