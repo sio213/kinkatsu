@@ -1,4 +1,5 @@
 import { ReminderForm, type ReminderFormHandle } from '@/components/reminders/reminder-form';
+import { FormScrollProvider } from '@/components/ui/form-scroll-context';
 import { PrimaryButton } from '@/components/ui/primary-button';
 import { Colors } from '@/constants/theme';
 import { useKeyboardInset } from '@/hooks/use-keyboard-inset';
@@ -35,6 +36,7 @@ export default function RoutineReminderScreen() {
   const setReminder = useRoutineDraftStore((state) => state.setReminder);
   const keyboardInset = useKeyboardInset();
   const formRef = useRef<ReminderFormHandle>(null);
+  const scrollRef = useRef<ScrollView>(null);
   const [submitDisabled, setSubmitDisabled] = useState(false);
 
   const handleSubmit = useCallback(
@@ -51,23 +53,26 @@ export default function RoutineReminderScreen() {
 
   return (
     <SafeAreaView style={styles.safe} edges={['bottom']}>
-      <ScrollView
-        contentContainerStyle={styles.content}
-        contentInset={{ bottom: keyboardInset }}
-        scrollIndicatorInsets={{ bottom: keyboardInset }}
-        keyboardShouldPersistTaps="handled"
-      >
-        <ReminderForm
-          ref={formRef}
-          initial={reminder ?? DEFAULT_INPUT}
-          onSubmit={handleSubmit}
-          onCancel={handleCancel}
-          onSubmitDisabledChange={setSubmitDisabled}
-          submitLabel="保存"
-          showTitleBody={false}
-          hideButtons
-        />
-      </ScrollView>
+      <FormScrollProvider scrollRef={scrollRef}>
+        <ScrollView
+          ref={scrollRef}
+          contentContainerStyle={styles.content}
+          contentInset={{ bottom: keyboardInset }}
+          scrollIndicatorInsets={{ bottom: keyboardInset }}
+          keyboardShouldPersistTaps="handled"
+        >
+          <ReminderForm
+            ref={formRef}
+            initial={reminder ?? DEFAULT_INPUT}
+            onSubmit={handleSubmit}
+            onCancel={handleCancel}
+            onSubmitDisabledChange={setSubmitDisabled}
+            submitLabel="保存"
+            showTitleBody={false}
+            hideButtons
+          />
+        </ScrollView>
+      </FormScrollProvider>
       <View style={styles.footer}>
         <PrimaryButton label="保存" onPress={() => formRef.current?.submit()} disabled={submitDisabled} />
       </View>

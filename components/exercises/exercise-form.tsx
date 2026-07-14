@@ -3,6 +3,7 @@ import { BoxedTextInput } from '@/components/ui/boxed-text-input';
 import { FormField } from '@/components/ui/form-field';
 import { FormFieldStack } from '@/components/ui/form-field-stack';
 import { FormLabel } from '@/components/ui/form-label';
+import { useScrollToFirstError } from '@/components/ui/form-scroll-context';
 import { Switch } from '@/components/ui/switch';
 import { Colors, Typography } from '@/constants/theme';
 import {
@@ -75,14 +76,15 @@ export const ExerciseForm = forwardRef<ExerciseFormHandle, Props>(function Exerc
   // プリセット種目は詳細画面でgetGuide()の解説を表示するため、フォームのポイントは編集不可
   // （メモ欄と役割が重複する上、保存しても表示されない「書き込み専用」状態になるのを避ける）
   const isPreset = initial?.source === 'preset';
+  const scrollToFirstError = useScrollToFirstError();
 
   useImperativeHandle(
     ref,
     () => ({
-      submit: () => handleSubmit(onSubmit)(),
+      submit: () => handleSubmit(onSubmit, scrollToFirstError)(),
       focusName: () => nameInputRef.current?.focus(),
     }),
-    [handleSubmit, onSubmit],
+    [handleSubmit, onSubmit, scrollToFirstError],
   );
 
   useEffect(() => {
@@ -91,7 +93,7 @@ export const ExerciseForm = forwardRef<ExerciseFormHandle, Props>(function Exerc
 
   return (
     <FormFieldStack>
-      <FormField label="種目名" required error={errors.name?.message}>
+      <FormField name="name" label="種目名" required error={errors.name?.message}>
         <Controller
           control={control}
           name="name"
@@ -111,7 +113,7 @@ export const ExerciseForm = forwardRef<ExerciseFormHandle, Props>(function Exerc
         />
       </FormField>
 
-      <FormField label="カテゴリ" required error={errors.category?.message}>
+      <FormField name="category" label="カテゴリ" required error={errors.category?.message}>
         <Controller
           control={control}
           name="category"
@@ -139,7 +141,7 @@ export const ExerciseForm = forwardRef<ExerciseFormHandle, Props>(function Exerc
       </FormField>
 
       {!isPreset && (
-        <FormField label="フォームのポイント" optional>
+        <FormField name="formPoints" label="フォームのポイント" optional>
           <Controller
             control={control}
             name="formPoints"
@@ -184,7 +186,7 @@ export const ExerciseForm = forwardRef<ExerciseFormHandle, Props>(function Exerc
         </FormField>
       )}
 
-      <FormField label="メモ" optional>
+      <FormField name="note" label="メモ" optional>
         <Controller
           control={control}
           name="note"

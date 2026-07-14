@@ -4,6 +4,7 @@ import { RoutineReminderField } from '@/components/routines/routine-reminder-fie
 import { BoxedTextInput } from '@/components/ui/boxed-text-input';
 import { FormField } from '@/components/ui/form-field';
 import { FormFieldStack } from '@/components/ui/form-field-stack';
+import { useScrollToFirstError } from '@/components/ui/form-scroll-context';
 import { Typography } from '@/constants/theme';
 import { usePermissionState } from '@/hooks/use-permission-state';
 import { useRoutineDraftStore } from '@/lib/routines/draft-store';
@@ -68,7 +69,12 @@ export const RoutineForm = forwardRef<RoutineFormHandle, Props>(function Routine
     [setReminderEnabled],
   );
 
-  useImperativeHandle(ref, () => ({ submit: () => handleSubmit(onSubmit)() }), [handleSubmit, onSubmit]);
+  const scrollToFirstError = useScrollToFirstError();
+  useImperativeHandle(
+    ref,
+    () => ({ submit: () => handleSubmit(onSubmit, scrollToFirstError)() }),
+    [handleSubmit, onSubmit, scrollToFirstError],
+  );
 
   useEffect(() => {
     onSubmitDisabledChange?.(submitDisabled);
@@ -114,7 +120,7 @@ export const RoutineForm = forwardRef<RoutineFormHandle, Props>(function Routine
 
   return (
     <FormFieldStack>
-      <FormField label="名前" required error={errors.name?.message}>
+      <FormField name="name" label="名前" required error={errors.name?.message}>
         <Controller
           control={control}
           name="name"
@@ -132,7 +138,7 @@ export const RoutineForm = forwardRef<RoutineFormHandle, Props>(function Routine
         />
       </FormField>
 
-      <FormField label="種目" required error={errors.exercises?.message}>
+      <FormField name="exercises" label="種目" required error={errors.exercises?.message}>
         {exercises.length === 0 ? (
           <RoutineAddExerciseButton variant="empty" onPress={onAddExercise} />
         ) : (
@@ -149,7 +155,7 @@ export const RoutineForm = forwardRef<RoutineFormHandle, Props>(function Routine
         )}
       </FormField>
 
-      <FormField label="リマインダー" error={errors.reminder?.message}>
+      <FormField name="reminder" label="リマインダー" error={errors.reminder?.message}>
         <RoutineReminderField
           enabled={reminderEnabled}
           onToggleEnabled={handleToggleReminderEnabled}

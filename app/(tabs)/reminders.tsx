@@ -1,6 +1,7 @@
 import { PermissionBanner } from '@/components/reminders/permission-banner';
 import { ReminderCard } from '@/components/reminders/reminder-card';
 import { ReminderForm } from '@/components/reminders/reminder-form';
+import { FormScrollProvider } from '@/components/ui/form-scroll-context';
 import { HeaderActionButton } from '@/components/ui/header-action-button';
 import { ListErrorBoundary } from '@/components/ui/list-error-boundary';
 import { Colors, Typography } from '@/constants/theme';
@@ -11,7 +12,7 @@ import { useReminders } from '@/hooks/use-reminders';
 import { ensurePermission } from '@/lib/notifications/permissions';
 import type { ReminderInput } from '@/lib/notifications/types';
 import { Stack } from 'expo-router';
-import { useCallback, useState } from 'react';
+import { useCallback, useRef, useState } from 'react';
 import {
   Alert,
   ScrollView,
@@ -28,6 +29,7 @@ export default function RemindersScreen() {
   const [permState, setPermState] = usePermissionState();
   const keyboardInset = useKeyboardInset();
   const pushDebounced = useDebouncedPush();
+  const scrollRef = useRef<ScrollView>(null);
   const [showForm, setShowForm] = useState(false);
   const [editTargetId, setEditTargetId] = useState<number | null>(null);
   const [togglingIds, setTogglingIds] = useState<Set<number>>(new Set());
@@ -126,50 +128,53 @@ export default function RemindersScreen() {
             ) : null,
         }}
       />
-      <ScrollView
-        contentContainerStyle={styles.scroll}
-        keyboardShouldPersistTaps="handled"
-        contentInset={{ bottom: keyboardInset }}
-        scrollIndicatorInsets={{ bottom: keyboardInset }}
-      >
-        {permState && permState !== 'granted' && (
-          <PermissionBanner state={permState} onRequest={handleRequestPermission} />
-        )}
+      <FormScrollProvider scrollRef={scrollRef}>
+        <ScrollView
+          ref={scrollRef}
+          contentContainerStyle={styles.scroll}
+          keyboardShouldPersistTaps="handled"
+          contentInset={{ bottom: keyboardInset }}
+          scrollIndicatorInsets={{ bottom: keyboardInset }}
+        >
+          {permState && permState !== 'granted' && (
+            <PermissionBanner state={permState} onRequest={handleRequestPermission} />
+          )}
 
-        {reminders.length === 0 && !showForm && (
-          <Text style={styles.empty}>リマインダーがありません</Text>
-        )}
+          {reminders.length === 0 && !showForm && (
+            <Text style={styles.empty}>リマインダーがありません</Text>
+          )}
 
-        <ListErrorBoundary>
-          {reminders.map((r) => (
-            <ReminderCard
-              key={r.id}
-              reminder={r}
-              isEditing={editTargetId === r.id && showForm}
-              onEdit={() => openEdit(r.id)}
-              onCloseEdit={closeForm}
-              onDelete={() => handleDelete(r.id)}
-              onToggle={(enabled) => handleToggle(r.id, enabled)}
-              isToggling={togglingIds.has(r.id)}
-              onSubmit={handleSubmit}
-              getNextFire={getNextFire}
-              now={now}
-              onOpenRoutine={handleOpenRoutine}
-            />
-          ))}
-        </ListErrorBoundary>
+          <ListErrorBoundary>
+            {reminders.map((r) => (
+              <ReminderCard
+                key={r.id}
+                reminder={r}
+                isEditing={editTargetId === r.id && showForm}
+                onEdit={() => openEdit(r.id)}
+                onCloseEdit={closeForm}
+                onDelete={() => handleDelete(r.id)}
+                onToggle={(enabled) => handleToggle(r.id, enabled)}
+                isToggling={togglingIds.has(r.id)}
+                onSubmit={handleSubmit}
+                getNextFire={getNextFire}
+                now={now}
+                onOpenRoutine={handleOpenRoutine}
+              />
+            ))}
+          </ListErrorBoundary>
 
-        {showForm && editTargetId == null && (
-          <View style={styles.addFormWrapper}>
-            <Text style={styles.addFormTitle}>リマインダーを追加</Text>
-            <ReminderForm
-              onSubmit={handleSubmit}
-              onCancel={closeForm}
-              submitLabel="追加"
-            />
-          </View>
-        )}
-      </ScrollView>
+          {showForm && editTargetId == null && (
+            <View style={styles.addFormWrapper}>
+              <Text style={styles.addFormTitle}>リマインダーを追加</Text>
+              <ReminderForm
+                onSubmit={handleSubmit}
+                onCancel={closeForm}
+                submitLabel="追加"
+              />
+            </View>
+          )}
+        </ScrollView>
+      </FormScrollProvider>
     </SafeAreaView>
   );
 }

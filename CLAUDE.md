@@ -87,6 +87,10 @@ kinkatsu用のGoogle Driveフォルダが `仕事 > Webサービス > 🏋️ ki
 - Zodスキーマは対象ドメインの `lib/**/validation.ts` に置く（例: `lib/exercises/validation.ts`）。フォーム独自の状態（UIモード切り替えなど、送信先の型に直接存在しないフィールド）もスキーマに含めてよく、送信時に確定した型（例: `ReminderInput`）へ変換する関数を同じファイルに用意する
 - チップ選択・トグルなど標準的な `TextInput` 以外のカスタムコントロールも `Controller` の `render={({ field: { value, onChange } }) => ...}` でRHFに繋ぐ
 - エラーメッセージは `formState.errors` を使い、`formState.isSubmitted`（またはisSubmittedと同等のフラグ）で「送信を試みた後だけ表示する」ガードを掛ける
+- バリデーションエラー時に、エラーになった項目のうち画面上で一番上にあるものまで自動スクロールする仕組み（`components/ui/form-scroll-context.tsx`）が共通化されている。新しいフォームを追加する際は必ず以下の3点を満たすこと（Providerの外や`name`を渡さなくてもクラッシュはしないが、その分自動スクロールが効かなくなる）
+  1. フォームを包むScrollViewの`ref`を`FormScrollProvider`の`scrollRef`に渡し、ScrollView自体もその中に置く
+  2. `FormField`に各フィールドの`name`（`Controller`/`register`に渡すnameと同じもの）を渡す。現時点でエラーを表示していないフィールド（チップ選択のkind切替など）でも、単一のRHFフィールドに対応するものには付けておくと、後からそのフィールドにバリデーションを追加した際も自動的に効く
+  3. `useImperativeHandle`のsubmitや送信ボタンの`onPress`は、`useScrollToFirstError()`で得た関数を`handleSubmit(onSubmit, onInvalid)`の第2引数に渡す（`handleSubmit(onSubmit)`単体のままにしない）
 
 ### タイポグラフィ・共通コンポーネント
 - フォントサイズ・ウェイト・行間は、必ず共通トークン（theme.ts等で一元管理するFontSize/Typography定義）を参照する。画面やコンポーネント個別に`fontSize`の値をハードコードしない
