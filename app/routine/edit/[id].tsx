@@ -1,6 +1,7 @@
 import { RoutineFormScreen } from '@/components/routines/routine-form-screen';
 import { NotFoundState } from '@/components/ui/not-found-state';
 import { Colors } from '@/constants/theme';
+import { useDebouncedPush } from '@/hooks/use-debounced-push';
 import { useRoutines } from '@/hooks/use-routines';
 import { getRoutineDetail } from '@/lib/routines/db';
 import { useRoutineDraftStore } from '@/lib/routines/draft-store';
@@ -74,9 +75,15 @@ export default function RoutineEditScreen() {
     router.push('/routine/exercise-picker');
   }, [router]);
 
-  const handlePressExercise = useCallback(() => {
-    router.push('/routine/exercise-edit');
-  }, [router]);
+  // 種目一覧の行ごとにfocusIndexが異なるため、連打すると別々のfocusIndexで
+  // 二重に画面が積まれてしまう(単に同じ画面へ戻すだけの他の遷移と違い実害があるため)
+  const pushDebounced = useDebouncedPush();
+  const handlePressExercise = useCallback(
+    (index: number) => {
+      pushDebounced({ pathname: '/routine/exercise-edit', params: { focusIndex: String(index) } });
+    },
+    [pushDebounced],
+  );
 
   const handlePressReminder = useCallback(() => {
     router.push('/routine/reminder');
