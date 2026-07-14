@@ -22,7 +22,7 @@ type Props = {
   onSubmit: (values: RoutineFormValues) => void;
   onSubmitDisabledChange?: (disabled: boolean) => void;
   onAddExercise: () => void;
-  onPressExercise: () => void;
+  onPressExercise: (index: number) => void;
   onPressReminder: () => void;
 };
 
@@ -141,7 +141,7 @@ export const RoutineForm = forwardRef<RoutineFormHandle, Props>(function Routine
               <RoutineExerciseRow
                 key={`${exercise.exerciseId}-${index}`}
                 exercise={exercise}
-                onPress={onPressExercise}
+                onPress={() => onPressExercise(index)}
               />
             ))}
             <RoutineAddExerciseButton variant="ghost" onPress={onAddExercise} />

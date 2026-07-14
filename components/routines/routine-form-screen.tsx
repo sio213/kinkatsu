@@ -10,7 +10,7 @@ type Props = {
   initialName?: string;
   onSubmit: (values: RoutineFormValues) => void;
   onAddExercise: () => void;
-  onPressExercise: () => void;
+  onPressExercise: (index: number) => void;
   onPressReminder: () => void;
 };
 

@@ -74,9 +74,12 @@ export default function RoutineEditScreen() {
     router.push('/routine/exercise-picker');
   }, [router]);
 
-  const handlePressExercise = useCallback(() => {
-    router.push('/routine/exercise-edit');
-  }, [router]);
+  const handlePressExercise = useCallback(
+    (index: number) => {
+      router.push({ pathname: '/routine/exercise-edit', params: { focusIndex: String(index) } });
+    },
+    [router],
+  );
 
   const handlePressReminder = useCallback(() => {
     router.push('/routine/reminder');

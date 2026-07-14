@@ -6,9 +6,9 @@ import { useKeyboardInset } from '@/hooks/use-keyboard-inset';
 import { useExercisesWithHistory } from '@/hooks/use-workout-session';
 import { useRoutineDraftStore } from '@/lib/routines/draft-store';
 import { NO_SESSION_TO_EXCLUDE } from '@/lib/workout/history';
-import { useRouter } from 'expo-router';
-import { useCallback } from 'react';
-import { ScrollView, StyleSheet, View } from 'react-native';
+import { useLocalSearchParams, useRouter } from 'expo-router';
+import { useCallback, useRef } from 'react';
+import { type LayoutChangeEvent, ScrollView, StyleSheet, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 // ルーティンの下書き（useRoutineDraftStore）にある全種目をまとめて編集する画面。
@@ -18,9 +18,45 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 // 確定＝戻る動作
 export default function RoutineExerciseEditScreen() {
   const router = useRouter();
+  const { focusIndex: focusIndexParam } = useLocalSearchParams<{ focusIndex?: string }>();
+  const focusIndex = focusIndexParam != null ? Number(focusIndexParam) : null;
   const exercises = useRoutineDraftStore((state) => state.exercises);
   const keyboardInset = useKeyboardInset();
   const historyExerciseIds = useExercisesWithHistory(NO_SESSION_TO_EXCLUDE);
+
+  // ルーティンフォームの種目一覧でタップした種目のカードまで自動スクロールするための位置計測。
+  // 各カードの実際のレイアウトはonLayoutでしか分からないため、行(list)自体とタップされた
+  // 種目カードの両方のY座標が判明した時点で一度だけscrollToする
+  const scrollRef = useRef<ScrollView>(null);
+  const listOffsetRef = useRef(0);
+  const itemOffsetsRef = useRef<Record<number, number>>({});
+  const scrolledToFocusRef = useRef(false);
+
+  const tryScrollToFocus = useCallback(() => {
+    if (scrolledToFocusRef.current || focusIndex == null) return;
+    const itemY = itemOffsetsRef.current[focusIndex];
+    if (itemY == null) return;
+    scrolledToFocusRef.current = true;
+    // 画面遷移のスライドが終わる前に確定させ、遷移完了時には既にその位置にいるように見せる
+    // (遷移後に改めてスクロールするとジャンプが二重に見えてしまう)
+    scrollRef.current?.scrollTo({ y: listOffsetRef.current + itemY, animated: false });
+  }, [focusIndex]);
+
+  const handleListLayout = useCallback(
+    (e: LayoutChangeEvent) => {
+      listOffsetRef.current = e.nativeEvent.layout.y;
+      tryScrollToFocus();
+    },
+    [tryScrollToFocus],
+  );
+
+  const handleItemLayout = useCallback(
+    (index: number) => (e: LayoutChangeEvent) => {
+      itemOffsetsRef.current[index] = e.nativeEvent.layout.y;
+      tryScrollToFocus();
+    },
+    [tryScrollToFocus],
+  );
 
   const handleAddExercise = useCallback(() => {
     // この画面自身から開いた場合は、確定後にこのままこの画面へ戻ればよい(ドラフトストアは
@@ -32,6 +68,7 @@ export default function RoutineExerciseEditScreen() {
   return (
     <SafeAreaView style={styles.safe} edges={['bottom']}>
       <ScrollView
+        ref={scrollRef}
         contentContainerStyle={styles.content}
         contentInset={{ bottom: keyboardInset }}
         scrollIndicatorInsets={{ bottom: keyboardInset }}
@@ -40,16 +77,17 @@ export default function RoutineExerciseEditScreen() {
         {exercises.length === 0 ? (
           <RoutineAddExerciseButton variant="empty" onPress={handleAddExercise} />
         ) : (
-          <View style={styles.list}>
+          <View testID="exercise-list" style={styles.list} onLayout={handleListLayout}>
             {exercises.map((exercise, index) => (
-              <RoutineTemplateExerciseCard
-                key={`${exercise.exerciseId}-${index}`}
-                exercise={exercise}
-                index={index}
-                isFirst={index === 0}
-                isLast={index === exercises.length - 1}
-                hasHistory={historyExerciseIds.has(exercise.exerciseId)}
-              />
+              <View key={`${exercise.exerciseId}-${index}`} testID={`exercise-item-${index}`} onLayout={handleItemLayout(index)}>
+                <RoutineTemplateExerciseCard
+                  exercise={exercise}
+                  index={index}
+                  isFirst={index === 0}
+                  isLast={index === exercises.length - 1}
+                  hasHistory={historyExerciseIds.has(exercise.exerciseId)}
+                />
+              </View>
             ))}
             <RoutineAddExerciseButton variant="ghost" onPress={handleAddExercise} />
           </View>
