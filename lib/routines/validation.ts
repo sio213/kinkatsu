@@ -1,3 +1,5 @@
+import type { ReminderInput } from '@/lib/notifications/types';
+import { buildEditInput } from '@/lib/notifications/validation';
 import type { RoutineDetail, RoutineInput } from '@/lib/routines/db';
 import { z } from 'zod';
 
@@ -22,12 +24,22 @@ const draftExerciseSchema = z.object({
 
 export type DraftExercise = z.infer<typeof draftExerciseSchema>;
 
-// exercisesは種目追加ピッカー・ドラフトストア経由でのみ増減し、ユーザーが直接編集する
-// フィールドではないため、エラーメッセージは「1件も無い」の1点のみで十分
-export const routineFormSchema = z.object({
-  name: z.string().trim().min(1, 'ルーティン名を入力してください'),
-  exercises: z.array(draftExerciseSchema).min(1, '種目を1つ以上追加してください'),
-});
+// exercises/reminder(Enabled)は種目追加ピッカー・リマインダー設定画面・ドラフトストア経由での
+// みでしか変化せず、ユーザーが直接この画面で編集するフィールドではないため、
+// エラーメッセージは各1点のみで十分
+export const routineFormSchema = z
+  .object({
+    name: z.string().trim().min(1, 'ルーティン名を入力してください'),
+    exercises: z.array(draftExerciseSchema).min(1, '種目を1つ以上追加してください'),
+    reminderEnabled: z.boolean(),
+    // ReminderForm(reminderFormSchema)側で入力内容自体は検証済みのため、ここでは
+    // 「ONなのに未設定(null)のまま保存しようとしていないか」だけをrefineで見る
+    reminder: z.custom<ReminderInput>().nullable(),
+  })
+  .refine((v) => !v.reminderEnabled || v.reminder != null, {
+    message: '通知タイミングを設定してください',
+    path: ['reminder'],
+  });
 
 export type RoutineFormValues = z.infer<typeof routineFormSchema>;
 
@@ -39,6 +51,14 @@ export function toRoutineInput(values: RoutineFormValues): RoutineInput {
       sets: e.sets,
     })),
   };
+}
+
+// 編集フォームの初期値読み込み用。getRoutineDetail()のDB行（リマインダー）を
+// フォーム/ドラフトストアが扱う形に変換する。紐づくリマインダーが無ければ、新規作成時と
+// 同じ既定(トグルON・未設定)にする
+export function toDraftReminder(detail: RoutineDetail): { enabled: boolean; reminder: ReminderInput | null } {
+  if (!detail.reminder) return { enabled: true, reminder: null };
+  return { enabled: detail.reminder.enabled, reminder: buildEditInput(detail.reminder) };
 }
 
 // 編集フォームの初期値読み込み用。getRoutineDetail()のDB行（種目メタ情報+セット）を

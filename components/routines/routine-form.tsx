@@ -1,10 +1,13 @@
 import { RoutineAddExerciseButton } from '@/components/routines/routine-add-exercise-button';
 import { RoutineExerciseRow } from '@/components/routines/routine-exercise-row';
+import { RoutineReminderField } from '@/components/routines/routine-reminder-field';
 import { BoxedTextInput } from '@/components/ui/boxed-text-input';
 import { FormField } from '@/components/ui/form-field';
 import { FormFieldStack } from '@/components/ui/form-field-stack';
 import { Typography } from '@/constants/theme';
+import { usePermissionState } from '@/hooks/use-permission-state';
 import { useRoutineDraftStore } from '@/lib/routines/draft-store';
+import { ensurePermission } from '@/lib/notifications/permissions';
 import { routineFormSchema, type RoutineFormValues } from '@/lib/routines/validation';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { useFocusEffect } from 'expo-router';
@@ -20,6 +23,7 @@ type Props = {
   onSubmitDisabledChange?: (disabled: boolean) => void;
   onAddExercise: () => void;
   onPressExercise: () => void;
+  onPressReminder: () => void;
 };
 
 // ルーティンの新規作成(app/routine/new.tsx)・編集(app/routine/edit/[id].tsx)で共通のフォーム本体。
@@ -27,25 +31,42 @@ type Props = {
 // テンプレートセット編集画面を行き来しても消えないよう useRoutineDraftStore（zustand）を
 // 唯一の情報源にし、画面がフォーカスを取り戻すたびにフォーム値へ同期する
 export const RoutineForm = forwardRef<RoutineFormHandle, Props>(function RoutineForm(
-  { initialName = '', onSubmit, onSubmitDisabledChange, onAddExercise, onPressExercise },
+  { initialName = '', onSubmit, onSubmitDisabledChange, onAddExercise, onPressExercise, onPressReminder },
   ref,
 ) {
   const draftExercises = useRoutineDraftStore((state) => state.exercises);
+  const reminderEnabled = useRoutineDraftStore((state) => state.reminderEnabled);
+  const reminder = useRoutineDraftStore((state) => state.reminder);
+  const setReminderEnabled = useRoutineDraftStore((state) => state.setReminderEnabled);
+  const [permState, setPermState] = usePermissionState();
 
   const {
     control,
     handleSubmit,
     setValue,
     watch,
+    trigger,
     formState: { errors, isSubmitted, isSubmitting },
   } = useForm<RoutineFormValues>({
     resolver: zodResolver(routineFormSchema),
-    defaultValues: { name: initialName, exercises: draftExercises },
+    defaultValues: { name: initialName, exercises: draftExercises, reminderEnabled, reminder },
   });
 
   const exercises = watch('exercises');
   const hasErrors = Object.keys(errors).length > 0;
   const submitDisabled = isSubmitting || (isSubmitted && hasErrors);
+
+  const handleRequestPermission = useCallback(async () => {
+    const r = await ensurePermission();
+    setPermState(r);
+  }, [setPermState]);
+
+  const handleToggleReminderEnabled = useCallback(
+    (next: boolean) => {
+      setReminderEnabled(next);
+    },
+    [setReminderEnabled],
+  );
 
   useImperativeHandle(ref, () => ({ submit: () => handleSubmit(onSubmit)() }), [handleSubmit, onSubmit]);
 
@@ -72,6 +93,24 @@ export const RoutineForm = forwardRef<RoutineFormHandle, Props>(function Routine
     // 同期したいのはdraftExercisesが変わったときだけでよい
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [draftExercises]);
+
+  // リマインダー設定画面(app/routine/reminder.tsx)を行き来しても消えないよう、exercisesと
+  // 同じくドラフトストアを唯一の情報源にしてフォーム値へ同期する。
+  // reminderEnabled自体はz.boolean()なだけでエラーを持たないが、その値次第でreminderフィールドの
+  // refineエラー(「通知タイミングを設定してください」)が有効かどうかが変わる。setValueの
+  // shouldValidateはreminderEnabled自身しか再検証しないため、トグルOFFにしてもreminder側の
+  // 古いエラーが残り保存ボタンが押せなくなる(reminder-form.tsxのkind切替と同じ不具合パターン)。
+  // フォーム全体を再検証してエラーを最新の状態に総入れ替えする
+  useEffect(() => {
+    setValue('reminderEnabled', reminderEnabled);
+    if (isSubmitted) trigger();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [reminderEnabled]);
+
+  useEffect(() => {
+    setValue('reminder', reminder, { shouldValidate: isSubmitted });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [reminder]);
 
   return (
     <FormFieldStack>
@@ -108,6 +147,19 @@ export const RoutineForm = forwardRef<RoutineFormHandle, Props>(function Routine
             <RoutineAddExerciseButton variant="ghost" onPress={onAddExercise} />
           </View>
         )}
+      </FormField>
+
+      <FormField label="リマインダー" error={errors.reminder?.message}>
+        <RoutineReminderField
+          enabled={reminderEnabled}
+          onToggleEnabled={handleToggleReminderEnabled}
+          reminder={reminder}
+          onPressConfigure={onPressReminder}
+          permState={permState}
+          onRequestPermission={handleRequestPermission}
+          now={new Date()}
+          hasError={!!errors.reminder}
+        />
       </FormField>
     </FormFieldStack>
   );

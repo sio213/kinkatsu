@@ -6,6 +6,7 @@ import {
   swapRoutineOrder,
   updateRoutine,
   type RoutineInput,
+  type RoutineReminderPlan,
 } from '@/lib/routines/db';
 import { eq, isNotNull } from 'drizzle-orm';
 import { useLiveQuery } from 'drizzle-orm/expo-sqlite';
@@ -17,8 +18,9 @@ export function useRoutines() {
 
   return {
     routines: list,
-    createRoutine: (input: RoutineInput) => createRoutine(input),
-    updateRoutine: (id: number, input: RoutineInput) => updateRoutine(id, input),
+    createRoutine: (input: RoutineInput, reminderPlan?: RoutineReminderPlan) => createRoutine(input, reminderPlan),
+    updateRoutine: (id: number, input: RoutineInput, reminderPlan?: RoutineReminderPlan) =>
+      updateRoutine(id, input, reminderPlan),
     removeRoutine: (id: number) => deleteRoutine(id),
     swapOrder: (id: number, targetId: number) => swapRoutineOrder(id, targetId),
   };

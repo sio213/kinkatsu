@@ -2,9 +2,12 @@ import { Switch } from '@/components/ui/switch';
 import { Colors, Typography } from '@/constants/theme';
 import type { Reminder } from '@/db/schema';
 import { formatKindSummary, formatNextFire } from '@/lib/notifications/format';
-import type { ReminderInput, ReminderKind } from '@/lib/notifications/types';
+import type { ReminderInput } from '@/lib/notifications/types';
+import { buildEditInput } from '@/lib/notifications/validation';
 import { StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import { ReminderForm } from './reminder-form';
+
+export { buildEditInput };
 
 type Props = {
   reminder: Reminder;
@@ -18,33 +21,6 @@ type Props = {
   getNextFire: (r: Reminder) => Date | null;
   now: Date;
 };
-
-export function buildEditInput(r: Reminder): ReminderInput {
-  return {
-    // ルーティン由来のリマインダー(routineId有り)を編集・保存する経路がここに来た場合でも
-    // 紐付けを保つため引き継ぐ。省略するとupdateReminder側でnull扱いになり、保存のたびに
-    // ルーティンとの紐付けが切れてしまう
-    routineId: r.routineId,
-    title: r.title,
-    body: r.body,
-    kind: r.kind as ReminderKind,
-    hour: r.hour,
-    minute: r.minute,
-    weekdays: r.weekdays ? JSON.parse(r.weekdays) : undefined,
-    // monthdays未設定の毎年は、以前anchorDateに発火日そのものをエンコードしていた旧形式のデータ
-    monthdays: r.monthdays
-      ? JSON.parse(r.monthdays)
-      : r.kind === 'yearly' && r.anchorDate
-        ? [new Date(r.anchorDate).getDate()]
-        : undefined,
-    anchorDate: r.anchorDate ?? undefined,
-    intervalDays: r.intervalDays ?? undefined,
-    intervalMonths: r.intervalMonths ?? undefined,
-    nthWeek: r.nthWeek ?? undefined,
-    nthWeekdays: r.nthWeekdays ? JSON.parse(r.nthWeekdays) : undefined,
-    enabled: r.enabled,
-  };
-}
 
 export function ReminderCard({
   reminder: r,

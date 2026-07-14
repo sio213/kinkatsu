@@ -5,11 +5,14 @@ import {
   routineExercises,
   routines,
   routineSets,
+  type Reminder,
   type Routine,
   type RoutineExercise,
   type RoutineSet,
 } from '@/db/schema';
-import { deleteReminder } from '@/lib/notifications/scheduler';
+import { createReminder, deleteReminder, updateReminder } from '@/lib/notifications/scheduler';
+import type { ReminderInput } from '@/lib/notifications/types';
+import { withRoutineReminderContent } from '@/lib/routines/reminder-input';
 import { getPreviousSets, hasAnyValue } from '@/lib/workout/history';
 import { eq, inArray } from 'drizzle-orm';
 
@@ -30,6 +33,13 @@ export type RoutineInput = {
   exercises: RoutineExerciseInput[];
 };
 
+// ルーティンフォームのリマインダーセクションの保存内容。inputがnull(未設定のまま)なら
+// リマインダーの作成/更新は行わない(トグルOFF+未設定はこの状態のまま保存できる)
+export type RoutineReminderPlan = {
+  enabled: boolean;
+  input: ReminderInput | null;
+};
+
 // ルーティンフォームの種目行（サムネイル・名前・部位タグ・代表セット）表示に必要な
 // 種目メタ情報込みの1件分
 export type RoutineDetailExercise = RoutineExercise & {
@@ -44,6 +54,9 @@ export type RoutineDetailExercise = RoutineExercise & {
 export type RoutineDetail = {
   routine: Routine;
   exercises: RoutineDetailExercise[];
+  // このルーティンに紐づくリマインダー(無ければnull)。1ルーティンにつき高々1件の前提
+  // （リマインダーセクションの保存フローがcreate/update先を1件に決め打ちしているため）
+  reminder: Reminder | null;
 };
 
 // 種目追加ピッカーで選ばれた種目をルーティンの下書きに加える際の初期セット値。
@@ -91,9 +104,38 @@ async function insertRoutineExercises(
   }
 }
 
-export async function createRoutine(input: RoutineInput): Promise<number> {
+// ルーティン保存(作成/更新)後にリマインダーのcreate/update/掃除を行う。既存の紐づくリマインダー
+// (高々1件の前提)を見て、reminderPlan.inputがあればそれで作成/更新、無ければ
+// (通常は起きないが、既存分が残っていた場合の防御的な掃除として)削除する。
+// ルーティン本体(routines/routineExercises/routineSets)のトランザクションが確定した後に
+// 呼ぶため、ここで失敗してもルーティン自体の保存は既に成功している。ここでthrowすると
+// createRoutine/updateRoutine全体が失敗扱いになり、ユーザーが保存をリトライして
+// ルーティンが重複作成される恐れがあるため、失敗はログのみに留めて再throwしない
+// (通知のスケジューリング失敗はOS側の一時的な問題であることが多く、次回このルーティンを
+// 開いて保存し直せば再試行される)
+async function applyRoutineReminderPlan(routineId: number, routineName: string, plan: RoutineReminderPlan): Promise<void> {
+  try {
+    const [existing] = await db.select({ id: reminders.id }).from(reminders).where(eq(reminders.routineId, routineId));
+
+    if (!plan.input) {
+      if (existing) await deleteReminder(existing.id);
+      return;
+    }
+
+    const content = withRoutineReminderContent({ ...plan.input, enabled: plan.enabled }, routineId, routineName);
+    if (existing) {
+      await updateReminder(existing.id, content);
+    } else {
+      await createReminder(content);
+    }
+  } catch (e) {
+    console.error('[routine reminder plan]', e);
+  }
+}
+
+export async function createRoutine(input: RoutineInput, reminderPlan?: RoutineReminderPlan): Promise<number> {
   const now = Date.now();
-  return db.transaction(async (tx) => {
+  const routineId = await db.transaction(async (tx) => {
     const existing = await tx.select({ orderIndex: routines.orderIndex }).from(routines);
     const orderIndex = existing.length > 0 ? Math.max(...existing.map((r) => r.orderIndex)) + 1 : 0;
     const [inserted] = await tx
@@ -103,19 +145,25 @@ export async function createRoutine(input: RoutineInput): Promise<number> {
     await insertRoutineExercises(tx, inserted.id, input.exercises, now);
     return inserted.id;
   });
+
+  if (reminderPlan) await applyRoutineReminderPlan(routineId, input.name, reminderPlan);
+
+  return routineId;
 }
 
 // 種目・セットは編集のたびに全置換する（フォームが下書き全体を保持しており差分更新の必要が無いため）。
 // そのためroutineExercises/routineSetsのidは保存のたびに新規採番される使い捨てで、
 // reminders.routineId以外にこれらのidを外部参照するものは無い前提。将来これらのidを
 // 安定参照したくなった場合（種目単位のメモ・セット単位の履歴リンク等）はこの方式が破綻するため設計し直しが必要
-export async function updateRoutine(routineId: number, input: RoutineInput): Promise<void> {
+export async function updateRoutine(routineId: number, input: RoutineInput, reminderPlan?: RoutineReminderPlan): Promise<void> {
   const now = Date.now();
   await db.transaction(async (tx) => {
     await tx.update(routines).set({ name: input.name, updatedAt: now }).where(eq(routines.id, routineId));
     await tx.delete(routineExercises).where(eq(routineExercises.routineId, routineId));
     await insertRoutineExercises(tx, routineId, input.exercises, now);
   });
+
+  if (reminderPlan) await applyRoutineReminderPlan(routineId, input.name, reminderPlan);
 }
 
 // ルーティンに紐づくリマインダーがあれば、OS通知のキャンセルまで行うdeleteReminder()を先に
@@ -189,8 +237,11 @@ export async function getRoutineDetail(routineId: number): Promise<RoutineDetail
     else setsByExercise.set(s.routineExerciseId, [s]);
   }
 
+  const [reminder] = await db.select().from(reminders).where(eq(reminders.routineId, routineId));
+
   return {
     routine,
     exercises: exerciseRows.map((e) => ({ ...e, sets: setsByExercise.get(e.id) ?? [] })),
+    reminder: reminder ?? null,
   };
 }

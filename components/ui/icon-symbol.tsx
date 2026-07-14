@@ -31,6 +31,8 @@ const MAPPING = {
   checkmark: 'check',
   xmark: 'close',
   'clock.arrow.circlepath': 'history',
+  'exclamationmark.triangle.fill': 'warning',
+  'arrow.up.right.square': 'open-in-new',
 } as IconMapping;
 
 /**

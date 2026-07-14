@@ -17,7 +17,7 @@ import {
 } from '@/lib/notifications/validation';
 import { zodResolver } from '@hookform/resolvers/zod';
 import DateTimePicker from '@react-native-community/datetimepicker';
-import { useState } from 'react';
+import { forwardRef, useEffect, useImperativeHandle, useState } from 'react';
 import { Controller, useForm } from 'react-hook-form';
 import {
   Platform,
@@ -104,6 +104,8 @@ function DayMultiSelectGrid({
   );
 }
 
+export type ReminderFormHandle = { submit: () => void };
+
 type Props = {
   initial?: ReminderInput;
   onSubmit: (input: ReminderInput) => void;
@@ -116,16 +118,28 @@ type Props = {
   // 呼び出し側は必ず非空のinitial.title/bodyを渡すこと(欄が無いためエラー表示のしようがなく、
   // 空のままだとバリデーションに引っかかって保存ボタンが理由不明のまま押せなくなる)
   showTitleBody?: boolean;
+  // ルーティンフォームのリマインダー設定画面(app/routine/reminder.tsx)のように、呼び出し側が
+  // 独自の固定フッター(RoutineFormScreen等と同じ型)を持つ場合、内蔵のキャンセル/確定ボタンを
+  // 非表示にしrefのsubmit()経由で呼べるようにする
+  hideButtons?: boolean;
+  // hideButtons使用時、外部フッターの確定ボタンのdisabled状態をRoutineForm等と同じ形で
+  // 呼び出し側に伝える
+  onSubmitDisabledChange?: (disabled: boolean) => void;
 };
 
-export function ReminderForm({
-  initial = DEFAULT_INPUT,
-  onSubmit,
-  onCancel,
-  submitLabel,
-  showPresets = true,
-  showTitleBody = true,
-}: Props) {
+export const ReminderForm = forwardRef<ReminderFormHandle, Props>(function ReminderForm(
+  {
+    initial = DEFAULT_INPUT,
+    onSubmit,
+    onCancel,
+    submitLabel,
+    showPresets = true,
+    showTitleBody = true,
+    hideButtons = false,
+    onSubmitDisabledChange,
+  }: Props,
+  ref,
+) {
   const [showAndroidTimePicker, setShowAndroidTimePicker] = useState(false);
 
   const {
@@ -133,6 +147,7 @@ export function ReminderForm({
     handleSubmit,
     watch,
     setValue,
+    trigger,
     formState: { errors, isSubmitted },
   } = useForm<ReminderFormValues>({
     resolver: zodResolver(reminderFormSchema),
@@ -140,6 +155,10 @@ export function ReminderForm({
   });
   const hasErrors = Object.keys(errors).length > 0;
   const submitDisabled = isSubmitted && hasErrors;
+
+  useEffect(() => {
+    onSubmitDisabledChange?.(submitDisabled);
+  }, [submitDisabled, onSubmitDisabledChange]);
 
   const kind = watch('kind');
   const hour = watch('hour');
@@ -159,6 +178,15 @@ export function ReminderForm({
   // バリデーション側もこれに合わせる（表示条件と検証条件がずれないよう一箇所にまとめる）
   const isMultiMonthdaySelection = kind === 'monthly' && monthDayMode === 'day';
 
+  // kind/monthDayModeは「どのフィールドが必須になるか」を決める分岐そのものなので、
+  // setValueの{shouldValidate}(=対象フィールド自身だけを再検証)では、切替前のkindで
+  // 出ていた別フィールド(weekdays/monthNthWeekdays等)の古いエラーがerrorsに残り続けてしまう
+  // (zodResolverは毎回スキーマ全体を検証するが、RHFはtrigger()に渡した対象フィールド分の
+  // 結果しか反映しないため)。フォーム全体を再検証してエラーを最新の状態に総入れ替えする
+  function revalidateIfSubmitted() {
+    if (isSubmitted) trigger();
+  }
+
   function applyPreset(preset: (typeof REMINDER_PRESETS)[number]) {
     if (preset.weekdays) {
       setValue('kind', 'weekly');
@@ -168,6 +196,7 @@ export function ReminderForm({
       setValue('kind', 'interval');
       setValue('intervalDays', 1);
     }
+    revalidateIfSubmitted();
   }
 
   const activePreset = REMINDER_PRESETS.find((p) => {
@@ -210,6 +239,8 @@ export function ReminderForm({
     // ルーティン由来のリマインダーを編集・保存してもルーティンとの紐付けが消えないようにする
     onSubmit({ ...toReminderInput(values), routineId: initial.routineId ?? null });
   }
+
+  useImperativeHandle(ref, () => ({ submit: () => handleSubmit(handleValid)() }));
 
   const timeDate = new Date();
   timeDate.setHours(hour, minute, 0, 0);
@@ -305,7 +336,10 @@ export function ReminderForm({
               <TouchableOpacity
                 key={k}
                 style={[styles.chip, kind === k && styles.chipActive]}
-                onPress={() => setValue('kind', k)}
+                onPress={() => {
+                  setValue('kind', k);
+                  revalidateIfSubmitted();
+                }}
               >
                 <Text style={[styles.chipText, kind === k && styles.chipTextActive]}>
                   {KIND_LABELS[k]}
@@ -413,7 +447,10 @@ export function ReminderForm({
                   <TouchableOpacity
                     key={mode}
                     style={[styles.chip, monthDayMode === mode && styles.chipActive]}
-                    onPress={() => setValue('monthDayMode', mode)}
+                    onPress={() => {
+                      setValue('monthDayMode', mode);
+                      revalidateIfSubmitted();
+                    }}
                   >
                     <Text style={[styles.chipText, monthDayMode === mode && styles.chipTextActive]}>
                       {mode === 'day' ? '日付' : '第N曜日'}
@@ -509,26 +546,28 @@ export function ReminderForm({
         )}
       </FormFieldStack>
 
-      <View style={styles.buttons}>
-        <TouchableOpacity
-          style={styles.cancelBtn}
-          onPress={onCancel}
-          accessibilityLabel="キャンセル"
-        >
-          <Text style={styles.cancelBtnText}>キャンセル</Text>
-        </TouchableOpacity>
-        <TouchableOpacity
-          style={[styles.submitBtn, submitDisabled && styles.submitBtnDisabled]}
-          onPress={handleSubmit(handleValid)}
-          disabled={submitDisabled}
-          accessibilityLabel={submitLabel}
-        >
-          <Text style={styles.submitBtnText}>{submitLabel}</Text>
-        </TouchableOpacity>
-      </View>
+      {!hideButtons && (
+        <View style={styles.buttons}>
+          <TouchableOpacity
+            style={styles.cancelBtn}
+            onPress={onCancel}
+            accessibilityLabel="キャンセル"
+          >
+            <Text style={styles.cancelBtnText}>キャンセル</Text>
+          </TouchableOpacity>
+          <TouchableOpacity
+            style={[styles.submitBtn, submitDisabled && styles.submitBtnDisabled]}
+            onPress={handleSubmit(handleValid)}
+            disabled={submitDisabled}
+            accessibilityLabel={submitLabel}
+          >
+            <Text style={styles.submitBtnText}>{submitLabel}</Text>
+          </TouchableOpacity>
+        </View>
+      )}
     </>
   );
-}
+});
 
 const styles = StyleSheet.create({
   // タイトルは箱(枠線・背景・角丸・横padding)とTextInput本体をBoxedTextInputで分離

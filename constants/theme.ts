@@ -27,6 +27,7 @@ const Palette = {
   blue600: '#2563EB',
 
   amber100: '#FEF3C7',
+  amber300: '#FCD34D',
   amber500: '#F59E0B',
   amber600: '#D97706',
   amber800: '#92400E',
@@ -64,6 +65,7 @@ export const Colors = {
   warningAccent: Palette.amber500,
   warningText: Palette.amber800,
   warningSurface: Palette.amber100,
+  warningBorder: Palette.amber300,
 
   icon: Palette.slate500,
   tabIconDefault: Palette.slate500,
