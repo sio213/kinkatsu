@@ -428,3 +428,52 @@ describe('routineIdの引き継ぎ', () => {
     expect(onSubmit).toHaveBeenCalledWith(expect.objectContaining({ routineId: null }));
   });
 });
+
+describe('showTitleBody: タイトル・通知内容欄の表示切り替え', () => {
+  test('デフォルト(true)ではタイトル・通知内容欄が表示される', async () => {
+    const { root } = await render();
+
+    expect(root.findByProps({ placeholder: 'タイトル' })).toBeDefined();
+    expect(root.findByProps({ placeholder: '通知内容' })).toBeDefined();
+  });
+
+  test('falseにするとタイトル・通知内容欄が表示されない', async () => {
+    const { root } = await render({ showTitleBody: false });
+
+    expect(() => root.findByProps({ placeholder: 'タイトル' })).toThrow();
+    expect(() => root.findByProps({ placeholder: '通知内容' })).toThrow();
+  });
+
+  test('タイトル・通知内容欄を隠していても、initialの値のまま保存できる(ユーザー入力欄が無いだけでバリデーションは素通り)', async () => {
+    const { root, onSubmit } = await render({
+      showTitleBody: false,
+      initial: {
+        title: '胸の日',
+        body: '後でじゃなく、今やる。',
+        kind: 'interval',
+        hour: 18,
+        minute: 0,
+        intervalDays: 1,
+        enabled: true,
+      },
+    });
+
+    await submit(root);
+
+    expect(onSubmit).toHaveBeenCalledWith(
+      expect.objectContaining({ title: '胸の日', body: '後でじゃなく、今やる。' }),
+    );
+  });
+
+  test('繰り返し種別(週次等)の選択・エラー表示は隠した状態でも通常どおり機能する', async () => {
+    const { root, onSubmit } = await render({ showTitleBody: false });
+
+    await press(root, '毎週');
+    await submit(root);
+    expect(allTexts(root)).toContain('曜日を1つ以上選択してください');
+
+    await press(root, '月');
+    await submit(root);
+    expect(onSubmit).toHaveBeenCalledWith(expect.objectContaining({ kind: 'weekly', weekdays: [1] }));
+  });
+});

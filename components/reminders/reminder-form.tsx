@@ -110,9 +110,22 @@ type Props = {
   onCancel: () => void;
   submitLabel: string;
   showPresets?: boolean;
+  // ルーティンフォームのリマインダーセクションから使う場合、タイトル・本文は
+  // ユーザー入力欄を持たずルーティン名から自動生成する(lib/routines/reminder-input.tsの
+  // withRoutineReminderContent参照)ため、その欄自体を非表示にする。falseにする場合、
+  // 呼び出し側は必ず非空のinitial.title/bodyを渡すこと(欄が無いためエラー表示のしようがなく、
+  // 空のままだとバリデーションに引っかかって保存ボタンが理由不明のまま押せなくなる)
+  showTitleBody?: boolean;
 };
 
-export function ReminderForm({ initial = DEFAULT_INPUT, onSubmit, onCancel, submitLabel, showPresets = true }: Props) {
+export function ReminderForm({
+  initial = DEFAULT_INPUT,
+  onSubmit,
+  onCancel,
+  submitLabel,
+  showPresets = true,
+  showTitleBody = true,
+}: Props) {
   const [showAndroidTimePicker, setShowAndroidTimePicker] = useState(false);
 
   const {
@@ -228,39 +241,43 @@ export function ReminderForm({ initial = DEFAULT_INPUT, onSubmit, onCancel, subm
           </FormField>
         )}
 
-        <FormField label="タイトル" required error={errors.title?.message}>
-          <Controller
-            control={control}
-            name="title"
-            render={({ field: { value, onChange } }) => (
-              <BoxedTextInput
-                height={38}
-                boxStyle={styles.inputBox}
-                style={styles.inputText}
-                value={value}
-                onChangeText={onChange}
-                placeholder="タイトル"
+        {showTitleBody && (
+          <>
+            <FormField label="タイトル" required error={errors.title?.message}>
+              <Controller
+                control={control}
+                name="title"
+                render={({ field: { value, onChange } }) => (
+                  <BoxedTextInput
+                    height={38}
+                    boxStyle={styles.inputBox}
+                    style={styles.inputText}
+                    value={value}
+                    onChangeText={onChange}
+                    placeholder="タイトル"
+                  />
+                )}
               />
-            )}
-          />
-        </FormField>
+            </FormField>
 
-        <FormField label="通知内容" required error={errors.body?.message}>
-          <Controller
-            control={control}
-            name="body"
-            render={({ field: { value, onChange } }) => (
-              <TextInput
-                style={styles.inputMulti}
-                value={value}
-                onChangeText={onChange}
-                placeholder="通知内容"
-                multiline
-                scrollEnabled={false}
+            <FormField label="通知内容" required error={errors.body?.message}>
+              <Controller
+                control={control}
+                name="body"
+                render={({ field: { value, onChange } }) => (
+                  <TextInput
+                    style={styles.inputMulti}
+                    value={value}
+                    onChangeText={onChange}
+                    placeholder="通知内容"
+                    multiline
+                    scrollEnabled={false}
+                  />
+                )}
               />
-            )}
-          />
-        </FormField>
+            </FormField>
+          </>
+        )}
 
         <FormField label="時刻">
           {Platform.OS === 'android' && (
