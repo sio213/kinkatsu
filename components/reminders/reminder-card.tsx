@@ -1,3 +1,4 @@
+import { IconSymbol } from '@/components/ui/icon-symbol';
 import { Switch } from '@/components/ui/switch';
 import { Colors, Typography } from '@/constants/theme';
 import type { Reminder } from '@/db/schema';
@@ -20,6 +21,9 @@ type Props = {
   onSubmit: (input: ReminderInput) => void;
   getNextFire: (r: Reminder) => Date | null;
   now: Date;
+  // ルーティン由来のリマインダー(routineId有り)をタップしたときの遷移先。
+  // routineIdがnull(単体リマインダー)のときは呼ばれない
+  onOpenRoutine?: (routineId: number) => void;
 };
 
 export function ReminderCard({
@@ -33,10 +37,26 @@ export function ReminderCard({
   onSubmit,
   getNextFire,
   now,
+  onOpenRoutine,
 }: Props) {
+  const isFromRoutine = r.routineId != null;
+
   return (
     <View>
       <View style={styles.card}>
+        {isFromRoutine && (
+          <TouchableOpacity
+            style={styles.routineBadge}
+            onPress={() => onOpenRoutine?.(r.routineId!)}
+            accessibilityRole="button"
+            accessibilityLabel={`${r.title}はルーティンのリマインダーです。ルーティン編集画面を開く`}
+            hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
+          >
+            <IconSymbol name="list.bullet.clipboard" size={13} color={Colors.textMuted} />
+            <Text style={styles.routineBadgeText}>ルーティンのリマインダー</Text>
+            <IconSymbol name="chevron.right" size={13} color={Colors.textMuted} />
+          </TouchableOpacity>
+        )}
         <View style={styles.cardMain}>
           <View style={styles.info}>
             <Text style={styles.title} numberOfLines={1}>{r.title}</Text>
@@ -59,14 +79,19 @@ export function ReminderCard({
           >
             <Text style={styles.actionBtnText}>{isEditing ? '閉じる' : '編集'}</Text>
           </TouchableOpacity>
-          <TouchableOpacity
-            style={[styles.actionBtn, styles.actionBtnDanger]}
-            onPress={onDelete}
-            accessibilityLabel={`${r.title}を削除`}
-            hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
-          >
-            <Text style={[styles.actionBtnText, styles.actionBtnDangerText]}>削除</Text>
-          </TouchableOpacity>
+          {/* ルーティン由来のリマインダーは、単体削除すると次にルーティン編集画面を開いたときに
+              「未設定」状態に見えてしまう(このカード上部のバッジからルーティン編集画面へ遷移し、
+              そちら側のトグルOFFで無効化してもらう導線に一本化する) */}
+          {!isFromRoutine && (
+            <TouchableOpacity
+              style={[styles.actionBtn, styles.actionBtnDanger]}
+              onPress={onDelete}
+              accessibilityLabel={`${r.title}を削除`}
+              hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
+            >
+              <Text style={[styles.actionBtnText, styles.actionBtnDangerText]}>削除</Text>
+            </TouchableOpacity>
+          )}
         </View>
       </View>
       {isEditing && (
@@ -98,6 +123,18 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: Colors.border,
   },
+  routineBadge: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    alignSelf: 'flex-start',
+    backgroundColor: Colors.surfaceSubtle,
+    borderRadius: 7,
+    paddingVertical: 6,
+    paddingHorizontal: 9,
+  },
+  routineBadgeText: { ...Typography.footnote, fontWeight: '600', color: Colors.textBody },
+
   cardMain: { flexDirection: 'row', alignItems: 'center', gap: 12 },
   info: { flex: 1, gap: 2 },
   title: { ...Typography.cardTitle, color: Colors.textPrimary },

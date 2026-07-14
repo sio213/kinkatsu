@@ -4,6 +4,7 @@ import { ReminderForm } from '@/components/reminders/reminder-form';
 import { HeaderActionButton } from '@/components/ui/header-action-button';
 import { ListErrorBoundary } from '@/components/ui/list-error-boundary';
 import { Colors, Typography } from '@/constants/theme';
+import { useDebouncedPush } from '@/hooks/use-debounced-push';
 import { useKeyboardInset } from '@/hooks/use-keyboard-inset';
 import { usePermissionState } from '@/hooks/use-permission-state';
 import { useReminders } from '@/hooks/use-reminders';
@@ -26,6 +27,7 @@ export default function RemindersScreen() {
 
   const [permState, setPermState] = usePermissionState();
   const keyboardInset = useKeyboardInset();
+  const pushDebounced = useDebouncedPush();
   const [showForm, setShowForm] = useState(false);
   const [editTargetId, setEditTargetId] = useState<number | null>(null);
   const [togglingIds, setTogglingIds] = useState<Set<number>>(new Set());
@@ -76,6 +78,13 @@ export default function RemindersScreen() {
       ]);
     },
     [removeReminder],
+  );
+
+  const handleOpenRoutine = useCallback(
+    (routineId: number) => {
+      pushDebounced(`/routine/edit/${routineId}`);
+    },
+    [pushDebounced],
   );
 
   const handleToggle = useCallback(
@@ -145,6 +154,7 @@ export default function RemindersScreen() {
               onSubmit={handleSubmit}
               getNextFire={getNextFire}
               now={now}
+              onOpenRoutine={handleOpenRoutine}
             />
           ))}
         </ListErrorBoundary>
