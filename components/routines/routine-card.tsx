@@ -1,5 +1,6 @@
 import { CategoryChip } from '@/components/exercises/category-chip';
 import { DesignIcon } from '@/components/ui/design-icon';
+import { IconSymbol } from '@/components/ui/icon-symbol';
 import { Colors, Typography } from '@/constants/theme';
 import { getCategoryLabel } from '@/lib/exercises/constants';
 import { summarizeCategories, type RoutineScheduleDisplay } from '@/lib/routines/format';
@@ -52,6 +53,7 @@ export function RoutineCard({
       onPress={onPress}
       accessibilityRole="button"
       accessibilityLabel={accessibilityLabel}
+      accessibilityHint="タップしてトレーニングを開始します"
     >
       <View style={styles.top}>
         <Text style={styles.name} numberOfLines={1}>{name}</Text>
@@ -75,13 +77,19 @@ export function RoutineCard({
         {overflowCount > 0 && <Text style={styles.overflow}>{`+${overflowCount}`}</Text>}
       </View>
 
-      <View style={styles.sched}>
-        <DesignIcon
-          name={schedule.active ? 'calendar-today' : 'event-busy'}
-          size={15}
-          color={schedule.active ? Colors.accent : Colors.textPlaceholder}
-        />
-        <Text style={[styles.schedText, !schedule.active && styles.schedTextOff]}>{schedule.label}</Text>
+      <View style={styles.bottomRow}>
+        <View style={styles.sched}>
+          <DesignIcon
+            name={schedule.active ? 'calendar-today' : 'event-busy'}
+            size={15}
+            color={schedule.active ? Colors.accent : Colors.textPlaceholder}
+          />
+          <Text style={[styles.schedText, !schedule.active && styles.schedTextOff]}>{schedule.label}</Text>
+        </View>
+        {/* カード全体タップの遷移先が編集画面からワークアウト開始に変わったため、他画面の
+            chevron「›」と同格の控えめな添え物として再生アイコンを置き、タップの意味を示す
+            (@designerレビュー) */}
+        <IconSymbol name="play.fill" size={14} color={Colors.textPlaceholder} />
       </View>
     </TouchableOpacity>
   );
@@ -104,11 +112,11 @@ const styles = StyleSheet.create({
   exerciseCount: { ...Typography.caption, fontWeight: '600', color: Colors.textMuted },
   overflow: { ...Typography.caption, fontWeight: '700', color: Colors.textPlaceholder },
 
+  bottomRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
   sched: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: 6,
-    alignSelf: 'flex-start',
     backgroundColor: Colors.surfaceSubtle,
     borderRadius: 7,
     paddingVertical: 6,

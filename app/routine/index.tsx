@@ -2,12 +2,16 @@ import { RoutineCard } from '@/components/routines/routine-card';
 import { HeaderActionButton } from '@/components/ui/header-action-button';
 import { ListErrorBoundary } from '@/components/ui/list-error-boundary';
 import { PrimaryButton } from '@/components/ui/primary-button';
+import { ResumeWorkoutBanner } from '@/components/workout/resume-workout-banner';
 import { Colors, Typography } from '@/constants/theme';
 import type { Routine } from '@/db/schema';
 import { useDebouncedPush } from '@/hooks/use-debounced-push';
 import { useRoutineExerciseSummaries, useRoutineReminders, useRoutines } from '@/hooks/use-routines';
+import { useWorkoutSessions } from '@/hooks/use-workout-session';
+import { useWorkoutStarter } from '@/hooks/use-workout-starter';
 import { useRoutineDraftStore } from '@/lib/routines/draft-store';
 import { getRoutineScheduleDisplay } from '@/lib/routines/format';
+import { startWorkoutFromRoutine } from '@/lib/workout/session';
 import { Stack } from 'expo-router';
 import { useCallback } from 'react';
 import { Alert, FlatList, StyleSheet, Text, View } from 'react-native';
@@ -17,8 +21,10 @@ export default function RoutineListScreen() {
   const { routines, removeRoutine, swapOrder } = useRoutines();
   const summaries = useRoutineExerciseSummaries();
   const routineReminders = useRoutineReminders();
+  const { activeSession } = useWorkoutSessions();
   const pushDebounced = useDebouncedPush();
   const resetDraft = useRoutineDraftStore((state) => state.reset);
+  const startWorkout = useWorkoutStarter(activeSession, (sessionId) => pushDebounced(`/workout/${sessionId}`));
 
   const handleCreate = useCallback(() => {
     // app/routine/new.tsx自身のマウント時resetに加えてここでも空にしておくことで、
@@ -33,6 +39,14 @@ export default function RoutineListScreen() {
       pushDebounced(`/routine/edit/${id}`);
     },
     [pushDebounced],
+  );
+
+  // カード本体タップ=ワークアウト即開始（編集は⋮メニューに一本化）。進行中セッションへの合流・
+  // 二重タップ防止・失敗時のAlertはuseWorkoutStarterに共通化済み(記録タブの「開始」と同じ土台)
+  const handleStartWorkout = useCallback(
+    (routineId: number) =>
+      startWorkout(async () => (await startWorkoutFromRoutine(routineId))?.sessionId ?? null),
+    [startWorkout],
   );
 
   const handleDelete = useCallback(
@@ -81,7 +95,7 @@ export default function RoutineListScreen() {
             schedule={schedule}
             isFirst={index === 0}
             isLast={index === routines.length - 1}
-            onPress={() => handleEdit(item.id)}
+            onPress={() => handleStartWorkout(item.id)}
             onEdit={() => handleEdit(item.id)}
             onMoveUp={() => {
               // isFirst/isLastのdisabled判定により通常はここに来ないが、メニュー展開中に
@@ -98,7 +112,7 @@ export default function RoutineListScreen() {
         </ListErrorBoundary>
       );
     },
-    [summaries, routineReminders, routines, handleEdit, handleSwap, handleDelete],
+    [summaries, routineReminders, routines, handleStartWorkout, handleEdit, handleSwap, handleDelete],
   );
 
   return (
@@ -122,6 +136,14 @@ export default function RoutineListScreen() {
         renderItem={renderItem}
         ItemSeparatorComponent={() => <View style={styles.separator} />}
         contentContainerStyle={styles.content}
+        ListHeaderComponent={
+          activeSession ? (
+            <ResumeWorkoutBanner
+              onPress={() => pushDebounced(`/workout/${activeSession.id}`)}
+              style={styles.resumeBanner}
+            />
+          ) : null
+        }
         ListEmptyComponent={
           <View style={styles.emptyWrapper}>
             <Text style={styles.empty}>ルーティンがありません</Text>
@@ -138,6 +160,8 @@ const styles = StyleSheet.create({
   list: { flex: 1 },
   content: { padding: 16, flexGrow: 1 },
   separator: { height: 11 },
+
+  resumeBanner: { marginBottom: 11 },
 
   emptyWrapper: { flex: 1, alignItems: 'center', justifyContent: 'center', gap: 12, paddingVertical: 32 },
   empty: { ...Typography.body, color: Colors.textMuted, textAlign: 'center' },

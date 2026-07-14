@@ -1,22 +1,24 @@
 import { HeaderActionButton } from '@/components/ui/header-action-button';
 import { IconSymbol } from '@/components/ui/icon-symbol';
 import { PrimaryButton } from '@/components/ui/primary-button';
+import { ResumeWorkoutBanner } from '@/components/workout/resume-workout-banner';
 import { SessionCard } from '@/components/workout/session-card';
 import { Colors, Typography } from '@/constants/theme';
 import type { WorkoutSession } from '@/db/schema';
 import { useSessionStats, useWorkoutSessions } from '@/hooks/use-workout-session';
+import { useWorkoutStarter } from '@/hooks/use-workout-starter';
 import { startWorkoutSession } from '@/lib/workout/session';
 import { groupSessionsByDate } from '@/lib/workout/summary';
 import { Stack, useRouter } from 'expo-router';
-import { useCallback, useRef } from 'react';
-import { Alert, SectionList, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
+import { useCallback } from 'react';
+import { SectionList, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 export default function RecordScreen() {
   const router = useRouter();
   const { sessions, activeSession } = useWorkoutSessions();
   const summaryBySession = useSessionStats();
-  const isStartingRef = useRef(false);
+  const startWorkout = useWorkoutStarter(activeSession, (sessionId) => router.push(`/workout/${sessionId}`));
 
   // 進行中セッションは履歴に出さず、開始/再開ボタンから直接遷移する対象にする
   const endedSessions = sessions.filter((s) => s.endedAt != null);
@@ -26,24 +28,10 @@ export default function RecordScreen() {
     data: group.sessions,
   }));
 
-  const handleStart = useCallback(async () => {
-    if (activeSession) {
-      router.push(`/workout/${activeSession.id}`);
-      return;
-    }
-    // 連打でstartSessionが二重に呼ばれ、endedAtがnullのセッションが2件できるのを防ぐ
-    if (isStartingRef.current) return;
-    isStartingRef.current = true;
-    try {
-      const session = await startWorkoutSession();
-      router.push(`/workout/${session.id}`);
-    } catch (e) {
-      console.error('[workout session start]', e);
-      Alert.alert('エラー', 'トレーニングを開始できませんでした。');
-    } finally {
-      isStartingRef.current = false;
-    }
-  }, [activeSession, router]);
+  const handleStart = useCallback(
+    () => startWorkout(async () => (await startWorkoutSession()).id),
+    [startWorkout],
+  );
 
   return (
     <SafeAreaView style={styles.safeArea} edges={[]}>
@@ -78,15 +66,7 @@ export default function RecordScreen() {
         )}
 
         {activeSession ? (
-          <TouchableOpacity
-            style={styles.resumeBanner}
-            onPress={handleStart}
-            accessibilityRole="button"
-            accessibilityLabel="進行中のトレーニングを再開する"
-          >
-            <IconSymbol name="timer" size={18} color={Colors.accent} />
-            <Text style={styles.resumeBannerText}>進行中のトレーニングを再開する</Text>
-          </TouchableOpacity>
+          <ResumeWorkoutBanner onPress={handleStart} />
         ) : sessions.length === 0 ? (
           <View style={styles.empty}>
             <IconSymbol name="list.bullet.clipboard" size={40} color={Colors.borderStrong} />
@@ -128,16 +108,6 @@ export default function RecordScreen() {
 const styles = StyleSheet.create({
   safeArea: { flex: 1, backgroundColor: Colors.background },
   container: { flex: 1, padding: 16 },
-
-  resumeBanner: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 8,
-    backgroundColor: Colors.accentSurface,
-    borderRadius: 10,
-    padding: 12,
-  },
-  resumeBannerText: { color: Colors.accent, ...Typography.bodyStrong },
 
   routineLinkBanner: {
     flexDirection: 'row',
