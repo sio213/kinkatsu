@@ -10,7 +10,7 @@ import { useWorkoutSessions } from '@/hooks/use-workout-session';
 import { useWorkoutStarter } from '@/hooks/use-workout-starter';
 import { useRoutineDraftStore } from '@/lib/routines/draft-store';
 import { getRoutineScheduleDisplay } from '@/lib/routines/format';
-import { startWorkoutFromRoutine } from '@/lib/workout/session';
+import { endWorkoutSession, startWorkoutFromRoutine } from '@/lib/workout/session';
 import { Stack } from 'expo-router';
 import { useCallback } from 'react';
 import { Alert, FlatList, StyleSheet, Text, View } from 'react-native';
@@ -40,23 +40,35 @@ export default function RoutineListScreen() {
     [pushDebounced],
   );
 
-  // カード本体タップ=ワークアウト即開始（編集は⋮メニューに一本化）。ただし記録タブの「開始/再開」
-  // ボタンと違い、ここでのタップは「(タップした)このルーティンを始めたい」という意図なので、
-  // 別のトレーニングが既に進行中の場合に無言でそちらへ遷移すると「押したのに違うものが開いた」
-  // という違和感になる（実機フィードバックで指摘）。そのため一旦確認を挟み、続けるか
-  // 進行中のトレーニングを開くかをユーザーに選んでもらう
+  // カードの「開始」ボタン専用の処理（カード本体タップは編集画面へ、@designerレビュー）。
+  // 別のトレーニングが既に進行中の場合、無言でそちらへ合流すると「押したのに違うものが開いた」
+  // という違和感になる（実機フィードバックで指摘）ため確認を挟む。「記録して開始」では
+  // 進行中セッションをendWorkoutSessionで終了（記録は保存されたまま）した上で、選んだ
+  // ルーティンのセッションを新規に開始する
   const handleStartWorkout = useCallback(
-    (routineId: number) => {
+    (routine: Routine) => {
       if (activeSession) {
-        Alert.alert('別のトレーニングが進行中です', 'このルーティンを開始するには、先に進行中のトレーニングを終了してください。', [
-          { text: 'キャンセル', style: 'cancel' },
-          { text: '進行中のトレーニングを開く', onPress: () => pushDebounced(`/workout/${activeSession.id}`) },
-        ]);
+        Alert.alert(
+          '実施中のトレーニングを終了しますか？',
+          `ここまでの記録を保存して「${routine.name}」を開始しますか？`,
+          [
+            { text: 'キャンセル', style: 'cancel' },
+            {
+              text: '記録して開始',
+              onPress: () => {
+                startWorkout(async () => {
+                  await endWorkoutSession(activeSession.id);
+                  return (await startWorkoutFromRoutine(routine.id))?.sessionId ?? null;
+                });
+              },
+            },
+          ],
+        );
         return;
       }
-      startWorkout(async () => (await startWorkoutFromRoutine(routineId))?.sessionId ?? null);
+      startWorkout(async () => (await startWorkoutFromRoutine(routine.id))?.sessionId ?? null);
     },
-    [activeSession, startWorkout, pushDebounced],
+    [activeSession, startWorkout],
   );
 
   const handleDelete = useCallback(
@@ -105,7 +117,8 @@ export default function RoutineListScreen() {
             schedule={schedule}
             isFirst={index === 0}
             isLast={index === routines.length - 1}
-            onPress={() => handleStartWorkout(item.id)}
+            onPress={() => handleEdit(item.id)}
+            onStart={() => handleStartWorkout(item)}
             onEdit={() => handleEdit(item.id)}
             onMoveUp={() => {
               // isFirst/isLastのdisabled判定により通常はここに来ないが、メニュー展開中に
