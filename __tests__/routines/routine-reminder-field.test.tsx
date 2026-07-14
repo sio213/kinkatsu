@@ -43,10 +43,18 @@ afterEach(() => {
   currentInstance = undefined;
 });
 
-// デザイン案の設定行(box)はaccessibilityRole="button"の唯一のTouchableOpacityなので、
-// これで一意に拾える(設定済み/未設定でaccessibilityLabelの文言が変わるため個別に指定しない)
+// 設定行(box)。permStateがdenied/undeterminedのときはPermissionBannerの「設定を開く」/
+// 「許可する」ボタンもaccessibilityRole="button"のTouchableOpacityとして同時に存在するため、
+// box特有のaccessibilityLabel(「通知タイミングを設定」または「タップして変更」を含む)で絞り込む
 function findBox(root: ReactTestInstance) {
-  return root.findAllByType(TouchableOpacity).find((t) => t.props.accessibilityRole === 'button');
+  return root
+    .findAllByType(TouchableOpacity)
+    .find(
+      (t) =>
+        typeof t.props.accessibilityLabel === 'string' &&
+        (t.props.accessibilityLabel.includes('通知タイミングを設定') ||
+          t.props.accessibilityLabel.includes('タップして変更')),
+    );
 }
 
 function boxOpacity(box: ReactTestInstance): number | undefined {
@@ -106,15 +114,26 @@ test('OFF+設定済みは次回発火時刻を表示しない', () => {
   expect(allTexts.some((t) => typeof t === 'string' && t.includes('次回'))).toBe(false);
 });
 
-test('ON+設定済みだが端末通知が拒否されているときは、設定行をopacity .6で軽く沈め次回発火時刻も出さない', () => {
+test('ON+設定済みだが端末通知が拒否されているときは、設定行をopacity .6でDisabledにし次回発火時刻も出さない', () => {
   const root = render({ enabled: true, reminder: makeReminder(), permState: 'denied' });
 
   const box = findBox(root)!;
-  expect(box.props.disabled).toBe(false); // 許可待ちなだけで編集は引き続き可能
+  // 許可されるまで設定画面を開いても通知は届かないため、遷移自体を止める
+  expect(box.props.disabled).toBe(true);
   expect(boxOpacity(box)).toBe(0.6);
+  expect(box.props.accessibilityLabel).toContain('通知が許可されていません');
 
   const allTexts = root.findAllByType(Text).map((t) => t.props.children).flat();
   expect(allTexts.some((t) => typeof t === 'string' && t.includes('次回'))).toBe(false);
+});
+
+test('ON+未設定だが端末通知が拒否されているときも、設定行をDisabledにする', () => {
+  const root = render({ enabled: true, reminder: null, permState: 'undetermined' });
+
+  const box = findBox(root)!;
+  expect(box.props.disabled).toBe(true);
+  expect(boxOpacity(box)).toBe(0.6);
+  expect(box.props.accessibilityLabel).toContain('通知が許可されていません');
 });
 
 test('設定行をタップするとonPressConfigureが呼ばれる(設定済み・未設定どちらも)', () => {

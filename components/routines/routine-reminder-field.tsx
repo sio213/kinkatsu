@@ -29,8 +29,9 @@ type Props = {
 // - OFF+設定済み: 設定行を残すが薄いグレー(opacity .45)にしタップも無効化する(値は保持)
 // - ON+未設定: 「通知タイミングを設定」の行(タップで設定画面へ)+ヒント文言
 // - ON+設定済み: 頻度要約。次回発火時刻は端末通知が許可されている場合のみ表示
-// 端末通知が拒否のときはPermissionBannerを設定行の上に表示し、設定行自体もopacity .6で軽く沈める
-// (トグルOFFによる.45の「操作不可」表現とは意図を分けている)
+// 端末通知が拒否のときはPermissionBannerを設定行の上に表示する。この間は設定画面を開いても
+// 通知は届かないため、設定行自体もopacity .6にした上でタップを無効化する(トグルOFFによる
+// .45の「操作不可」とは見た目の濃さを分けているが、どちらも操作不可という点は同じ)
 export function RoutineReminderField({
   enabled,
   onToggleEnabled,
@@ -42,9 +43,11 @@ export function RoutineReminderField({
   hasError,
 }: Props) {
   const permissionDenied = enabled && permState != null && permState !== 'granted';
+  const boxDisabled = !enabled || permissionDenied;
   const boxOpacity = !enabled ? 0.45 : permissionDenied ? 0.6 : 1;
   const showNextFire = enabled && reminder != null && permState === 'granted';
   const showHint = enabled && !reminder && !hasError;
+  const disabledReason = !enabled ? '(現在オフ)' : permissionDenied ? '(通知が許可されていません)' : '';
 
   return (
     <View style={styles.container}>
@@ -61,13 +64,13 @@ export function RoutineReminderField({
         <TouchableOpacity
           style={[styles.box, { opacity: boxOpacity }]}
           onPress={onPressConfigure}
-          disabled={!enabled}
+          disabled={boxDisabled}
           accessibilityRole="button"
-          accessibilityState={{ disabled: !enabled }}
+          accessibilityState={{ disabled: boxDisabled }}
           accessibilityLabel={
             reminder
-              ? `${previewReminderSummary(reminder)}${enabled ? '' : '(現在オフ)'}、タップして変更`
-              : '通知タイミングを設定'
+              ? `${previewReminderSummary(reminder)}${disabledReason}、タップして変更`
+              : `通知タイミングを設定${disabledReason}`
           }
         >
           <DesignIcon name="calendar-today" size={18} color={Colors.accent} />
