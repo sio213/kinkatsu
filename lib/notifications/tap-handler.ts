@@ -33,12 +33,13 @@ export async function resolveReminderTapDestination(
 
   if (reminder?.routineId == null) return '/';
 
-  // 既に別のトレーニングが進行中の場合、無言でそちらを開くとルーティン一覧のカードタップと同様
-  // 「タップしたものと違う画面が開く」違和感になる(実機フィードバックで指摘済みの問題と同種)。
-  // 通知タップはAlertで確認を挟める画面文脈を持たないため、record画面(進行中セッションの再開
-  // バナーが既にある)に任せ、ここでは推測でどちらかへ割り込まない
+  // 既にトレーニングが進行中の場合は、新規セッションを作らずその画面をそのまま開く(ユーザー要望:
+  // 「トレーニング途中なら何も追加せずトレーニング画面を開く」)。ルーティン一覧のカードタップでは
+  // 「タップしたルーティンと違う進行中セッションが無言で開く違和感」を確認Alertで解消したが、
+  // 通知タップは特定のルーティンを選んで押す操作ではなく受動的なきっかけに過ぎないため、
+  // 「今どのトレーニングが進行中でも、それを続けさせる」ことの方が親切と判断した
   const activeSession = await getActiveSession();
-  if (activeSession) return '/';
+  if (activeSession) return `/workout/${activeSession.id}`;
 
   // startWorkoutFromRoutineはDB書き込みを伴うが、この関数自体はエラーをcatchせず素通しする
   // (呼び出し元のapp/_layout.tsxがconsole.errorのみで受け止め、Alertは出さない)。通知タップは

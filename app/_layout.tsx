@@ -83,9 +83,9 @@ export default function RootLayout() {
   }, [success]);
 
   // 通知タップ → 記録タブ(単体リマインダー)またはワークアウト画面(ルーティン由来のリマインダー。
-  // 種目・目標セット入りで新規開始/進行中セッションがあれば記録タブへ)へ遷移。cold start／
-  // background／foregroundのいずれのタップもuseLastNotificationResponseが横断して拾うため、
-  // リスナーの手動組み合わせは不要。
+  // 種目・目標セット入りで新規開始/既に進行中のトレーニングがあればそれをそのまま開く)へ遷移。
+  // cold start／background／foregroundのいずれのタップもuseLastNotificationResponseが
+  // 横断して拾うため、リスナーの手動組み合わせは不要。
   useEffect(() => {
     if (!success || !lastNotificationResponse) return;
     (async () => {
