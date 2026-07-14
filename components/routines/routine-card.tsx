@@ -1,6 +1,7 @@
 import { CategoryChip } from '@/components/exercises/category-chip';
 import { DesignIcon } from '@/components/ui/design-icon';
 import { IconSymbol } from '@/components/ui/icon-symbol';
+import { PrimaryButton } from '@/components/ui/primary-button';
 import { Colors, Typography } from '@/constants/theme';
 import { getCategoryLabel } from '@/lib/exercises/constants';
 import { summarizeCategories, type RoutineScheduleDisplay } from '@/lib/routines/format';
@@ -15,6 +16,7 @@ type Props = {
   isFirst: boolean;
   isLast: boolean;
   onPress: () => void;
+  onStart: () => void;
   onEdit: () => void;
   onMoveUp: () => void;
   onMoveDown: () => void;
@@ -29,6 +31,7 @@ export function RoutineCard({
   isFirst,
   isLast,
   onPress,
+  onStart,
   onEdit,
   onMoveUp,
   onMoveDown,
@@ -53,7 +56,7 @@ export function RoutineCard({
       onPress={onPress}
       accessibilityRole="button"
       accessibilityLabel={accessibilityLabel}
-      accessibilityHint="タップしてトレーニングを開始します"
+      accessibilityHint="タップして編集画面を開きます"
     >
       <View style={styles.top}>
         <Text style={styles.name} numberOfLines={1}>{name}</Text>
@@ -77,20 +80,22 @@ export function RoutineCard({
         {overflowCount > 0 && <Text style={styles.overflow}>{`+${overflowCount}`}</Text>}
       </View>
 
-      <View style={styles.bottomRow}>
-        <View style={styles.sched}>
-          <DesignIcon
-            name={schedule.active ? 'calendar-today' : 'event-busy'}
-            size={15}
-            color={schedule.active ? Colors.accent : Colors.textPlaceholder}
-          />
-          <Text style={[styles.schedText, !schedule.active && styles.schedTextOff]}>{schedule.label}</Text>
-        </View>
-        {/* カード全体タップの遷移先が編集画面からワークアウト開始に変わったため、他画面の
-            chevron「›」と同格の控えめな添え物として再生アイコンを置き、タップの意味を示す
-            (@designerレビュー) */}
-        <IconSymbol name="play.fill" size={14} color={Colors.textPlaceholder} />
+      <View style={styles.sched}>
+        <DesignIcon
+          name={schedule.active ? 'calendar-today' : 'event-busy'}
+          size={15}
+          color={schedule.active ? Colors.accent : Colors.textPlaceholder}
+        />
+        <Text style={[styles.schedText, !schedule.active && styles.schedTextOff]}>{schedule.label}</Text>
       </View>
+
+      <PrimaryButton
+        label="開始"
+        icon={<IconSymbol name="play.fill" size={16} color={Colors.onAccent} />}
+        onPress={onStart}
+        accessibilityLabel={`「${name}」のトレーニングを開始`}
+        style={styles.startBtn}
+      />
     </TouchableOpacity>
   );
 }
@@ -112,10 +117,10 @@ const styles = StyleSheet.create({
   exerciseCount: { ...Typography.caption, fontWeight: '600', color: Colors.textMuted },
   overflow: { ...Typography.caption, fontWeight: '700', color: Colors.textPlaceholder },
 
-  bottomRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
   sched: {
     flexDirection: 'row',
     alignItems: 'center',
+    alignSelf: 'flex-start',
     gap: 6,
     backgroundColor: Colors.surfaceSubtle,
     borderRadius: 7,
@@ -124,4 +129,6 @@ const styles = StyleSheet.create({
   },
   schedText: { ...Typography.footnote, fontWeight: '600', color: Colors.textBody },
   schedTextOff: { color: Colors.textPlaceholder },
+
+  startBtn: { paddingVertical: 11 },
 });
