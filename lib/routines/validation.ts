@@ -54,10 +54,14 @@ export function toRoutineInput(values: RoutineFormValues): RoutineInput {
 }
 
 // 編集フォームの初期値読み込み用。getRoutineDetail()のDB行（リマインダー）を
-// フォーム/ドラフトストアが扱う形に変換する。紐づくリマインダーが無ければ、新規作成時と
-// 同じ既定(トグルON・未設定)にする
+// フォーム/ドラフトストアが扱う形に変換する。紐づくリマインダーが無ければトグルOFFにする。
+// routineFormSchemaのrefine(「ONなのに未設定は保存不可」)により、保存済みの既存ルーティンで
+// reminderが無い(=行自体が作られていない)のは必ず直前の保存時にトグルOFFだった場合のみ
+// (ON+未設定のまま保存されることは無い)。ここをtrue(新規作成時と同じ既定)にすると、
+// 「OFFにして保存したのに次に開くとONになっている」というバグになる(新規作成時の既定ONは
+// draft-store.tsのreset()側で持つため、この関数は新規作成時には呼ばれず影響しない)
 export function toDraftReminder(detail: RoutineDetail): { enabled: boolean; reminder: ReminderInput | null } {
-  if (!detail.reminder) return { enabled: true, reminder: null };
+  if (!detail.reminder) return { enabled: false, reminder: null };
   return { enabled: detail.reminder.enabled, reminder: buildEditInput(detail.reminder) };
 }
 

@@ -154,8 +154,8 @@ describe('toDraftReminder', () => {
     reminder: null,
   };
 
-  test('紐づくリマインダーが無ければ既定(トグルON・未設定)を返す', () => {
-    expect(toDraftReminder(baseDetail)).toEqual({ enabled: true, reminder: null });
+  test('紐づくリマインダーが無ければトグルOFF(未設定)を返す(既存ルーティンでreminderが無いのは保存時のバリデーション上OFFで保存した場合のみのため)', () => {
+    expect(toDraftReminder(baseDetail)).toEqual({ enabled: false, reminder: null });
   });
 
   test('紐づくリマインダーがあれば、そのenabled状態とReminderInputへ変換した設定内容を返す', () => {
