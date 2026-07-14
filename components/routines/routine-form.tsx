@@ -44,6 +44,7 @@ export const RoutineForm = forwardRef<RoutineFormHandle, Props>(function Routine
     handleSubmit,
     setValue,
     watch,
+    trigger,
     formState: { errors, isSubmitted, isSubmitting },
   } = useForm<RoutineFormValues>({
     resolver: zodResolver(routineFormSchema),
@@ -97,9 +98,15 @@ export const RoutineForm = forwardRef<RoutineFormHandle, Props>(function Routine
   }, [draftExercises]);
 
   // リマインダー設定画面(app/routine/reminder.tsx)を行き来しても消えないよう、exercisesと
-  // 同じくドラフトストアを唯一の情報源にしてフォーム値へ同期する
+  // 同じくドラフトストアを唯一の情報源にしてフォーム値へ同期する。
+  // reminderEnabled自体はz.boolean()なだけでエラーを持たないが、その値次第でreminderフィールドの
+  // refineエラー(「通知タイミングを設定してください」)が有効かどうかが変わる。setValueの
+  // shouldValidateはreminderEnabled自身しか再検証しないため、トグルOFFにしてもreminder側の
+  // 古いエラーが残り保存ボタンが押せなくなる(reminder-form.tsxのkind切替と同じ不具合パターン)。
+  // フォーム全体を再検証してエラーを最新の状態に総入れ替えする
   useEffect(() => {
-    setValue('reminderEnabled', reminderEnabled, { shouldValidate: isSubmitted });
+    setValue('reminderEnabled', reminderEnabled);
+    if (isSubmitted) trigger();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [reminderEnabled]);
 
@@ -154,6 +161,7 @@ export const RoutineForm = forwardRef<RoutineFormHandle, Props>(function Routine
           permState={permState}
           onRequestPermission={handleRequestPermission}
           now={new Date()}
+          hasError={!!errors.reminder}
         />
       </FormField>
     </FormFieldStack>

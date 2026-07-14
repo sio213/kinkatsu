@@ -241,7 +241,10 @@ describe('リマインダーセクション: 既存ルーティンからのhydra
     );
     const root = await renderResolved();
 
-    expect(root.findByProps({ accessibilityLabel: 'リマインダーの設定を変更' })).toBeDefined();
+    const reminderBox = root
+      .findAllByType(TouchableOpacity)
+      .find((t) => typeof t.props.accessibilityLabel === 'string' && t.props.accessibilityLabel.includes('タップして変更'));
+    expect(reminderBox).toBeDefined();
 
     const submitBtn = findButtonByLabel(root, '保存')!;
     await act(async () => {

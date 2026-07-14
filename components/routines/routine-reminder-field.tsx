@@ -1,10 +1,11 @@
 import { PermissionBanner } from '@/components/reminders/permission-banner';
+import { DesignIcon } from '@/components/ui/design-icon';
 import { IconSymbol } from '@/components/ui/icon-symbol';
 import { Switch } from '@/components/ui/switch';
 import { Colors, Typography } from '@/constants/theme';
 import { formatNextFire } from '@/lib/notifications/format';
-import type { ReminderInput } from '@/lib/notifications/types';
 import type { PermissionState } from '@/lib/notifications/permissions';
+import type { ReminderInput } from '@/lib/notifications/types';
 import { previewNextFireDate, previewReminderSummary } from '@/lib/routines/reminder-input';
 import { StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 
@@ -16,14 +17,20 @@ type Props = {
   permState: PermissionState | null;
   onRequestPermission: () => void;
   now: Date;
+  // routineFormSchemaのrefineによるバリデーションエラーの有無。実際のエラー文言表示は
+  // 呼び出し側(routine-form.tsxのFormField)に任せ、ここでは未設定時のヒント文言を
+  // エラーと同時に出さないための判定にだけ使う
+  hasError?: boolean;
 };
 
-// ルーティンフォームの「リマインダー」セクション。トグルON/OFF×設定済み/未設定の
-// 4パターンを持つ(design memo「リマインダー — 実装方針サンプル」参照):
-// OFF+未設定は行のみ、OFF+設定済みは設定内容をグレー表示、ON+未設定は「設定」を促す行
-// (未設定のまま保存しようとするとroutineFormSchemaのrefineでエラーになる)、
-// ON+設定済みは頻度要約+次回発火時刻を表示する。タップするといずれもリマインダー設定画面
-// (app/routine/reminder.tsx)へ遷移し、設定/再設定できる
+// デザイン案(デザイン検討/ルーティン デザイン案.html「リマインダー — 実装方針サンプル」)に準拠。
+// トグルON/OFF×設定済み/未設定の4パターン:
+// - OFF+未設定: トグル行のみ(何も出さない)
+// - OFF+設定済み: 設定行を残すが薄いグレー(opacity .45)にしタップも無効化する(値は保持)
+// - ON+未設定: 「通知タイミングを設定」の行(タップで設定画面へ)+ヒント文言
+// - ON+設定済み: 頻度要約。次回発火時刻は端末通知が許可されている場合のみ表示
+// 端末通知が拒否のときはPermissionBannerを設定行の上に表示し、設定行自体もopacity .6で軽く沈める
+// (トグルOFFによる.45の「操作不可」表現とは意図を分けている)
 export function RoutineReminderField({
   enabled,
   onToggleEnabled,
@@ -32,86 +39,82 @@ export function RoutineReminderField({
   permState,
   onRequestPermission,
   now,
+  hasError,
 }: Props) {
+  const permissionDenied = enabled && permState != null && permState !== 'granted';
+  const boxOpacity = !enabled ? 0.45 : permissionDenied ? 0.6 : 1;
+  const showNextFire = enabled && reminder != null && permState === 'granted';
+  const showHint = enabled && !reminder && !hasError;
+
   return (
     <View style={styles.container}>
-      {/* 「リマインダー」の見出し自体はこのフィールドを包むFormField側(routine-form.tsx)の
-          FormLabelが既に表示しているため、ここでは繰り返さずSwitchだけを右寄せで置く */}
       <View style={styles.toggleRow}>
-        <Switch value={enabled} onValueChange={onToggleEnabled} accessibilityLabel="リマインダー" />
+        <Text style={styles.notifyLabel}>通知する</Text>
+        <Switch value={enabled} onValueChange={onToggleEnabled} accessibilityLabel="通知する" />
       </View>
 
-      {reminder ? (
-        <TouchableOpacity
-          style={styles.summaryRow}
-          onPress={onPressConfigure}
-          accessibilityRole="button"
-          accessibilityLabel={enabled ? 'リマインダーの設定を変更' : 'リマインダーの設定を変更(現在オフ)'}
-        >
-          <View style={styles.summaryTextGroup}>
-            <Text style={[styles.summaryText, !enabled && styles.summaryTextDisabled]}>
-              {previewReminderSummary(reminder)}
-            </Text>
-            {enabled && (
-              <Text style={styles.nextFireText}>{formatNextFire(previewNextFireDate(reminder, now), now)}</Text>
-            )}
-          </View>
-          <IconSymbol name="chevron.right" size={18} color={Colors.textPlaceholder} />
-        </TouchableOpacity>
-      ) : (
-        enabled && (
-          <TouchableOpacity
-            style={styles.emptyPrompt}
-            onPress={onPressConfigure}
-            accessibilityRole="button"
-            accessibilityLabel="リマインダーを設定"
-          >
-            <Text style={styles.emptyPromptText}>リマインダーを設定</Text>
-            <IconSymbol name="chevron.right" size={18} color={Colors.accent} />
-          </TouchableOpacity>
-        )
+      {permissionDenied && (
+        <PermissionBanner state={permState as 'denied' | 'undetermined'} onRequest={onRequestPermission} />
       )}
 
-      {enabled && permState && permState !== 'granted' && (
-        <PermissionBanner state={permState} onRequest={onRequestPermission} />
+      {(enabled || reminder) && (
+        <TouchableOpacity
+          style={[styles.box, { opacity: boxOpacity }]}
+          onPress={onPressConfigure}
+          disabled={!enabled}
+          accessibilityRole="button"
+          accessibilityState={{ disabled: !enabled }}
+          accessibilityLabel={
+            reminder
+              ? `${previewReminderSummary(reminder)}${enabled ? '' : '(現在オフ)'}、タップして変更`
+              : '通知タイミングを設定'
+          }
+        >
+          <DesignIcon name="calendar-today" size={18} color={Colors.accent} />
+          {reminder ? (
+            <Text style={styles.boxSummaryText} numberOfLines={1}>
+              {previewReminderSummary(reminder)}
+            </Text>
+          ) : (
+            <View style={styles.boxPlaceholderGroup}>
+              <Text style={styles.boxPlaceholderTitle}>通知タイミングを設定</Text>
+              <Text style={styles.boxPlaceholderSubtitle}>タップして設定</Text>
+            </View>
+          )}
+          <IconSymbol name="chevron.right" size={18} color={Colors.textPlaceholder} />
+        </TouchableOpacity>
       )}
+
+      {showNextFire && (
+        <Text style={styles.nextFireText}>{formatNextFire(previewNextFireDate(reminder, now), now)}</Text>
+      )}
+
+      {showHint && <Text style={styles.hintText}>未設定のうちは通知されません。</Text>}
     </View>
   );
 }
 
 const styles = StyleSheet.create({
   container: { gap: 8 },
-  toggleRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'flex-end' },
+  toggleRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
+  notifyLabel: { ...Typography.bodyStrong, color: Colors.textPrimary },
 
-  summaryRow: {
+  box: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: 8,
-    backgroundColor: Colors.surfaceMuted,
-    borderRadius: 9,
+    backgroundColor: Colors.surface,
+    borderRadius: 7,
     borderWidth: 1,
-    borderColor: Colors.border,
+    borderColor: Colors.borderStrong,
     paddingVertical: 10,
     paddingHorizontal: 12,
   },
-  summaryTextGroup: { flex: 1, gap: 2 },
-  summaryText: { ...Typography.cardTitle, color: Colors.textPrimary },
-  // OFF時はテキスト色だけを落とし、chevron・背景・枠線は変えない(タップして再設定できることが
-  // 見た目上も伝わるようにするため。行全体をopacityで薄くすると「操作不可」に見えてしまう)
-  summaryTextDisabled: { color: Colors.textMuted },
-  nextFireText: { ...Typography.caption, color: Colors.textMuted },
+  boxSummaryText: { ...Typography.footnote, fontWeight: '600', color: Colors.textPrimary, flex: 1 },
+  boxPlaceholderGroup: { flex: 1, gap: 1 },
+  boxPlaceholderTitle: { ...Typography.footnote, fontWeight: '600', color: Colors.textPrimary },
+  boxPlaceholderSubtitle: { ...Typography.caption, fontWeight: '500', color: Colors.textPlaceholder },
 
-  emptyPrompt: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    borderWidth: 1.5,
-    borderStyle: 'dashed',
-    borderColor: Colors.borderStrong,
-    backgroundColor: Colors.surface,
-    borderRadius: 9,
-    paddingVertical: 12,
-    paddingHorizontal: 12,
-  },
-  emptyPromptText: { ...Typography.bodyStrong, color: Colors.accent },
+  nextFireText: { ...Typography.caption, fontWeight: '600', color: Colors.textMuted },
+  hintText: { ...Typography.caption, fontWeight: '400', color: Colors.textMuted },
 });

@@ -37,7 +37,7 @@ export const routineFormSchema = z
     reminder: z.custom<ReminderInput>().nullable(),
   })
   .refine((v) => !v.reminderEnabled || v.reminder != null, {
-    message: 'リマインダーを設定してください',
+    message: '通知タイミングを設定してください',
     path: ['reminder'],
   });
 

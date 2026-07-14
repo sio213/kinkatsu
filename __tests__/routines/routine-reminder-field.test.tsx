@@ -43,65 +43,86 @@ afterEach(() => {
   currentInstance = undefined;
 });
 
-function findByLabel(root: ReactTestInstance, label: string) {
-  return root.findAllByType(TouchableOpacity).find((t) => t.props.accessibilityLabel === label);
+// デザイン案の設定行(box)はaccessibilityRole="button"の唯一のTouchableOpacityなので、
+// これで一意に拾える(設定済み/未設定でaccessibilityLabelの文言が変わるため個別に指定しない)
+function findBox(root: ReactTestInstance) {
+  return root.findAllByType(TouchableOpacity).find((t) => t.props.accessibilityRole === 'button');
 }
 
-test('ON+未設定は「リマインダーを設定」の促し行を表示する', () => {
-  const root = render({ enabled: true, reminder: null });
-  expect(findByLabel(root, 'リマインダーを設定')).toBeDefined();
+function boxOpacity(box: ReactTestInstance): number | undefined {
+  const flat = [box.props.style].flat(Infinity).filter(Boolean) as { opacity?: number }[];
+  return flat.find((s) => typeof s === 'object' && 'opacity' in s)?.opacity;
+}
+
+test('OFF+未設定は設定行を一切表示しない', () => {
+  const root = render({ enabled: false, reminder: null });
+  expect(findBox(root)).toBeUndefined();
 });
 
-test('OFF+未設定は促し行も設定内容も何も表示しない', () => {
-  const root = render({ enabled: false, reminder: null });
-  expect(findByLabel(root, 'リマインダーを設定')).toBeUndefined();
-  expect(findByLabel(root, 'リマインダーの設定を変更')).toBeUndefined();
+test('ON+未設定は「通知タイミングを設定」の設定行を表示し、ヒント文言も出す', () => {
+  const root = render({ enabled: true, reminder: null });
+  const box = findBox(root)!;
+  const texts = box.findAllByType(Text).map((t) => t.props.children).flat();
+  expect(texts).toContain('通知タイミングを設定');
+  expect(texts).toContain('タップして設定');
+  expect(box.props.disabled).toBe(false);
+  expect(root.findByProps({ children: '未設定のうちは通知されません。' })).toBeDefined();
+});
+
+test('ON+未設定でもhasError:trueのときはヒント文言を出さない(バリデーションエラー表示と同時に出ないようにする)', () => {
+  const root = render({ enabled: true, reminder: null, hasError: true });
+  expect(() => root.findByProps({ children: '未設定のうちは通知されません。' })).toThrow();
 });
 
 test('ON+設定済みは頻度要約と次回発火時刻を表示する', () => {
   const reminder = makeReminder({ kind: 'interval', intervalDays: 1, hour: 7, minute: 0 });
   const root = render({ enabled: true, reminder });
 
-  const row = findByLabel(root, 'リマインダーの設定を変更')!;
-  const texts = row.findAllByType(Text).map((t) => t.props.children).flat();
-  expect(texts.some((t) => typeof t === 'string' && t.includes('毎日'))).toBe(true);
-  expect(texts.some((t) => typeof t === 'string' && t.includes('次回'))).toBe(true);
+  const box = findBox(root)!;
+  const boxTexts = box.findAllByType(Text).map((t) => t.props.children).flat();
+  expect(boxTexts.some((t) => typeof t === 'string' && t.includes('毎日'))).toBe(true);
+  expect(box.props.disabled).toBe(false);
+  expect(boxOpacity(box)).toBe(1);
+
+  const allTexts = root.findAllByType(Text).map((t) => t.props.children).flat();
+  expect(allTexts.some((t) => typeof t === 'string' && t.includes('次回'))).toBe(true);
 });
 
-test('OFF+設定済みは設定内容を表示するが次回発火時刻は表示しない(accessibilityLabelにもオフである旨を含める)', () => {
+test('OFF+設定済みは設定内容を保持したまま薄いグレー(opacity .45)でDisabledにする(デザイン案どおり操作不可)', () => {
   const reminder = makeReminder();
   const root = render({ enabled: false, reminder });
 
-  const row = findByLabel(root, 'リマインダーの設定を変更(現在オフ)')!;
-  const texts = row.findAllByType(Text).map((t) => t.props.children).flat();
-  expect(texts.some((t) => typeof t === 'string' && t.includes('次回'))).toBe(false);
+  const box = findBox(root)!;
+  expect(box.props.disabled).toBe(true);
+  expect(boxOpacity(box)).toBe(0.45);
+
+  const boxTexts = box.findAllByType(Text).map((t) => t.props.children).flat();
+  expect(boxTexts.some((t) => typeof t === 'string' && t.includes('毎日'))).toBe(true);
 });
 
-test('OFF+設定済みでも行自体はopacityで薄くしない(タップできることが見た目でも伝わるようにする)', () => {
+test('OFF+設定済みは次回発火時刻を表示しない', () => {
   const root = render({ enabled: false, reminder: makeReminder() });
-  const row = findByLabel(root, 'リマインダーの設定を変更(現在オフ)')!;
-
-  const flatStyle = [row.props.style].flat(Infinity).filter(Boolean);
-  expect(flatStyle.some((s) => typeof s === 'object' && 'opacity' in s)).toBe(false);
+  const allTexts = root.findAllByType(Text).map((t) => t.props.children).flat();
+  expect(allTexts.some((t) => typeof t === 'string' && t.includes('次回'))).toBe(false);
 });
 
-test('設定済みの行をタップするとonPressConfigureが呼ばれる', () => {
+test('ON+設定済みだが端末通知が拒否されているときは、設定行をopacity .6で軽く沈め次回発火時刻も出さない', () => {
+  const root = render({ enabled: true, reminder: makeReminder(), permState: 'denied' });
+
+  const box = findBox(root)!;
+  expect(box.props.disabled).toBe(false); // 許可待ちなだけで編集は引き続き可能
+  expect(boxOpacity(box)).toBe(0.6);
+
+  const allTexts = root.findAllByType(Text).map((t) => t.props.children).flat();
+  expect(allTexts.some((t) => typeof t === 'string' && t.includes('次回'))).toBe(false);
+});
+
+test('設定行をタップするとonPressConfigureが呼ばれる(設定済み・未設定どちらも)', () => {
   const onPressConfigure = jest.fn();
   const root = render({ reminder: makeReminder(), onPressConfigure });
 
   act(() => {
-    findByLabel(root, 'リマインダーの設定を変更')!.props.onPress();
-  });
-
-  expect(onPressConfigure).toHaveBeenCalled();
-});
-
-test('未設定の促し行をタップするとonPressConfigureが呼ばれる', () => {
-  const onPressConfigure = jest.fn();
-  const root = render({ reminder: null, onPressConfigure });
-
-  act(() => {
-    findByLabel(root, 'リマインダーを設定')!.props.onPress();
+    findBox(root)!.props.onPress();
   });
 
   expect(onPressConfigure).toHaveBeenCalled();
@@ -117,6 +138,11 @@ test('トグルを押すとonToggleEnabledが呼ばれる', () => {
   });
 
   expect(onToggleEnabled).toHaveBeenCalledWith(false);
+});
+
+test('トグルの見出しは「通知する」(フィールド見出し「リマインダー」との重複を避ける)', () => {
+  const root = render({ enabled: true });
+  expect(root.findByProps({ children: '通知する' })).toBeDefined();
 });
 
 test('ON+permStateがdeniedのときは許可バナーを表示する', () => {

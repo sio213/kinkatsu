@@ -281,12 +281,12 @@ describe('リマインダーセクション', () => {
     });
 
     expect(mockCreateRoutine).not.toHaveBeenCalled();
-    expect(root.findByProps({ children: 'リマインダーを設定してください' })).toBeDefined();
+    expect(root.findByProps({ children: '通知タイミングを設定してください' })).toBeDefined();
   });
 
   test('リマインダーの設定行を押すと/routine/reminderへ遷移する', () => {
     const root = render();
-    const row = root.findByProps({ accessibilityLabel: 'リマインダーを設定' });
+    const row = root.findByProps({ accessibilityLabel: '通知タイミングを設定' });
 
     act(() => {
       row.props.onPress();

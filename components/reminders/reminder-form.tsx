@@ -147,6 +147,7 @@ export const ReminderForm = forwardRef<ReminderFormHandle, Props>(function Remin
     handleSubmit,
     watch,
     setValue,
+    trigger,
     formState: { errors, isSubmitted },
   } = useForm<ReminderFormValues>({
     resolver: zodResolver(reminderFormSchema),
@@ -177,6 +178,15 @@ export const ReminderForm = forwardRef<ReminderFormHandle, Props>(function Remin
   // バリデーション側もこれに合わせる（表示条件と検証条件がずれないよう一箇所にまとめる）
   const isMultiMonthdaySelection = kind === 'monthly' && monthDayMode === 'day';
 
+  // kind/monthDayModeは「どのフィールドが必須になるか」を決める分岐そのものなので、
+  // setValueの{shouldValidate}(=対象フィールド自身だけを再検証)では、切替前のkindで
+  // 出ていた別フィールド(weekdays/monthNthWeekdays等)の古いエラーがerrorsに残り続けてしまう
+  // (zodResolverは毎回スキーマ全体を検証するが、RHFはtrigger()に渡した対象フィールド分の
+  // 結果しか反映しないため)。フォーム全体を再検証してエラーを最新の状態に総入れ替えする
+  function revalidateIfSubmitted() {
+    if (isSubmitted) trigger();
+  }
+
   function applyPreset(preset: (typeof REMINDER_PRESETS)[number]) {
     if (preset.weekdays) {
       setValue('kind', 'weekly');
@@ -186,6 +196,7 @@ export const ReminderForm = forwardRef<ReminderFormHandle, Props>(function Remin
       setValue('kind', 'interval');
       setValue('intervalDays', 1);
     }
+    revalidateIfSubmitted();
   }
 
   const activePreset = REMINDER_PRESETS.find((p) => {
@@ -325,7 +336,10 @@ export const ReminderForm = forwardRef<ReminderFormHandle, Props>(function Remin
               <TouchableOpacity
                 key={k}
                 style={[styles.chip, kind === k && styles.chipActive]}
-                onPress={() => setValue('kind', k)}
+                onPress={() => {
+                  setValue('kind', k);
+                  revalidateIfSubmitted();
+                }}
               >
                 <Text style={[styles.chipText, kind === k && styles.chipTextActive]}>
                   {KIND_LABELS[k]}
@@ -433,7 +447,10 @@ export const ReminderForm = forwardRef<ReminderFormHandle, Props>(function Remin
                   <TouchableOpacity
                     key={mode}
                     style={[styles.chip, monthDayMode === mode && styles.chipActive]}
-                    onPress={() => setValue('monthDayMode', mode)}
+                    onPress={() => {
+                      setValue('monthDayMode', mode);
+                      revalidateIfSubmitted();
+                    }}
                   >
                     <Text style={[styles.chipText, monthDayMode === mode && styles.chipTextActive]}>
                       {mode === 'day' ? '日付' : '第N曜日'}

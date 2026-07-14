@@ -62,7 +62,7 @@ describe('routineFormSchema', () => {
     const result = routineFormSchema.safeParse(baseFormValues({ reminderEnabled: true, reminder: null }));
     expect(result.success).toBe(false);
     if (!result.success) {
-      expect(result.error.flatten().fieldErrors.reminder?.[0]).toBe('リマインダーを設定してください');
+      expect(result.error.flatten().fieldErrors.reminder?.[0]).toBe('通知タイミングを設定してください');
     }
   });
 
