@@ -1,6 +1,6 @@
 import { CategoryChip } from '@/components/exercises/category-chip';
+import { ExerciseCardMenu } from '@/components/exercises/exercise-card-menu';
 import { RoutineTemplateSetRow } from '@/components/routines/routine-template-set-row';
-import { DropdownMenu } from '@/components/ui/dropdown-menu';
 import { IconSymbol } from '@/components/ui/icon-symbol';
 import { Colors, Typography } from '@/constants/theme';
 import { useDebouncedPush } from '@/hooks/use-debounced-push';
@@ -17,18 +17,37 @@ type Props = {
   exercise: DraftExercise;
   // ドラフトストアのexercises配列内での位置。updateExerciseSets/removeExerciseAtの引数に使う
   index: number;
+  isFirst: boolean;
+  isLast: boolean;
+  // この種目に「過去の記録から読み込む」で読み込める実績が1件でもあるか(session-exercise-card.tsxと
+  // 同じ考え方だが、ルーティンには「進行中セッション」の概念が無いため除外対象は無い)
+  hasHistory: boolean;
 };
 
+// 値が1つも無いセット行(空欄のまま追加しただけ等)は「入力済みの内容」として扱わない。
+// トレーニング中画面(lib/workout/history.tsのhasAnyValue)と同じ判定だが、こちらはDBの行
+// (setNumber等を持つPreviousSetValues)ではなく下書きのDraftExercise['sets']が対象のため別関数にする
+function hasAnyDraftSetValue(s: DraftExercise['sets'][number]): boolean {
+  return s.weight != null || s.reps != null || s.durationSeconds != null || s.distanceMeters != null;
+}
+
 // テンプレートセット編集画面（app/routine/exercise-edit.tsx）の種目1件分のカード。
-// トレーニング中画面のSessionExerciseCardと似た構造(折りたたみ可能なヘッダー+セット表+
-// 追加/削除ボタン)だが、種目の入れ替え・過去記録読み込みはセッション固有の機能のため持たず、
-// 代わりに⋮メニューにこの画面が担う「種目をルーティンから削除」を持つ
-export const RoutineTemplateExerciseCard = memo(function RoutineTemplateExerciseCard({ exercise, index }: Props) {
+// トレーニング中画面のSessionExerciseCardと構造・⋮メニュー(ExerciseCardMenu共通コンポーネント)は
+// 同じだが、各項目の実処理はDBではなく下書き配列(useRoutineDraftStore)を直接書き換える
+export const RoutineTemplateExerciseCard = memo(function RoutineTemplateExerciseCard({
+  exercise,
+  index,
+  isFirst,
+  isLast,
+  hasHistory,
+}: Props) {
   const images = getExerciseImages(exercise);
   const measurementType = resolveMeasurementType(exercise.measurementType);
   const columns = MEASUREMENT_COLUMNS[measurementType];
   const updateExerciseSets = useRoutineDraftStore((state) => state.updateExerciseSets);
   const removeExerciseAt = useRoutineDraftStore((state) => state.removeExerciseAt);
+  const moveExerciseAt = useRoutineDraftStore((state) => state.moveExerciseAt);
+  const lastSetsReplacement = useRoutineDraftStore((state) => state.lastSetsReplacement);
   const pushDebounced = useDebouncedPush();
   const [collapsed, setCollapsed] = useState(false);
   const expanded = !collapsed;
@@ -43,6 +62,20 @@ export const RoutineTemplateExerciseCard = memo(function RoutineTemplateExercise
   // 発番済みのローカルkey配列を追従させることで、React側の同一性をsetsの中身と正しく対応させる
   const nextRowKeyRef = useRef(0);
   const [rowKeys, setRowKeys] = useState<number[]>(() => sets.map(() => nextRowKeyRef.current++));
+
+  // 「過去の記録から読み込む」はこのカードの追加/削除/値編集ハンドラを経由せず、別画面から
+  // 直接setsを丸ごと差し替える。上記rowKeysの前提(このカードの操作でしか長さ・中身は変わらない)
+  // が崩れるケースのため、lastSetsReplacementで自分のindex宛ての差し替えを検知したらrowKeysを
+  // 総入れ替えし、既存のRoutineTemplateSetRowインスタンス(≒古い表示値)を全行分再マウントさせる
+  const lastHandledReplacementTokenRef = useRef<number | null>(null);
+  if (
+    lastSetsReplacement != null &&
+    lastSetsReplacement.index === index &&
+    lastSetsReplacement.token !== lastHandledReplacementTokenRef.current
+  ) {
+    lastHandledReplacementTokenRef.current = lastSetsReplacement.token;
+    setRowKeys(sets.map(() => nextRowKeyRef.current++));
+  }
 
   const handleToggleExpanded = useCallback(() => {
     LayoutAnimation.configureNext(LayoutAnimation.Presets.easeInEaseOut);
@@ -89,6 +122,38 @@ export const RoutineTemplateExerciseCard = memo(function RoutineTemplateExercise
     ]);
   }, [removeExerciseAt, index]);
 
+  const handleMoveUp = useCallback(() => moveExerciseAt(index, 'up'), [moveExerciseAt, index]);
+  const handleMoveDown = useCallback(() => moveExerciseAt(index, 'down'), [moveExerciseAt, index]);
+
+  const handleSwapExercise = useCallback(() => {
+    // 入れ替え確定時に既存のセット内容が失われることの確認要否を、入れ替え画面側で
+    // 判断できるよう渡しておく(session-exercise-card.tsxのhandleSwapExerciseと同じ考え方だが、
+    // ルーティンには✓確定の概念が無いため「値が1つでも入っているか」で判定する)
+    const hasRecordedData = sets.some(hasAnyDraftSetValue);
+    pushDebounced({
+      pathname: '/routine/exercise-swap',
+      params: {
+        index: String(index),
+        currentExerciseId: String(exercise.exerciseId),
+        currentExerciseName: exercise.name,
+        hasRecordedData: hasRecordedData ? 'true' : 'false',
+      },
+    });
+  }, [pushDebounced, index, exercise.exerciseId, exercise.name, sets]);
+
+  const handleLoadFromHistory = useCallback(() => {
+    const hasRecordedData = sets.some(hasAnyDraftSetValue);
+    pushDebounced({
+      pathname: '/routine/history-picker',
+      params: {
+        index: String(index),
+        exerciseId: String(exercise.exerciseId),
+        exerciseName: exercise.name,
+        hasRecordedData: hasRecordedData ? 'true' : 'false',
+      },
+    });
+  }, [pushDebounced, index, exercise.exerciseId, exercise.name, sets]);
+
   return (
     <View style={styles.card}>
       <TouchableOpacity
@@ -116,20 +181,15 @@ export const RoutineTemplateExerciseCard = memo(function RoutineTemplateExercise
             <IconSymbol name="info.circle" size={20} color={Colors.textPlaceholder} />
           </TouchableOpacity>
           {expanded && (
-            <DropdownMenu
-              groups={[[{ key: 'delete', label: '削除', icon: 'delete-outline', danger: true, onPress: handleDeleteExercise }]]}
-              minWidth={140}
-              renderTrigger={({ open, onPress }) => (
-                <TouchableOpacity
-                  onPress={onPress}
-                  hitSlop={{ top: 14, bottom: 14, left: 14, right: 14 }}
-                  accessibilityRole="button"
-                  accessibilityLabel="メニューを開く"
-                  accessibilityState={{ expanded: open }}
-                >
-                  <IconSymbol name="ellipsis" size={20} color={open ? Colors.accent : Colors.textPlaceholder} />
-                </TouchableOpacity>
-              )}
+            <ExerciseCardMenu
+              isFirst={isFirst}
+              isLast={isLast}
+              onSwap={handleSwapExercise}
+              onMoveUp={handleMoveUp}
+              onMoveDown={handleMoveDown}
+              onLoadFromHistory={handleLoadFromHistory}
+              hasHistory={hasHistory}
+              onDelete={handleDeleteExercise}
             />
           )}
           {!expanded && (
