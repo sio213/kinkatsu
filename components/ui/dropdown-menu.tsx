@@ -2,11 +2,40 @@ import { DesignIcon, type DesignIconName } from '@/components/ui/design-icon';
 import { IconSymbol } from '@/components/ui/icon-symbol';
 import { Colors, Typography } from '@/constants/theme';
 import { useRef, useState, type ReactNode } from 'react';
-import { Dimensions, Keyboard, Modal, Pressable, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
+import {
+  Dimensions,
+  Keyboard,
+  Modal,
+  Pressable,
+  StyleSheet,
+  Text,
+  TouchableOpacity,
+  View,
+  type LayoutChangeEvent,
+} from 'react-native';
 
 const SCREEN_WIDTH = Dimensions.get('window').width;
+const SCREEN_HEIGHT = Dimensions.get('window').height;
+// トリガーとメニューの間の余白。下に開く場合の上マージン・上に開く場合の下マージンの両方に使う
+const MENU_GAP = 4;
 
 type Anchor = { x: number; y: number; width: number; height: number };
+
+// トリガーのアンカーとメニュー自身の高さから配置スタイルを決める純粋関数。ネイティブの
+// measureInWindow/onLayoutから独立させることで、実機無しでも位置決めロジック単体をテストできる
+export function computeMenuPositionStyle(
+  anchor: Anchor,
+  menuHeight: number | null,
+  minWidth: number,
+): { minWidth: number; top: number; right: number; bottom?: undefined } | { minWidth: number; bottom: number; right: number; top?: undefined } {
+  const spaceBelow = SCREEN_HEIGHT - (anchor.y + anchor.height);
+  const opensUpward = menuHeight != null && menuHeight + MENU_GAP > spaceBelow;
+  const right = SCREEN_WIDTH - (anchor.x + anchor.width);
+
+  return opensUpward
+    ? { minWidth, bottom: SCREEN_HEIGHT - anchor.y + MENU_GAP, right }
+    : { minWidth, top: anchor.y + anchor.height + MENU_GAP, right };
+}
 
 type DropdownMenuItemBase = {
   key: string;
@@ -33,10 +62,15 @@ type Props = {
 
 // ⋮メニュー・並び替えメニューなど「トリガーを押すと画面上にオーバーレイのメニューが開く」UIの共通実装。
 // Modal+measureInWindowでトリガーのアンカー位置に絶対配置し、開閉のたびに背後のレイアウトが
-// ガタつかないようにする
+// ガタつかないようにする。トリガーが画面下部にあり、下に開くと画面外にはみ出す場合は
+// 自動的にトリガーの上に開き直す（実機で「カードが下にある時⋮メニューが画面外に出て操作できない」
+// バグの回帰防止）
 export function DropdownMenu({ groups, renderTrigger, minWidth = 160, backdropTestID }: Props) {
   const triggerRef = useRef<View>(null);
   const [anchor, setAnchor] = useState<Anchor | null>(null);
+  // メニュー自体の実際の高さ。中身（項目数）依存で開くたびに変わりうるため、開く度に測り直す。
+  // nullの間は「まだ上下どちらに開くか決まっていない」状態を表す
+  const [menuHeight, setMenuHeight] = useState<number | null>(null);
   const open = anchor !== null;
 
   const handleOpen = () => {
@@ -45,13 +79,27 @@ export function DropdownMenu({ groups, renderTrigger, minWidth = 160, backdropTe
     Keyboard.dismiss();
     // measureInWindowは非同期（ネイティブブリッジ経由）のため、先に暫定位置でメニューを開いてから
     // 実際の位置に更新する。ネイティブ環境ではほぼ同一フレーム内に解決され体感できるズレは生じない
+    setMenuHeight(null);
     setAnchor({ x: 0, y: 0, width: 0, height: 0 });
     triggerRef.current?.measureInWindow((x, y, width, height) => {
       setAnchor({ x, y, width, height });
     });
   };
 
-  const handleClose = () => setAnchor(null);
+  const handleClose = () => {
+    setAnchor(null);
+    setMenuHeight(null);
+  };
+
+  const handleMenuLayout = (e: LayoutChangeEvent) => {
+    // 初回レイアウト時の高さだけを採用する（項目の展開等でこのメニュー自体の高さが
+    // 動的に変わる想定は無いため、以降のonLayoutは無視して不要な位置再計算を避ける）
+    if (menuHeight == null) setMenuHeight(e.nativeEvent.layout.height);
+  };
+
+  // トリガーの下に開いた場合に画面下端からはみ出すか。まだ高さが分からない場合ははみ出さない
+  // 前提（下開き）で暫定描画し、実際の高さが分かってからのみ上開きへ切り替える
+  const menuPositionStyle = anchor ? computeMenuPositionStyle(anchor, menuHeight, minWidth) : null;
 
   return (
     <>
@@ -65,10 +113,9 @@ export function DropdownMenu({ groups, renderTrigger, minWidth = 160, backdropTe
         <Pressable testID={backdropTestID} style={styles.backdrop} onPress={handleClose} />
         {anchor && (
           <View
-            style={[
-              styles.menu,
-              { minWidth, top: anchor.y + anchor.height + 4, right: SCREEN_WIDTH - (anchor.x + anchor.width) },
-            ]}
+            testID="dropdown-menu"
+            onLayout={handleMenuLayout}
+            style={[styles.menu, menuPositionStyle, menuHeight == null && styles.menuMeasuring]}
           >
             {groups.map((group, index) => (
               <View key={group.map((item) => item.key).join('-')}>
@@ -200,6 +247,9 @@ const styles = StyleSheet.create({
     shadowRadius: 12,
     elevation: 4,
   },
+  // 高さ測定前(menuHeight未確定)は上開き/下開きの最終位置がまだ決まっていないため、
+  // 暫定位置での一瞬の表示("下開き"前提の位置に一瞬見えてから上に飛ぶ)を隠す
+  menuMeasuring: { opacity: 0 },
   divider: { height: StyleSheet.hairlineWidth, backgroundColor: Colors.border, marginVertical: 4 },
   menuItem: {
     flexDirection: 'row',
