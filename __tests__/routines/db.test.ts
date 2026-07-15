@@ -93,6 +93,7 @@ jest.mock('@/db/schema', () => ({
 
 jest.mock('drizzle-orm', () => ({
   eq: jest.fn((col, val) => ({ type: 'eq', col, val })),
+  gt: jest.fn((col, val) => ({ type: 'gt', col, val })),
   inArray: jest.fn((col, val) => ({ type: 'inArray', col, val })),
 }));
 
@@ -111,11 +112,12 @@ jest.mock('@/lib/workout/history', () => ({
   hasAnyValue: jest.requireActual('@/lib/workout/history').hasAnyValue,
 }));
 
-import { routineExercises, routineSets, routines } from '@/db/schema';
+import { reminders, routineExercises, routineSets, routines } from '@/db/schema';
 import {
   buildInitialRoutineSets,
   createRoutine,
   deleteRoutine,
+  duplicateRoutine,
   getRoutineDetail,
   swapRoutineOrder,
   updateRoutine,
@@ -403,6 +405,120 @@ describe('deleteRoutine', () => {
     expect(mockDeleteReminder).toHaveBeenCalledTimes(2);
     expect(mockDeleteReminder).toHaveBeenNthCalledWith(1, 1);
     expect(mockDeleteReminder).toHaveBeenNthCalledWith(2, 2);
+  });
+});
+
+describe('duplicateRoutine', () => {
+  test('存在しないroutineIdはエラーを投げ、以降のinsert/updateは発生しない', async () => {
+    mockSelectWhere.mockResolvedValueOnce([]); // source検索(該当なし)
+
+    await expect(duplicateRoutine(999)).rejects.toThrow('routine not found: 999');
+    expect(mockInsertValues).not.toHaveBeenCalled();
+    expect(mockUpdateSet).not.toHaveBeenCalled();
+  });
+
+  test('末尾のルーティン(後続無し)を複製すると、orderIndexシフトのupdateは発生せず直後のorderIndexで挿入される', async () => {
+    mockSelectWhere
+      .mockResolvedValueOnce([{ id: 1, name: '胸の日', orderIndex: 2 }]) // source
+      .mockResolvedValueOnce([]) // routineExercises
+      .mockResolvedValueOnce([]); // toShift(後続無し)
+
+    await duplicateRoutine(1);
+
+    expect(mockUpdateSet).not.toHaveBeenCalled();
+    expect(mockInsertValues).toHaveBeenCalledWith(
+      routines,
+      expect.objectContaining({ name: '胸の日 コピー', orderIndex: 3 }),
+    );
+  });
+
+  test('先頭/中間のルーティンを複製すると、後続カードのorderIndexが+1シフトされてから新規挿入される', async () => {
+    const calls: string[] = [];
+    mockSelectWhere
+      .mockResolvedValueOnce([{ id: 1, name: '胸の日', orderIndex: 0 }]) // source
+      .mockResolvedValueOnce([]) // routineExercises
+      .mockResolvedValueOnce([
+        { id: 2, orderIndex: 1 },
+        { id: 3, orderIndex: 2 },
+      ]); // toShift
+    mockUpdateSet.mockImplementation((table: unknown, values: unknown) => {
+      calls.push(`update:${(values as { orderIndex: number }).orderIndex}`);
+      return { where: (...args: unknown[]) => mockUpdateWhere(...args) };
+    });
+    mockInsertValues.mockImplementation((table: unknown) => {
+      if (table === routines) calls.push('insertRoutine');
+      return { returning: () => mockReturning() };
+    });
+
+    await duplicateRoutine(1);
+
+    expect(calls).toEqual(['update:2', 'update:3', 'insertRoutine']);
+    expect(mockInsertValues).toHaveBeenCalledWith(routines, expect.objectContaining({ orderIndex: 1 }));
+  });
+
+  test('複数種目・複数セットが新しいルーティンIDにひもづけてコピーされる', async () => {
+    mockSelectWhere
+      .mockResolvedValueOnce([{ id: 1, name: '胸の日', orderIndex: 0 }]) // source
+      .mockResolvedValueOnce([
+        { id: 10, exerciseId: 1, orderIndex: 0 },
+        { id: 20, exerciseId: 2, orderIndex: 1 },
+      ]) // routineExercises
+      .mockResolvedValueOnce([
+        { id: 100, routineExerciseId: 10, setNumber: 1, weight: 60, reps: 8, durationSeconds: null, distanceMeters: null },
+        { id: 200, routineExerciseId: 20, setNumber: 1, weight: 10, reps: 12, durationSeconds: null, distanceMeters: null },
+      ]) // routineSets
+      .mockResolvedValueOnce([]); // toShift
+
+    mockReturning
+      .mockResolvedValueOnce([{ id: 999 }]) // routines insert(複製先)
+      .mockResolvedValueOnce([{ id: 500 }]) // 種目1のroutineExercises insert
+      .mockResolvedValueOnce([{ id: 600 }]); // 種目2のroutineExercises insert
+
+    const newId = await duplicateRoutine(1);
+
+    expect(newId).toBe(999);
+    expect(mockInsertValues).toHaveBeenCalledWith(
+      routineExercises,
+      expect.objectContaining({ routineId: 999, exerciseId: 1, orderIndex: 0 }),
+    );
+    expect(mockInsertValues).toHaveBeenCalledWith(
+      routineExercises,
+      expect.objectContaining({ routineId: 999, exerciseId: 2, orderIndex: 1 }),
+    );
+    expect(mockInsertValues).toHaveBeenCalledWith(routineSets, [
+      expect.objectContaining({ routineExerciseId: 500, setNumber: 1, weight: 60, reps: 8 }),
+    ]);
+    expect(mockInsertValues).toHaveBeenCalledWith(routineSets, [
+      expect.objectContaining({ routineExerciseId: 600, setNumber: 1, weight: 10, reps: 12 }),
+    ]);
+  });
+
+  test('種目0件のルーティンを複製すると、routineExercises/routineSetsへのinsertは発生しない', async () => {
+    mockSelectWhere
+      .mockResolvedValueOnce([{ id: 1, name: '有酸素', orderIndex: 0 }]) // source
+      .mockResolvedValueOnce([]) // routineExercises
+      .mockResolvedValueOnce([]); // toShift
+
+    await duplicateRoutine(1);
+
+    expect(mockInsertValues).not.toHaveBeenCalledWith(routineExercises, expect.anything());
+    expect(mockInsertValues).not.toHaveBeenCalledWith(routineSets, expect.anything());
+  });
+
+  // リマインダーは複製しない(同じ曜日に重複登録されると気づかず放置されがちなため)。
+  // reminderPlanを渡さないcreateRoutine同様、紐づくリマインダーの検索すら行わない設計
+  test('リマインダーの検索・作成・更新・削除は一切発生しない', async () => {
+    mockSelectWhere
+      .mockResolvedValueOnce([{ id: 1, name: '胸の日', orderIndex: 0 }]) // source
+      .mockResolvedValueOnce([]) // routineExercises
+      .mockResolvedValueOnce([]); // toShift
+
+    await duplicateRoutine(1);
+
+    expect(mockCreateReminder).not.toHaveBeenCalled();
+    expect(mockUpdateReminder).not.toHaveBeenCalled();
+    expect(mockDeleteReminder).not.toHaveBeenCalled();
+    expect(mockSelectWhere).not.toHaveBeenCalledWith(reminders, expect.anything());
   });
 });
 

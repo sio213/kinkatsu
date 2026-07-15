@@ -3,6 +3,7 @@ import { exercises, reminders, routineExercises, routines, type Reminder, type R
 import {
   createRoutine,
   deleteRoutine,
+  duplicateRoutine,
   swapRoutineOrder,
   updateRoutine,
   type RoutineInput,
@@ -23,6 +24,7 @@ export function useRoutines() {
       updateRoutine(id, input, reminderPlan),
     removeRoutine: (id: number) => deleteRoutine(id),
     swapOrder: (id: number, targetId: number) => swapRoutineOrder(id, targetId),
+    duplicateRoutine: (id: number) => duplicateRoutine(id),
   };
 }
 

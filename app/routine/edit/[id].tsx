@@ -14,7 +14,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 type Status = 'loading' | 'error' | 'not-found' | 'ready';
 
 export default function RoutineEditScreen() {
-  const { id } = useLocalSearchParams<{ id: string }>();
+  const { id, focusName } = useLocalSearchParams<{ id: string; focusName?: string }>();
   const routineId = Number(id);
   const router = useRouter();
   const { updateRoutine } = useRoutines();
@@ -115,6 +115,7 @@ export default function RoutineEditScreen() {
     <RoutineFormScreen
       key={routineId}
       initialName={name}
+      autoFocusName={focusName === '1'}
       onSubmit={handleSubmit}
       onAddExercise={handleAddExercise}
       onPressExercise={handlePressExercise}

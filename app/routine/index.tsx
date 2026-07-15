@@ -17,7 +17,7 @@ import { Alert, FlatList, StyleSheet, Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 export default function RoutineListScreen() {
-  const { routines, removeRoutine, swapOrder } = useRoutines();
+  const { routines, removeRoutine, swapOrder, duplicateRoutine } = useRoutines();
   const summaries = useRoutineExerciseSummaries();
   const routineReminders = useRoutineReminders();
   const { activeSession } = useWorkoutSessions();
@@ -71,6 +71,21 @@ export default function RoutineListScreen() {
     [activeSession, startWorkout],
   );
 
+  // 複製メニュー。作っただけで一覧に戻すと「コピー」の名前のまま放置されがちなので、複製直後に
+  // そのまま編集画面へ遷移させ、名前欄にフォーカスを当てて即リネームを促す（実機フィードバックで指摘）
+  const handleDuplicate = useCallback(
+    async (routine: Routine) => {
+      try {
+        const newId = await duplicateRoutine(routine.id);
+        pushDebounced({ pathname: '/routine/edit/[id]', params: { id: String(newId), focusName: '1' } });
+      } catch (e) {
+        console.error('[routine duplicate]', e);
+        Alert.alert('エラー', 'ルーティンの複製に失敗しました。');
+      }
+    },
+    [duplicateRoutine, pushDebounced],
+  );
+
   const handleDelete = useCallback(
     (routine: Routine) => {
       Alert.alert('削除', `「${routine.name}」を削除しますか？`, [
@@ -120,6 +135,7 @@ export default function RoutineListScreen() {
             onPress={() => handleEdit(item.id)}
             onStart={() => handleStartWorkout(item)}
             onEdit={() => handleEdit(item.id)}
+            onDuplicate={() => handleDuplicate(item)}
             onMoveUp={() => {
               // isFirst/isLastのdisabled判定により通常はここに来ないが、メニュー展開中に
               // 他操作でroutinesが更新される競合を考慮し、配列外アクセスにしない
@@ -135,7 +151,7 @@ export default function RoutineListScreen() {
         </ListErrorBoundary>
       );
     },
-    [summaries, routineReminders, routines, handleStartWorkout, handleEdit, handleSwap, handleDelete],
+    [summaries, routineReminders, routines, handleStartWorkout, handleEdit, handleDuplicate, handleSwap, handleDelete],
   );
 
   return (
