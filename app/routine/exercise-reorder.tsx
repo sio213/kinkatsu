@@ -20,8 +20,8 @@ function stripRowKey({ rowKey: _rowKey, ...exercise }: ReorderRow): DraftExercis
 
 // ヘッダー⋮「種目を並び替え」(app/routine/exercise-edit.tsx)から開く専用画面。
 // ドラッグして並び順が変わるたびにuseRoutineDraftStore.reorderExercisesへ即時反映する。
-// 他のドラフト系画面(exercise-edit.tsxの「保存」等)と同じく、この画面の「保存」も
-// 実処理を持たない見た目上の確定＝戻るボタン
+// 他のドラフト系画面(exercise-edit.tsxの「保存」等)と同じく実処理を持たないボタンだが、
+// こちらは既に反映済みであることをそのままボタン名にも表し「戻る」とする
 export default function RoutineExerciseReorderScreen() {
   const router = useRouter();
   const reorderExercises = useRoutineDraftStore((state) => state.reorderExercises);
@@ -78,7 +78,7 @@ export default function RoutineExerciseReorderScreen() {
         )}
       />
       <View style={styles.footer}>
-        <PrimaryButton label="保存" onPress={() => router.back()} />
+        <PrimaryButton label="戻る" onPress={() => router.back()} />
       </View>
     </SafeAreaView>
   );
