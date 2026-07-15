@@ -3,8 +3,8 @@ import { IconSymbol } from '@/components/ui/icon-symbol';
 import { Colors, Typography } from '@/constants/theme';
 import { getCategoryLabel, resolveMeasurementType } from '@/lib/exercises/constants';
 import { getExerciseImages } from '@/lib/exercises/images';
-import { summarizeRoutineExerciseSets } from '@/lib/routines/format';
 import type { DraftExercise } from '@/lib/routines/validation';
+import { summarizeExerciseSets } from '@/lib/workout/set-format';
 import { Image } from 'expo-image';
 import { memo } from 'react';
 import { StyleSheet, Text, TouchableOpacity, View } from 'react-native';
@@ -19,7 +19,7 @@ type Props = {
 // ⋮メニュー（デザイン案どおり）で行う想定のため、この行自体には削除ボタンを持たせない
 export const RoutineExerciseRow = memo(function RoutineExerciseRow({ exercise, onPress }: Props) {
   const images = getExerciseImages(exercise);
-  const setsSummary = summarizeRoutineExerciseSets(resolveMeasurementType(exercise.measurementType), exercise.sets);
+  const setsSummary = summarizeExerciseSets(resolveMeasurementType(exercise.measurementType), exercise.sets);
   const categoryLabel = getCategoryLabel(exercise.category);
 
   return (

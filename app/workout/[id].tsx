@@ -8,6 +8,7 @@ import { PrimaryButton } from '@/components/ui/primary-button';
 import { AddExerciseButton } from '@/components/workout/add-exercise-button';
 import { SessionExerciseCard, type SessionExerciseCardHandle } from '@/components/workout/session-exercise-card';
 import { Colors, Typography } from '@/constants/theme';
+import { useAutoCollapseCompletedExercises } from '@/hooks/use-auto-collapse-completed-exercises';
 import { useDebouncedPush } from '@/hooks/use-debounced-push';
 import { useKeyboardInset } from '@/hooks/use-keyboard-inset';
 import { useRoutines } from '@/hooks/use-routines';
@@ -88,21 +89,16 @@ export default function WorkoutScreen() {
       }
     });
   }, [navigation, tryFocus]);
-  // 種目カードのアコーディオン開閉状態。カード側のローカルstateにすると、FlatListの
-  // virtualizationでカードがアンマウント→再マウントされた際に開閉状態がリセットされてしまうため、
-  // この画面が生きている間は保持されるようここで持つ（値未保存=展開中がデフォルト）
-  const [collapsedIds, setCollapsedIds] = useState<Set<number>>(() => new Set());
-  const handleToggleCollapsed = useCallback((sessionExerciseId: number) => {
-    setCollapsedIds((prev) => {
-      const next = new Set(prev);
-      if (next.has(sessionExerciseId)) {
-        next.delete(sessionExerciseId);
-      } else {
-        next.add(sessionExerciseId);
-      }
-      return next;
-    });
-  }, []);
+  // endedAtがあれば終了済み＝過去の記録を開いている（見た目は共用しつつ、進行中固有の
+  // UI（リアルタイムタイマー・「トレーニングを終了」ボタン・種目カードの自動折りたたみ）だけを
+  // 出し分ける）。hooksはこの後の早期returnより前で無条件に呼ぶ必要があるため、sessionが
+  // まだnullの間もここで安全に評価できる形にしている
+  const isActive = session != null && session.endedAt == null;
+  const {
+    collapsedIds,
+    toggleCollapsed: handleToggleCollapsed,
+    handleInteract,
+  } = useAutoCollapseCompletedExercises(isActive, sessionExercises, sessionSets);
 
   useEffect(() => {
     if (!session || session.endedAt != null) return;
@@ -224,10 +220,6 @@ export default function WorkoutScreen() {
 
   if (!session) return null;
 
-  // endedAtがあれば終了済み＝過去の記録を開いている（見た目は共用しつつ、進行中固有の
-  // UI（リアルタイムタイマー・「トレーニングを終了」ボタン）だけを出し分ける）
-  const isActive = session.endedAt == null;
-
   const menuItems: DropdownMenuItem[] = [
     {
       key: 'add',
@@ -326,6 +318,7 @@ export default function WorkoutScreen() {
                   previousSessionExerciseId={sessionExercises[index - 1]?.sessionExerciseId ?? null}
                   nextSessionExerciseId={sessionExercises[index + 1]?.sessionExerciseId ?? null}
                   onToggleCollapsed={handleToggleCollapsed}
+                  onInteract={handleInteract}
                   prefilledSetIds={prefilledEntry?.prefilledSetIds ?? EMPTY_PREFILLED_SET_IDS}
                   hasHistory={exercisesWithHistory.has(item.id)}
                 />

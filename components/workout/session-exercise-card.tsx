@@ -8,7 +8,11 @@ import type { SessionExercise } from '@/hooks/use-workout-session';
 import { resolveMeasurementType } from '@/lib/exercises/constants';
 import { getExerciseImages } from '@/lib/exercises/images';
 import { removeExerciseFromSession, swapExerciseOrder } from '@/lib/workout/session';
-import { MEASUREMENT_COLUMNS, parseColumnsWithFallback } from '@/lib/workout/set-format';
+import {
+  MEASUREMENT_COLUMNS,
+  parseColumnsWithFallback,
+  summarizeExerciseSets,
+} from '@/lib/workout/set-format';
 import { addSet, deleteLastSet, reopenSet, saveDraft, saveSet, type SetValues } from '@/lib/workout/sets';
 import { Image } from 'expo-image';
 import { forwardRef, memo, useCallback, useImperativeHandle, useRef, useState } from 'react';
@@ -26,6 +30,10 @@ type Props = {
   previousSessionExerciseId: number | null;
   nextSessionExerciseId: number | null;
   onToggleCollapsed: (sessionExerciseId: number) => void;
+  // カード内で何らかの操作（セット確定/取り消し/追加/削除、値の入力開始、開閉）が起きるたびに
+  // 呼ばれる。親（workout/[id].tsx）はこれを「別の種目カードに触れた」タイミングとして使い、
+  // 完了済みで畳む予約がされている他のカードを実際に畳む
+  onInteract: (sessionExerciseId: number) => void;
   // 種目追加/入れ替え時に前回の記録から実際に値をコピーして挿入したセットのid一覧
   // （lib/workout/session.tsのPrefilledCard.prefilledSetIds）。この行idに含まれるSetRowだけ
   // ゴースト表示にする
@@ -49,6 +57,7 @@ export const SessionExerciseCard = memo(
       previousSessionExerciseId,
       nextSessionExerciseId,
       onToggleCollapsed,
+      onInteract,
       prefilledSetIds,
       hasHistory,
     }: Props,
@@ -99,10 +108,18 @@ export const SessionExerciseCard = memo(
   }
   const cardReviewed = cardReviewedRef.current || anyEditedInCard;
 
-  const handleDraftChange = useCallback((setId: number, values: Record<string, string>) => {
-    draftValuesRef.current.set(setId, values);
-    setAnyEditedInCard(true);
-  }, []);
+  const notifyInteraction = useCallback(() => {
+    onInteract(exercise.sessionExerciseId);
+  }, [onInteract, exercise.sessionExerciseId]);
+
+  const handleDraftChange = useCallback(
+    (setId: number, values: Record<string, string>) => {
+      draftValuesRef.current.set(setId, values);
+      setAnyEditedInCard(true);
+      notifyInteraction();
+    },
+    [notifyInteraction],
+  );
 
   // 1文字入力するたびに呼ばれるバックグラウンド保存。ここでAlertを出すと入力中に
   // 何度もポップアップが出てしまうため、失敗時はログのみに留める（最終的な保存は
@@ -116,10 +133,12 @@ export const SessionExerciseCard = memo(
   }, []);
 
   const handlePressInfo = useCallback(() => {
+    notifyInteraction();
     pushDebounced(`/exercise/${exercise.id}`);
-  }, [pushDebounced, exercise.id]);
+  }, [pushDebounced, exercise.id, notifyInteraction]);
 
   const handleSwapExercise = useCallback(() => {
+    notifyInteraction();
     // 確認ダイアログの要否をexercise-swap画面側で判断できるよう、既に何か記録済みか
     // （✓確定済みかどうか）を渡しておく。前回セットのプリフィル（✓未タップ・値だけ入っている状態）は
     // ユーザーがまだ確認していないため「記録済み」に含めない（セット削除の確認要否と同じ考え方）
@@ -134,9 +153,10 @@ export const SessionExerciseCard = memo(
         hasRecordedData: hasRecordedData ? 'true' : 'false',
       },
     });
-  }, [pushDebounced, sessionId, exercise.sessionExerciseId, exercise.id, exercise.name, sets]);
+  }, [pushDebounced, sessionId, exercise.sessionExerciseId, exercise.id, exercise.name, sets, notifyInteraction]);
 
   const handleLoadFromHistory = useCallback(() => {
+    notifyInteraction();
     // 確認ダイアログの要否を記録から読み込む画面側で判断できるよう、既に何か記録済みか
     // （✓確定済みかどうか）を渡しておく（handleSwapExerciseと同じ考え方）
     const hasRecordedData = sets.some((s) => s.completedAt != null);
@@ -150,16 +170,18 @@ export const SessionExerciseCard = memo(
         hasRecordedData: hasRecordedData ? 'true' : 'false',
       },
     });
-  }, [pushDebounced, sessionId, exercise.sessionExerciseId, exercise.id, exercise.name, sets]);
+  }, [pushDebounced, sessionId, exercise.sessionExerciseId, exercise.id, exercise.name, sets, notifyInteraction]);
 
   const handleToggleExpanded = useCallback(() => {
     LayoutAnimation.configureNext(LayoutAnimation.Presets.easeInEaseOut);
     onToggleCollapsed(exercise.sessionExerciseId);
-  }, [onToggleCollapsed, exercise.sessionExerciseId]);
+    notifyInteraction();
+  }, [onToggleCollapsed, exercise.sessionExerciseId, notifyInteraction]);
 
   const handleAddSet = useCallback(async () => {
     if (isMutatingRef.current) return;
     isMutatingRef.current = true;
+    notifyInteraction();
     try {
       // 直前のセットが✓未タップ（completedAt: null）の場合、DBにはまだ値が保存されていないため、
       // 画面上の入力途中の値（draft）があればそれをコピー元にする。✓タップ済みならDB上の
@@ -181,7 +203,7 @@ export const SessionExerciseCard = memo(
     } finally {
       isMutatingRef.current = false;
     }
-  }, [sessionId, exercise.id, exercise.sessionExerciseId, sets, columns]);
+  }, [sessionId, exercise.id, exercise.sessionExerciseId, sets, columns, notifyInteraction]);
 
   const runDeleteLastSet = useCallback(async () => {
     if (isMutatingRef.current) return;
@@ -200,6 +222,7 @@ export const SessionExerciseCard = memo(
   }, [exercise.sessionExerciseId, sets]);
 
   const handleDeleteSet = useCallback(() => {
+    notifyInteraction();
     const last = sets[sets.length - 1];
     // 値が入っている（チェック済みの）セットを消す場合だけ確認する。空のセットの削除は毎回確認すると
     // かえって煩わしいため確認なしで即削除してよい
@@ -211,49 +234,60 @@ export const SessionExerciseCard = memo(
       return;
     }
     runDeleteLastSet();
-  }, [sets, runDeleteLastSet]);
+  }, [sets, runDeleteLastSet, notifyInteraction]);
 
-  const handleSaveSet = useCallback(async (setId: number, values: SetValues) => {
-    try {
-      await saveSet(setId, values);
-      // 確定後はhandleAddSetがこのセットのdraftを参照しなくなるため、Mapに積み上がらないよう掃除する
-      draftValuesRef.current.delete(setId);
-    } catch (e) {
-      console.error('[save set]', e);
-      Alert.alert('エラー', 'セットを保存できませんでした。');
-    }
-  }, []);
+  const handleSaveSet = useCallback(
+    async (setId: number, values: SetValues) => {
+      notifyInteraction();
+      try {
+        await saveSet(setId, values);
+        // 確定後はhandleAddSetがこのセットのdraftを参照しなくなるため、Mapに積み上がらないよう掃除する
+        draftValuesRef.current.delete(setId);
+      } catch (e) {
+        console.error('[save set]', e);
+        Alert.alert('エラー', 'セットを保存できませんでした。');
+      }
+    },
+    [notifyInteraction],
+  );
 
-  const handleReopenSet = useCallback(async (setId: number) => {
-    try {
-      await reopenSet(setId);
-    } catch (e) {
-      console.error('[reopen set]', e);
-      Alert.alert('エラー', 'セットを編集状態に戻せませんでした。');
-    }
-  }, []);
+  const handleReopenSet = useCallback(
+    async (setId: number) => {
+      notifyInteraction();
+      try {
+        await reopenSet(setId);
+      } catch (e) {
+        console.error('[reopen set]', e);
+        Alert.alert('エラー', 'セットを編集状態に戻せませんでした。');
+      }
+    },
+    [notifyInteraction],
+  );
 
   const handleMoveUp = useCallback(async () => {
     if (previousSessionExerciseId == null) return;
+    notifyInteraction();
     try {
       await swapExerciseOrder(exercise.sessionExerciseId, previousSessionExerciseId);
     } catch (e) {
       console.error('[move exercise up]', e);
       Alert.alert('エラー', '種目を並び替えられませんでした。');
     }
-  }, [exercise.sessionExerciseId, previousSessionExerciseId]);
+  }, [exercise.sessionExerciseId, previousSessionExerciseId, notifyInteraction]);
 
   const handleMoveDown = useCallback(async () => {
     if (nextSessionExerciseId == null) return;
+    notifyInteraction();
     try {
       await swapExerciseOrder(exercise.sessionExerciseId, nextSessionExerciseId);
     } catch (e) {
       console.error('[move exercise down]', e);
       Alert.alert('エラー', '種目を並び替えられませんでした。');
     }
-  }, [exercise.sessionExerciseId, nextSessionExerciseId]);
+  }, [exercise.sessionExerciseId, nextSessionExerciseId, notifyInteraction]);
 
   const handleDeleteExercise = useCallback(() => {
+    notifyInteraction();
     Alert.alert('この種目を削除しますか？', '記録した内容も削除されます。', [
       { text: 'キャンセル', style: 'cancel' },
       {
@@ -269,7 +303,9 @@ export const SessionExerciseCard = memo(
         },
       },
     ]);
-  }, [exercise.sessionExerciseId]);
+  }, [exercise.sessionExerciseId, notifyInteraction]);
+
+  const collapsedSummary = summarizeExerciseSets(measurementType, sets);
 
   return (
     <View style={styles.card}>
@@ -279,7 +315,7 @@ export const SessionExerciseCard = memo(
         activeOpacity={0.7}
         accessibilityRole="button"
         accessibilityLabel={
-          expanded ? `${exercise.name}を折りたたむ` : `${exercise.name}、${sets.length}セット、展開する`
+          expanded ? `${exercise.name}を折りたたむ` : `${exercise.name}、${collapsedSummary}、展開する`
         }
         accessibilityState={{ expanded }}
       >
@@ -288,7 +324,14 @@ export const SessionExerciseCard = memo(
           <Text style={styles.name} numberOfLines={1}>
             {exercise.name}
           </Text>
-          <CategoryChip category={exercise.category} />
+          <View style={styles.metaRow}>
+            <CategoryChip category={exercise.category} />
+            {!expanded && (
+              <Text style={styles.collapsedSummaryText} numberOfLines={1}>
+                {collapsedSummary}
+              </Text>
+            )}
+          </View>
         </View>
         <View style={styles.trailing}>
           <TouchableOpacity
@@ -312,15 +355,12 @@ export const SessionExerciseCard = memo(
             />
           )}
           {!expanded && (
-            <View style={styles.collapsedSummary}>
-              <Text style={styles.collapsedSummaryText}>{sets.length}セット</Text>
-              <IconSymbol
-                name="chevron.right"
-                size={14}
-                color={Colors.textPlaceholder}
-                style={styles.collapsedChevron}
-              />
-            </View>
+            <IconSymbol
+              name="chevron.right"
+              size={14}
+              color={Colors.textPlaceholder}
+              style={styles.collapsedChevron}
+            />
           )}
         </View>
       </TouchableOpacity>
@@ -410,11 +450,15 @@ const styles = StyleSheet.create({
     borderBottomColor: Colors.border,
   },
   headerCollapsed: { borderBottomWidth: 0 },
-  // 「Nセットのサマリー」と「ⓘボタン」を1つのグループにまとめ、gapで一定の余白を確保する。
-  // header全体のgap(10)だけに頼ると、ⓘのhitSlop(14pt)と視覚的に密集して見えるため
+  // ⓘボタンとchevronの間に一定の余白を確保する。header全体のgap(10)だけに頼ると、
+  // ⓘのhitSlop(14pt)と視覚的に密集して見えるため
   trailing: { flexDirection: 'row', alignItems: 'center', gap: 14 },
-  collapsedSummary: { flexDirection: 'row', alignItems: 'center', gap: 4 },
-  collapsedSummaryText: { ...Typography.footnote, fontWeight: '600', color: Colors.textPlaceholder },
+  // カテゴリチップと折りたたみ時のサマリーを横並びにする行。チップは内容幅のまま、
+  // サマリー側だけflexShrinkさせて長い場合は末尾を省略する
+  metaRow: { flexDirection: 'row', alignItems: 'center', gap: 6 },
+  // 折りたたみ時のサマリーは重量×回数などの実データを含む一次情報のため、非活性を示す
+  // textPlaceholderではなくtextMuted（WCAG AA 4.5:1適合）を使う
+  collapsedSummaryText: { ...Typography.footnote, fontWeight: '600', color: Colors.textMuted, flexShrink: 1 },
   collapsedChevron: { transform: [{ rotate: '90deg' }] },
   thumbnail: {
     width: 46,
