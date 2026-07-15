@@ -150,6 +150,88 @@ describe('moveExerciseAt', () => {
   });
 });
 
+describe('reorderExercises', () => {
+  test('渡した配列の順序をそのまま置き換える(末尾→先頭)', () => {
+    const { hydrate, reorderExercises } = useRoutineDraftStore.getState();
+    hydrate([makeDraftExercise(1), makeDraftExercise(2), makeDraftExercise(3)]);
+
+    const [a, b, c] = useRoutineDraftStore.getState().exercises;
+    reorderExercises([c, a, b]);
+
+    expect(useRoutineDraftStore.getState().exercises.map((e) => e.exerciseId)).toEqual([3, 1, 2]);
+  });
+
+  test('先頭→末尾への移動も正しく反映する', () => {
+    const { hydrate, reorderExercises } = useRoutineDraftStore.getState();
+    hydrate([makeDraftExercise(1), makeDraftExercise(2), makeDraftExercise(3)]);
+
+    const [a, b, c] = useRoutineDraftStore.getState().exercises;
+    reorderExercises([b, c, a]);
+
+    expect(useRoutineDraftStore.getState().exercises.map((e) => e.exerciseId)).toEqual([2, 3, 1]);
+  });
+
+  test('要素が1件だけの配列に同じ内容を渡しても変化しない', () => {
+    const { hydrate, reorderExercises } = useRoutineDraftStore.getState();
+    hydrate([makeDraftExercise(1)]);
+
+    reorderExercises(useRoutineDraftStore.getState().exercises);
+
+    expect(useRoutineDraftStore.getState().exercises.map((e) => e.exerciseId)).toEqual([1]);
+  });
+
+  test('sets等の中身を保ったまま順序だけを入れ替える', () => {
+    const { hydrate, reorderExercises } = useRoutineDraftStore.getState();
+    hydrate([
+      makeDraftExercise(1, { sets: [{ weight: 10, reps: 1, durationSeconds: null, distanceMeters: null }] }),
+      makeDraftExercise(2, { sets: [{ weight: 20, reps: 2, durationSeconds: null, distanceMeters: null }] }),
+    ]);
+
+    const [a, b] = useRoutineDraftStore.getState().exercises;
+    reorderExercises([b, a]);
+
+    const exercises = useRoutineDraftStore.getState().exercises;
+    expect(exercises[0]).toEqual(b);
+    expect(exercises[1]).toEqual(a);
+  });
+
+  test('exercisesが空の状態で空配列を渡しても空配列のまま', () => {
+    const { hydrate, reorderExercises } = useRoutineDraftStore.getState();
+    hydrate([]);
+
+    reorderExercises([]);
+
+    expect(useRoutineDraftStore.getState().exercises).toEqual([]);
+  });
+
+  test('同じ順序をそのまま渡し直しても内容は変化しない(冪等)', () => {
+    const { hydrate, reorderExercises } = useRoutineDraftStore.getState();
+    hydrate([makeDraftExercise(1), makeDraftExercise(2), makeDraftExercise(3)]);
+    const before = useRoutineDraftStore.getState().exercises;
+
+    reorderExercises(before);
+
+    expect(useRoutineDraftStore.getState().exercises.map((e) => e.exerciseId)).toEqual([1, 2, 3]);
+  });
+
+  test('同じexerciseIdを複数含む配列でも、各要素の中身(sets)ごと正しく並び替わる', () => {
+    const { hydrate, reorderExercises } = useRoutineDraftStore.getState();
+    const first = makeDraftExercise(5, {
+      sets: [{ weight: 10, reps: 1, durationSeconds: null, distanceMeters: null }],
+    });
+    const second = makeDraftExercise(5, {
+      sets: [{ weight: 20, reps: 2, durationSeconds: null, distanceMeters: null }],
+    });
+    hydrate([first, second]);
+
+    reorderExercises([second, first]);
+
+    const exercises = useRoutineDraftStore.getState().exercises;
+    expect(exercises[0].sets).toEqual(second.sets);
+    expect(exercises[1].sets).toEqual(first.sets);
+  });
+});
+
 describe('replaceExerciseAt', () => {
   test('指定indexの種目を丸ごと別の種目に差し替える', () => {
     const { hydrate, replaceExerciseAt } = useRoutineDraftStore.getState();

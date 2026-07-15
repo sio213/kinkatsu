@@ -1,12 +1,13 @@
 import { RoutineAddExerciseButton } from '@/components/routines/routine-add-exercise-button';
 import { RoutineTemplateExerciseCard } from '@/components/routines/routine-template-exercise-card';
+import { HeaderMenu, type DropdownMenuItem } from '@/components/ui/dropdown-menu';
 import { PrimaryButton } from '@/components/ui/primary-button';
 import { Colors } from '@/constants/theme';
 import { useKeyboardInset } from '@/hooks/use-keyboard-inset';
 import { useExercisesWithHistory } from '@/hooks/use-workout-session';
 import { useRoutineDraftStore } from '@/lib/routines/draft-store';
 import { NO_SESSION_TO_EXCLUDE } from '@/lib/workout/history';
-import { useLocalSearchParams, useRouter } from 'expo-router';
+import { Stack, useLocalSearchParams, useRouter } from 'expo-router';
 import { useCallback, useRef } from 'react';
 import { type LayoutChangeEvent, ScrollView, StyleSheet, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
@@ -71,8 +72,28 @@ export default function RoutineExerciseEditScreen() {
     router.push({ pathname: '/routine/exercise-picker', params: { returnTo: 'exercise-edit' } });
   }, [router]);
 
+  const handleReorder = useCallback(() => {
+    router.push('/routine/exercise-reorder');
+  }, [router]);
+
+  const menuItems: DropdownMenuItem[] = [
+    {
+      key: 'reorder',
+      label: '種目を並び替え',
+      icon: 'swap-vert',
+      disabled: exercises.length <= 1,
+      hint: exercises.length <= 1 ? '2種目以上あるときに使えます' : undefined,
+      onPress: handleReorder,
+    },
+  ];
+
   return (
     <SafeAreaView style={styles.safe} edges={['bottom']}>
+      <Stack.Screen
+        options={{
+          headerRight: () => <HeaderMenu groups={[menuItems]} accessibilityLabel="種目編集のメニューを開く" />,
+        }}
+      />
       <ScrollView
         ref={scrollRef}
         contentContainerStyle={styles.content}
