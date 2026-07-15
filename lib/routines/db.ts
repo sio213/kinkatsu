@@ -1,4 +1,4 @@
-import { db, type Tx } from '@/db/client';
+import { db, type DbOrTx, type Tx } from '@/db/client';
 import {
   exercises,
   reminders,
@@ -14,7 +14,7 @@ import { createReminder, deleteReminder, updateReminder } from '@/lib/notificati
 import type { ReminderInput } from '@/lib/notifications/types';
 import { withRoutineReminderContent } from '@/lib/routines/reminder-input';
 import { getPreviousSets, hasAnyValue } from '@/lib/workout/history';
-import { eq, inArray } from 'drizzle-orm';
+import { eq, gt, inArray, sql } from 'drizzle-orm';
 
 export type RoutineSetInput = {
   weight: number | null;
@@ -76,6 +76,27 @@ export async function buildInitialRoutineSets(exerciseId: number): Promise<Routi
     durationSeconds: s.durationSeconds,
     distanceMeters: s.distanceMeters,
   }));
+}
+
+// routineExercises.idごとのroutineSetsをsetNumber順に引けるMapにする。getRoutineDetail(表示用)と
+// duplicateRoutine(コピー用)の両方で「種目に紐づくセットをまとめて取得しグルーピングする」処理が
+// 共通のため切り出す
+async function fetchSetsByExercise(dbOrTx: DbOrTx, exerciseIds: number[]): Promise<Map<number, RoutineSet[]>> {
+  const setRows = exerciseIds.length
+    ? await dbOrTx
+        .select()
+        .from(routineSets)
+        .where(inArray(routineSets.routineExerciseId, exerciseIds))
+        .orderBy(routineSets.setNumber)
+    : [];
+
+  const setsByExercise = new Map<number, RoutineSet[]>();
+  for (const s of setRows) {
+    const list = setsByExercise.get(s.routineExerciseId);
+    if (list) list.push(s);
+    else setsByExercise.set(s.routineExerciseId, [s]);
+  }
+  return setsByExercise;
 }
 
 async function insertRoutineExercises(
@@ -166,6 +187,51 @@ export async function updateRoutine(routineId: number, input: RoutineInput, remi
   if (reminderPlan) await applyRoutineReminderPlan(routineId, input.name, reminderPlan);
 }
 
+// 一覧の「⋮」メニューの「複製」。種目・セット構成を丸ごとコピーし、元カードの直下に挿入する。
+// リマインダーは複製しない（同じ曜日に重複登録されると気づかず放置されがちなため、複製先は
+// 通知未設定の別ルーティンとして始める）
+export async function duplicateRoutine(routineId: number): Promise<number> {
+  const now = Date.now();
+  return db.transaction(async (tx) => {
+    const [source] = await tx.select().from(routines).where(eq(routines.id, routineId));
+    if (!source) throw new Error(`routine not found: ${routineId}`);
+
+    const exerciseRows = await tx
+      .select()
+      .from(routineExercises)
+      .where(eq(routineExercises.routineId, routineId))
+      .orderBy(routineExercises.orderIndex);
+
+    const exerciseIds = exerciseRows.map((e) => e.id);
+    const setsByExercise = await fetchSetsByExercise(tx, exerciseIds);
+
+    const exercisesInput: RoutineExerciseInput[] = exerciseRows.map((e) => ({
+      exerciseId: e.exerciseId,
+      sets: (setsByExercise.get(e.id) ?? []).map((s) => ({
+        weight: s.weight,
+        reps: s.reps,
+        durationSeconds: s.durationSeconds,
+        distanceMeters: s.distanceMeters,
+      })),
+    }));
+
+    // 元カードの直下に割り込ませるため、後続カードのorderIndexを一括で+1シフトしてから挿入する。
+    // 挿入より先に行う必要がある（挿入を先にすると、新規行のorderIndexもこのUPDATEのWHERE条件に
+    // 引っかかり二重にシフトされてしまう）
+    await tx
+      .update(routines)
+      .set({ orderIndex: sql`${routines.orderIndex} + 1` })
+      .where(gt(routines.orderIndex, source.orderIndex));
+
+    const [inserted] = await tx
+      .insert(routines)
+      .values({ name: `${source.name} コピー`, orderIndex: source.orderIndex + 1, createdAt: now, updatedAt: now })
+      .returning();
+    await insertRoutineExercises(tx, inserted.id, exercisesInput, now);
+    return inserted.id;
+  });
+}
+
 // ルーティンに紐づくリマインダーがあれば、OS通知のキャンセルまで行うdeleteReminder()を先に
 // 経由してから消す。reminders.routineIdのON DELETE SET NULLはあくまで安全網であり、
 // それに任せて生カスケードで行だけ消すとOS通知が残留してしまうため
@@ -222,20 +288,7 @@ export async function getRoutineDetail(routineId: number): Promise<RoutineDetail
     .orderBy(routineExercises.orderIndex);
 
   const exerciseIds = exerciseRows.map((e) => e.id);
-  const setRows = exerciseIds.length
-    ? await db
-        .select()
-        .from(routineSets)
-        .where(inArray(routineSets.routineExerciseId, exerciseIds))
-        .orderBy(routineSets.setNumber)
-    : [];
-
-  const setsByExercise = new Map<number, RoutineSet[]>();
-  for (const s of setRows) {
-    const list = setsByExercise.get(s.routineExerciseId);
-    if (list) list.push(s);
-    else setsByExercise.set(s.routineExerciseId, [s]);
-  }
+  const setsByExercise = await fetchSetsByExercise(db, exerciseIds);
 
   const [reminder] = await db.select().from(reminders).where(eq(reminders.routineId, routineId));
 

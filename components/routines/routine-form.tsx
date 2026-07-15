@@ -20,6 +20,9 @@ export type RoutineFormHandle = { submit: () => void };
 
 type Props = {
   initialName?: string;
+  // 複製直後の遷移時など、名前欄に最初からフォーカス+全選択を当てて「コピー」のまま
+  // 放置されず即リネームできるようにしたい場合にtrueを渡す
+  autoFocusName?: boolean;
   onSubmit: (values: RoutineFormValues) => void;
   onSubmitDisabledChange?: (disabled: boolean) => void;
   onAddExercise: () => void;
@@ -32,7 +35,15 @@ type Props = {
 // テンプレートセット編集画面を行き来しても消えないよう useRoutineDraftStore（zustand）を
 // 唯一の情報源にし、画面がフォーカスを取り戻すたびにフォーム値へ同期する
 export const RoutineForm = forwardRef<RoutineFormHandle, Props>(function RoutineForm(
-  { initialName = '', onSubmit, onSubmitDisabledChange, onAddExercise, onPressExercise, onPressReminder },
+  {
+    initialName = '',
+    autoFocusName = false,
+    onSubmit,
+    onSubmitDisabledChange,
+    onAddExercise,
+    onPressExercise,
+    onPressReminder,
+  },
   ref,
 ) {
   const draftExercises = useRoutineDraftStore((state) => state.exercises);
@@ -133,6 +144,8 @@ export const RoutineForm = forwardRef<RoutineFormHandle, Props>(function Routine
               onChangeText={onChange}
               placeholder="例：胸の日"
               accessibilityLabel="名前"
+              autoFocus={autoFocusName}
+              selectTextOnFocus={autoFocusName}
             />
           )}
         />

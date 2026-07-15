@@ -18,6 +18,7 @@ type Props = {
   onPress: () => void;
   onStart: () => void;
   onEdit: () => void;
+  onDuplicate: () => void;
   onMoveUp: () => void;
   onMoveDown: () => void;
   onDelete: () => void;
@@ -33,6 +34,7 @@ export function RoutineCard({
   onPress,
   onStart,
   onEdit,
+  onDuplicate,
   onMoveUp,
   onMoveDown,
   onDelete,
@@ -65,6 +67,7 @@ export function RoutineCard({
             isFirst={isFirst}
             isLast={isLast}
             onEdit={onEdit}
+            onDuplicate={onDuplicate}
             onMoveUp={onMoveUp}
             onMoveDown={onMoveDown}
             onDelete={onDelete}

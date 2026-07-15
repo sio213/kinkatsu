@@ -7,16 +7,18 @@ type Props = {
   isFirst: boolean;
   isLast: boolean;
   onEdit: () => void;
+  onDuplicate: () => void;
   onMoveUp: () => void;
   onMoveDown: () => void;
   onDelete: () => void;
 };
 
-// ルーティン一覧カードの「⋮」メニュー（編集/上へ移動/下へ移動/削除）。
-// components/workout/exercise-card-menu.tsxと同じDropdownMenuの使い方に揃える
-export function RoutineCardMenu({ isFirst, isLast, onEdit, onMoveUp, onMoveDown, onDelete }: Props) {
+// ルーティン一覧カードの「⋮」メニュー（編集/複製/上へ移動/下へ移動/削除）。
+// components/exercises/exercise-card-menu.tsxと同じDropdownMenuの使い方に揃える
+export function RoutineCardMenu({ isFirst, isLast, onEdit, onDuplicate, onMoveUp, onMoveDown, onDelete }: Props) {
   const items: DropdownMenuItem[] = [
     { key: 'edit', label: '編集', icon: 'edit', onPress: onEdit },
+    { key: 'duplicate', label: '複製', icon: 'content-copy', onPress: onDuplicate },
     { key: 'up', label: '上へ移動', icon: 'arrow-upward', disabled: isFirst, onPress: onMoveUp },
     { key: 'down', label: '下へ移動', icon: 'arrow-downward', disabled: isLast, onPress: onMoveDown },
     { key: 'delete', label: '削除', icon: 'delete-outline', danger: true, onPress: onDelete },

@@ -12,12 +12,12 @@ import { useRoutineDraftStore } from '@/lib/routines/draft-store';
 import { getRoutineScheduleDisplay } from '@/lib/routines/format';
 import { endWorkoutSession, startWorkoutFromRoutine } from '@/lib/workout/session';
 import { Stack } from 'expo-router';
-import { useCallback } from 'react';
+import { useCallback, useRef } from 'react';
 import { Alert, FlatList, StyleSheet, Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 export default function RoutineListScreen() {
-  const { routines, removeRoutine, swapOrder } = useRoutines();
+  const { routines, removeRoutine, swapOrder, duplicateRoutine } = useRoutines();
   const summaries = useRoutineExerciseSummaries();
   const routineReminders = useRoutineReminders();
   const { activeSession } = useWorkoutSessions();
@@ -71,6 +71,29 @@ export default function RoutineListScreen() {
     [activeSession, startWorkout],
   );
 
+  // 複製メニュー。作っただけで一覧に戻すと「コピー」の名前のまま放置されがちなので、複製直後に
+  // そのまま編集画面へ遷移させ、名前欄にフォーカスを当てて即リネームを促す（実機フィードバックで指摘）。
+  // 複製は削除と違って確認ダイアログを挟まず即実行するため、DB書き込み中に⋮メニューを再度開いて
+  // 連打すると同じルーティンが複数複製されうる。useWorkoutStarterのisStartingRefと同じ方針で
+  // 処理中の再実行をガードする（レビュー指摘）
+  const isDuplicatingRef = useRef(false);
+  const handleDuplicate = useCallback(
+    async (routine: Routine) => {
+      if (isDuplicatingRef.current) return;
+      isDuplicatingRef.current = true;
+      try {
+        const newId = await duplicateRoutine(routine.id);
+        pushDebounced({ pathname: '/routine/edit/[id]', params: { id: String(newId), focusName: '1' } });
+      } catch (e) {
+        console.error('[routine duplicate]', e);
+        Alert.alert('エラー', 'ルーティンの複製に失敗しました。');
+      } finally {
+        isDuplicatingRef.current = false;
+      }
+    },
+    [duplicateRoutine, pushDebounced],
+  );
+
   const handleDelete = useCallback(
     (routine: Routine) => {
       Alert.alert('削除', `「${routine.name}」を削除しますか？`, [
@@ -120,6 +143,7 @@ export default function RoutineListScreen() {
             onPress={() => handleEdit(item.id)}
             onStart={() => handleStartWorkout(item)}
             onEdit={() => handleEdit(item.id)}
+            onDuplicate={() => handleDuplicate(item)}
             onMoveUp={() => {
               // isFirst/isLastのdisabled判定により通常はここに来ないが、メニュー展開中に
               // 他操作でroutinesが更新される競合を考慮し、配列外アクセスにしない
@@ -135,7 +159,7 @@ export default function RoutineListScreen() {
         </ListErrorBoundary>
       );
     },
-    [summaries, routineReminders, routines, handleStartWorkout, handleEdit, handleSwap, handleDelete],
+    [summaries, routineReminders, routines, handleStartWorkout, handleEdit, handleDuplicate, handleSwap, handleDelete],
   );
 
   return (

@@ -2,7 +2,15 @@
 // better-sqlite3で実SQLiteを立て、ルーティン関連テーブルのFK制約(cascade/restrict/set null)が
 // マイグレーションSQL通りに効くことを検証する。lib/routines/db.tsの各関数はモック化したdb.test.tsで
 // 呼び出し順を確認するに留め、実際のカスケード挙動の保証はこちらが担う。
+//
+// duplicateRoutineのorderIndexシフト(sql`${routines.orderIndex} + 1`)だけは例外的に、
+// drizzle-orm/better-sqlite3の実クエリビルダ経由で検証する(db.test.tsはsql自体をモックしており、
+// このコードベースで初めて使うsqlタグ付きテンプレートが実際に正しいSQLへコンパイルされるかは
+// カバーできていないため。db/schema.tsはexpo-sqlite非依存なのでこの用途にそのまま使える)
 import Database from 'better-sqlite3';
+import { drizzle } from 'drizzle-orm/better-sqlite3';
+import { gt, sql } from 'drizzle-orm';
+import { routines } from '@/db/schema';
 import fs from 'node:fs';
 import path from 'node:path';
 
@@ -17,8 +25,9 @@ function migrationFiles() {
 
 function applyAllMigrations(db: Database.Database) {
   for (const file of migrationFiles()) {
-    const sql = fs.readFileSync(path.join(DRIZZLE_DIR, file), 'utf-8');
-    db.exec(sql.replace(/--> statement-breakpoint/g, ''));
+    // drizzle-ormのsqlタグ関数(import済み)とのシャドーイングを避けるためsqlTextという名前にする
+    const sqlText = fs.readFileSync(path.join(DRIZZLE_DIR, file), 'utf-8');
+    db.exec(sqlText.replace(/--> statement-breakpoint/g, ''));
   }
 }
 
@@ -220,5 +229,35 @@ describe('ルーティン機能スキーマ - 実SQLite上でのFK挙動', () =>
       .all(routineId) as { name: string }[];
 
     expect(rows.map((r) => r.name)).toEqual(['種目B', '種目A']);
+  });
+
+  it('duplicateRoutine相当のorderIndexシフト: sql`${routines.orderIndex} + 1`は各行の現在値を基準に+1し、後続行だけが対象になる', () => {
+    db = new Database(':memory:');
+    db.pragma('foreign_keys = ON');
+    applyAllMigrations(db);
+    const now = Date.now();
+    db.prepare(
+      `INSERT INTO routines (name, order_index, created_at, updated_at)
+       VALUES ('A', 0, ?, ?), ('B', 1, ?, ?), ('C', 2, ?, ?)`,
+    ).run(now, now, now, now, now, now);
+
+    const orm = drizzle(db);
+    orm
+      .update(routines)
+      .set({ orderIndex: sql`${routines.orderIndex} + 1` })
+      .where(gt(routines.orderIndex, 0))
+      .run();
+
+    const rows = db.prepare('SELECT name, order_index AS orderIndex FROM routines ORDER BY name').all() as {
+      name: string;
+      orderIndex: number;
+    }[];
+    // Aはgtの対象外なので0のまま、B/Cはそれぞれ自分の現在値+1になる(全行が同じ値に
+    // 揃ってしまう固定値updateとの違いを確認する)
+    expect(rows).toEqual([
+      { name: 'A', orderIndex: 0 },
+      { name: 'B', orderIndex: 2 },
+      { name: 'C', orderIndex: 3 },
+    ]);
   });
 });

@@ -118,6 +118,23 @@ test('取得成功: 名前・種目一覧がフォームに反映される', asy
   expect(root.findByProps({ accessibilityLabel: 'ベンチプレス、胸、1セット・60kg×8' })).toBeDefined();
 });
 
+test('複製直後の遷移(?focusName=1)では名前欄がautoFocusになる', async () => {
+  mockUseLocalSearchParams.mockReturnValue({ id: '1', focusName: '1' });
+  mockGetRoutineDetail.mockResolvedValue(makeDetail());
+  const root = await renderResolved();
+
+  const nameInput = root.findAllByType(TextInput)[0];
+  expect(nameInput.props.autoFocus).toBe(true);
+});
+
+test('通常の編集画面遷移(focusNameパラメータ無し)では名前欄はautoFocusにならない', async () => {
+  mockGetRoutineDetail.mockResolvedValue(makeDetail());
+  const root = await renderResolved();
+
+  const nameInput = root.findAllByType(TextInput)[0];
+  expect(nameInput.props.autoFocus).toBeFalsy();
+});
+
 test('リマインダー未設定(紐づくreminder行が無い)の既存ルーティンを編集すると、通知トグルはOFFで表示される(バグ回帰防止: OFFで保存→次に開くとONになっていた不具合)', async () => {
   // routineFormSchemaのrefineにより、ON+未設定のまま保存されることは無いため、
   // reminderが無い既存ルーティンは必ず直前にOFFで保存された結果のはず

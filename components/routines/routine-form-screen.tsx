@@ -9,6 +9,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 
 type Props = {
   initialName?: string;
+  autoFocusName?: boolean;
   onSubmit: (values: RoutineFormValues) => void;
   onAddExercise: () => void;
   onPressExercise: (index: number) => void;
@@ -18,7 +19,14 @@ type Props = {
 // ルーティンの新規作成・編集で共通の「フォーム＋下部固定の保存ボタン」の画面シェル。
 // components/exercises/exercise-form-screen.tsxと同じ構造。保存ボタンはこの中で完結するため
 // （呼び出し側から外部トリガーで保存する必要が無いため）forwardRefは持たない
-export function RoutineFormScreen({ initialName, onSubmit, onAddExercise, onPressExercise, onPressReminder }: Props) {
+export function RoutineFormScreen({
+  initialName,
+  autoFocusName,
+  onSubmit,
+  onAddExercise,
+  onPressExercise,
+  onPressReminder,
+}: Props) {
   const formRef = useRef<RoutineFormHandle>(null);
   const scrollRef = useRef<ScrollView>(null);
   const [submitDisabled, setSubmitDisabled] = useState(false);
@@ -31,6 +39,7 @@ export function RoutineFormScreen({ initialName, onSubmit, onAddExercise, onPres
             <RoutineForm
               ref={formRef}
               initialName={initialName}
+              autoFocusName={autoFocusName}
               onSubmit={onSubmit}
               onSubmitDisabledChange={setSubmitDisabled}
               onAddExercise={onAddExercise}

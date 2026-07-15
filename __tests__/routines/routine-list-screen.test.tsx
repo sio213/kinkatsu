@@ -67,7 +67,12 @@ function baseSessions(overrides: Partial<ReturnType<typeof mockUseWorkoutSession
 
 beforeEach(() => {
   jest.clearAllMocks();
-  mockUseRoutines.mockReturnValue({ routines: [baseRoutine()], removeRoutine: jest.fn(), swapOrder: jest.fn() });
+  mockUseRoutines.mockReturnValue({
+    routines: [baseRoutine()],
+    removeRoutine: jest.fn(),
+    swapOrder: jest.fn(),
+    duplicateRoutine: jest.fn(),
+  });
   mockUseRoutineExerciseSummaries.mockReturnValue(new Map());
   mockUseRoutineReminders.mockReturnValue(new Map());
   mockUseWorkoutSessions.mockReturnValue(baseSessions());
@@ -213,6 +218,115 @@ test('⋮メニューの「編集」は引き続きルーティン編集画面�
 
   expect(mockPush).toHaveBeenCalledWith('/routine/edit/1');
   expect(mockStartWorkoutFromRoutine).not.toHaveBeenCalled();
+});
+
+test('⋮メニューの「複製」を押すと、複製後の新しいIDで名前欄オートフォーカス付きの編集画面へ遷移する', async () => {
+  const mockDuplicateRoutine = jest.fn().mockResolvedValue(42);
+  mockUseRoutines.mockReturnValue({
+    routines: [baseRoutine()],
+    removeRoutine: jest.fn(),
+    swapOrder: jest.fn(),
+    duplicateRoutine: mockDuplicateRoutine,
+  });
+  const root = render();
+
+  const menuTrigger = findByAccessibilityLabel(root, 'メニューを開く')!;
+  act(() => {
+    menuTrigger.props.onPress();
+  });
+
+  const duplicateItem = findByAccessibilityLabel(root, '複製')!;
+  await act(async () => {
+    await duplicateItem.props.onPress();
+  });
+
+  expect(mockDuplicateRoutine).toHaveBeenCalledWith(1);
+  expect(mockPush).toHaveBeenCalledWith({
+    pathname: '/routine/edit/[id]',
+    params: { id: '42', focusName: '1' },
+  });
+});
+
+test('複製が失敗した場合はAlertを表示し、遷移しない', async () => {
+  const mockDuplicateRoutine = jest.fn().mockRejectedValue(new Error('db error'));
+  mockUseRoutines.mockReturnValue({
+    routines: [baseRoutine()],
+    removeRoutine: jest.fn(),
+    swapOrder: jest.fn(),
+    duplicateRoutine: mockDuplicateRoutine,
+  });
+  const root = render();
+
+  const menuTrigger = findByAccessibilityLabel(root, 'メニューを開く')!;
+  act(() => {
+    menuTrigger.props.onPress();
+  });
+
+  const duplicateItem = findByAccessibilityLabel(root, '複製')!;
+  await act(async () => {
+    await duplicateItem.props.onPress();
+  });
+
+  expect(Alert.alert).toHaveBeenCalledWith('エラー', 'ルーティンの複製に失敗しました。');
+  expect(mockPush).not.toHaveBeenCalled();
+});
+
+test('複数カードがある場合、2枚目の複製で正しいroutineId（1枚目ではない）が渡される', async () => {
+  const mockDuplicateRoutine = jest.fn().mockResolvedValue(99);
+  mockUseRoutines.mockReturnValue({
+    routines: [baseRoutine({ id: 1, name: '胸トレ' }), baseRoutine({ id: 2, name: '脚トレ' })],
+    removeRoutine: jest.fn(),
+    swapOrder: jest.fn(),
+    duplicateRoutine: mockDuplicateRoutine,
+  });
+  const root = render();
+
+  const menuTriggers = root
+    .findAllByType(TouchableOpacity)
+    .filter((t) => t.props.accessibilityLabel === 'メニューを開く');
+  act(() => {
+    menuTriggers[1].props.onPress();
+  });
+
+  const duplicateItem = findByAccessibilityLabel(root, '複製')!;
+  await act(async () => {
+    await duplicateItem.props.onPress();
+  });
+
+  expect(mockDuplicateRoutine).toHaveBeenCalledWith(2);
+});
+
+test('複製処理中に連打しても、duplicateRoutineは1回しか呼ばれない（同じルーティンが複数複製されるのを防止）', async () => {
+  let resolveDuplicate!: (id: number) => void;
+  const mockDuplicateRoutine = jest.fn().mockReturnValue(
+    new Promise<number>((resolve) => {
+      resolveDuplicate = resolve;
+    }),
+  );
+  mockUseRoutines.mockReturnValue({
+    routines: [baseRoutine()],
+    removeRoutine: jest.fn(),
+    swapOrder: jest.fn(),
+    duplicateRoutine: mockDuplicateRoutine,
+  });
+  const root = render();
+
+  const menuTrigger = findByAccessibilityLabel(root, 'メニューを開く')!;
+  act(() => {
+    menuTrigger.props.onPress();
+  });
+  const duplicateItem = findByAccessibilityLabel(root, '複製')!;
+
+  act(() => {
+    duplicateItem.props.onPress();
+    duplicateItem.props.onPress();
+  });
+
+  expect(mockDuplicateRoutine).toHaveBeenCalledTimes(1);
+
+  await act(async () => {
+    resolveDuplicate(42);
+  });
 });
 
 test('連打してもstartWorkoutFromRoutineは1回しか呼ばれない（二重セッション生成の防止）', async () => {
