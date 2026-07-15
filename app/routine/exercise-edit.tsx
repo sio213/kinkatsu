@@ -149,7 +149,7 @@ export default function RoutineExerciseEditScreen() {
     {
       key: 'add',
       label: '種目を追加',
-      icon: 'add-circle',
+      icon: 'add',
       // 画面下部（一覧末尾）のRoutineAddExerciseButtonと同じ操作。種目数が多いとボタンまで
       // スクロールする必要があるため、スクロール位置に関係なく開けるメニューにも用意する
       onPress: handleAddExercise,
