@@ -30,6 +30,10 @@ type RoutineDraftState = {
   // まとめて別の種目のものに差し替える（DBのreplaceSessionExerciseと同じ「丸ごと置き換え」の
   // 考え方だが、こちらはDBではなく下書き配列を直接書き換える）
   replaceExerciseAt: (index: number, exercise: DraftExercise) => void;
+  // ヘッダー⋮「種目を並び替え」から開く専用画面(app/routine/exercise-reorder.tsx)。ドラッグする
+  // たびに配列全体を書き換える。moveExerciseAt(隣接1件だけの入れ替え)と違い、任意の位置へ
+  // 動かした結果の並び順そのものを丸ごと差し替える。要素の追加・削除は行わない前提
+  reorderExercises: (exercises: DraftExercise[]) => void;
   // テンプレートセット編集画面でのセット追加・削除・値変更をまとめて反映する
   // （setNumberは配列の並び順から導出するため、DraftExercise側に別途保持しない）
   updateExerciseSets: (index: number, sets: DraftExercise['sets']) => void;
@@ -66,6 +70,7 @@ export const useRoutineDraftStore = create<RoutineDraftState>((set) => ({
     set((state) => ({
       exercises: state.exercises.map((e, i) => (i === index ? exercise : e)),
     })),
+  reorderExercises: (exercises) => set({ exercises }),
   updateExerciseSets: (index, sets) =>
     set((state) => ({
       exercises: state.exercises.map((e, i) => (i === index ? { ...e, sets } : e)),

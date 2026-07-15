@@ -22,7 +22,7 @@
       "^@/(.*)$": "<rootDir>/$1"
     },
     "transformIgnorePatterns": [
-      "node_modules/(?!((jest-)?react-native|@react-native(-community)?|expo(-[^/]*)?|@expo(-[^/]*)?/.*|react-navigation|@react-navigation/.*|@unimodules/.*|unimodules|sentry-expo|native-base|react-native-svg|drizzle-orm)/)"
+      "node_modules/(?!((jest-)?react-native|@react-native(-community)?|expo(-[^/]*)?|@expo(-[^/]*)?/.*|react-navigation|@react-navigation/.*|@unimodules/.*|unimodules|sentry-expo|native-base|react-native-svg|react-native-gesture-handler|react-native-reorderable-list|react-native-reanimated|react-native-worklets|drizzle-orm)/)"
     ]
   },
   "dependencies": {
@@ -60,6 +60,7 @@
     "react-native": "0.81.5",
     "react-native-gesture-handler": "~2.28.0",
     "react-native-reanimated": "~4.1.1",
+    "react-native-reorderable-list": "^0.18.1",
     "react-native-safe-area-context": "~5.6.0",
     "react-native-screens": "~4.16.0",
     "react-native-svg": "15.12.1",

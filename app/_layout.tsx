@@ -28,6 +28,7 @@ import {
   Text,
   View,
 } from 'react-native';
+import { GestureHandlerRootView } from 'react-native-gesture-handler';
 import 'react-native-reanimated';
 
 Notifications.setNotificationHandler({
@@ -125,54 +126,63 @@ export default function RootLayout() {
   if (!success) return null;
 
   return (
-    <ThemeProvider value={colorScheme === 'dark' ? DarkTheme : DefaultTheme}>
-      <Stack screenOptions={headerOptions}>
-        <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
-        <Stack.Screen name="exercise/[id]" options={{ title: '' }} />
-        <Stack.Screen
-          name="exercise/edit/[id]"
-          options={{ title: '種目を編集' }}
-        />
-        <Stack.Screen name="exercise/new" options={{ title: '種目を作成' }} />
-        <Stack.Screen name="routine/index" options={{ title: 'ルーティン' }} />
-        <Stack.Screen name="routine/new" options={{ title: 'ルーティンを作成' }} />
-        <Stack.Screen name="routine/edit/[id]" options={{ title: 'ルーティンを編集' }} />
-        <Stack.Screen name="routine/exercise-picker" options={{ title: '種目を追加' }} />
-        <Stack.Screen name="routine/exercise-edit" options={{ title: '種目を編集' }} />
-        <Stack.Screen name="routine/exercise-swap" options={{ title: '種目を入れ替え' }} />
-        {/* デザイン上、単体種目版のhistory-pickerと同じヘッダー文言（過去の記録から読み込み）を使う */}
-        <Stack.Screen name="routine/history-picker" options={{ title: '過去の記録から読み込み' }} />
-        <Stack.Screen name="routine/reminder" options={{ title: 'リマインダー' }} />
-        <Stack.Screen name="workout/[id]" options={{ title: '' }} />
-        <Stack.Screen
-          name="workout/exercise-picker"
-          options={{ title: '種目を追加' }}
-        />
-        <Stack.Screen
-          name="workout/exercise-swap"
-          options={{ title: '種目を入れ替え' }}
-        />
-        <Stack.Screen
-          name="workout/history-picker"
-          options={{ title: '過去の記録から読み込み' }}
-        />
-        {/* デザイン上、単一種目版のhistory-pickerと同じヘッダー文言（過去の記録から読み込み）を使う */}
-        <Stack.Screen
-          name="workout/session-history-picker"
-          options={{ title: '過去の記録から読み込み' }}
-        />
-        {/* ヘッダーは選んだ過去セッションの日付（例:「7月3日（木）」）を動的に表示するため、
-            画面側でStack.Screen optionsを上書きする（workout/[id]と同じ方針） */}
-        <Stack.Screen name="workout/session-history-load" options={{ title: '' }} />
-        <Stack.Screen
-          name="modal"
-          options={{ presentation: 'modal', title: 'Modal' }}
-        />
-      </Stack>
-      <StatusBar style="auto" />
-    </ThemeProvider>
+    // react-native-reorderable-list(種目まとめて並び替え画面)がgesture-handlerのPanジェスチャに
+    // 依存するため、アプリ全体をGestureHandlerRootViewで包む必要がある(無いとAndroidでドラッグが反応しない)
+    <GestureHandlerRootView style={styles.gestureRoot}>
+      <ThemeProvider value={colorScheme === 'dark' ? DarkTheme : DefaultTheme}>
+        <Stack screenOptions={headerOptions}>
+          <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
+          <Stack.Screen name="exercise/[id]" options={{ title: '' }} />
+          <Stack.Screen
+            name="exercise/edit/[id]"
+            options={{ title: '種目を編集' }}
+          />
+          <Stack.Screen name="exercise/new" options={{ title: '種目を作成' }} />
+          <Stack.Screen name="routine/index" options={{ title: 'ルーティン' }} />
+          <Stack.Screen name="routine/new" options={{ title: 'ルーティンを作成' }} />
+          <Stack.Screen name="routine/edit/[id]" options={{ title: 'ルーティンを編集' }} />
+          <Stack.Screen name="routine/exercise-picker" options={{ title: '種目を追加' }} />
+          <Stack.Screen name="routine/exercise-edit" options={{ title: '種目を編集' }} />
+          <Stack.Screen name="routine/exercise-reorder" options={{ title: '種目を並び替え' }} />
+          <Stack.Screen name="routine/exercise-swap" options={{ title: '種目を入れ替え' }} />
+          {/* デザイン上、単体種目版のhistory-pickerと同じヘッダー文言（過去の記録から読み込み）を使う */}
+          <Stack.Screen name="routine/history-picker" options={{ title: '過去の記録から読み込み' }} />
+          <Stack.Screen name="routine/reminder" options={{ title: 'リマインダー' }} />
+          <Stack.Screen name="workout/[id]" options={{ title: '' }} />
+          <Stack.Screen
+            name="workout/exercise-picker"
+            options={{ title: '種目を追加' }}
+          />
+          <Stack.Screen
+            name="workout/exercise-swap"
+            options={{ title: '種目を入れ替え' }}
+          />
+          <Stack.Screen
+            name="workout/history-picker"
+            options={{ title: '過去の記録から読み込み' }}
+          />
+          {/* デザイン上、単一種目版のhistory-pickerと同じヘッダー文言（過去の記録から読み込み）を使う */}
+          <Stack.Screen
+            name="workout/session-history-picker"
+            options={{ title: '過去の記録から読み込み' }}
+          />
+          {/* ヘッダーは選んだ過去セッションの日付（例:「7月3日（木）」）を動的に表示するため、
+              画面側でStack.Screen optionsを上書きする（workout/[id]と同じ方針） */}
+          <Stack.Screen name="workout/session-history-load" options={{ title: '' }} />
+          <Stack.Screen
+            name="modal"
+            options={{ presentation: 'modal', title: 'Modal' }}
+          />
+        </Stack>
+        <StatusBar style="auto" />
+      </ThemeProvider>
+    </GestureHandlerRootView>
   );
 }
+
+const styles = StyleSheet.create({
+  gestureRoot: { flex: 1 },
+});
 
 const migrationStyles = StyleSheet.create({
   container: {
