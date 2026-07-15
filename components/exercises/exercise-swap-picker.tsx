@@ -1,6 +1,4 @@
-import { CategoryFilterChips } from '@/components/exercises/category-filter-chips';
-import { ExerciseSearchBar } from '@/components/exercises/exercise-search-bar';
-import { ExerciseSortDropdown } from '@/components/exercises/exercise-sort-dropdown';
+import { ExerciseFilterHeader } from '@/components/exercises/exercise-filter-header';
 import { HeaderTitle } from '@/components/ui/header-title';
 import { ListErrorBoundary } from '@/components/ui/list-error-boundary';
 import { PrimaryButton } from '@/components/ui/primary-button';
@@ -136,11 +134,15 @@ export function ExerciseSwapPicker({
   );
 
   const listHeader = (
-    <View style={styles.headerArea}>
-      <ExerciseSearchBar value={search} onChangeText={setSearch} onSubmitEditing={Keyboard.dismiss} />
-      <CategoryFilterChips activeCategory={activeCategory} onChange={setActiveCategory} />
-      <ExerciseSortDropdown sortBy={sortBy} onChange={setSortBy} />
-    </View>
+    <ExerciseFilterHeader
+      search={search}
+      onChangeSearch={setSearch}
+      onSubmitSearch={Keyboard.dismiss}
+      activeCategory={activeCategory}
+      onChangeCategory={setActiveCategory}
+      sortBy={sortBy}
+      onChangeSortBy={setSortBy}
+    />
   );
 
   const trimmedSearch = search.trim();
@@ -165,6 +167,8 @@ export function ExerciseSwapPicker({
         keyExtractor={(item) => String(item.id)}
         renderItem={renderItem}
         ListHeaderComponent={listHeader}
+        // 検索・カテゴリ絞り込み・並び替えをスクロールしても隠れないよう先頭(index 0)で固定する
+        stickyHeaderIndices={[0]}
         ListEmptyComponent={emptyComponent}
         contentContainerStyle={styles.content}
         contentInset={{ bottom: keyboardInset }}
@@ -182,8 +186,6 @@ const styles = StyleSheet.create({
   safeArea: { flex: 1, backgroundColor: Colors.background },
   list: { flex: 1 },
   content: { paddingHorizontal: 16, paddingBottom: 16 },
-
-  headerArea: { paddingTop: 12, gap: 8, marginBottom: 4 },
 
   emptyWrapper: { alignItems: 'center', paddingVertical: 32 },
   empty: { color: Colors.textMuted, ...Typography.body, textAlign: 'center' },
