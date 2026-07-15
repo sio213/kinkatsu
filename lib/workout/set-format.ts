@@ -206,3 +206,73 @@ export function parseColumnsWithFallback(
     return acc;
   }, {});
 }
+
+export type SetLike = {
+  weight: number | null;
+  reps: number | null;
+  durationSeconds: number | null;
+  distanceMeters: number | null;
+};
+
+// 計測タイプごとの「代表セットを決める指標」。weight_reps/weight_timeは重量が主指標、
+// reps/time/distance_timeはそれぞれ回数・時間・距離が唯一の指標になる
+function primaryMetric(measurementType: MeasurementType, s: SetLike): number | null {
+  switch (measurementType) {
+    case 'weight_reps':
+    case 'weight_time':
+      return s.weight;
+    case 'reps':
+      return s.reps;
+    case 'time':
+      return s.durationSeconds;
+    case 'distance_time':
+      return s.distanceMeters;
+  }
+}
+
+// 主指標が同値のときのタイブレーク指標。weight_repsは回数が多い方、weight_timeは
+// 時間が長い方を優先する（デザインメモの「同kgなら回数が多い方」をweight_time相当にも一般化）。
+// 単一指標の計測タイプはタイブレークの概念が無い
+function secondaryMetric(measurementType: MeasurementType, s: SetLike): number | null {
+  switch (measurementType) {
+    case 'weight_reps':
+      return s.reps;
+    case 'weight_time':
+      return s.durationSeconds;
+    default:
+      return null;
+  }
+}
+
+// 種目1件分の代表セットを1つ選ぶ（渡されたセット群の中で最大の主指標、
+// 同値なら副指標が大きい方）。主指標が全セットnull（未入力）ならnullを返す
+export function pickRepresentativeSet<T extends SetLike>(
+  measurementType: MeasurementType,
+  sets: T[],
+): T | null {
+  let best: T | null = null;
+  let bestPrimary = -Infinity;
+  let bestSecondary = -Infinity;
+  for (const s of sets) {
+    const primary = primaryMetric(measurementType, s);
+    if (primary == null) continue;
+    const secondary = secondaryMetric(measurementType, s) ?? -Infinity;
+    if (primary > bestPrimary || (primary === bestPrimary && secondary > bestSecondary)) {
+      best = s;
+      bestPrimary = primary;
+      bestSecondary = secondary;
+    }
+  }
+  return best;
+}
+
+// 「Nセット・{代表セット}」の要約文字列（ルーティンフォームの種目行・トレーニング画面の
+// 折りたたみ種目カードで使用）。代表セットが決まらない（全セット未入力）場合は件数のみに
+// フォールバックする
+export function summarizeExerciseSets(measurementType: MeasurementType, sets: SetLike[]): string {
+  if (sets.length === 0) return '0セット';
+  const columns = MEASUREMENT_COLUMNS[measurementType];
+  const best = pickRepresentativeSet(measurementType, sets);
+  const summary = best ? formatHistorySetSummary(columns, [best]) : null;
+  return summary ? `${sets.length}セット・${summary}` : `${sets.length}セット`;
+}
