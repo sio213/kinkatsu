@@ -61,10 +61,13 @@ const styles = StyleSheet.create({
     zIndex: 1,
   },
   // border/borderColor/borderRadiusはBoxedTextInputの既定値のまま。背景色だけ
-  // 検索欄用のsurfaceMutedに上書きする
+  // 検索欄用のsurfaceMutedに上書きする。paddingRightは、Androidだけ自前のクリアボタン
+  // (searchClearBtn)分の余白を確保する。iOSのclearButtonMode="while-editing"はTextInput
+  // 自身の内側(＝この余白を引いた範囲)に描画されるため、Androidと同じ36を指定すると
+  // ネイティブのクリアボタンが箱の右端よりかなり内側(中央寄り)にずれて見えてしまう
   searchBox: {
     paddingLeft: 36,
-    paddingRight: 36,
+    paddingRight: Platform.OS === 'ios' ? 11 : 36,
     backgroundColor: Colors.surfaceMuted,
   },
   searchText: Typography.body,
