@@ -42,21 +42,23 @@ export const ReorderableExerciseRow = memo(function ReorderableExerciseRow({
   };
 
   return (
-    <View style={[styles.card, isActive && styles.cardActive]}>
-      <Pressable
-        onLongPress={drag}
-        hitSlop={{ top: 14, bottom: 14, left: 14, right: 14 }}
-        accessibilityRole="button"
-        accessibilityLabel={`${name}をドラッグして並び替え`}
-        accessibilityHint="スクリーンリーダーではドラッグの代わりに上へ移動・下へ移動のアクションを使ってください"
-        accessibilityActions={[
-          ...(isFirst ? [] : [{ name: 'moveUp', label: '上へ移動' }]),
-          ...(isLast ? [] : [{ name: 'moveDown', label: '下へ移動' }]),
-        ]}
-        onAccessibilityAction={handleAccessibilityAction}
-      >
-        <DesignIcon name="drag-indicator" size={20} color={isActive ? Colors.accent : Colors.borderStrong} />
-      </Pressable>
+    // この画面の行自体はタップで詳細へ遷移する等の他の役割を持たないため、ハンドルアイコン
+    // だけでなくカード全体を長押し領域にできる(他のタップ操作と衝突しない)。長押し時間も
+    // RN標準の500msだと並び替え操作としてはもたつくため、体感が軽くなるよう短くしている
+    <Pressable
+      onLongPress={drag}
+      delayLongPress={150}
+      style={[styles.card, isActive && styles.cardActive]}
+      accessibilityRole="button"
+      accessibilityLabel={`${name}をドラッグして並び替え`}
+      accessibilityHint="スクリーンリーダーではドラッグの代わりに上へ移動・下へ移動のアクションを使ってください"
+      accessibilityActions={[
+        ...(isFirst ? [] : [{ name: 'moveUp', label: '上へ移動' }]),
+        ...(isLast ? [] : [{ name: 'moveDown', label: '下へ移動' }]),
+      ]}
+      onAccessibilityAction={handleAccessibilityAction}
+    >
+      <DesignIcon name="drag-indicator" size={20} color={isActive ? Colors.accent : Colors.borderStrong} />
       <Image source={thumbnail} style={styles.thumbnail} contentFit="cover" />
       <View style={styles.info}>
         <Text style={styles.name} numberOfLines={1}>
@@ -67,7 +69,7 @@ export const ReorderableExerciseRow = memo(function ReorderableExerciseRow({
           <Text style={styles.setCount}>{metaText}</Text>
         </View>
       </View>
-    </View>
+    </Pressable>
   );
 });
 
