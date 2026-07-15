@@ -1,16 +1,15 @@
-import { Checkbox } from '@/components/ui/checkbox';
-import { ContextBar } from '@/components/ui/context-bar';
-import { DesignIcon } from '@/components/ui/design-icon';
+import { CheckboxSelectHeader } from '@/components/ui/checkbox-select-header';
 import { HeaderTitle } from '@/components/ui/header-title';
+import { LoadSubmitFooter } from '@/components/ui/load-submit-footer';
 import { NotFoundState } from '@/components/ui/not-found-state';
-import { PrimaryButton } from '@/components/ui/primary-button';
 import { HistoryLoadExerciseCard } from '@/components/workout/history-load-exercise-card';
-import { Colors, Typography } from '@/constants/theme';
+import { Colors } from '@/constants/theme';
+import { useCheckboxSelection } from '@/hooks/use-checkbox-selection';
 import { getSessionExerciseCards, type SessionHistoryCard } from '@/lib/workout/history';
 import { formatSessionDateGroup } from '@/lib/workout/summary';
 import { Stack, useRouter } from 'expo-router';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { ActivityIndicator, FlatList, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
+import { ActivityIndicator, FlatList, StyleSheet, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 type Props = {
@@ -38,7 +37,7 @@ export function SessionHistoryLoadView({ sourceSessionId, sourceStartedAt, onSub
         if (!cancelled) {
           setCards(data);
           // 初期状態は全選択（デザイン通り）
-          setSelectedIds(new Set(data.map((c) => c.workoutSessionExerciseId)));
+          selectAll(data.map((c) => c.workoutSessionExerciseId));
         }
       })
       .catch((e) => {
@@ -48,30 +47,15 @@ export function SessionHistoryLoadView({ sourceSessionId, sourceStartedAt, onSub
     return () => {
       cancelled = true;
     };
+    // selectAllはuseCheckboxSelectionが返す安定した参照のためdepsに含めなくてよい
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [sourceSessionId]);
   useEffect(() => fetchCards(), [fetchCards]);
 
-  const [selectedIds, setSelectedIds] = useState<Set<number>>(() => new Set());
   const loadedCards = useMemo(() => (Array.isArray(cards) ? cards : []), [cards]);
-  const allSelected = loadedCards.length > 0 && selectedIds.size === loadedCards.length;
-
-  const handleToggle = useCallback((workoutSessionExerciseId: number) => {
-    setSelectedIds((prev) => {
-      const next = new Set(prev);
-      if (next.has(workoutSessionExerciseId)) {
-        next.delete(workoutSessionExerciseId);
-      } else {
-        next.add(workoutSessionExerciseId);
-      }
-      return next;
-    });
-  }, []);
-
-  const handleToggleAll = useCallback(() => {
-    setSelectedIds((prev) =>
-      prev.size === loadedCards.length ? new Set() : new Set(loadedCards.map((c) => c.workoutSessionExerciseId)),
-    );
-  }, [loadedCards]);
+  const cardIds = useMemo(() => loadedCards.map((c) => c.workoutSessionExerciseId), [loadedCards]);
+  const { selectedIds, allSelected, toggle: handleToggle, toggleAll: handleToggleAll, selectAll } =
+    useCheckboxSelection(cardIds);
 
   const handleSubmit = useCallback(async () => {
     if (selectedIds.size === 0) return;
@@ -96,22 +80,13 @@ export function SessionHistoryLoadView({ sourceSessionId, sourceStartedAt, onSub
       <Stack.Screen options={{ headerTitle: () => <HeaderTitle title="この記録から読み込み" subtitle={dateLabel} /> }} />
 
       {hasCards && (
-        <ContextBar>
-          <Text style={styles.headerCount}>
-            読み込む種目 <Text style={styles.headerCountValue}>{`${selectedIds.size} / ${loadedCards.length}`}</Text>
-          </Text>
-          <TouchableOpacity
-            style={styles.selectAll}
-            onPress={handleToggleAll}
-            hitSlop={{ top: 6, bottom: 6, left: 6, right: 6 }}
-            accessibilityRole="checkbox"
-            accessibilityState={{ checked: allSelected }}
-            accessibilityLabel="全選択"
-          >
-            <Checkbox checked={allSelected} />
-            <Text style={styles.selectAllText}>全選択</Text>
-          </TouchableOpacity>
-        </ContextBar>
+        <CheckboxSelectHeader
+          itemLabel="種目"
+          selectedCount={selectedIds.size}
+          totalCount={loadedCards.length}
+          allSelected={allSelected}
+          onToggleAll={handleToggleAll}
+        />
       )}
 
       {cards === null ? (
@@ -147,14 +122,7 @@ export function SessionHistoryLoadView({ sourceSessionId, sourceStartedAt, onSub
       )}
 
       {hasCards && (
-        <View style={styles.footer}>
-          <PrimaryButton
-            label={submitLabel}
-            onPress={handleSubmit}
-            disabled={selectedIds.size === 0}
-            icon={<DesignIcon name="download" size={16} color={Colors.onAccent} />}
-          />
-        </View>
+        <LoadSubmitFooter label={submitLabel} onPress={handleSubmit} disabled={selectedIds.size === 0} />
       )}
     </SafeAreaView>
   );
@@ -163,20 +131,8 @@ export function SessionHistoryLoadView({ sourceSessionId, sourceStartedAt, onSub
 const styles = StyleSheet.create({
   safeArea: { flex: 1, backgroundColor: Colors.background },
 
-  headerCount: { ...Typography.footnote, fontWeight: '700', color: Colors.textMuted },
-  headerCountValue: { color: Colors.text },
-  selectAll: { flexDirection: 'row', alignItems: 'center', gap: 5 },
-  selectAllText: { ...Typography.footnote, fontWeight: '700', color: Colors.accent },
-
   loading: { flex: 1, alignItems: 'center', justifyContent: 'center' },
 
   list: { flex: 1 },
   content: { paddingHorizontal: 16, paddingBottom: 16 },
-
-  footer: {
-    padding: 16,
-    paddingTop: 8,
-    borderTopWidth: 1,
-    borderTopColor: Colors.border,
-  },
 });

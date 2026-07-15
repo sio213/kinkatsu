@@ -1,13 +1,6 @@
-import { CategoryChip } from '@/components/exercises/category-chip';
-import { Checkbox } from '@/components/ui/checkbox';
-import { Colors, Typography } from '@/constants/theme';
-import { getCategoryLabel, resolveMeasurementType } from '@/lib/exercises/constants';
-import { getExerciseImages } from '@/lib/exercises/images';
+import { SelectableExerciseRow } from '@/components/exercises/selectable-exercise-row';
 import type { SessionHistoryCard } from '@/lib/workout/history';
-import { formatHistorySetSummary, MEASUREMENT_COLUMNS } from '@/lib/workout/set-format';
-import { Image } from 'expo-image';
 import { memo } from 'react';
-import { StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 
 type Props = {
   card: SessionHistoryCard;
@@ -15,57 +8,21 @@ type Props = {
   onToggle: (workoutSessionExerciseId: number) => void;
 };
 
+// 過去の記録から読み込む、の画面3で使う行。表示の実体はselectable-exercise-row.tsx
+// （ルーティンから読み込む、のRoutineLoadExerciseCardと共有）で、ここではSessionHistoryCard
+// (実績値)の型をその正規化propsへ変換するだけの薄いアダプター
 export const HistoryLoadExerciseCard = memo(function HistoryLoadExerciseCard({ card, selected, onToggle }: Props) {
-  const images = getExerciseImages(card);
-  const measurementType = resolveMeasurementType(card.measurementType);
-  const summary = formatHistorySetSummary(MEASUREMENT_COLUMNS[measurementType], card.sets);
-
-  const handlePress = () => onToggle(card.workoutSessionExerciseId);
-
   return (
-    <TouchableOpacity
-      style={styles.row}
-      onPress={handlePress}
-      accessibilityRole="checkbox"
-      accessibilityState={{ checked: selected }}
-      accessibilityLabel={`${card.name}、${getCategoryLabel(card.category)}、${summary}`}
-    >
-      <Checkbox checked={selected} />
-      <Image source={images.thumbnail} style={styles.thumbnail} contentFit="cover" />
-      <View style={styles.info}>
-        <View style={styles.nameRow}>
-          <Text style={styles.name} numberOfLines={1}>
-            {card.name}
-          </Text>
-          <CategoryChip category={card.category} />
-        </View>
-        <Text style={styles.summary} numberOfLines={1}>
-          {summary}
-        </Text>
-      </View>
-    </TouchableOpacity>
+    <SelectableExerciseRow
+      id={card.workoutSessionExerciseId}
+      name={card.name}
+      category={card.category}
+      measurementType={card.measurementType}
+      source={card.source}
+      slug={card.slug}
+      sets={card.sets}
+      selected={selected}
+      onToggle={onToggle}
+    />
   );
-});
-
-const styles = StyleSheet.create({
-  row: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 10,
-    paddingVertical: 12,
-    borderBottomWidth: 1,
-    borderBottomColor: Colors.border,
-  },
-  thumbnail: {
-    width: 40,
-    height: 40,
-    borderRadius: 7,
-    backgroundColor: Colors.surfaceSubtle,
-    borderWidth: 1,
-    borderColor: Colors.border,
-  },
-  info: { flex: 1, gap: 3 },
-  nameRow: { flexDirection: 'row', alignItems: 'center', gap: 6 },
-  name: { ...Typography.cardTitle, color: Colors.textPrimary, flexShrink: 1 },
-  summary: { ...Typography.footnote, color: Colors.textMuted },
 });

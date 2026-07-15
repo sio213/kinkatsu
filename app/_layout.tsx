@@ -175,6 +175,13 @@ export default function RootLayout() {
               画面側でStack.Screen optionsを上書きする（workout/[id]と同じ方針） */}
           <Stack.Screen name="workout/session-history-load" options={{ title: '' }} />
           <Stack.Screen
+            name="workout/routine-picker"
+            options={{ title: 'ルーティンから読み込み' }}
+          />
+          {/* ヘッダーは選んだルーティン名を動的に表示するため、画面側でStack.Screen optionsを
+              上書きする（workout/session-history-loadと同じ方針） */}
+          <Stack.Screen name="workout/routine-load" options={{ title: '' }} />
+          <Stack.Screen
             name="modal"
             options={{ presentation: 'modal', title: 'Modal' }}
           />
