@@ -324,7 +324,14 @@ export const SessionExerciseCard = memo(
           <Text style={styles.name} numberOfLines={1}>
             {exercise.name}
           </Text>
-          <CategoryChip category={exercise.category} />
+          <View style={styles.metaRow}>
+            <CategoryChip category={exercise.category} />
+            {!expanded && (
+              <Text style={styles.collapsedSummaryText} numberOfLines={1}>
+                {collapsedSummary}
+              </Text>
+            )}
+          </View>
         </View>
         <View style={styles.trailing}>
           <TouchableOpacity
@@ -348,17 +355,12 @@ export const SessionExerciseCard = memo(
             />
           )}
           {!expanded && (
-            <View style={styles.collapsedSummary}>
-              <Text style={styles.collapsedSummaryText} numberOfLines={1}>
-                {collapsedSummary}
-              </Text>
-              <IconSymbol
-                name="chevron.right"
-                size={14}
-                color={Colors.textPlaceholder}
-                style={styles.collapsedChevron}
-              />
-            </View>
+            <IconSymbol
+              name="chevron.right"
+              size={14}
+              color={Colors.textPlaceholder}
+              style={styles.collapsedChevron}
+            />
           )}
         </View>
       </TouchableOpacity>
@@ -448,13 +450,15 @@ const styles = StyleSheet.create({
     borderBottomColor: Colors.border,
   },
   headerCollapsed: { borderBottomWidth: 0 },
-  // 「Nセットのサマリー」と「ⓘボタン」を1つのグループにまとめ、gapで一定の余白を確保する。
-  // header全体のgap(10)だけに頼ると、ⓘのhitSlop(14pt)と視覚的に密集して見えるため
+  // ⓘボタンとchevronの間に一定の余白を確保する。header全体のgap(10)だけに頼ると、
+  // ⓘのhitSlop(14pt)と視覚的に密集して見えるため
   trailing: { flexDirection: 'row', alignItems: 'center', gap: 14 },
-  collapsedSummary: { flexDirection: 'row', alignItems: 'center', gap: 4 },
+  // カテゴリチップと折りたたみ時のサマリーを横並びにする行。チップは内容幅のまま、
+  // サマリー側だけflexShrinkさせて長い場合は末尾を省略する
+  metaRow: { flexDirection: 'row', alignItems: 'center', gap: 6 },
   // 折りたたみ時のサマリーは重量×回数などの実データを含む一次情報のため、非活性を示す
   // textPlaceholderではなくtextMuted（WCAG AA 4.5:1適合）を使う
-  collapsedSummaryText: { ...Typography.footnote, fontWeight: '600', color: Colors.textMuted },
+  collapsedSummaryText: { ...Typography.footnote, fontWeight: '600', color: Colors.textMuted, flexShrink: 1 },
   collapsedChevron: { transform: [{ rotate: '90deg' }] },
   thumbnail: {
     width: 46,
