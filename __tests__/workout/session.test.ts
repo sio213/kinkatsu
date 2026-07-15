@@ -81,6 +81,7 @@ jest.mock('@/db/schema', () => ({
 
 jest.mock('drizzle-orm', () => ({
   eq: jest.fn((col, val) => ({ col, val })),
+  and: jest.fn((...conditions) => ({ and: conditions })),
   desc: jest.fn((col) => ({ desc: col })),
   isNull: jest.fn((col) => ({ isNull: col })),
 }));
@@ -109,6 +110,7 @@ import {
   endWorkoutSession,
   getActiveSession,
   replaceSessionExercise,
+  reorderSessionExercises,
   startWorkoutFromRoutine,
   startWorkoutSession,
 } from '@/lib/workout/session';
@@ -162,6 +164,53 @@ describe('endWorkoutSession', () => {
   it('updateが失敗した場合はエラーを握りつぶさずthrowする（呼び出し側でAlertを出すため）', async () => {
     mockUpdateWhere.mockRejectedValueOnce(new Error('db error'));
     await expect(endWorkoutSession(1)).rejects.toThrow('db error');
+  });
+});
+
+describe('reorderSessionExercises', () => {
+  it('空配列を渡すと何も更新しない(no-op)', async () => {
+    await reorderSessionExercises(1, []);
+    expect(mockUpdateSet).not.toHaveBeenCalled();
+  });
+
+  it('渡した配列の順序通りに0始まりのorderIndexを振り直す', async () => {
+    await reorderSessionExercises(1, [30, 10, 20]);
+
+    expect(mockUpdateSet).toHaveBeenNthCalledWith(1, { orderIndex: 0 });
+    expect(mockUpdateSet).toHaveBeenNthCalledWith(2, { orderIndex: 1 });
+    expect(mockUpdateSet).toHaveBeenNthCalledWith(3, { orderIndex: 2 });
+  });
+
+  it('各行の更新をsessionExerciseId・sessionId両方でスコープする(他セッションの行を誤って書き換えない)', async () => {
+    await reorderSessionExercises(7, [30]);
+
+    expect(mockUpdateWhere).toHaveBeenCalledWith({
+      and: [
+        { col: 'id', val: 30 },
+        { col: 'sessionId', val: 7 },
+      ],
+    });
+  });
+
+  it('要素が1件だけでもorderIndex=0で更新する', async () => {
+    await reorderSessionExercises(1, [42]);
+    expect(mockUpdateSet).toHaveBeenCalledTimes(1);
+    expect(mockUpdateSet).toHaveBeenCalledWith({ orderIndex: 0 });
+  });
+
+  it('更新が失敗した場合はエラーを握りつぶさずthrowする（呼び出し側でAlertを出すため）', async () => {
+    mockUpdateWhere.mockRejectedValueOnce(new Error('db error'));
+    await expect(reorderSessionExercises(1, [10, 20])).rejects.toThrow('db error');
+  });
+
+  it('3件中2件目の更新が失敗した場合、3件目の更新は試みない（ループは失敗時点で止まる）', async () => {
+    mockUpdateWhere
+      .mockResolvedValueOnce(undefined)
+      .mockRejectedValueOnce(new Error('db error'));
+
+    await expect(reorderSessionExercises(1, [30, 10, 20])).rejects.toThrow('db error');
+
+    expect(mockUpdateWhere).toHaveBeenCalledTimes(2);
   });
 });
 
