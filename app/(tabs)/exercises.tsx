@@ -1,7 +1,5 @@
-import { CategoryFilterChips } from '@/components/exercises/category-filter-chips';
 import { ExerciseCard } from '@/components/exercises/exercise-card';
-import { ExerciseSearchBar } from '@/components/exercises/exercise-search-bar';
-import { ExerciseSortDropdown } from '@/components/exercises/exercise-sort-dropdown';
+import { ExerciseFilterHeader } from '@/components/exercises/exercise-filter-header';
 import { HeaderActionButton } from '@/components/ui/header-action-button';
 import { ListErrorBoundary } from '@/components/ui/list-error-boundary';
 import { Colors, Typography } from '@/constants/theme';
@@ -58,11 +56,14 @@ export default function ExercisesScreen() {
   );
 
   const listHeader = (
-    <View style={styles.headerArea}>
-      <ExerciseSearchBar value={search} onChangeText={setSearch} />
-      <CategoryFilterChips activeCategory={activeCategory} onChange={setActiveCategory} />
-      <ExerciseSortDropdown sortBy={sortBy} onChange={setSortBy} />
-    </View>
+    <ExerciseFilterHeader
+      search={search}
+      onChangeSearch={setSearch}
+      activeCategory={activeCategory}
+      onChangeCategory={setActiveCategory}
+      sortBy={sortBy}
+      onChangeSortBy={setSortBy}
+    />
   );
 
   const trimmedSearch = search.trim();
@@ -108,6 +109,8 @@ export default function ExercisesScreen() {
         renderItem={renderItem}
         ItemSeparatorComponent={() => <View style={styles.separator} />}
         ListHeaderComponent={listHeader}
+        // 検索・カテゴリ絞り込み・並び替えをスクロールしても隠れないよう先頭(index 0)で固定する
+        stickyHeaderIndices={[0]}
         ListEmptyComponent={emptyComponent}
         contentContainerStyle={styles.content}
         contentInset={{ bottom: keyboardInset }}
@@ -122,8 +125,6 @@ const styles = StyleSheet.create({
   safeArea: { flex: 1, backgroundColor: Colors.background },
   list: { flex: 1 },
   content: { paddingHorizontal: 16, paddingBottom: 40 },
-
-  headerArea: { paddingTop: 16, gap: 8, marginBottom: 4 },
 
   separator: { height: 8 },
 

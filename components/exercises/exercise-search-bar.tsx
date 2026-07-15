@@ -22,7 +22,7 @@ export function ExerciseSearchBar({ value, onChangeText, onSubmitEditing }: Prop
         value={value}
         onChangeText={onChangeText}
         onSubmitEditing={onSubmitEditing}
-        placeholder="種目を検索..."
+        placeholder="種目を検索"
         accessibilityLabel="種目を検索"
         clearButtonMode="while-editing"
         returnKeyType="search"
