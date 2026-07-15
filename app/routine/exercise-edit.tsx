@@ -147,8 +147,16 @@ export default function RoutineExerciseEditScreen() {
 
   const menuItems: DropdownMenuItem[] = [
     {
+      key: 'add',
+      label: '種目を追加',
+      icon: 'add',
+      // 画面下部（一覧末尾）のRoutineAddExerciseButtonと同じ操作。種目数が多いとボタンまで
+      // スクロールする必要があるため、スクロール位置に関係なく開けるメニューにも用意する
+      onPress: handleAddExercise,
+    },
+    {
       key: 'history',
-      label: '過去の記録から読み込む',
+      label: '過去の記録から読み込み',
       icon: 'history',
       // 種目カード個別の⋮メニューにも同名の項目(1種目のセット値を置換)があるため、
       // こちらは複数種目をまとめて扱うことが分かるようhintで補足する

@@ -32,7 +32,7 @@ export function ExerciseCardMenu({
     { key: 'down', label: '下へ移動', icon: 'arrow-downward', disabled: isLast, onPress: onMoveDown },
     {
       key: 'history',
-      label: '過去の記録から読み込む',
+      label: '過去の記録から読み込み',
       icon: 'history',
       disabled: !hasHistory,
       hint: !hasHistory ? 'この種目の過去の記録がありません' : undefined,
