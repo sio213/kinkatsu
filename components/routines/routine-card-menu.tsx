@@ -14,26 +14,19 @@ type Props = {
 };
 
 // ルーティン一覧カードの「⋮」メニュー（編集/複製/上へ移動/下へ移動/削除）。
-// components/ui/dropdown-menu.tsxの共通DropdownMenuを使う点はcomponents/exercises/exercise-card-menu.tsx
-// と同じだが、こちらは項目数が多いため内容操作系(編集/複製)・並び替え系(上/下)・破壊操作(削除)で
-// groupsを3つに分け、削除の誤タップを防ぐ（@designerレビュー。exercise-card-menu.tsxは項目が
-// 少なく単一グループのまま）
+// components/exercises/exercise-card-menu.tsxと同じDropdownMenuの使い方に揃える
 export function RoutineCardMenu({ isFirst, isLast, onEdit, onDuplicate, onMoveUp, onMoveDown, onDelete }: Props) {
-  const groups: DropdownMenuItem[][] = [
-    [
-      { key: 'edit', label: '編集', icon: 'edit', onPress: onEdit },
-      { key: 'duplicate', label: '複製', icon: 'content-copy', onPress: onDuplicate },
-    ],
-    [
-      { key: 'up', label: '上へ移動', icon: 'arrow-upward', disabled: isFirst, onPress: onMoveUp },
-      { key: 'down', label: '下へ移動', icon: 'arrow-downward', disabled: isLast, onPress: onMoveDown },
-    ],
-    [{ key: 'delete', label: '削除', icon: 'delete-outline', danger: true, onPress: onDelete }],
+  const items: DropdownMenuItem[] = [
+    { key: 'edit', label: '編集', icon: 'edit', onPress: onEdit },
+    { key: 'duplicate', label: '複製', icon: 'content-copy', onPress: onDuplicate },
+    { key: 'up', label: '上へ移動', icon: 'arrow-upward', disabled: isFirst, onPress: onMoveUp },
+    { key: 'down', label: '下へ移動', icon: 'arrow-downward', disabled: isLast, onPress: onMoveDown },
+    { key: 'delete', label: '削除', icon: 'delete-outline', danger: true, onPress: onDelete },
   ];
 
   return (
     <DropdownMenu
-      groups={groups}
+      groups={[items]}
       minWidth={160}
       renderTrigger={({ open, onPress }) => (
         <TouchableOpacity
