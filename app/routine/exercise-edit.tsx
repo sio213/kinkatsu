@@ -15,8 +15,8 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 // ルーティンの下書き（useRoutineDraftStore）にある全種目をまとめて編集する画面。
 // 種目の追加・並び順はルーティンフォーム側で行い、この画面はセットの追加・削除・値編集と
 // 種目単体の削除・並び替え・入れ替え・過去記録の読み込み（⋮メニュー）に専念する。保存操作の実体は
-// 無く、「保存」ボタンは編集内容が既にドラフトストアへ即時反映済みであることを踏まえた見た目上の
-// 確定＝戻る動作
+// 無く、ヘッダーの戻るアイコンで抜けても結果は同じであることが分かるよう、フッターのボタンも
+// 「保存」ではなく実態通り「戻る」とする
 export default function RoutineExerciseEditScreen() {
   const router = useRouter();
   const { focusIndex: focusIndexParam } = useLocalSearchParams<{ focusIndex?: string }>();
@@ -121,7 +121,7 @@ export default function RoutineExerciseEditScreen() {
         )}
       </ScrollView>
       <View style={styles.footer}>
-        <PrimaryButton label="保存" onPress={() => router.back()} />
+        <PrimaryButton label="戻る" onPress={() => router.back()} />
       </View>
     </SafeAreaView>
   );
