@@ -222,6 +222,7 @@ export default function WorkoutScreen() {
   const isActive = session.endedAt == null;
 
   const menuItems: DropdownMenuItem[] = [
+    { key: 'history', label: '過去の記録から読み込む', icon: 'history', onPress: handleLoadFromHistory },
     {
       key: 'reorder',
       label: '種目を並び替え',
@@ -230,7 +231,6 @@ export default function WorkoutScreen() {
       hint: sessionExercises.length <= 1 ? '2種目以上あるときに使えます' : undefined,
       onPress: handleReorder,
     },
-    { key: 'history', label: '過去の記録から読み込む', icon: 'history', onPress: handleLoadFromHistory },
     { key: 'delete', label: '削除', icon: 'delete-outline', danger: true, onPress: handleDeleteSession },
   ];
 
