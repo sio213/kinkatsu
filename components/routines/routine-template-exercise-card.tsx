@@ -8,7 +8,7 @@ import { resolveMeasurementType } from '@/lib/exercises/constants';
 import { getExerciseImages } from '@/lib/exercises/images';
 import { useRoutineDraftStore } from '@/lib/routines/draft-store';
 import type { DraftExercise } from '@/lib/routines/validation';
-import { MEASUREMENT_COLUMNS } from '@/lib/workout/set-format';
+import { MEASUREMENT_COLUMNS, summarizeExerciseSets } from '@/lib/workout/set-format';
 import { Image } from 'expo-image';
 import { forwardRef, memo, useCallback, useImperativeHandle, useRef, useState } from 'react';
 import { Alert, LayoutAnimation, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
@@ -160,6 +160,8 @@ export const RoutineTemplateExerciseCard = memo(
     });
   }, [pushDebounced, index, exercise.exerciseId, exercise.name, sets]);
 
+  const collapsedSummary = summarizeExerciseSets(measurementType, sets);
+
   return (
     <View style={styles.card}>
       <TouchableOpacity
@@ -167,7 +169,7 @@ export const RoutineTemplateExerciseCard = memo(
         onPress={handleToggleExpanded}
         activeOpacity={0.7}
         accessibilityRole="button"
-        accessibilityLabel={expanded ? `${exercise.name}を折りたたむ` : `${exercise.name}、${sets.length}セット、展開する`}
+        accessibilityLabel={expanded ? `${exercise.name}を折りたたむ` : `${exercise.name}、${collapsedSummary}、展開する`}
         accessibilityState={{ expanded }}
       >
         <Image source={images.thumbnail} style={styles.thumbnail} contentFit="cover" />
@@ -175,7 +177,14 @@ export const RoutineTemplateExerciseCard = memo(
           <Text style={styles.name} numberOfLines={1}>
             {exercise.name}
           </Text>
-          <CategoryChip category={exercise.category} />
+          <View style={styles.metaRow}>
+            <CategoryChip category={exercise.category} />
+            {!expanded && (
+              <Text style={styles.collapsedSummaryText} numberOfLines={1}>
+                {collapsedSummary}
+              </Text>
+            )}
+          </View>
         </View>
         <View style={styles.trailing}>
           <TouchableOpacity
@@ -199,10 +208,7 @@ export const RoutineTemplateExerciseCard = memo(
             />
           )}
           {!expanded && (
-            <View style={styles.collapsedSummary}>
-              <Text style={styles.collapsedSummaryText}>{sets.length}セット</Text>
-              <IconSymbol name="chevron.right" size={14} color={Colors.textPlaceholder} style={styles.collapsedChevron} />
-            </View>
+            <IconSymbol name="chevron.right" size={14} color={Colors.textPlaceholder} style={styles.collapsedChevron} />
           )}
         </View>
       </TouchableOpacity>
@@ -273,9 +279,15 @@ const styles = StyleSheet.create({
     borderBottomColor: Colors.border,
   },
   headerCollapsed: { borderBottomWidth: 0 },
+  // ⓘボタンとchevronの間に一定の余白を確保する。header全体のgap(10)だけに頼ると、
+  // ⓘのhitSlop(14pt)と視覚的に密集して見えるため
   trailing: { flexDirection: 'row', alignItems: 'center', gap: 14 },
-  collapsedSummary: { flexDirection: 'row', alignItems: 'center', gap: 4 },
-  collapsedSummaryText: { ...Typography.footnote, fontWeight: '600', color: Colors.textPlaceholder },
+  // カテゴリチップと折りたたみ時のサマリーを横並びにする行。チップは内容幅のまま、
+  // サマリー側だけflexShrinkさせて長い場合は末尾を省略する
+  metaRow: { flexDirection: 'row', alignItems: 'center', gap: 6 },
+  // 折りたたみ時のサマリーは重量×回数などの実データを含む一次情報のため、非活性を示す
+  // textPlaceholderではなくtextMuted（WCAG AA 4.5:1適合）を使う（session-exercise-card.tsxと統一）
+  collapsedSummaryText: { ...Typography.footnote, fontWeight: '600', color: Colors.textMuted, flexShrink: 1 },
   collapsedChevron: { transform: [{ rotate: '90deg' }] },
   thumbnail: {
     width: 46,
