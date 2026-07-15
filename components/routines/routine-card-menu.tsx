@@ -14,7 +14,7 @@ type Props = {
 };
 
 // ルーティン一覧カードの「⋮」メニュー（編集/複製/上へ移動/下へ移動/削除）。
-// components/workout/exercise-card-menu.tsxと同じDropdownMenuの使い方に揃える。
+// components/exercises/exercise-card-menu.tsxと同じDropdownMenuの使い方に揃える。
 // 内容操作系(編集/複製)・並び替え系(上/下)・破壊操作(削除)でグループを分け、
 // 削除の誤タップを防ぐ（@designerレビュー）
 export function RoutineCardMenu({ isFirst, isLast, onEdit, onDuplicate, onMoveUp, onMoveDown, onDelete }: Props) {

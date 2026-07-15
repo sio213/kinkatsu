@@ -14,7 +14,7 @@ import { createReminder, deleteReminder, updateReminder } from '@/lib/notificati
 import type { ReminderInput } from '@/lib/notifications/types';
 import { withRoutineReminderContent } from '@/lib/routines/reminder-input';
 import { getPreviousSets, hasAnyValue } from '@/lib/workout/history';
-import { eq, gt, inArray } from 'drizzle-orm';
+import { eq, gt, inArray, sql } from 'drizzle-orm';
 
 export type RoutineSetInput = {
   weight: number | null;
@@ -215,14 +215,13 @@ export async function duplicateRoutine(routineId: number): Promise<number> {
       })),
     }));
 
-    // 元カードの直下に割り込ませるため、後続カードのorderIndexを1つずつ後ろへずらしてから挿入する
-    const toShift = await tx
-      .select({ id: routines.id, orderIndex: routines.orderIndex })
-      .from(routines)
+    // 元カードの直下に割り込ませるため、後続カードのorderIndexを一括で+1シフトしてから挿入する。
+    // 挿入より先に行う必要がある（挿入を先にすると、新規行のorderIndexもこのUPDATEのWHERE条件に
+    // 引っかかり二重にシフトされてしまう）
+    await tx
+      .update(routines)
+      .set({ orderIndex: sql`${routines.orderIndex} + 1` })
       .where(gt(routines.orderIndex, source.orderIndex));
-    for (const r of toShift) {
-      await tx.update(routines).set({ orderIndex: r.orderIndex + 1 }).where(eq(routines.id, r.id));
-    }
 
     const [inserted] = await tx
       .insert(routines)

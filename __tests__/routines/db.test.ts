@@ -95,6 +95,7 @@ jest.mock('drizzle-orm', () => ({
   eq: jest.fn((col, val) => ({ type: 'eq', col, val })),
   gt: jest.fn((col, val) => ({ type: 'gt', col, val })),
   inArray: jest.fn((col, val) => ({ type: 'inArray', col, val })),
+  sql: jest.fn((strings, ...values) => ({ type: 'sql', strings, values })),
 }));
 
 const mockDeleteReminder = jest.fn();
@@ -417,32 +418,17 @@ describe('duplicateRoutine', () => {
     expect(mockUpdateSet).not.toHaveBeenCalled();
   });
 
-  test('末尾のルーティン(後続無し)を複製すると、orderIndexシフトのupdateは発生せず直後のorderIndexで挿入される', async () => {
-    mockSelectWhere
-      .mockResolvedValueOnce([{ id: 1, name: '胸の日', orderIndex: 2 }]) // source
-      .mockResolvedValueOnce([]) // routineExercises
-      .mockResolvedValueOnce([]); // toShift(後続無し)
-
-    await duplicateRoutine(1);
-
-    expect(mockUpdateSet).not.toHaveBeenCalled();
-    expect(mockInsertValues).toHaveBeenCalledWith(
-      routines,
-      expect.objectContaining({ name: '胸の日 コピー', orderIndex: 3 }),
-    );
-  });
-
-  test('先頭/中間のルーティンを複製すると、後続カードのorderIndexが+1シフトされてから新規挿入される', async () => {
+  // orderIndexのシフトは対象行数分ループでUPDATEを発行するとN+1になるため、1本のUPDATE文
+  // (sql`${routines.orderIndex} + 1`)で後続カード全体を一括更新する(@codereview指摘)。
+  // このUPDATEは新規行のinsertより先に行う必要がある(順序が逆だと、挿入した新規行自身の
+  // orderIndexもWHERE条件に引っかかり二重にシフトされてしまう)
+  test('orderIndexシフトのUPDATE(1本)→新規ルーティンのinsertの順で呼ばれ、名前は「元の名前 コピー」、orderIndexは元の直後になる', async () => {
     const calls: string[] = [];
     mockSelectWhere
-      .mockResolvedValueOnce([{ id: 1, name: '胸の日', orderIndex: 0 }]) // source
-      .mockResolvedValueOnce([]) // routineExercises
-      .mockResolvedValueOnce([
-        { id: 2, orderIndex: 1 },
-        { id: 3, orderIndex: 2 },
-      ]); // toShift
-    mockUpdateSet.mockImplementation((table: unknown, values: unknown) => {
-      calls.push(`update:${(values as { orderIndex: number }).orderIndex}`);
+      .mockResolvedValueOnce([{ id: 1, name: '胸の日', orderIndex: 2 }]) // source
+      .mockResolvedValueOnce([]); // routineExercises
+    mockUpdateSet.mockImplementation(() => {
+      calls.push('updateShift');
       return { where: (...args: unknown[]) => mockUpdateWhere(...args) };
     });
     mockInsertValues.mockImplementation((table: unknown) => {
@@ -452,8 +438,28 @@ describe('duplicateRoutine', () => {
 
     await duplicateRoutine(1);
 
-    expect(calls).toEqual(['update:2', 'update:3', 'insertRoutine']);
-    expect(mockInsertValues).toHaveBeenCalledWith(routines, expect.objectContaining({ orderIndex: 1 }));
+    expect(calls).toEqual(['updateShift', 'insertRoutine']);
+    expect(mockUpdateSet).toHaveBeenCalledWith(routines, { orderIndex: expect.objectContaining({ type: 'sql' }) });
+    expect(mockUpdateWhere).toHaveBeenCalledWith({ type: 'gt', col: routines.orderIndex, val: 2 });
+    expect(mockInsertValues).toHaveBeenCalledWith(
+      routines,
+      expect.objectContaining({ name: '胸の日 コピー', orderIndex: 3 }),
+    );
+  });
+
+  // 初版は連番なしの単純結合仕様と決めたため(要件定義で合意済み)、コピーをさらに複製すると
+  // 「コピー コピー」のように名前が伸びる。これは既知の仕様であることをテストで明示しておく
+  test('既に「〇〇 コピー」という名前のルーティンを複製すると「〇〇 コピー コピー」になる(初版は連番なしの仕様)', async () => {
+    mockSelectWhere
+      .mockResolvedValueOnce([{ id: 1, name: '胸の日 コピー', orderIndex: 0 }]) // source
+      .mockResolvedValueOnce([]); // routineExercises
+
+    await duplicateRoutine(1);
+
+    expect(mockInsertValues).toHaveBeenCalledWith(
+      routines,
+      expect.objectContaining({ name: '胸の日 コピー コピー' }),
+    );
   });
 
   test('複数種目・複数セットが新しいルーティンIDにひもづけてコピーされる', async () => {
@@ -466,8 +472,7 @@ describe('duplicateRoutine', () => {
       .mockResolvedValueOnce([
         { id: 100, routineExerciseId: 10, setNumber: 1, weight: 60, reps: 8, durationSeconds: null, distanceMeters: null },
         { id: 200, routineExerciseId: 20, setNumber: 1, weight: 10, reps: 12, durationSeconds: null, distanceMeters: null },
-      ]) // routineSets
-      .mockResolvedValueOnce([]); // toShift
+      ]); // routineSets
 
     mockReturning
       .mockResolvedValueOnce([{ id: 999 }]) // routines insert(複製先)
@@ -496,8 +501,7 @@ describe('duplicateRoutine', () => {
   test('種目0件のルーティンを複製すると、routineExercises/routineSetsへのinsertは発生しない', async () => {
     mockSelectWhere
       .mockResolvedValueOnce([{ id: 1, name: '有酸素', orderIndex: 0 }]) // source
-      .mockResolvedValueOnce([]) // routineExercises
-      .mockResolvedValueOnce([]); // toShift
+      .mockResolvedValueOnce([]); // routineExercises
 
     await duplicateRoutine(1);
 
@@ -510,8 +514,7 @@ describe('duplicateRoutine', () => {
   test('リマインダーの検索・作成・更新・削除は一切発生しない', async () => {
     mockSelectWhere
       .mockResolvedValueOnce([{ id: 1, name: '胸の日', orderIndex: 0 }]) // source
-      .mockResolvedValueOnce([]) // routineExercises
-      .mockResolvedValueOnce([]); // toShift
+      .mockResolvedValueOnce([]); // routineExercises
 
     await duplicateRoutine(1);
 
