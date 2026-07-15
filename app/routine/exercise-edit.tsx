@@ -1,5 +1,8 @@
 import { RoutineAddExerciseButton } from '@/components/routines/routine-add-exercise-button';
-import { RoutineTemplateExerciseCard } from '@/components/routines/routine-template-exercise-card';
+import {
+  RoutineTemplateExerciseCard,
+  type RoutineTemplateExerciseCardHandle,
+} from '@/components/routines/routine-template-exercise-card';
 import { HeaderMenu, type DropdownMenuItem } from '@/components/ui/dropdown-menu';
 import { PrimaryButton } from '@/components/ui/primary-button';
 import { Colors } from '@/constants/theme';
@@ -7,8 +10,10 @@ import { useKeyboardInset } from '@/hooks/use-keyboard-inset';
 import { useExercisesWithHistory } from '@/hooks/use-workout-session';
 import { useRoutineDraftStore } from '@/lib/routines/draft-store';
 import { NO_SESSION_TO_EXCLUDE } from '@/lib/workout/history';
-import { Stack, useLocalSearchParams, useRouter } from 'expo-router';
-import { useCallback, useRef } from 'react';
+import type { ParamListBase } from '@react-navigation/native';
+import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
+import { Stack, useLocalSearchParams, useNavigation, useRouter } from 'expo-router';
+import { useCallback, useEffect, useRef } from 'react';
 import { type LayoutChangeEvent, ScrollView, StyleSheet, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
@@ -19,6 +24,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 // 「保存」ではなく実態通り「戻る」とする
 export default function RoutineExerciseEditScreen() {
   const router = useRouter();
+  const navigation = useNavigation<NativeStackNavigationProp<ParamListBase>>();
   const { focusIndex: focusIndexParam } = useLocalSearchParams<{ focusIndex?: string }>();
   const focusIndex = focusIndexParam != null ? Number(focusIndexParam) : null;
   const exercises = useRoutineDraftStore((state) => state.exercises);
@@ -53,25 +59,65 @@ export default function RoutineExerciseEditScreen() {
   // 種目追加ピッカー・過去の記録から読み込む(セッション単位)画面から戻った直後、追加された
   // 最初のカードまで自動スクロールする。focusIndexと違いこの画面を離れず何度でも起こりうるため、
   // 一度きりのフラグ(scrolledToFocusRef)ではなくtokenで「前回処理済みの追加と同じか」を判定する
-  const lastHandledAddTokenRef = useRef<number | null>(null);
+  const lastHandledScrollTokenRef = useRef<number | null>(null);
+  // トレーニング中画面(app/workout/[id].tsx)のcardRefsRefと同じ考え方。追加された最初のカードの
+  // 最初のセット重量入力欄にもフォーカスし、そのまま数値を打ち込めるようにする。keyはDraftExercise
+  // に安定id(DBのidに相当するもの)が無いため配列indexを使うが、追加直後の一度きりの参照にしか
+  // 使わないため、その後の並び替え・削除でindexがズレても影響しない
+  const cardRefsRef = useRef<Map<number, RoutineTemplateExerciseCardHandle>>(new Map());
+  // フォーカス(=キーボード表示)はスクロールと違い、画面遷移のスライドアニメーション中に起きると
+  // キーボードがせり出しながらレイアウトが動く見た目のジャンクになる（トレーニング中画面
+  // (app/workout/[id].tsx)がtransitionEndを待ってからfocusFirstSet()する理由と同じ）。
+  // そのため、スクロールのトークン消費とは別に、フォーカスの成否を独立したトークンで管理し、
+  // 画面遷移が完了する(readyToFocusRef=true)までは実行を待たせ、取りこぼさず後から再試行できるようにする
+  const lastHandledFocusTokenRef = useRef<number | null>(null);
+  const readyToFocusRef = useRef(false);
 
   const tryScrollToAdded = useCallback(() => {
-    if (lastAddedAt == null || lastAddedAt.token === lastHandledAddTokenRef.current) return;
+    if (lastAddedAt == null || lastAddedAt.token === lastHandledScrollTokenRef.current) return;
     const listY = listOffsetRef.current;
     const itemY = itemOffsetsRef.current[lastAddedAt.index];
     if (listY == null || itemY == null) return;
-    lastHandledAddTokenRef.current = lastAddedAt.token;
+    lastHandledScrollTokenRef.current = lastAddedAt.token;
     const y = Math.max(0, listY + itemY - styles.content.paddingTop);
     scrollRef.current?.scrollTo({ y, animated: true });
   }, [lastAddedAt]);
+
+  const tryFocusAdded = useCallback(() => {
+    if (
+      lastAddedAt == null ||
+      !lastAddedAt.shouldFocus ||
+      lastAddedAt.token === lastHandledFocusTokenRef.current ||
+      !readyToFocusRef.current
+    ) {
+      return;
+    }
+    const handle = cardRefsRef.current.get(lastAddedAt.index);
+    if (!handle) return;
+    lastHandledFocusTokenRef.current = lastAddedAt.token;
+    handle.focusFirstSet();
+  }, [lastAddedAt]);
+
+  // ルーティンフォームからexercise-editへの初回遷移(push/replace)・種目追加ピッカーや
+  // 過去の記録から読み込む画面からexercise-editへ戻る遷移(pop/dismiss)のどちらでも、
+  // このスクリーン自身のtransitionEndが「今まさに見えている状態になった」タイミングを表す
+  useEffect(() => {
+    return navigation.addListener('transitionEnd', (e) => {
+      if (!e.data.closing) {
+        readyToFocusRef.current = true;
+        tryFocusAdded();
+      }
+    });
+  }, [navigation, tryFocusAdded]);
 
   const handleListLayout = useCallback(
     (e: LayoutChangeEvent) => {
       listOffsetRef.current = e.nativeEvent.layout.y;
       tryScrollToFocus();
       tryScrollToAdded();
+      tryFocusAdded();
     },
-    [tryScrollToFocus, tryScrollToAdded],
+    [tryScrollToFocus, tryScrollToAdded, tryFocusAdded],
   );
 
   const handleItemLayout = useCallback(
@@ -79,8 +125,9 @@ export default function RoutineExerciseEditScreen() {
       itemOffsetsRef.current[index] = e.nativeEvent.layout.y;
       tryScrollToFocus();
       tryScrollToAdded();
+      tryFocusAdded();
     },
-    [tryScrollToFocus, tryScrollToAdded],
+    [tryScrollToFocus, tryScrollToAdded, tryFocusAdded],
   );
 
   const handleAddExercise = useCallback(() => {
@@ -139,6 +186,14 @@ export default function RoutineExerciseEditScreen() {
             {exercises.map((exercise, index) => (
               <View key={`${exercise.exerciseId}-${index}`} testID={`exercise-item-${index}`} onLayout={handleItemLayout(index)}>
                 <RoutineTemplateExerciseCard
+                  ref={(handle) => {
+                    if (handle) {
+                      cardRefsRef.current.set(index, handle);
+                      if (lastAddedAt?.index === index) tryFocusAdded();
+                    } else {
+                      cardRefsRef.current.delete(index);
+                    }
+                  }}
                   exercise={exercise}
                   index={index}
                   isFirst={index === 0}

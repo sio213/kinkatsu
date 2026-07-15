@@ -1,12 +1,15 @@
 const mockBack = jest.fn();
 const mockPush = jest.fn();
 const mockUseExercisesWithHistory = jest.fn();
+// 実装ではaddListenerの戻り値(登録解除関数)は使うが、ここでは呼び出し記録だけできれば十分
+const mockAddListener = jest.fn().mockReturnValue(() => {});
 
 const mockUseLocalSearchParams = jest.fn();
 
 jest.mock('expo-router', () => ({
   useRouter: () => ({ back: mockBack, push: mockPush }),
   useLocalSearchParams: () => mockUseLocalSearchParams(),
+  useNavigation: () => ({ addListener: mockAddListener }),
   // Stack.Screen はナビゲーターのoptionsを設定するコンポーネントで本来は見た目を持たないが、
   // headerRightの中身（⋮ボタン）をテストで検証できるよう、そのレンダー関数だけ実行してやる
   Stack: {
@@ -57,6 +60,19 @@ function render() {
     currentInstance = create(React.createElement(RoutineExerciseEditScreen));
   });
   return currentInstance!.root;
+}
+
+// この画面自身の遷移(ルーティンフォームからのpush/replace、種目追加ピッカー等からのpop/dismiss)が
+// 完了したことを表すtransitionEndを疑似発火する。closing=falseは「自分が表示された側」を表す
+// (app/workout/[id].tsxのnavigation.addListener('transitionEnd', ...)と同じイベント形)。
+// tryFocusAddedの参照はlastAddedAtが変わるたびに新しくなり、そのたびにuseEffectが登録し直す
+// ため、直近(最後)に登録されたリスナーを使う
+function fireTransitionEnd(closing = false) {
+  const calls = mockAddListener.mock.calls.filter(([eventName]) => eventName === 'transitionEnd');
+  const listener = calls[calls.length - 1]?.[1];
+  act(() => {
+    listener?.({ data: { closing } });
+  });
 }
 
 beforeEach(() => {
@@ -285,7 +301,7 @@ describe('ヘッダー⋮メニュー: 過去の記録から読み込む', () =>
   });
 });
 
-describe('種目追加後の自動スクロール(過去の記録から読み込む・種目を追加ピッカーから戻った直後、追加された最初のカードまでスクロールする)', () => {
+describe('種目追加後の自動スクロール・自動フォーカス(過去の記録から読み込む・種目を追加ピッカーから戻った直後、追加された最初のカードまでスクロールし最初のセットの入力欄にフォーカスする。トレーニング中画面のcardRefsRef/focusFirstSetと同じ考え方)', () => {
   test('addExercisesで種目が追加されると、追加された最初のカードの位置までscrollToが呼ばれる', () => {
     act(() => {
       useRoutineDraftStore.getState().hydrate([makeExercise(1), makeExercise(2)]);
@@ -311,6 +327,90 @@ describe('種目追加後の自動スクロール(過去の記録から読み込
 
     // listY(12) + itemY(480) - contentのpaddingTop(12) = 480
     expect(scrollTo).toHaveBeenCalledWith({ y: 480, animated: true });
+  });
+
+  test('画面遷移(transitionEnd)完了後であれば、追加された最初のカードの最初のセット入力欄にフォーカスする', () => {
+    act(() => {
+      useRoutineDraftStore.getState().hydrate([makeExercise(1)]);
+    });
+    const root = render();
+    fireTransitionEnd();
+
+    act(() => {
+      root.findByProps({ testID: 'exercise-list' }).props.onLayout({ nativeEvent: { layout: { y: 0 } } });
+      root.findByProps({ testID: 'exercise-item-0' }).props.onLayout({ nativeEvent: { layout: { y: 0 } } });
+    });
+
+    act(() => {
+      useRoutineDraftStore.getState().addExercises([makeExercise(2)]);
+    });
+
+    const newCardInputs = root
+      .findByProps({ testID: 'exercise-item-1' })
+      .findAllByType(TextInput);
+    const focusSpy = jest.spyOn(newCardInputs[0].instance, 'focus');
+
+    act(() => {
+      root.findByProps({ testID: 'exercise-item-1' }).props.onLayout({ nativeEvent: { layout: { y: 100 } } });
+    });
+
+    expect(focusSpy).toHaveBeenCalledTimes(1);
+  });
+
+  test('画面遷移(transitionEnd)が完了する前は、レイアウトが揃っていてもフォーカスしない(遷移アニメ中にキーボードが被さるジャンクを防ぐ)', () => {
+    act(() => {
+      useRoutineDraftStore.getState().hydrate([makeExercise(1)]);
+    });
+    const root = render();
+    // transitionEndをまだ発火しない(遷移アニメーションがまだ終わっていない想定)
+
+    act(() => {
+      root.findByProps({ testID: 'exercise-list' }).props.onLayout({ nativeEvent: { layout: { y: 0 } } });
+      root.findByProps({ testID: 'exercise-item-0' }).props.onLayout({ nativeEvent: { layout: { y: 0 } } });
+    });
+    act(() => {
+      useRoutineDraftStore.getState().addExercises([makeExercise(2)]);
+    });
+
+    const newCardInputs = root.findByProps({ testID: 'exercise-item-1' }).findAllByType(TextInput);
+    const focusSpy = jest.spyOn(newCardInputs[0].instance, 'focus');
+
+    act(() => {
+      root.findByProps({ testID: 'exercise-item-1' }).props.onLayout({ nativeEvent: { layout: { y: 100 } } });
+    });
+    expect(focusSpy).not.toHaveBeenCalled();
+
+    // 遷移が完了した時点で、取りこぼさず改めてフォーカスする
+    fireTransitionEnd();
+    expect(focusSpy).toHaveBeenCalledTimes(1);
+  });
+
+  test('過去の記録から読み込む等で複数の種目が一度に追加された場合は、キーボードを自動で開かない(スクロールのみ行う)', () => {
+    act(() => {
+      useRoutineDraftStore.getState().hydrate([makeExercise(1)]);
+    });
+    const root = render();
+    fireTransitionEnd();
+
+    act(() => {
+      root.findByProps({ testID: 'exercise-list' }).props.onLayout({ nativeEvent: { layout: { y: 0 } } });
+      root.findByProps({ testID: 'exercise-item-0' }).props.onLayout({ nativeEvent: { layout: { y: 0 } } });
+    });
+
+    act(() => {
+      useRoutineDraftStore.getState().addExercises([makeExercise(2), makeExercise(3)]);
+    });
+
+    const newCardInputs = root.findByProps({ testID: 'exercise-item-1' }).findAllByType(TextInput);
+    const focusSpy = jest.spyOn(newCardInputs[0].instance, 'focus');
+    const scrollTo = jest.spyOn(root.findByType(ScrollView).instance, 'scrollTo');
+
+    act(() => {
+      root.findByProps({ testID: 'exercise-item-1' }).props.onLayout({ nativeEvent: { layout: { y: 100 } } });
+    });
+
+    expect(scrollTo).toHaveBeenCalled();
+    expect(focusSpy).not.toHaveBeenCalled();
   });
 
   test('同じ画面インスタンス内で複数回追加されても、その都度スクロールする(一度きりのフラグではない)', () => {

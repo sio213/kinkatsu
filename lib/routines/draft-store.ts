@@ -23,14 +23,17 @@ type RoutineDraftState = {
   // 種目追加ピッカー・過去の記録から読み込む(セッション単位)画面から呼ばれる。末尾に追加するため、
   // 追加された最初の種目のindexはこの呼び出し時点のexercises.lengthになる
   addExercises: (exercises: DraftExercise[]) => void;
-  // exercise-edit.tsxが、追加された最初のカードまで自動スクロールするための通知。
+  // exercise-edit.tsxが、追加された最初のカードまで自動スクロール・自動フォーカスするための通知。
   // lastSetsReplacementと同じくtokenで「前回と同じ追加ではない」ことを検知する
   // (この画面を離れず複数回追加されることがあるため、一度きりのフラグでは足りない)。
   // ストアはシングルトンで編集セッションをまたいで残り続けるため、消費側(exercise-edit.tsx)の
   // ref判定だけでは「別のルーティンの編集を開始した後に残っていた古い通知」を除外できない
   // （hydrateを挟まずexercise-editが再マウントされることは無いため、hydrate側でクリアすれば
-  // 編集対象routineが変わるたび確実に古い値が消える）
-  lastAddedAt: { index: number; token: number } | null;
+  // 編集対象routineが変わるたび確実に古い値が消える）。
+  // shouldFocusは「過去の記録から読み込む」で複数種目をまとめて追加した場合はfalseにする
+  // (どれか1件に決め打ちでキーボードを開くと、複数件をまとめて確認したいユーザーの意図と
+  // ずれるため。スクロールで追加位置を見せるところまでは複数件でも行う)
+  lastAddedAt: { index: number; token: number; shouldFocus: boolean } | null;
   removeExerciseAt: (index: number) => void;
   // テンプレートセット編集画面の⋮メニュー「上へ移動」「下へ移動」。DBのswapExerciseOrder
   // （orderIndexを持つ行同士の入れ替え）と違い、配列そのものの並び順が順序を表すため、
@@ -74,7 +77,7 @@ export const useRoutineDraftStore = create<RoutineDraftState>((set) => ({
       // 「前回と同じトークンではない」ことをexercise-edit.tsx側が確実に検知できるようにする
       lastAddedAt:
         newExercises.length > 0
-          ? { index: state.exercises.length, token: Date.now() + Math.random() }
+          ? { index: state.exercises.length, token: Date.now() + Math.random(), shouldFocus: newExercises.length === 1 }
           : state.lastAddedAt,
     })),
   lastAddedAt: null,

@@ -1,6 +1,6 @@
 import { CategoryChip } from '@/components/exercises/category-chip';
 import { ExerciseCardMenu } from '@/components/exercises/exercise-card-menu';
-import { RoutineTemplateSetRow } from '@/components/routines/routine-template-set-row';
+import { RoutineTemplateSetRow, type RoutineTemplateSetRowHandle } from '@/components/routines/routine-template-set-row';
 import { IconSymbol } from '@/components/ui/icon-symbol';
 import { Colors, Typography } from '@/constants/theme';
 import { useDebouncedPush } from '@/hooks/use-debounced-push';
@@ -10,7 +10,7 @@ import { useRoutineDraftStore } from '@/lib/routines/draft-store';
 import type { DraftExercise } from '@/lib/routines/validation';
 import { MEASUREMENT_COLUMNS } from '@/lib/workout/set-format';
 import { Image } from 'expo-image';
-import { memo, useCallback, useRef, useState } from 'react';
+import { forwardRef, memo, useCallback, useImperativeHandle, useRef, useState } from 'react';
 import { Alert, LayoutAnimation, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 
 type Props = {
@@ -24,6 +24,8 @@ type Props = {
   hasHistory: boolean;
 };
 
+export type RoutineTemplateExerciseCardHandle = { focusFirstSet: () => void };
+
 // 値が1つも無いセット行(空欄のまま追加しただけ等)は「入力済みの内容」として扱わない。
 // トレーニング中画面(lib/workout/set-values.tsのhasAnyValue)と同じ判定だが、こちらはDBの行
 // (setNumber等を持つPreviousSetValues)ではなく下書きのDraftExercise['sets']が対象のため別関数にする
@@ -34,13 +36,11 @@ function hasAnyDraftSetValue(s: DraftExercise['sets'][number]): boolean {
 // テンプレートセット編集画面（app/routine/exercise-edit.tsx）の種目1件分のカード。
 // トレーニング中画面のSessionExerciseCardと構造・⋮メニュー(ExerciseCardMenu共通コンポーネント)は
 // 同じだが、各項目の実処理はDBではなく下書き配列(useRoutineDraftStore)を直接書き換える
-export const RoutineTemplateExerciseCard = memo(function RoutineTemplateExerciseCard({
-  exercise,
-  index,
-  isFirst,
-  isLast,
-  hasHistory,
-}: Props) {
+export const RoutineTemplateExerciseCard = memo(
+  forwardRef<RoutineTemplateExerciseCardHandle, Props>(function RoutineTemplateExerciseCard(
+    { exercise, index, isFirst, isLast, hasHistory }: Props,
+    ref,
+  ) {
   const images = getExerciseImages(exercise);
   const measurementType = resolveMeasurementType(exercise.measurementType);
   const columns = MEASUREMENT_COLUMNS[measurementType];
@@ -52,6 +52,12 @@ export const RoutineTemplateExerciseCard = memo(function RoutineTemplateExercise
   const [collapsed, setCollapsed] = useState(false);
   const expanded = !collapsed;
   const sets = exercise.sets;
+
+  // 種目追加ピッカー・過去の記録から読み込む直後、この画面(app/routine/exercise-edit.tsx)から
+  // 「最初のセットの重量入力欄にフォーカスして欲しい」という指示を受けて実際にフォーカスする
+  // (session-exercise-card.tsxのSessionExerciseCardHandleと同じ考え方)
+  const firstSetRowRef = useRef<RoutineTemplateSetRowHandle>(null);
+  useImperativeHandle(ref, () => ({ focusFirstSet: () => firstSetRowRef.current?.focus() }), []);
 
   // DraftExercise['sets']の各セットにはDBの行idのような安定した識別子が無く、配列内の
   // 位置しか手がかりが無い。行ごとの✕削除（末尾に限らず任意のindexを取り除ける）を
@@ -215,6 +221,7 @@ export const RoutineTemplateExerciseCard = memo(function RoutineTemplateExercise
         {sets.map((s, setIndex) => (
           <RoutineTemplateSetRow
             key={rowKeys[setIndex]}
+            ref={setIndex === 0 ? firstSetRowRef : undefined}
             setNumber={setIndex + 1}
             values={s}
             measurementType={measurementType}
@@ -245,8 +252,9 @@ export const RoutineTemplateExerciseCard = memo(function RoutineTemplateExercise
         </View>
       </View>
     </View>
-  );
-});
+    );
+  }),
+);
 
 const styles = StyleSheet.create({
   card: {
