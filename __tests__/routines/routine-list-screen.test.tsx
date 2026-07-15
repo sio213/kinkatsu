@@ -296,6 +296,39 @@ test('複数カードがある場合、2枚目の複製で正しいroutineId（1
   expect(mockDuplicateRoutine).toHaveBeenCalledWith(2);
 });
 
+test('複製処理中に連打しても、duplicateRoutineは1回しか呼ばれない（同じルーティンが複数複製されるのを防止）', async () => {
+  let resolveDuplicate!: (id: number) => void;
+  const mockDuplicateRoutine = jest.fn().mockReturnValue(
+    new Promise<number>((resolve) => {
+      resolveDuplicate = resolve;
+    }),
+  );
+  mockUseRoutines.mockReturnValue({
+    routines: [baseRoutine()],
+    removeRoutine: jest.fn(),
+    swapOrder: jest.fn(),
+    duplicateRoutine: mockDuplicateRoutine,
+  });
+  const root = render();
+
+  const menuTrigger = findByAccessibilityLabel(root, 'メニューを開く')!;
+  act(() => {
+    menuTrigger.props.onPress();
+  });
+  const duplicateItem = findByAccessibilityLabel(root, '複製')!;
+
+  act(() => {
+    duplicateItem.props.onPress();
+    duplicateItem.props.onPress();
+  });
+
+  expect(mockDuplicateRoutine).toHaveBeenCalledTimes(1);
+
+  await act(async () => {
+    resolveDuplicate(42);
+  });
+});
+
 test('連打してもstartWorkoutFromRoutineは1回しか呼ばれない（二重セッション生成の防止）', async () => {
   let resolveStart!: (v: { sessionId: number; cards: never[] }) => void;
   mockStartWorkoutFromRoutine.mockReturnValue(
