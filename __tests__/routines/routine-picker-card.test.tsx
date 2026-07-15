@@ -22,7 +22,7 @@ test('名前・種目数・カテゴリチップを表示する', () => {
 
 test('カード全体が1つの読み上げ単位（accessibilityLabel）にまとまる', () => {
   const { root } = render();
-  expect(root.findByProps({ accessibilityLabel: '胸トレ、3種目、胸' })).toBeDefined();
+  expect(root.findByProps({ accessibilityLabel: '胸トレ、胸、3種目' })).toBeDefined();
 });
 
 test('カテゴリが無い場合はaccessibilityLabelにカテゴリ部分を含めない', () => {

@@ -30,8 +30,8 @@ export const RoutinePickerCard = memo(function RoutinePickerCard({
   // カード全体を1つの読み上げ単位にまとめる（routine-card.tsxと同じ考え方）
   const accessibilityLabel = [
     name,
-    `${exerciseCount}種目`,
     categories.length > 0 ? categories.map(getCategoryLabel).join('・') : null,
+    `${exerciseCount}種目`,
   ]
     .filter(Boolean)
     .join('、');
@@ -48,11 +48,11 @@ export const RoutinePickerCard = memo(function RoutinePickerCard({
       <View style={styles.content}>
         <Text style={styles.name} numberOfLines={1}>{name}</Text>
         <View style={styles.meta}>
-          <Text style={styles.exerciseCount}>{exerciseCount}種目</Text>
           {visible.map((category) => (
             <CategoryChip key={category} category={category} />
           ))}
           {overflowCount > 0 && <Text style={styles.overflow}>{`+${overflowCount}`}</Text>}
+          <Text style={styles.exerciseCount}>{exerciseCount}種目</Text>
         </View>
       </View>
       <Text style={styles.chevron}>›</Text>

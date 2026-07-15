@@ -45,8 +45,8 @@ export function RoutineCard({
   // カード全体を1つの読み上げ単位にまとめる（past-training-session-card.tsxと同じ考え方）
   const accessibilityLabel = [
     name,
-    `${exerciseCount}種目`,
     categories.length > 0 ? categories.map(getCategoryLabel).join('・') : null,
+    `${exerciseCount}種目`,
     schedule.label,
   ]
     .filter(Boolean)
@@ -76,11 +76,11 @@ export function RoutineCard({
       </View>
 
       <View style={styles.meta}>
-        <Text style={styles.exerciseCount}>{exerciseCount}種目</Text>
         {visible.map((category) => (
           <CategoryChip key={category} category={category} />
         ))}
         {overflowCount > 0 && <Text style={styles.overflow}>{`+${overflowCount}`}</Text>}
+        <Text style={styles.exerciseCount}>{exerciseCount}種目</Text>
       </View>
 
       <View style={styles.sched}>
