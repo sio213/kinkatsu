@@ -39,16 +39,13 @@ export function ExerciseFilterHeader({
 
 const styles = StyleSheet.create({
   // stickyHeaderIndices={[0]}で固定表示にされる前提。下からスクロールしてくる一覧が
-  // 透けないよう不透明な背景色を持たせ、下線で固定領域との境界を示す。marginBottomは、
-  // ExerciseCard(枠線あり)が直下に来る種目一覧タブで境界線同士が隙間なく重なって
-  // 二重線に見えないようにするための余白（他の項目間隔と同じ8pt）
+  // 透けないよう不透明な背景色を持たせる。marginBottomは、ExerciseCard(枠線あり)が
+  // 直下に来る種目一覧タブで余白が詰まって見えないようにするための調整（他の項目間隔と同じ8pt）
   headerArea: {
     paddingTop: 12,
     paddingBottom: 8,
     marginBottom: 8,
     gap: 8,
     backgroundColor: Colors.background,
-    borderBottomWidth: 1,
-    borderBottomColor: Colors.border,
   },
 });
