@@ -230,8 +230,16 @@ export default function WorkoutScreen() {
 
   const menuItems: DropdownMenuItem[] = [
     {
+      key: 'add',
+      label: '種目を追加',
+      icon: 'add-circle',
+      // 画面下部（一覧末尾）のAddExerciseButtonと同じ操作。種目数が多いとボタンまで
+      // スクロールする必要があるため、スクロール位置に関係なく開けるメニューにも用意する
+      onPress: handleAddExercise,
+    },
+    {
       key: 'routine',
-      label: 'ルーティンから読み込む',
+      label: 'ルーティンから読み込み',
       icon: 'fitness-center',
       disabled: routines.length === 0,
       hint:
@@ -242,7 +250,7 @@ export default function WorkoutScreen() {
     },
     {
       key: 'history',
-      label: '過去の記録から読み込む',
+      label: '過去の記録から読み込み',
       icon: 'history',
       // 種目カード個別の⋮メニューにも同名の項目(1種目のセット値を置換)があるため、
       // こちらは複数種目をまとめて扱うことが分かるようhintで補足する
