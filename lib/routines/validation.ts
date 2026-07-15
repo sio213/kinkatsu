@@ -1,6 +1,8 @@
 import type { ReminderInput } from '@/lib/notifications/types';
 import { buildEditInput } from '@/lib/notifications/validation';
 import type { RoutineDetail, RoutineInput } from '@/lib/routines/db';
+import type { HistorySetValues, SessionHistoryCard } from '@/lib/workout/history';
+import { hasAnyValue } from '@/lib/workout/set-values';
 import { z } from 'zod';
 
 const draftSetSchema = z.object({
@@ -63,6 +65,34 @@ export function toRoutineInput(values: RoutineFormValues): RoutineInput {
 export function toDraftReminder(detail: RoutineDetail): { enabled: boolean; reminder: ReminderInput | null } {
   if (!detail.reminder) return { enabled: false, reminder: null };
   return { enabled: detail.reminder.enabled, reminder: buildEditInput(detail.reminder) };
+}
+
+// HistorySetValues[](✓確定・未確定を問わない実測値)からDraftExercise['sets']への変換。
+// 値が1つも無い行(セット追加だけして未入力のまま終えた等)はhasAnyValueで除外する
+// (絞り込まないと余分な空セットが混入する)。historyCardsToDraftExercises・
+// app/routine/history-picker.tsxのrunLoadで共用する
+export function historySetsToDraftSets(sets: HistorySetValues[]): DraftExercise['sets'] {
+  return sets.filter(hasAnyValue).map((s) => ({
+    weight: s.weight,
+    reps: s.reps,
+    durationSeconds: s.durationSeconds,
+    distanceMeters: s.distanceMeters,
+  }));
+}
+
+// ヘッダー⋮「過去の記録から読み込む」(app/routine/session-history-load.tsx)用。選ばれた
+// 過去セッションのカード群(SessionHistoryCard、DBのworkoutSessionExercises+setsから取得した実データ)を
+// 下書きストアのaddExercisesにそのまま渡せるDraftExercise[]へ変換する
+export function historyCardsToDraftExercises(cards: SessionHistoryCard[]): DraftExercise[] {
+  return cards.map((c) => ({
+    exerciseId: c.exerciseId,
+    name: c.name,
+    category: c.category,
+    measurementType: c.measurementType,
+    source: c.source,
+    slug: c.slug,
+    sets: historySetsToDraftSets(c.sets),
+  }));
 }
 
 // 編集フォームの初期値読み込み用。getRoutineDetail()のDB行（種目メタ情報+セット）を

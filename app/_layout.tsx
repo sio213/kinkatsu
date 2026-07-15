@@ -147,6 +147,10 @@ export default function RootLayout() {
           <Stack.Screen name="routine/exercise-swap" options={{ title: '種目を入れ替え' }} />
           {/* デザイン上、単体種目版のhistory-pickerと同じヘッダー文言（過去の記録から読み込み）を使う */}
           <Stack.Screen name="routine/history-picker" options={{ title: '過去の記録から読み込み' }} />
+          <Stack.Screen name="routine/session-history-picker" options={{ title: '過去の記録から読み込み' }} />
+          {/* ヘッダーは選んだ過去セッションの日付を動的に表示するため、画面側でStack.Screen
+              optionsを上書きする（workout/session-history-loadと同じ方針） */}
+          <Stack.Screen name="routine/session-history-load" options={{ title: '' }} />
           <Stack.Screen name="routine/reminder" options={{ title: 'リマインダー' }} />
           <Stack.Screen name="workout/[id]" options={{ title: '' }} />
           <Stack.Screen name="workout/exercise-reorder" options={{ title: '種目を並び替え' }} />

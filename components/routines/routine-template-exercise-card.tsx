@@ -25,7 +25,7 @@ type Props = {
 };
 
 // 値が1つも無いセット行(空欄のまま追加しただけ等)は「入力済みの内容」として扱わない。
-// トレーニング中画面(lib/workout/history.tsのhasAnyValue)と同じ判定だが、こちらはDBの行
+// トレーニング中画面(lib/workout/set-values.tsのhasAnyValue)と同じ判定だが、こちらはDBの行
 // (setNumber等を持つPreviousSetValues)ではなく下書きのDraftExercise['sets']が対象のため別関数にする
 function hasAnyDraftSetValue(s: DraftExercise['sets'][number]): boolean {
   return s.weight != null || s.reps != null || s.durationSeconds != null || s.distanceMeters != null;

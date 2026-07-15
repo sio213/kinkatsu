@@ -22,6 +22,7 @@ export default function RoutineExerciseEditScreen() {
   const { focusIndex: focusIndexParam } = useLocalSearchParams<{ focusIndex?: string }>();
   const focusIndex = focusIndexParam != null ? Number(focusIndexParam) : null;
   const exercises = useRoutineDraftStore((state) => state.exercises);
+  const lastAddedAt = useRoutineDraftStore((state) => state.lastAddedAt);
   const keyboardInset = useKeyboardInset();
   const historyExerciseIds = useExercisesWithHistory(NO_SESSION_TO_EXCLUDE);
 
@@ -49,20 +50,37 @@ export default function RoutineExerciseEditScreen() {
     scrollRef.current?.scrollTo({ y, animated: false });
   }, [focusIndex]);
 
+  // 種目追加ピッカー・過去の記録から読み込む(セッション単位)画面から戻った直後、追加された
+  // 最初のカードまで自動スクロールする。focusIndexと違いこの画面を離れず何度でも起こりうるため、
+  // 一度きりのフラグ(scrolledToFocusRef)ではなくtokenで「前回処理済みの追加と同じか」を判定する
+  const lastHandledAddTokenRef = useRef<number | null>(null);
+
+  const tryScrollToAdded = useCallback(() => {
+    if (lastAddedAt == null || lastAddedAt.token === lastHandledAddTokenRef.current) return;
+    const listY = listOffsetRef.current;
+    const itemY = itemOffsetsRef.current[lastAddedAt.index];
+    if (listY == null || itemY == null) return;
+    lastHandledAddTokenRef.current = lastAddedAt.token;
+    const y = Math.max(0, listY + itemY - styles.content.paddingTop);
+    scrollRef.current?.scrollTo({ y, animated: true });
+  }, [lastAddedAt]);
+
   const handleListLayout = useCallback(
     (e: LayoutChangeEvent) => {
       listOffsetRef.current = e.nativeEvent.layout.y;
       tryScrollToFocus();
+      tryScrollToAdded();
     },
-    [tryScrollToFocus],
+    [tryScrollToFocus, tryScrollToAdded],
   );
 
   const handleItemLayout = useCallback(
     (index: number) => (e: LayoutChangeEvent) => {
       itemOffsetsRef.current[index] = e.nativeEvent.layout.y;
       tryScrollToFocus();
+      tryScrollToAdded();
     },
-    [tryScrollToFocus],
+    [tryScrollToFocus, tryScrollToAdded],
   );
 
   const handleAddExercise = useCallback(() => {
@@ -76,7 +94,20 @@ export default function RoutineExerciseEditScreen() {
     router.push('/routine/exercise-reorder');
   }, [router]);
 
+  const handleLoadFromHistory = useCallback(() => {
+    router.push('/routine/session-history-picker');
+  }, [router]);
+
   const menuItems: DropdownMenuItem[] = [
+    {
+      key: 'history',
+      label: '過去の記録から読み込む',
+      icon: 'history',
+      // 種目カード個別の⋮メニューにも同名の項目(1種目のセット値を置換)があるため、
+      // こちらは複数種目をまとめて扱うことが分かるようhintで補足する
+      hint: '過去のトレーニングを選んで複数の種目をまとめて追加します',
+      onPress: handleLoadFromHistory,
+    },
     {
       key: 'reorder',
       label: '種目を並び替え',
