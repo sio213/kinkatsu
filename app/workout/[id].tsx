@@ -222,7 +222,15 @@ export default function WorkoutScreen() {
   const isActive = session.endedAt == null;
 
   const menuItems: DropdownMenuItem[] = [
-    { key: 'history', label: '過去の記録から読み込む', icon: 'history', onPress: handleLoadFromHistory },
+    {
+      key: 'history',
+      label: '過去の記録から読み込む',
+      icon: 'history',
+      // 種目カード個別の⋮メニューにも同名の項目(1種目のセット値を置換)があるため、
+      // こちらは複数種目をまとめて扱うことが分かるようhintで補足する
+      hint: '過去のトレーニングを選んで複数の種目をまとめて追加します',
+      onPress: handleLoadFromHistory,
+    },
     {
       key: 'reorder',
       label: '種目を並び替え',

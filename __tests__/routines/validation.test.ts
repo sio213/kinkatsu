@@ -1,5 +1,6 @@
 import type { RoutineDetail } from '@/lib/routines/db';
 import {
+  historyCardsToDraftExercises,
   routineFormSchema,
   toDraftExercises,
   toDraftReminder,
@@ -7,6 +8,7 @@ import {
   type DraftExercise,
   type RoutineFormValues,
 } from '@/lib/routines/validation';
+import type { SessionHistoryCard } from '@/lib/workout/history';
 
 function makeDraftExercise(overrides: Partial<DraftExercise> = {}): DraftExercise {
   return {
@@ -144,6 +146,67 @@ describe('toDraftExercises', () => {
       reminder: null,
     };
     expect(toDraftExercises(detail)).toEqual([]);
+  });
+});
+
+function makeHistoryCard(overrides: Partial<SessionHistoryCard> = {}): SessionHistoryCard {
+  return {
+    workoutSessionExerciseId: 500,
+    exerciseId: 5,
+    name: 'ベンチプレス',
+    category: 'chest',
+    measurementType: 'weight_reps',
+    source: 'preset',
+    slug: 'bench_press',
+    sets: [{ setNumber: 1, weight: 60, reps: 8, durationSeconds: null, distanceMeters: null, completedAt: 1 }],
+    ...overrides,
+  };
+}
+
+describe('historyCardsToDraftExercises', () => {
+  test('SessionHistoryCardの表示用フィールドをDraftExerciseへ変換する(workoutSessionExerciseIdは含めない)', () => {
+    const result = historyCardsToDraftExercises([makeHistoryCard()]);
+    expect(result).toEqual([
+      {
+        exerciseId: 5,
+        name: 'ベンチプレス',
+        category: 'chest',
+        measurementType: 'weight_reps',
+        source: 'preset',
+        slug: 'bench_press',
+        sets: [{ weight: 60, reps: 8, durationSeconds: null, distanceMeters: null }],
+      },
+    ]);
+  });
+
+  test('値が1つも無いセット(空欄のまま追加しただけ等)はhasAnyValueで除外する', () => {
+    const card = makeHistoryCard({
+      sets: [
+        { setNumber: 1, weight: 60, reps: 8, durationSeconds: null, distanceMeters: null, completedAt: 1 },
+        { setNumber: 2, weight: null, reps: null, durationSeconds: null, distanceMeters: null, completedAt: null },
+      ],
+    });
+    const result = historyCardsToDraftExercises([card]);
+    expect(result[0].sets).toEqual([{ weight: 60, reps: 8, durationSeconds: null, distanceMeters: null }]);
+  });
+
+  test('completedAtは変換後のDraftExercise.setsに含まれない(✓未確定でも値があれば読み込む)', () => {
+    const card = makeHistoryCard({
+      sets: [{ setNumber: 1, weight: 60, reps: 8, durationSeconds: null, distanceMeters: null, completedAt: null }],
+    });
+    const result = historyCardsToDraftExercises([card]);
+    expect(result[0].sets).toEqual([{ weight: 60, reps: 8, durationSeconds: null, distanceMeters: null }]);
+  });
+
+  test('複数カードを渡すと元の並び順のままDraftExercise[]に変換する', () => {
+    const bench = makeHistoryCard({ exerciseId: 5, name: 'ベンチプレス' });
+    const squat = makeHistoryCard({ exerciseId: 9, name: 'スクワット', category: 'leg' });
+    const result = historyCardsToDraftExercises([bench, squat]);
+    expect(result.map((e) => e.exerciseId)).toEqual([5, 9]);
+  });
+
+  test('カードが空配列なら空配列を返す', () => {
+    expect(historyCardsToDraftExercises([])).toEqual([]);
   });
 });
 

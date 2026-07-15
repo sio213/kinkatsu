@@ -6,11 +6,10 @@ import { Colors, Typography } from '@/constants/theme';
 import { useExercise } from '@/hooks/use-exercises';
 import { resolveMeasurementType } from '@/lib/exercises/constants';
 import { useRoutineDraftStore } from '@/lib/routines/draft-store';
-import type { DraftExercise } from '@/lib/routines/validation';
+import { historySetsToDraftSets } from '@/lib/routines/validation';
 import {
   computePersonalBestIds,
   getExerciseHistoryEntries,
-  hasAnyValue,
   NO_SESSION_TO_EXCLUDE,
   type HistoryEntry,
 } from '@/lib/workout/history';
@@ -88,14 +87,9 @@ export default function RoutineHistoryPickerScreen() {
       isLoadingRef.current = true;
       // getExerciseHistoryEntriesはカード単位(✓確定セットが1件以上あるか)でしか絞り込まないため、
       // entry.setsには値が1つも無い行(セット追加だけして未入力のまま終えた等)が混ざりうる。
-      // workout側のloadHistoryIntoSessionExercise/buildInitialRoutineSetsと同じくhasAnyValueで
-      // 絞り込んでから読み込む(絞り込まないと余分な空セットがテンプレートに混入してしまう)
-      const sets: DraftExercise['sets'] = entry.sets.filter(hasAnyValue).map((s) => ({
-        weight: s.weight,
-        reps: s.reps,
-        durationSeconds: s.durationSeconds,
-        distanceMeters: s.distanceMeters,
-      }));
+      // historySetsToDraftSets(session-history-load.tsxと共用)で絞り込んでから読み込む
+      // (絞り込まないと余分な空セットがテンプレートに混入してしまう)
+      const sets = historySetsToDraftSets(entry.sets);
       loadSetsIntoExerciseAt(index, sets);
       router.back();
     },

@@ -1,31 +1,19 @@
 import { db, type DbOrTx } from '@/db/client';
 import { exercises, sets, workoutSessionExercises, workoutSessions } from '@/db/schema';
 import { UNKNOWN_CATEGORY_ORDER, CATEGORY_ORDER, type MeasurementType } from '@/lib/exercises/constants';
+import { hasAnyValue, type PreviousSetValues } from '@/lib/workout/set-values';
 import { and, desc, eq, inArray, isNotNull, ne } from 'drizzle-orm';
 
-export type PreviousSetValues = {
-  setNumber: number;
-  weight: number | null;
-  reps: number | null;
-  durationSeconds: number | null;
-  distanceMeters: number | null;
-};
+// DBに依存しないモジュール(lib/routines/validation.ts等)からも安全にimportできるよう
+// lib/workout/set-values.tsに切り出した実体をそのまま再エクスポートする(既存の
+// import { hasAnyValue } from '@/lib/workout/history' を壊さないため)
+export { hasAnyValue, type PreviousSetValues };
 
 // excludeSessionIdは通常「今まさに編集中のセッション」を渡し自分自身を実績として参照しない
 // ようにするためのものだが、ルーティン編集にはそもそも「セッション」という概念が無い。
 // どのセッションidとも一致し得ないこの番兵値を渡すことで「何も除外しない」を表現する
 // (app/routine/exercise-edit.tsx・app/routine/history-picker.tsxで共有)
 export const NO_SESSION_TO_EXCLUDE = -1;
-
-// 4つの値カラムのいずれかに実際の値が入っているか。前回セットが✓未確定のまま
-// 何も入力せずに終えたセッションの場合、getPreviousSets/getPreviousSetsForCardは
-// 全カラムnullの行を返しうる（「セット追加」だけ押されて未入力のまま終わった等）。
-// そのような行は「前回入力した値」として意味を持たないため、コピー元から除外する
-// （除外しないと新しいカードに余分な空行が増えたり、値の無い行が背景色だけゴースト表示される
-// ＝中身が空なのに「前回の値がある」ように見える、という2つの問題が起きる）
-export function hasAnyValue(s: PreviousSetValues): boolean {
-  return s.weight != null || s.reps != null || s.durationSeconds != null || s.distanceMeters != null;
-}
 
 // 種目の「前回の記録」を取得する。同じ種目が1セッション内に複数カード（ウォームアップ用＋本番用等）で
 // 追加できる仕様のため、セッション単位ではなくカード（workoutSessionExercises）単位で直近の1枚を
