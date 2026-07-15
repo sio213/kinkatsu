@@ -232,7 +232,7 @@ export default function WorkoutScreen() {
     {
       key: 'routine',
       label: 'ルーティンから読み込む',
-      icon: 'assignment',
+      icon: 'fitness-center',
       disabled: routines.length === 0,
       hint:
         routines.length === 0
