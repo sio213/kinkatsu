@@ -2,7 +2,7 @@ import { db, type Tx } from '@/db/client';
 import { sets, workoutSessionExercises, workoutSessions, type WorkoutSession } from '@/db/schema';
 import { getRoutineDetail } from '@/lib/routines/db';
 import { getPreviousSets, hasAnyValue, type PreviousSetValues } from '@/lib/workout/history';
-import { desc, eq, isNull } from 'drizzle-orm';
+import { and, desc, eq, isNull } from 'drizzle-orm';
 
 // 種目カードが新規追加/入れ替えされたことを呼び出し側（画面）に伝える情報。
 // kindは新規追加(常にリスト末尾に増える)か種目入れ替え(既存カードの位置のまま)かを表し、
@@ -303,6 +303,27 @@ export async function swapExerciseOrder(sessionExerciseId: number, targetSession
       .update(workoutSessionExercises)
       .set({ orderIndex: a.orderIndex })
       .where(eq(workoutSessionExercises.id, targetSessionExerciseId));
+  });
+}
+
+// ヘッダー⋮「並び替え」(app/workout/exercise-reorder.tsx)。ドラッグで確定した任意の並び順を
+// まとめてDBへ反映する。swapExerciseOrder（隣接2件だけの入れ替え）と違い、渡された配列の並び順
+// そのものを0始まりのorderIndexとして振り直す。他セッションの行を誤って書き換えないよう
+// sessionIdでスコープする
+export async function reorderSessionExercises(sessionId: number, orderedSessionExerciseIds: number[]) {
+  if (orderedSessionExerciseIds.length === 0) return;
+  await db.transaction(async (tx) => {
+    for (const [orderIndex, sessionExerciseId] of orderedSessionExerciseIds.entries()) {
+      await tx
+        .update(workoutSessionExercises)
+        .set({ orderIndex })
+        .where(
+          and(
+            eq(workoutSessionExercises.id, sessionExerciseId),
+            eq(workoutSessionExercises.sessionId, sessionId),
+          ),
+        );
+    }
   });
 }
 

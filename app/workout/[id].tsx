@@ -177,6 +177,11 @@ export default function WorkoutScreen() {
     pushDebounced({ pathname: '/workout/session-history-picker', params: { sessionId: String(sessionId) } });
   };
 
+  const handleReorder = () => {
+    if (sessionId == null) return;
+    pushDebounced({ pathname: '/workout/exercise-reorder', params: { sessionId: String(sessionId) } });
+  };
+
   const handleDeleteSession = () => {
     if (sessionId == null) return;
     Alert.alert('この記録を削除しますか？', '記録した種目・セットもすべて削除されます。', [
@@ -218,6 +223,14 @@ export default function WorkoutScreen() {
 
   const menuItems: DropdownMenuItem[] = [
     { key: 'history', label: '過去の記録から読み込む', icon: 'history', onPress: handleLoadFromHistory },
+    {
+      key: 'reorder',
+      label: '種目を並び替え',
+      icon: 'swap-vert',
+      disabled: sessionExercises.length <= 1,
+      hint: sessionExercises.length <= 1 ? '2種目以上あるときに使えます' : undefined,
+      onPress: handleReorder,
+    },
     { key: 'delete', label: '削除', icon: 'delete-outline', danger: true, onPress: handleDeleteSession },
   ];
 
