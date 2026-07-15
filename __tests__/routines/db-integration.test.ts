@@ -25,8 +25,9 @@ function migrationFiles() {
 
 function applyAllMigrations(db: Database.Database) {
   for (const file of migrationFiles()) {
-    const sql = fs.readFileSync(path.join(DRIZZLE_DIR, file), 'utf-8');
-    db.exec(sql.replace(/--> statement-breakpoint/g, ''));
+    // drizzle-ormのsqlタグ関数(import済み)とのシャドーイングを避けるためsqlTextという名前にする
+    const sqlText = fs.readFileSync(path.join(DRIZZLE_DIR, file), 'utf-8');
+    db.exec(sqlText.replace(/--> statement-breakpoint/g, ''));
   }
 }
 
