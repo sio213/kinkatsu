@@ -107,6 +107,7 @@ jest.mock('@/lib/routines/db', () => ({
 
 import {
   addExercisesToSession,
+  addRoutineExercisesToSession,
   endWorkoutSession,
   getActiveSession,
   replaceSessionExercise,
@@ -820,5 +821,146 @@ describe('startWorkoutFromRoutine', () => {
     });
     mockReturning.mockRejectedValueOnce(new Error('db error'));
     await expect(startWorkoutFromRoutine(1)).rejects.toThrow('db error');
+  });
+});
+
+// トレーニング中画面ヘッダー⋮「ルーティンから読み込む」用。startWorkoutFromRoutineと違い
+// 新規セッションを作らず既存sessionIdへ追加する点、選んだselections(routineExerciseId)で
+// detail.exercisesを絞り込む点が固有のロジックのため、そこを中心に検証する。目標セットの
+// コピー・全カラムnull除外・setNumber振り直し自体はinsertRoutineCardsIntoSession共通のため
+// startWorkoutFromRoutine側のテストで既にカバーされている
+describe('addRoutineExercisesToSession', () => {
+  it('selectionsが空なら何も取得・insertせず空配列を返す', async () => {
+    const result = await addRoutineExercisesToSession(1, 99, []);
+    expect(result).toEqual([]);
+    expect(mockGetRoutineDetail).not.toHaveBeenCalled();
+    expect(mockInsertValues).not.toHaveBeenCalled();
+  });
+
+  it('存在しないroutineIdの場合は空配列を返しinsertしない', async () => {
+    mockGetRoutineDetail.mockResolvedValueOnce(null);
+    const result = await addRoutineExercisesToSession(1, 999, [{ routineExerciseId: 501 }]);
+    expect(result).toEqual([]);
+    expect(mockInsertValues).not.toHaveBeenCalled();
+  });
+
+  it('selectionsが全て存在しない(削除済み等の)routineExerciseIdの場合はinsertしない', async () => {
+    mockGetRoutineDetail.mockResolvedValueOnce({
+      routine: { id: 1, name: 'A' },
+      reminder: null,
+      exercises: [{ id: 501, exerciseId: 10, sets: [] }],
+    });
+    const result = await addRoutineExercisesToSession(1, 1, [{ routineExerciseId: 999 }]);
+    expect(result).toEqual([]);
+    expect(mockInsertValues).not.toHaveBeenCalled();
+  });
+
+  it('有効なidと無効なidが混在する場合、有効な分だけ処理する(クライアントの値を信用しない)', async () => {
+    mockGetRoutineDetail.mockResolvedValueOnce({
+      routine: { id: 1, name: 'A' },
+      reminder: null,
+      exercises: [
+        { id: 501, exerciseId: 10, sets: [] },
+        { id: 502, exerciseId: 11, sets: [] },
+      ],
+    });
+    mockSelectWhere.mockResolvedValueOnce([]);
+    mockReturning.mockResolvedValueOnce([{ id: 200, exerciseId: 10 }]);
+
+    await addRoutineExercisesToSession(7, 1, [{ routineExerciseId: 501 }, { routineExerciseId: 999 }]);
+
+    const payload = mockInsertValues.mock.calls[0][0];
+    expect(payload).toEqual([{ sessionId: 7, exerciseId: 10, orderIndex: 0, createdAt: expect.any(Number) }]);
+  });
+
+  it('selectionsの並びに関わらず、ルーティン内の表示順(orderIndex順)で処理・挿入される', async () => {
+    mockGetRoutineDetail.mockResolvedValueOnce({
+      routine: { id: 1, name: 'A' },
+      reminder: null,
+      exercises: [
+        { id: 501, exerciseId: 10, sets: [] },
+        { id: 502, exerciseId: 11, sets: [] },
+        { id: 503, exerciseId: 12, sets: [] },
+      ],
+    });
+    mockSelectWhere.mockResolvedValueOnce([]);
+    mockReturning.mockResolvedValueOnce([
+      { id: 200, exerciseId: 10 },
+      { id: 201, exerciseId: 12 },
+    ]);
+
+    // クリック順は503→501の逆順だが、表示順は501,503のはず
+    await addRoutineExercisesToSession(7, 1, [{ routineExerciseId: 503 }, { routineExerciseId: 501 }]);
+
+    const payload = mockInsertValues.mock.calls[0][0];
+    expect(payload.map((p: { exerciseId: number }) => p.exerciseId)).toEqual([10, 12]);
+  });
+
+  it('既存カードがあるセッションへの追加は、既存の続き番号からorderIndexを振る', async () => {
+    mockGetRoutineDetail.mockResolvedValueOnce({
+      routine: { id: 1, name: 'A' },
+      reminder: null,
+      exercises: [{ id: 501, exerciseId: 10, sets: [] }],
+    });
+    mockSelectWhere.mockResolvedValueOnce([{ orderIndex: 0 }, { orderIndex: 1 }]);
+    mockReturning.mockResolvedValueOnce([{ id: 200, exerciseId: 10 }]);
+
+    await addRoutineExercisesToSession(7, 1, [{ routineExerciseId: 501 }]);
+
+    const payload = mockInsertValues.mock.calls[0][0];
+    expect(payload).toEqual([{ sessionId: 7, exerciseId: 10, orderIndex: 2, createdAt: expect.any(Number) }]);
+  });
+
+  it('選んだ種目の目標セットがコピーされprefilledSetIdsが返る', async () => {
+    mockGetRoutineDetail.mockResolvedValueOnce({
+      routine: { id: 1, name: 'A' },
+      reminder: null,
+      exercises: [
+        {
+          id: 501,
+          exerciseId: 10,
+          sets: [{ setNumber: 1, weight: 62.5, reps: 8, durationSeconds: null, distanceMeters: null }],
+        },
+      ],
+    });
+    mockSelectWhere.mockResolvedValueOnce([]);
+    mockReturning.mockResolvedValueOnce([{ id: 200, exerciseId: 10 }]);
+    mockSetsReturning.mockResolvedValueOnce([{ id: 900 }]);
+
+    const result = await addRoutineExercisesToSession(7, 1, [{ routineExerciseId: 501 }]);
+
+    const setsPayload = mockSetsInsertValues.mock.calls[0][0];
+    expect(setsPayload).toEqual([
+      {
+        sessionId: 7,
+        exerciseId: 10,
+        workoutSessionExerciseId: 200,
+        setNumber: 1,
+        weight: 62.5,
+        reps: 8,
+        durationSeconds: null,
+        distanceMeters: null,
+        completedAt: null,
+        createdAt: expect.any(Number),
+      },
+    ]);
+    expect(result).toEqual([
+      { sessionId: 7, exerciseId: 10, sessionExerciseId: 200, kind: 'new', prefilledSetIds: [900] },
+    ]);
+  });
+
+  it('getRoutineDetailが失敗した場合はエラーを握りつぶさずthrowする', async () => {
+    mockGetRoutineDetail.mockRejectedValueOnce(new Error('db error'));
+    await expect(addRoutineExercisesToSession(1, 1, [{ routineExerciseId: 501 }])).rejects.toThrow('db error');
+  });
+
+  it('insertが失敗した場合もエラーを握りつぶさずthrowする', async () => {
+    mockGetRoutineDetail.mockResolvedValueOnce({
+      routine: { id: 1, name: 'A' },
+      reminder: null,
+      exercises: [{ id: 501, exerciseId: 10, sets: [] }],
+    });
+    mockReturning.mockRejectedValueOnce(new Error('insert error'));
+    await expect(addRoutineExercisesToSession(1, 1, [{ routineExerciseId: 501 }])).rejects.toThrow('insert error');
   });
 });

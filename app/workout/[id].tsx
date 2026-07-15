@@ -10,6 +10,7 @@ import { SessionExerciseCard, type SessionExerciseCardHandle } from '@/component
 import { Colors, Typography } from '@/constants/theme';
 import { useDebouncedPush } from '@/hooks/use-debounced-push';
 import { useKeyboardInset } from '@/hooks/use-keyboard-inset';
+import { useRoutines } from '@/hooks/use-routines';
 import {
   EMPTY_PREFILLED_SET_IDS,
   EMPTY_SETS,
@@ -47,6 +48,7 @@ export default function WorkoutScreen() {
   const sessionExercises = useSessionExercises(sessionId ?? -1);
   const sessionSets = useSessionSets(sessionId ?? -1);
   const exercisesWithHistory = useExercisesWithHistory(sessionId ?? -1);
+  const { routines } = useRoutines();
   const [now, setNow] = useState(() => Date.now());
   const isFinishingRef = useRef(false);
   const keyboardInset = useKeyboardInset();
@@ -177,6 +179,11 @@ export default function WorkoutScreen() {
     pushDebounced({ pathname: '/workout/session-history-picker', params: { sessionId: String(sessionId) } });
   };
 
+  const handleLoadFromRoutine = () => {
+    if (sessionId == null) return;
+    pushDebounced({ pathname: '/workout/routine-picker', params: { sessionId: String(sessionId) } });
+  };
+
   const handleReorder = () => {
     if (sessionId == null) return;
     pushDebounced({ pathname: '/workout/exercise-reorder', params: { sessionId: String(sessionId) } });
@@ -222,6 +229,17 @@ export default function WorkoutScreen() {
   const isActive = session.endedAt == null;
 
   const menuItems: DropdownMenuItem[] = [
+    {
+      key: 'routine',
+      label: 'ルーティンから読み込む',
+      icon: 'assignment',
+      disabled: routines.length === 0,
+      hint:
+        routines.length === 0
+          ? '保存済みのルーティンがありません'
+          : '保存済みのルーティンを選んで種目と目標セット値をまとめて追加します',
+      onPress: handleLoadFromRoutine,
+    },
     {
       key: 'history',
       label: '過去の記録から読み込む',

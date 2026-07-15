@@ -1,6 +1,6 @@
 import { db, type Tx } from '@/db/client';
 import { sets, workoutSessionExercises, workoutSessions, type WorkoutSession } from '@/db/schema';
-import { getRoutineDetail } from '@/lib/routines/db';
+import { getRoutineDetail, type RoutineDetailExercise } from '@/lib/routines/db';
 import { getPreviousSets, hasAnyValue, type PreviousSetValues } from '@/lib/workout/history';
 import { and, desc, eq, isNull } from 'drizzle-orm';
 
@@ -225,11 +225,39 @@ export async function addHistoryCardsToSession(
 
 type RoutineExerciseCardSpec = ExerciseCardSpec & { routineExerciseId: number };
 
+// ルーティンの種目群(exercises)を、既存tx・sessionIdへ新規カードとして流し込む共通処理。
+// startWorkoutFromRoutine（新規セッション作成時）とaddRoutineExercisesToSession（進行中セッションへの
+// 追加時）の両方から呼ばれる。completedAtは常にnull・prefilledSetIdsで返すことで、他のプリフィル
+// 経路と同じ「値はあるが✓未確定」のゴースト表示にする(実績値ではなく目標値であることが伝わり、
+// 誤って「今日もうこのセットをやった」ように見えることを防ぐ)
+function insertRoutineCardsIntoSession(
+  tx: Tx,
+  sessionId: number,
+  exercises: Pick<RoutineDetailExercise, 'id' | 'exerciseId' | 'sets'>[],
+  now: number,
+): Promise<PrefilledCard[]> {
+  const routineSetsByExerciseId = new Map(exercises.map((e) => [e.id, e.sets]));
+  return insertSessionExerciseCards(
+    tx,
+    sessionId,
+    exercises.map((e) => ({ exerciseId: e.exerciseId, routineExerciseId: e.id })),
+    now,
+    'new',
+    // setNumberはPreviousSetValues型を満たすためだけに渡している。実際の番号はこの後
+    // buildInitialSetsが1から振り直すため、routineSets側の値(欠番/重複があり得る)は使われない
+    async (_tx, spec: RoutineExerciseCardSpec) =>
+      (routineSetsByExerciseId.get(spec.routineExerciseId) ?? []).map((s) => ({
+        setNumber: s.setNumber,
+        weight: s.weight,
+        reps: s.reps,
+        durationSeconds: s.durationSeconds,
+        distanceMeters: s.distanceMeters,
+      })),
+  );
+}
+
 // ルーティン一覧のカードタップ・ルーティン由来リマインダーの通知タップ用。新規セッションを作り、
-// そのルーティンに登録済みの種目・目標セット(routineSets)を最初から入れた状態で返す。
-// completedAtは常にnull・prefilledSetIdsで返すことで、他のプリフィル経路と同じ「値はあるが
-// ✓未確定」のゴースト表示にする(実績値ではなく目標値であることが伝わり、誤って「今日もう
-// このセットをやった」ように見えることを防ぐ)
+// そのルーティンに登録済みの種目・目標セット(routineSets)を最初から入れた状態で返す
 export async function startWorkoutFromRoutine(
   routineId: number,
 ): Promise<{ sessionId: number; cards: PrefilledCard[] } | null> {
@@ -239,7 +267,6 @@ export async function startWorkoutFromRoutine(
   if (!detail || detail.exercises.length === 0) return null;
 
   const now = Date.now();
-  const routineSetsByExerciseId = new Map(detail.exercises.map((e) => [e.id, e.sets]));
 
   return db.transaction(async (tx) => {
     const [session] = await tx
@@ -247,26 +274,34 @@ export async function startWorkoutFromRoutine(
       .values({ startedAt: now, createdAt: now, updatedAt: now })
       .returning();
 
-    const cards = await insertSessionExerciseCards(
-      tx,
-      session.id,
-      detail.exercises.map((e) => ({ exerciseId: e.exerciseId, routineExerciseId: e.id })),
-      now,
-      'new',
-      // setNumberはPreviousSetValues型を満たすためだけに渡している。実際の番号はこの後
-      // buildInitialSetsが1から振り直すため、routineSets側の値(欠番/重複があり得る)は使われない
-      async (_tx, spec: RoutineExerciseCardSpec) =>
-        (routineSetsByExerciseId.get(spec.routineExerciseId) ?? []).map((s) => ({
-          setNumber: s.setNumber,
-          weight: s.weight,
-          reps: s.reps,
-          durationSeconds: s.durationSeconds,
-          distanceMeters: s.distanceMeters,
-        })),
-    );
+    const cards = await insertRoutineCardsIntoSession(tx, session.id, detail.exercises, now);
 
     return { sessionId: session.id, cards };
   });
+}
+
+export type RoutineExerciseSelection = { routineExerciseId: number };
+
+// トレーニング中画面ヘッダー⋮「ルーティンから読み込む」用。選んだルーティンのうち、画面3で
+// ユーザーがチェックボックスで選んだ種目だけを既存セッションへ新規カードとして追加する。
+// addHistoryCardsToSessionと同じく、クライアントには選んだ種目のid(routineExerciseId)だけを
+// 送らせ、実際の目標セット値はここでDBから改めて取得する(クライアント側の値を信用しない)
+export async function addRoutineExercisesToSession(
+  sessionId: number,
+  routineId: number,
+  selections: RoutineExerciseSelection[],
+): Promise<PrefilledCard[]> {
+  if (selections.length === 0) return [];
+  const detail = await getRoutineDetail(routineId);
+  if (!detail) return [];
+  // detail.exercises(orderIndex順)をfilterすることで、一部だけ選択してもselectionsの並びが
+  // クリック順ではなくルーティン内の表示順のまま保たれる(SessionHistoryLoadViewのhandleSubmitと同じ考え方)
+  const selectedIds = new Set(selections.map((s) => s.routineExerciseId));
+  const selectedExercises = detail.exercises.filter((e) => selectedIds.has(e.id));
+  if (selectedExercises.length === 0) return [];
+
+  const now = Date.now();
+  return db.transaction((tx) => insertRoutineCardsIntoSession(tx, sessionId, selectedExercises, now));
 }
 
 // 種目カードの「⋮」メニューの「削除」。sets側はworkoutSessionExerciseIdにonDelete cascadeが
