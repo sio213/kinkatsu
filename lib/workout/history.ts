@@ -61,6 +61,7 @@ export type HistorySetValues = PreviousSetValues & { completedAt: number | null 
 
 export type HistoryEntry = {
   workoutSessionExerciseId: number;
+  sessionId: number;
   startedAt: number;
   sets: HistorySetValues[];
 };
@@ -78,6 +79,7 @@ export async function getExerciseHistoryEntries(
   const cards = await db
     .select({
       workoutSessionExerciseId: workoutSessionExercises.id,
+      sessionId: workoutSessionExercises.sessionId,
       startedAt: workoutSessions.startedAt,
     })
     .from(workoutSessionExercises)
@@ -121,6 +123,7 @@ export async function getExerciseHistoryEntries(
   return cards
     .map((c) => ({
       workoutSessionExerciseId: c.workoutSessionExerciseId,
+      sessionId: c.sessionId,
       startedAt: c.startedAt,
       sets: setsByCard.get(c.workoutSessionExerciseId) ?? [],
     }))

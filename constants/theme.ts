@@ -38,6 +38,7 @@ const Palette = {
 
   purple600: '#9333EA',
   green600: '#16A34A',
+  green700: '#15803D',
   pink500: '#EC4899',
 } as const;
 
@@ -65,6 +66,11 @@ export const Colors = {
 
   danger: Palette.red600,
   dangerSurface: Palette.red100,
+
+  // カレンダー選択日パネルの前回比較数値（+2.5kg等）専用。デザイン案指定の色
+  // (#15803D)をそのまま使う。categoryAbsCore(#16A34A)と近い色味だが別の意味づけの
+  // トークンのため意図的に共用しない
+  success: Palette.green700,
 
   warning: Palette.amber600,
   warningAccent: Palette.amber500,

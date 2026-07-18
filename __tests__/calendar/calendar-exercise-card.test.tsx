@@ -1,6 +1,7 @@
 import { act, create } from 'react-test-renderer';
 import { Text, TouchableOpacity } from 'react-native';
 import { CalendarExerciseCard } from '@/components/calendar/calendar-exercise-card';
+import { Colors } from '@/constants/theme';
 
 const onPress = jest.fn();
 
@@ -14,6 +15,7 @@ function render(props: Partial<Parameters<typeof CalendarExerciseCard>[0]> = {})
     measurementType: 'weight_reps',
     sets: [{ weight: 60, reps: 8, durationSeconds: null, distanceMeters: null, completedAt: 1 }],
     isBest: false,
+    comparison: null,
     onPress,
     ...props,
   };
@@ -102,5 +104,31 @@ describe('CalendarExerciseCard', () => {
     });
     const texts = root.root.findAllByType(Text).map((t) => t.props.children);
     expect(texts.some((t) => typeof t === 'string' && t.includes('60kg'))).toBe(true);
+  });
+
+  describe('前回比較(comparison)', () => {
+    it('comparisonが無ければ比較表示をしない', () => {
+      const root = render({ comparison: null });
+      const texts = root.root.findAllByType(Text).map((t) => t.props.children);
+      expect(texts).not.toContain('+2.5kg');
+    });
+
+    it('増加していれば緑文字(デザイン案指定の#15803D)でラベルを表示する', () => {
+      const root = render({ comparison: { field: 'weight', delta: 2.5, label: '+2.5kg' } });
+      const text = root.root.findAllByType(Text).find((t) => t.props.children === '+2.5kg')!;
+      expect(text.props.style).toEqual(expect.arrayContaining([expect.objectContaining({ color: Colors.success })]));
+    });
+
+    it('減少していれば赤文字(デザイン案指定の#DC2626、Colors.dangerと同値)でラベルを表示する', () => {
+      const root = render({ comparison: { field: 'reps', delta: -2, label: '-2回' } });
+      const text = root.root.findAllByType(Text).find((t) => t.props.children === '-2回')!;
+      expect(text.props.style).toEqual(expect.arrayContaining([expect.objectContaining({ color: Colors.danger })]));
+    });
+
+    it('accessibilityLabelに前回比較を含む', () => {
+      const root = render({ comparison: { field: 'weight', delta: 2.5, label: '+2.5kg' } });
+      const label = root.root.findByType(TouchableOpacity).props.accessibilityLabel as string;
+      expect(label).toContain('+2.5kg');
+    });
   });
 });

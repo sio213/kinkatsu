@@ -23,7 +23,8 @@ function entry(
   startedAt: number,
   sets: HistoryEntry['sets'],
 ): HistoryEntry {
-  return { workoutSessionExerciseId, startedAt, sets };
+  // sessionIdはcomputePersonalBestIds/pickPrimaryCategoryの判定に使われないため固定値でよい
+  return { workoutSessionExerciseId, sessionId: 1, startedAt, sets };
 }
 
 function confirmedSet(overrides: Partial<HistoryEntry['sets'][number]> = {}) {

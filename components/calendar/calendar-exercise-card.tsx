@@ -4,6 +4,7 @@ import { BestBadge } from '@/components/workout/best-badge';
 import { Colors, Typography } from '@/constants/theme';
 import { resolveMeasurementType, getCategoryLabel } from '@/lib/exercises/constants';
 import { getExerciseImages, type ExerciseImages } from '@/lib/exercises/images';
+import type { SetComparison } from '@/lib/workout/comparison';
 import { summarizeExerciseSets, type SetLike } from '@/lib/workout/set-format';
 import { memo } from 'react';
 import { StyleSheet, Text, TouchableOpacity } from 'react-native';
@@ -24,6 +25,9 @@ type Props = {
   measurementType: string;
   sets: HistorySetLike[];
   isBest: boolean;
+  // 直前の同種目セッションとの比較（hooks/use-calendar-day-exercises.tsで算出）。
+  // 比較対象が無い/変化なしならnull
+  comparison: SetComparison | null;
   onPress: (exerciseId: number) => void;
 };
 
@@ -39,6 +43,7 @@ export const CalendarExerciseCard = memo(function CalendarExerciseCard({
   measurementType,
   sets,
   isBest,
+  comparison,
   onPress,
 }: Props) {
   const images: ExerciseImages = getExerciseImages({ source, slug });
@@ -46,13 +51,14 @@ export const CalendarExerciseCard = memo(function CalendarExerciseCard({
   const confirmedSets = sets.filter((s) => s.completedAt != null);
   const summary = summarizeExerciseSets(resolvedMeasurementType, confirmedSets);
   const categoryLabel = getCategoryLabel(category);
+  const isIncrease = comparison != null && comparison.delta > 0;
 
   return (
     <TouchableOpacity
       style={styles.card}
       onPress={() => onPress(exerciseId)}
       accessibilityRole="button"
-      accessibilityLabel={`${name}、${categoryLabel}、${summary}${isBest ? '、自己ベスト' : ''}`}
+      accessibilityLabel={`${name}、${categoryLabel}、${summary}${isBest ? '、自己ベスト' : ''}${comparison ? `、前回比${comparison.label}` : ''}`}
     >
       <ExerciseIdentity
         images={images}
@@ -60,9 +66,16 @@ export const CalendarExerciseCard = memo(function CalendarExerciseCard({
         category={category}
         nameTrailing={isBest && <BestBadge />}
         metaTrailing={
-          <Text style={styles.summary} numberOfLines={1}>
-            {summary}
-          </Text>
+          <>
+            <Text style={styles.summary} numberOfLines={1}>
+              {summary}
+            </Text>
+            {comparison && (
+              <Text style={[styles.comparisonText, { color: isIncrease ? Colors.success : Colors.danger }]}>
+                {comparison.label}
+              </Text>
+            )}
+          </>
         }
       />
       <IconSymbol name="chevron.right" size={19} color={Colors.textPlaceholder} />
@@ -81,5 +94,10 @@ const styles = StyleSheet.create({
     borderRadius: 12,
     padding: 10,
   },
-  summary: { ...Typography.footnote, color: Colors.textMuted },
+  // カテゴリチップ・概要・前回比較の3要素がmetaRow内で横並びになるため、幅が足りない場合は
+  // 概要(summary)側を縮めて前回比較(comparison)が切れないようにする
+  summary: { ...Typography.footnote, color: Colors.textMuted, flexShrink: 1 },
+  // デザイン案指定の色分け（増加#15803D/減少#DC2626のプレーンなテキスト、アイコンは無し）に
+  // そのまま合わせる。サイズはBestBadgeと同じ「バッジ的な強調テキスト」の役割のためTypography.badgeを使う
+  comparisonText: { ...Typography.badge, flexShrink: 0 },
 });

@@ -7,6 +7,7 @@ import type { HistoryEntry } from '@/lib/workout/history';
 
 const entry: HistoryEntry = {
   workoutSessionExerciseId: 100,
+  sessionId: 1,
   startedAt: new Date('2026-07-01T10:00:00').getTime(),
   sets: [
     { setNumber: 1, weight: 60, reps: 10, durationSeconds: null, distanceMeters: null, completedAt: 1 },

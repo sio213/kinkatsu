@@ -216,7 +216,8 @@ export type SetLike = {
 
 // 計測タイプごとの「代表セットを決める指標」。weight_reps/weight_timeは重量が主指標、
 // reps/time/distance_timeはそれぞれ回数・時間・距離が唯一の指標になる
-function primaryMetric(measurementType: MeasurementType, s: SetLike): number | null {
+// （lib/workout/comparison.tsの前回比較でも同じ指標定義を使うためexportしている）
+export function primaryMetric(measurementType: MeasurementType, s: SetLike): number | null {
   switch (measurementType) {
     case 'weight_reps':
     case 'weight_time':
@@ -233,7 +234,7 @@ function primaryMetric(measurementType: MeasurementType, s: SetLike): number | n
 // 主指標が同値のときのタイブレーク指標。weight_repsは回数が多い方、weight_timeは
 // 時間が長い方を優先する（デザインメモの「同kgなら回数が多い方」をweight_time相当にも一般化）。
 // 単一指標の計測タイプはタイブレークの概念が無い
-function secondaryMetric(measurementType: MeasurementType, s: SetLike): number | null {
+export function secondaryMetric(measurementType: MeasurementType, s: SetLike): number | null {
   switch (measurementType) {
     case 'weight_reps':
       return s.reps;
