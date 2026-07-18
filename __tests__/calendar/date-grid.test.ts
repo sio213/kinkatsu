@@ -1,4 +1,4 @@
-import { addMonths, buildMonthGridDates, CELLS_PER_WEEK, isSameDay, WEEKS_PER_GRID } from '@/lib/calendar/date-grid';
+import { addMonths, buildMonthGridDates, CELLS_PER_WEEK, isSameDay, weeksInMonthGrid } from '@/lib/calendar/date-grid';
 
 describe('isSameDay', () => {
   it('同じ年月日なら true', () => {
@@ -18,9 +18,21 @@ describe('isSameDay', () => {
   });
 });
 
+describe('weeksInMonthGrid', () => {
+  it.each([
+    [2026, 6, 5], // 2026年7月: 1日が水曜、31日→5週
+    [2028, 1, 5], // 2028年2月(うるう年): 1日が火曜、29日→5週
+    [2026, 1, 4], // 2026年2月: 1日が日曜、28日→ちょうど4週
+    [2026, 7, 6], // 2026年8月: 1日が土曜、31日→6週
+  ])('%s年%s月(0始まり)は%s週', (year, month, expectedWeeks) => {
+    expect(weeksInMonthGrid(year, month)).toBe(expectedWeeks);
+  });
+});
+
 describe('buildMonthGridDates', () => {
-  it('常に42日分（6週間×7日）を返す', () => {
-    expect(buildMonthGridDates(2026, 6)).toHaveLength(WEEKS_PER_GRID * CELLS_PER_WEEK);
+  it('デザイン案通り、月を過不足なく埋められる最小の週数だけ返す（常に6週固定でパディングしない）', () => {
+    // 2026年7月は5週(35セル)で足りる。6週固定(42セル)にはパディングしない
+    expect(buildMonthGridDates(2026, 6)).toHaveLength(5 * CELLS_PER_WEEK);
   });
 
   it('先頭は日曜日、末尾は土曜日で終わる（週の境界を跨がない）', () => {
@@ -60,14 +72,25 @@ describe('buildMonthGridDates', () => {
     expect(dec1).toBeDefined();
   });
 
-  it('うるう年2月でも42日を維持する', () => {
-    // 2028年はうるう年
-    expect(buildMonthGridDates(2028, 1)).toHaveLength(WEEKS_PER_GRID * CELLS_PER_WEEK);
+  it('うるう年2月は5週(35セル)を返す', () => {
+    // 2028年はうるう年。1日が火曜のため5週で足りる
+    expect(buildMonthGridDates(2028, 1)).toHaveLength(5 * CELLS_PER_WEEK);
   });
 
-  it('1日が土曜始まりの月は前月から最大6日分を含む（境界値）', () => {
+  it('1日が日曜始まりでちょうど4週で収まる月は4週(28セル)を返す', () => {
+    // 2026年2月1日は日曜日、28日(平年)なのでちょうど4週=28日で埋まる
+    const dates = buildMonthGridDates(2026, 1);
+    expect(dates).toHaveLength(4 * CELLS_PER_WEEK);
+    expect(dates[0].getMonth()).toBe(1);
+    expect(dates[0].getDate()).toBe(1);
+    expect(dates[dates.length - 1].getMonth()).toBe(1);
+    expect(dates[dates.length - 1].getDate()).toBe(28);
+  });
+
+  it('1日が土曜始まりの月は6週(42セル)を返し、前月から最大6日分を含む（境界値）', () => {
     // 2026年8月1日は土曜日
     const dates = buildMonthGridDates(2026, 7);
+    expect(dates).toHaveLength(6 * CELLS_PER_WEEK);
     expect(dates[0].getMonth()).toBe(6);
     expect(dates[0].getDate()).toBe(26);
     expect(dates[6].getMonth()).toBe(7);

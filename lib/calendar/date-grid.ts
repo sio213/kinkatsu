@@ -2,19 +2,27 @@
 // （lib/notifications/schedule-math.tsと同じ考え方）。
 
 export const CELLS_PER_WEEK = 7;
-export const WEEKS_PER_GRID = 6;
 
 export function isSameDay(a: Date, b: Date): boolean {
   return a.getFullYear() === b.getFullYear() && a.getMonth() === b.getMonth() && a.getDate() === b.getDate();
 }
 
-// 月表示グリッドに並べる42日分（6週間×7日）の日付を、前月/当月/翌月をまたいで生成する。
-// 1日が週の何曜日から始まるかに関わらず常に6週間分埋めることで、月によってグリッドの
-// 高さが変わってしまう（＝画面が月をまたぐたびにガタつく）のを防ぐ
+// 月表示グリッドに必要な週数（4〜6週）を、1日の曜日と月の日数から計算する。
+// デザイン案はその月を過不足なく埋められる最小の週数で表示しており（例: 2026年7月は5週）、
+// 常に6週固定でパディングはしない
+export function weeksInMonthGrid(year: number, month: number): number {
+  const firstOfMonth = new Date(year, month, 1);
+  const daysInMonth = new Date(year, month + 1, 0).getDate();
+  return Math.ceil((firstOfMonth.getDay() + daysInMonth) / CELLS_PER_WEEK);
+}
+
+// 月表示グリッドに並べる日付を、前月/当月/翌月をまたいで生成する。行数は
+// weeksInMonthGridに従い月ごとに4〜6週で可変（デザイン案通り）
 export function buildMonthGridDates(year: number, month: number): Date[] {
   const firstOfMonth = new Date(year, month, 1);
   const gridStart = new Date(year, month, 1 - firstOfMonth.getDay());
-  return Array.from({ length: WEEKS_PER_GRID * CELLS_PER_WEEK }, (_, i) => {
+  const weeks = weeksInMonthGrid(year, month);
+  return Array.from({ length: weeks * CELLS_PER_WEEK }, (_, i) => {
     const d = new Date(gridStart);
     d.setDate(gridStart.getDate() + i);
     return d;
