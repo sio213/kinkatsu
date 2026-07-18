@@ -20,6 +20,22 @@ export type CalendarMonthRecords = {
 // JOINし、完了済みセット1件につき1行取得することで「セット数が最も多いカテゴリ」の集計に
 // そのまま使える形にしている
 export function useCalendarMonthRecords(startMs: number, endMs: number): CalendarMonthRecords {
+  // useLiveQueryはクエリのfrom()に指定したテーブル（このクエリではsets）の変更しか自動購読しない
+  // （drizzle-orm/expo-sqlite/query.jsの実装がquery.config.table1つだけを対象にaddDatabaseChangeListener
+  // している）。トレーニング終了(endWorkoutSession)はworkoutSessions.endedAtを更新するだけでsetsには
+  // 書き込みが無いため、このクエリ単体では終了直後に月グリッドの色分けが更新されないバグがあった。
+  // workoutSessions側にも同じ範囲で軽量な購読を張り、その更新をdepsに含めることでメインクエリの
+  // 再購読・即時再フェッチを強制する（deps変更でuseEffectが張り直され、内部で無条件にquery.then()
+  // が走るため）。どちらのdepsにもstartMs/endMsを含める必要がある（省略するとdefaultの[]により
+  // マウント時のクロージャに固定され、月送りでrangeが変わってもクエリが再購読されない）
+  const { data: sessionsInRangeSignal } = useLiveQuery(
+    db
+      .select({ id: workoutSessions.id, endedAt: workoutSessions.endedAt })
+      .from(workoutSessions)
+      .where(and(gte(workoutSessions.startedAt, startMs), lt(workoutSessions.startedAt, endMs))),
+    [startMs, endMs],
+  );
+
   const { data } = useLiveQuery(
     db
       .select({
@@ -44,6 +60,7 @@ export function useCalendarMonthRecords(startMs: number, endMs: number): Calenda
       // getPastTrainingSessionsと同じ懸念）に備え、セッションidも最終タイブレークに加えて
       // 常に決定的な順序にする（orderIndexはソートにのみ使うためselect projectionには含めない）
       .orderBy(asc(workoutSessions.startedAt), asc(workoutSessions.id), asc(workoutSessionExercises.orderIndex)),
+    [startMs, endMs, sessionsInRangeSignal],
   );
 
   return useMemo(() => {

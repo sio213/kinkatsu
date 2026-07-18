@@ -1,17 +1,19 @@
 import { CalendarExerciseCard } from '@/components/calendar/calendar-exercise-card';
 import { CategoryColorLegend } from '@/components/calendar/category-color-legend';
 import { DayEmptyState } from '@/components/calendar/day-empty-state';
+import { SessionTimeGroupHeader } from '@/components/calendar/session-time-group-header';
 import { SwipeableMonthView } from '@/components/calendar/swipeable-month-view';
 import { CategoryFilterChips } from '@/components/exercises/category-filter-chips';
 import { IconSymbol } from '@/components/ui/icon-symbol';
 import { ResumeWorkoutBanner } from '@/components/workout/resume-workout-banner';
 import { Colors, Typography } from '@/constants/theme';
-import { useCalendarDayExercises } from '@/hooks/use-calendar-day-exercises';
+import { useCalendarDayExercises, type CalendarDayCard } from '@/hooks/use-calendar-day-exercises';
 import { useCalendarMonthRecords } from '@/hooks/use-calendar-month-records';
 import { useDebouncedPush } from '@/hooks/use-debounced-push';
 import { useWorkoutSessions } from '@/hooks/use-workout-session';
 import { addMonths, isSameDay } from '@/lib/calendar/date-grid';
 import { CATEGORY_ALL, EXERCISE_CATEGORIES } from '@/lib/exercises/constants';
+import { groupCardsBySession } from '@/lib/calendar/session-groups';
 import { formatMonthGroup, formatSessionDateGroup } from '@/lib/workout/summary';
 import { Stack } from 'expo-router';
 import { useCallback, useMemo, useState } from 'react';
@@ -43,6 +45,36 @@ function MonthNavButton({
         color={Colors.textPlaceholder}
       />
     </TouchableOpacity>
+  );
+}
+
+// 時間帯グループ表示・フラット表示のどちらでもカード列の描画は同一のため共有する
+// （CalendarExerciseCardへ渡すpropsを2箇所に重複させない）
+function DayCardList({
+  cards,
+  onPressExercise,
+}: {
+  cards: CalendarDayCard[];
+  onPressExercise: (exerciseId: number) => void;
+}) {
+  return (
+    <View style={styles.dayCardList}>
+      {cards.map((card) => (
+        <CalendarExerciseCard
+          key={card.workoutSessionExerciseId}
+          exerciseId={card.exerciseId}
+          name={card.name}
+          category={card.category}
+          source={card.source}
+          slug={card.slug}
+          measurementType={card.measurementType}
+          sets={card.sets}
+          isBest={card.isBest}
+          comparison={card.comparison}
+          onPress={onPressExercise}
+        />
+      ))}
+    </View>
   );
 }
 
@@ -80,6 +112,13 @@ export default function CalendarScreen() {
   // カテゴリフィルターは月グリッドのマーカー表示だけに作用する（デザイン案「確定：カテゴリ
   // フィルタ適用」の仕様通り）。選択日パネルはフィルターの影響を受けず常に全記録を表示する
   const { cards: dayCards, retry: retryDayCards } = useCalendarDayExercises(selectedDate);
+  // 同日に複数セッションがある場合だけ、セッション単位（時刻の早い順）でグルーピングして
+  // 時間帯見出しを表示する（デザイン案「複数18」）。1セッションのみの日は見出しを出さず
+  // 従来通りのフラットな一覧のままにする（1件しかないのに時刻見出しを出す価値が薄いため）
+  const dayCardGroups = useMemo(
+    () => (Array.isArray(dayCards) ? groupCardsBySession(dayCards) : []),
+    [dayCards],
+  );
 
   const pushDebounced = useDebouncedPush();
   const handlePressExercise = useCallback(
@@ -158,24 +197,17 @@ export default function CalendarScreen() {
             ) : (
               <Text style={styles.dayEmptyText}>記録がありません</Text>
             )
-          ) : (
-            <View style={styles.dayCardList}>
-              {dayCards.map((card) => (
-                <CalendarExerciseCard
-                  key={card.workoutSessionExerciseId}
-                  exerciseId={card.exerciseId}
-                  name={card.name}
-                  category={card.category}
-                  source={card.source}
-                  slug={card.slug}
-                  measurementType={card.measurementType}
-                  sets={card.sets}
-                  isBest={card.isBest}
-                  comparison={card.comparison}
-                  onPress={handlePressExercise}
-                />
+          ) : dayCardGroups.length > 1 ? (
+            <View style={styles.dayGroupList}>
+              {dayCardGroups.map((group) => (
+                <View key={group.sessionId} style={styles.dayGroup}>
+                  <SessionTimeGroupHeader sessionStartedAt={group.sessionStartedAt} />
+                  <DayCardList cards={group.cards} onPressExercise={handlePressExercise} />
+                </View>
               ))}
             </View>
+          ) : (
+            <DayCardList cards={dayCards} onPressExercise={handlePressExercise} />
           )}
         </View>
       </ScrollView>
@@ -200,4 +232,7 @@ const styles = StyleSheet.create({
   dayErrorText: { ...Typography.body, color: Colors.danger },
   dayRetryText: { ...Typography.bodyStrong, color: Colors.accent },
   dayCardList: { gap: 8 },
+  // 時間帯グループ間の余白はデザイン案「複数18」のheight:12px相当
+  dayGroupList: { gap: 12 },
+  dayGroup: { gap: 8 },
 });

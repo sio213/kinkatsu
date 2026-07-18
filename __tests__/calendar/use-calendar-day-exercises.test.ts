@@ -72,8 +72,9 @@ describe('useCalendarDayExercises', () => {
   });
 
   it('選択日のセッションの種目カードを取得し、自己ベストのカードにisBest:trueを付与する', async () => {
+    const startedAt = new Date(2026, 6, 16, 7, 0).getTime();
     (useWorkoutSessions as jest.Mock).mockReturnValue({
-      sessions: [{ id: 1, startedAt: new Date(2026, 6, 16, 7, 0).getTime(), endedAt: new Date(2026, 6, 16, 8, 0).getTime() }],
+      sessions: [{ id: 1, startedAt, endedAt: new Date(2026, 6, 16, 8, 0).getTime() }],
     });
     const card = {
       workoutSessionExerciseId: 100,
@@ -94,12 +95,15 @@ describe('useCalendarDayExercises', () => {
 
     expect(mockGetSessionExerciseCards).toHaveBeenCalledWith(1);
     expect(mockGetExerciseHistoryEntries).toHaveBeenCalledWith(1, -1);
-    expect(getResult()).toEqual([{ ...card, sessionId: 1, isBest: true, comparison: null }]);
+    expect(getResult()).toEqual([
+      { ...card, sessionId: 1, sessionStartedAt: startedAt, isBest: true, comparison: null },
+    ]);
   });
 
   it('自己ベストでないカードにはisBest:falseを付与する', async () => {
+    const startedAt = new Date(2026, 6, 16, 7, 0).getTime();
     (useWorkoutSessions as jest.Mock).mockReturnValue({
-      sessions: [{ id: 1, startedAt: new Date(2026, 6, 16, 7, 0).getTime(), endedAt: new Date(2026, 6, 16, 8, 0).getTime() }],
+      sessions: [{ id: 1, startedAt, endedAt: new Date(2026, 6, 16, 8, 0).getTime() }],
     });
     const card = {
       workoutSessionExerciseId: 100,
@@ -118,7 +122,9 @@ describe('useCalendarDayExercises', () => {
     const { getResult, root } = renderHook(new Date(2026, 6, 16));
     await flush(root);
 
-    expect(getResult()).toEqual([{ ...card, sessionId: 1, isBest: false, comparison: null }]);
+    expect(getResult()).toEqual([
+      { ...card, sessionId: 1, sessionStartedAt: startedAt, isBest: false, comparison: null },
+    ]);
   });
 
   it('取得に失敗したら\'error\'を返す', async () => {
@@ -152,10 +158,12 @@ describe('useCalendarDayExercises', () => {
   });
 
   it('同じ日に複数セッションがあれば両方の種目カードを合算して返す', async () => {
+    const morningStart = new Date(2026, 6, 16, 7, 0).getTime();
+    const eveningStart = new Date(2026, 6, 16, 20, 0).getTime();
     (useWorkoutSessions as jest.Mock).mockReturnValue({
       sessions: [
-        { id: 1, startedAt: new Date(2026, 6, 16, 7, 0).getTime(), endedAt: new Date(2026, 6, 16, 8, 0).getTime() },
-        { id: 2, startedAt: new Date(2026, 6, 16, 20, 0).getTime(), endedAt: new Date(2026, 6, 16, 21, 0).getTime() },
+        { id: 1, startedAt: morningStart, endedAt: new Date(2026, 6, 16, 8, 0).getTime() },
+        { id: 2, startedAt: eveningStart, endedAt: new Date(2026, 6, 16, 21, 0).getTime() },
       ],
     });
     const cardA = {
@@ -188,8 +196,8 @@ describe('useCalendarDayExercises', () => {
     await flush(root);
 
     expect(getResult()).toEqual([
-      { ...cardA, sessionId: 1, isBest: false, comparison: null },
-      { ...cardB, sessionId: 2, isBest: false, comparison: null },
+      { ...cardA, sessionId: 1, sessionStartedAt: morningStart, isBest: false, comparison: null },
+      { ...cardB, sessionId: 2, sessionStartedAt: eveningStart, isBest: false, comparison: null },
     ]);
   });
 
@@ -211,10 +219,12 @@ describe('useCalendarDayExercises', () => {
   });
 
   it('同じ種目が複数セッションにまたがる場合でも履歴取得は種目ごとに1回だけ呼ばれる', async () => {
+    const morningStart = new Date(2026, 6, 16, 7, 0).getTime();
+    const eveningStart = new Date(2026, 6, 16, 20, 0).getTime();
     (useWorkoutSessions as jest.Mock).mockReturnValue({
       sessions: [
-        { id: 1, startedAt: new Date(2026, 6, 16, 7, 0).getTime(), endedAt: new Date(2026, 6, 16, 8, 0).getTime() },
-        { id: 2, startedAt: new Date(2026, 6, 16, 20, 0).getTime(), endedAt: new Date(2026, 6, 16, 21, 0).getTime() },
+        { id: 1, startedAt: morningStart, endedAt: new Date(2026, 6, 16, 8, 0).getTime() },
+        { id: 2, startedAt: eveningStart, endedAt: new Date(2026, 6, 16, 21, 0).getTime() },
       ],
     });
     const cardMorning = {
@@ -240,8 +250,8 @@ describe('useCalendarDayExercises', () => {
     expect(mockGetExerciseHistoryEntries).toHaveBeenCalledTimes(1);
     expect(mockGetExerciseHistoryEntries).toHaveBeenCalledWith(1, -1);
     expect(getResult()).toEqual([
-      { ...cardMorning, sessionId: 1, isBest: false, comparison: null },
-      { ...cardEvening, sessionId: 2, isBest: false, comparison: null },
+      { ...cardMorning, sessionId: 1, sessionStartedAt: morningStart, isBest: false, comparison: null },
+      { ...cardEvening, sessionId: 2, sessionStartedAt: eveningStart, isBest: false, comparison: null },
     ]);
   });
 
@@ -251,8 +261,9 @@ describe('useCalendarDayExercises', () => {
     // こうすることで自己ベスト判定と前回比較の「確定/未確定」の基準が常に一致する
 
     it('前回よりセット内容が良くなっていればcomparisonに差分が入る', async () => {
+      const startedAt = new Date(2026, 6, 16, 7, 0).getTime();
       (useWorkoutSessions as jest.Mock).mockReturnValue({
-        sessions: [{ id: 2, startedAt: new Date(2026, 6, 16, 7, 0).getTime(), endedAt: new Date(2026, 6, 16, 8, 0).getTime() }],
+        sessions: [{ id: 2, startedAt, endedAt: new Date(2026, 6, 16, 8, 0).getTime() }],
       });
       const card = {
         workoutSessionExerciseId: 200,
@@ -280,13 +291,20 @@ describe('useCalendarDayExercises', () => {
       await flush(root);
 
       expect(getResult()).toEqual([
-        { ...card, sessionId: 2, isBest: false, comparison: { field: 'weight', delta: 2.5, label: '+2.5kg' } },
+        {
+          ...card,
+          sessionId: 2,
+          sessionStartedAt: startedAt,
+          isBest: false,
+          comparison: { field: 'weight', delta: 2.5, label: '+2.5kg' },
+        },
       ]);
     });
 
     it('前回記録が無ければcomparisonはnullのまま', async () => {
+      const startedAt = new Date(2026, 6, 16, 7, 0).getTime();
       (useWorkoutSessions as jest.Mock).mockReturnValue({
-        sessions: [{ id: 1, startedAt: new Date(2026, 6, 16, 7, 0).getTime(), endedAt: new Date(2026, 6, 16, 8, 0).getTime() }],
+        sessions: [{ id: 1, startedAt, endedAt: new Date(2026, 6, 16, 8, 0).getTime() }],
       });
       const card = {
         workoutSessionExerciseId: 100,
@@ -305,12 +323,15 @@ describe('useCalendarDayExercises', () => {
       const { getResult, root } = renderHook(new Date(2026, 6, 16));
       await flush(root);
 
-      expect(getResult()).toEqual([{ ...card, sessionId: 1, isBest: false, comparison: null }]);
+      expect(getResult()).toEqual([
+        { ...card, sessionId: 1, sessionStartedAt: startedAt, isBest: false, comparison: null },
+      ]);
     });
 
     it('履歴に自分自身のセッションしか無ければ前回記録なし扱い（自分自身とは比較しない）', async () => {
+      const startedAt = new Date(2026, 6, 16, 7, 0).getTime();
       (useWorkoutSessions as jest.Mock).mockReturnValue({
-        sessions: [{ id: 1, startedAt: new Date(2026, 6, 16, 7, 0).getTime(), endedAt: new Date(2026, 6, 16, 8, 0).getTime() }],
+        sessions: [{ id: 1, startedAt, endedAt: new Date(2026, 6, 16, 8, 0).getTime() }],
       });
       const card = {
         workoutSessionExerciseId: 100,
@@ -332,12 +353,15 @@ describe('useCalendarDayExercises', () => {
       const { getResult, root } = renderHook(new Date(2026, 6, 16));
       await flush(root);
 
-      expect(getResult()).toEqual([{ ...card, sessionId: 1, isBest: false, comparison: null }]);
+      expect(getResult()).toEqual([
+        { ...card, sessionId: 1, sessionStartedAt: startedAt, isBest: false, comparison: null },
+      ]);
     });
 
     it('✓未確定のセットは比較対象の集計から除外される（自己ベスト判定・表示概要と基準を揃える）', async () => {
+      const startedAt = new Date(2026, 6, 16, 7, 0).getTime();
       (useWorkoutSessions as jest.Mock).mockReturnValue({
-        sessions: [{ id: 2, startedAt: new Date(2026, 6, 16, 7, 0).getTime(), endedAt: new Date(2026, 6, 16, 8, 0).getTime() }],
+        sessions: [{ id: 2, startedAt, endedAt: new Date(2026, 6, 16, 8, 0).getTime() }],
       });
       const card = {
         workoutSessionExerciseId: 200,
@@ -369,7 +393,57 @@ describe('useCalendarDayExercises', () => {
 
       // 未確定の100kg×20が代表セットに混入していれば+40kgになってしまうが、
       // 確定セット(60kg×8)だけを見るため差分は無し(comparison: null)になるはず
-      expect(getResult()).toEqual([{ ...card, sessionId: 2, isBest: false, comparison: null }]);
+      expect(getResult()).toEqual([
+        { ...card, sessionId: 2, sessionStartedAt: startedAt, isBest: false, comparison: null },
+      ]);
+    });
+
+    it('同日に複数セッションがある場合、朝カードの前回比較は時系列的に後の同日夜セッションと比較されない（PR8で発覚したバグの回帰テスト）', async () => {
+      const morningStart = new Date(2026, 6, 16, 7, 0).getTime();
+      const eveningStart = new Date(2026, 6, 16, 20, 0).getTime();
+      (useWorkoutSessions as jest.Mock).mockReturnValue({
+        sessions: [
+          { id: 1, startedAt: morningStart, endedAt: new Date(2026, 6, 16, 8, 0).getTime() },
+          { id: 2, startedAt: eveningStart, endedAt: new Date(2026, 6, 16, 21, 0).getTime() },
+        ],
+      });
+      const cardMorning = {
+        workoutSessionExerciseId: 100,
+        exerciseId: 1,
+        name: 'ベンチプレス',
+        category: 'chest',
+        measurementType: 'weight_reps',
+        source: 'preset',
+        slug: 'bench-press',
+        sets: [{ weight: 60, reps: 8, durationSeconds: null, distanceMeters: null, completedAt: 1 }],
+      };
+      const cardEvening = {
+        ...cardMorning,
+        workoutSessionExerciseId: 101,
+        sets: [{ weight: 65, reps: 8, durationSeconds: null, distanceMeters: null, completedAt: 1 }],
+      };
+      mockGetSessionExerciseCards.mockImplementation((sessionId: number) =>
+        Promise.resolve(sessionId === 1 ? [cardMorning] : [cardEvening]),
+      );
+      // getExerciseHistoryEntriesは新しい順（desc(startedAt)）で返る。当日の夜→朝の順に並ぶ
+      mockGetExerciseHistoryEntries.mockResolvedValue([
+        { workoutSessionExerciseId: 101, sessionId: 2, startedAt: eveningStart, sets: cardEvening.sets },
+        { workoutSessionExerciseId: 100, sessionId: 1, startedAt: morningStart, sets: cardMorning.sets },
+      ]);
+      mockComputePersonalBestIds.mockReturnValue(new Set());
+
+      const { getResult, root } = renderHook(new Date(2026, 6, 16));
+      await flush(root);
+
+      const results = getResult() as { sessionId: number; comparison: unknown }[];
+      const morningResult = results.find((c) => c.sessionId === 1)!;
+      const eveningResult = results.find((c) => c.sessionId === 2)!;
+
+      // 夜カードは正しく「朝(自分より前)」と比較され差分が出る
+      expect(eveningResult.comparison).toEqual({ field: 'weight', delta: 5, label: '+5kg' });
+      // 朝カードは、自分より後に始まった同日夜セッションと比較されてはいけない
+      // （前回記録が無い扱い＝comparison:nullになるべき）
+      expect(morningResult.comparison).toBeNull();
     });
   });
 });

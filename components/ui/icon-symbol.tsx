@@ -19,7 +19,6 @@ const MAPPING = {
   'chevron.left.forwardslash.chevron.right': 'code',
   'chevron.left': 'chevron-left',
   'chevron.right': 'chevron-right',
-  calendar: 'calendar-month',
   ellipsis: 'more-vert',
   'dumbbell.fill': 'fitness-center',
   'list.bullet.clipboard': 'assignment',
