@@ -1,4 +1,38 @@
-import { addMonths, buildMonthGridDates, CELLS_PER_WEEK, isSameDay, weeksInMonthGrid } from '@/lib/calendar/date-grid';
+import { addMonths, buildMonthGridDates, CELLS_PER_WEEK, isSameDay, toDateKey, weeksInMonthGrid } from '@/lib/calendar/date-grid';
+
+describe('toDateKey', () => {
+  it('YYYY-MM-DD形式（月/日は2桁ゼロパディング）を返す', () => {
+    expect(toDateKey(new Date(2026, 0, 5))).toBe('2026-01-05');
+    expect(toDateKey(new Date(2026, 11, 31))).toBe('2026-12-31');
+  });
+
+  it('時刻部分は無視される（同日なら常に同じキー）', () => {
+    expect(toDateKey(new Date(2026, 6, 16, 0, 0))).toBe(toDateKey(new Date(2026, 6, 16, 23, 59)));
+  });
+
+  // 実行環境のTZ(process.env.TZ)をテスト内で明示的に切り替えて検証する。CI(ubuntu-latestは
+  // デフォルトUTC)とローカル(Asia/Tokyo等)でこのテストの結果が変わってはいけない。
+  // 境界時刻は「UTCに変換すると日付が変わる側」を狙って選んでおり、toISOString().split('T')[0]の
+  // ような誤実装に戻すと必ず失敗する（=このテストで初めて回帰を検知できる）
+  describe('タイムゾーンに依存しない（process.env.TZを切り替えて検証）', () => {
+    const originalTZ = process.env.TZ;
+    afterEach(() => {
+      process.env.TZ = originalTZ;
+    });
+
+    it('UTC+9(Asia/Tokyo)の深夜0時台でも前日にずれない', () => {
+      process.env.TZ = 'Asia/Tokyo';
+      // 00:30 JST → UTCでは前日15:30。toISOString()経由だと'2025-12-31'になってしまう
+      expect(toDateKey(new Date(2026, 0, 1, 0, 30))).toBe('2026-01-01');
+    });
+
+    it('UTC-8(America/Los_Angeles)の23時台でも翌日にずれない', () => {
+      process.env.TZ = 'America/Los_Angeles';
+      // 23:30 PST → UTCでは翌日07:30。toISOString()経由だと'2026-01-02'になってしまう
+      expect(toDateKey(new Date(2026, 0, 1, 23, 30))).toBe('2026-01-01');
+    });
+  });
+});
 
 describe('isSameDay', () => {
   it('同じ年月日なら true', () => {
