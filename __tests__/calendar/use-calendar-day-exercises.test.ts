@@ -39,6 +39,7 @@ async function flush(root: ReturnType<typeof create>) {
     await Promise.resolve();
     await Promise.resolve();
     await Promise.resolve();
+    await Promise.resolve();
   });
   return root;
 }
@@ -85,7 +86,7 @@ describe('useCalendarDayExercises', () => {
       sets: [{ weight: 60, reps: 8, durationSeconds: null, distanceMeters: null, completedAt: 1 }],
     };
     mockGetSessionExerciseCards.mockResolvedValue([card]);
-    mockGetExerciseHistoryEntries.mockResolvedValue([{ workoutSessionExerciseId: 100, startedAt: 1, sets: [] }]);
+    mockGetExerciseHistoryEntries.mockResolvedValue([{ workoutSessionExerciseId: 100, sessionId: 1, startedAt: 1, sets: [] }]);
     mockComputePersonalBestIds.mockReturnValue(new Set([100]));
 
     const { getResult, root } = renderHook(new Date(2026, 6, 16));
@@ -93,7 +94,7 @@ describe('useCalendarDayExercises', () => {
 
     expect(mockGetSessionExerciseCards).toHaveBeenCalledWith(1);
     expect(mockGetExerciseHistoryEntries).toHaveBeenCalledWith(1, -1);
-    expect(getResult()).toEqual([{ ...card, isBest: true }]);
+    expect(getResult()).toEqual([{ ...card, sessionId: 1, isBest: true, comparison: null }]);
   });
 
   it('自己ベストでないカードにはisBest:falseを付与する', async () => {
@@ -117,7 +118,7 @@ describe('useCalendarDayExercises', () => {
     const { getResult, root } = renderHook(new Date(2026, 6, 16));
     await flush(root);
 
-    expect(getResult()).toEqual([{ ...card, isBest: false }]);
+    expect(getResult()).toEqual([{ ...card, sessionId: 1, isBest: false, comparison: null }]);
   });
 
   it('取得に失敗したら\'error\'を返す', async () => {
@@ -187,8 +188,8 @@ describe('useCalendarDayExercises', () => {
     await flush(root);
 
     expect(getResult()).toEqual([
-      { ...cardA, isBest: false },
-      { ...cardB, isBest: false },
+      { ...cardA, sessionId: 1, isBest: false, comparison: null },
+      { ...cardB, sessionId: 2, isBest: false, comparison: null },
     ]);
   });
 
@@ -239,8 +240,136 @@ describe('useCalendarDayExercises', () => {
     expect(mockGetExerciseHistoryEntries).toHaveBeenCalledTimes(1);
     expect(mockGetExerciseHistoryEntries).toHaveBeenCalledWith(1, -1);
     expect(getResult()).toEqual([
-      { ...cardMorning, isBest: false },
-      { ...cardEvening, isBest: false },
+      { ...cardMorning, sessionId: 1, isBest: false, comparison: null },
+      { ...cardEvening, sessionId: 2, isBest: false, comparison: null },
     ]);
+  });
+
+  describe('前回比較(comparison)', () => {
+    // 前回比較はgetPreviousSets（別クエリ）ではなく、自己ベスト判定と同じ
+    // getExerciseHistoryEntries（✓確定セットを持つカードのみ、new順）から導出する。
+    // こうすることで自己ベスト判定と前回比較の「確定/未確定」の基準が常に一致する
+
+    it('前回よりセット内容が良くなっていればcomparisonに差分が入る', async () => {
+      (useWorkoutSessions as jest.Mock).mockReturnValue({
+        sessions: [{ id: 2, startedAt: new Date(2026, 6, 16, 7, 0).getTime(), endedAt: new Date(2026, 6, 16, 8, 0).getTime() }],
+      });
+      const card = {
+        workoutSessionExerciseId: 200,
+        exerciseId: 1,
+        name: 'ベンチプレス',
+        category: 'chest',
+        measurementType: 'weight_reps',
+        source: 'preset',
+        slug: 'bench-press',
+        sets: [{ weight: 62.5, reps: 8, durationSeconds: null, distanceMeters: null, completedAt: 1 }],
+      };
+      mockGetSessionExerciseCards.mockResolvedValue([card]);
+      // 過去(セッションid=1)の確定セットを含む1件が履歴として返る
+      mockGetExerciseHistoryEntries.mockResolvedValue([
+        {
+          workoutSessionExerciseId: 100,
+          sessionId: 1,
+          startedAt: 0,
+          sets: [{ weight: 60, reps: 8, durationSeconds: null, distanceMeters: null, completedAt: 1 }],
+        },
+      ]);
+      mockComputePersonalBestIds.mockReturnValue(new Set());
+
+      const { getResult, root } = renderHook(new Date(2026, 6, 16));
+      await flush(root);
+
+      expect(getResult()).toEqual([
+        { ...card, sessionId: 2, isBest: false, comparison: { field: 'weight', delta: 2.5, label: '+2.5kg' } },
+      ]);
+    });
+
+    it('前回記録が無ければcomparisonはnullのまま', async () => {
+      (useWorkoutSessions as jest.Mock).mockReturnValue({
+        sessions: [{ id: 1, startedAt: new Date(2026, 6, 16, 7, 0).getTime(), endedAt: new Date(2026, 6, 16, 8, 0).getTime() }],
+      });
+      const card = {
+        workoutSessionExerciseId: 100,
+        exerciseId: 1,
+        name: 'ベンチプレス',
+        category: 'chest',
+        measurementType: 'weight_reps',
+        source: 'preset',
+        slug: 'bench-press',
+        sets: [{ weight: 60, reps: 8, durationSeconds: null, distanceMeters: null, completedAt: 1 }],
+      };
+      mockGetSessionExerciseCards.mockResolvedValue([card]);
+      mockGetExerciseHistoryEntries.mockResolvedValue([]);
+      mockComputePersonalBestIds.mockReturnValue(new Set());
+
+      const { getResult, root } = renderHook(new Date(2026, 6, 16));
+      await flush(root);
+
+      expect(getResult()).toEqual([{ ...card, sessionId: 1, isBest: false, comparison: null }]);
+    });
+
+    it('履歴に自分自身のセッションしか無ければ前回記録なし扱い（自分自身とは比較しない）', async () => {
+      (useWorkoutSessions as jest.Mock).mockReturnValue({
+        sessions: [{ id: 1, startedAt: new Date(2026, 6, 16, 7, 0).getTime(), endedAt: new Date(2026, 6, 16, 8, 0).getTime() }],
+      });
+      const card = {
+        workoutSessionExerciseId: 100,
+        exerciseId: 1,
+        name: 'ベンチプレス',
+        category: 'chest',
+        measurementType: 'weight_reps',
+        source: 'preset',
+        slug: 'bench-press',
+        sets: [{ weight: 60, reps: 8, durationSeconds: null, distanceMeters: null, completedAt: 1 }],
+      };
+      mockGetSessionExerciseCards.mockResolvedValue([card]);
+      // 履歴に含まれる唯一のエントリが今表示中のカード自身（同じsessionId）
+      mockGetExerciseHistoryEntries.mockResolvedValue([
+        { workoutSessionExerciseId: 100, sessionId: 1, startedAt: 1, sets: card.sets },
+      ]);
+      mockComputePersonalBestIds.mockReturnValue(new Set());
+
+      const { getResult, root } = renderHook(new Date(2026, 6, 16));
+      await flush(root);
+
+      expect(getResult()).toEqual([{ ...card, sessionId: 1, isBest: false, comparison: null }]);
+    });
+
+    it('✓未確定のセットは比較対象の集計から除外される（自己ベスト判定・表示概要と基準を揃える）', async () => {
+      (useWorkoutSessions as jest.Mock).mockReturnValue({
+        sessions: [{ id: 2, startedAt: new Date(2026, 6, 16, 7, 0).getTime(), endedAt: new Date(2026, 6, 16, 8, 0).getTime() }],
+      });
+      const card = {
+        workoutSessionExerciseId: 200,
+        exerciseId: 1,
+        name: 'ベンチプレス',
+        category: 'chest',
+        measurementType: 'weight_reps',
+        source: 'preset',
+        slug: 'bench-press',
+        sets: [
+          { weight: 60, reps: 8, durationSeconds: null, distanceMeters: null, completedAt: 1 },
+          // プリフィルされただけの未確定セット。代表セット選定から除外されるべき
+          { weight: 100, reps: 20, durationSeconds: null, distanceMeters: null, completedAt: null },
+        ],
+      };
+      mockGetSessionExerciseCards.mockResolvedValue([card]);
+      mockGetExerciseHistoryEntries.mockResolvedValue([
+        {
+          workoutSessionExerciseId: 100,
+          sessionId: 1,
+          startedAt: 0,
+          sets: [{ weight: 60, reps: 8, durationSeconds: null, distanceMeters: null, completedAt: 1 }],
+        },
+      ]);
+      mockComputePersonalBestIds.mockReturnValue(new Set());
+
+      const { getResult, root } = renderHook(new Date(2026, 6, 16));
+      await flush(root);
+
+      // 未確定の100kg×20が代表セットに混入していれば+40kgになってしまうが、
+      // 確定セット(60kg×8)だけを見るため差分は無し(comparison: null)になるはず
+      expect(getResult()).toEqual([{ ...card, sessionId: 2, isBest: false, comparison: null }]);
+    });
   });
 });

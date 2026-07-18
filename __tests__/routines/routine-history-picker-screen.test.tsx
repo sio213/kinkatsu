@@ -50,6 +50,7 @@ const mockGetExerciseHistoryEntries = jest.spyOn(historyModule, 'getExerciseHist
 
 const entry1 = {
   workoutSessionExerciseId: 100,
+  sessionId: 1,
   startedAt: new Date('2026-07-01T10:00:00').getTime(),
   sets: [
     { setNumber: 1, weight: 60, reps: 10, durationSeconds: null, distanceMeters: null, completedAt: 1 },
@@ -58,6 +59,7 @@ const entry1 = {
 };
 const entry2 = {
   workoutSessionExerciseId: 101,
+  sessionId: 2,
   startedAt: new Date('2026-06-01T10:00:00').getTime(),
   sets: [{ setNumber: 1, weight: 80, reps: 5, durationSeconds: null, distanceMeters: null, completedAt: 1 }],
 };
@@ -183,6 +185,7 @@ test('hasRecordedDataがfalseなら確認なしですぐloadSetsIntoExerciseAt�
 test('値が1つも無い行(セット追加だけして未入力のまま終えた等)は読み込み時に除外される(getExerciseHistoryEntriesは行単位までは絞り込まないため)', async () => {
   const entryWithEmptyRow = {
     workoutSessionExerciseId: 100,
+    sessionId: 1,
     startedAt: new Date('2026-07-01T10:00:00').getTime(),
     sets: [
       { setNumber: 1, weight: 60, reps: 10, durationSeconds: null, distanceMeters: null, completedAt: 1 },

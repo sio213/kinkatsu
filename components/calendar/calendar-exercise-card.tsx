@@ -4,9 +4,10 @@ import { BestBadge } from '@/components/workout/best-badge';
 import { Colors, Typography } from '@/constants/theme';
 import { resolveMeasurementType, getCategoryLabel } from '@/lib/exercises/constants';
 import { getExerciseImages, type ExerciseImages } from '@/lib/exercises/images';
+import type { SetComparison } from '@/lib/workout/comparison';
 import { summarizeExerciseSets, type SetLike } from '@/lib/workout/set-format';
 import { memo } from 'react';
-import { StyleSheet, Text, TouchableOpacity } from 'react-native';
+import { StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 
 // getSessionExerciseCards由来のsetsは、プリフィル用途で✓未確定(completedAt null)のセットも
 // 含んだまま返ってくる。自己ベスト判定(computePersonalBestIds)は確定セットしか見ていないため、
@@ -24,6 +25,9 @@ type Props = {
   measurementType: string;
   sets: HistorySetLike[];
   isBest: boolean;
+  // 直前の同種目セッションとの比較（hooks/use-calendar-day-exercises.tsで算出）。
+  // 比較対象が無い/変化なしならnull
+  comparison: SetComparison | null;
   onPress: (exerciseId: number) => void;
 };
 
@@ -39,6 +43,7 @@ export const CalendarExerciseCard = memo(function CalendarExerciseCard({
   measurementType,
   sets,
   isBest,
+  comparison,
   onPress,
 }: Props) {
   const images: ExerciseImages = getExerciseImages({ source, slug });
@@ -46,13 +51,14 @@ export const CalendarExerciseCard = memo(function CalendarExerciseCard({
   const confirmedSets = sets.filter((s) => s.completedAt != null);
   const summary = summarizeExerciseSets(resolvedMeasurementType, confirmedSets);
   const categoryLabel = getCategoryLabel(category);
+  const isIncrease = comparison != null && comparison.delta > 0;
 
   return (
     <TouchableOpacity
       style={styles.card}
       onPress={() => onPress(exerciseId)}
       accessibilityRole="button"
-      accessibilityLabel={`${name}、${categoryLabel}、${summary}${isBest ? '、自己ベスト' : ''}`}
+      accessibilityLabel={`${name}、${categoryLabel}、${summary}${isBest ? '、自己ベスト' : ''}${comparison ? `、前回比${comparison.label}` : ''}`}
     >
       <ExerciseIdentity
         images={images}
@@ -60,9 +66,17 @@ export const CalendarExerciseCard = memo(function CalendarExerciseCard({
         category={category}
         nameTrailing={isBest && <BestBadge />}
         metaTrailing={
-          <Text style={styles.summary} numberOfLines={1}>
-            {summary}
-          </Text>
+          <>
+            <Text style={styles.summary} numberOfLines={1}>
+              {summary}
+            </Text>
+            {comparison && (
+              <View style={styles.comparison}>
+                <IconSymbol name={isIncrease ? 'arrow.up' : 'arrow.down'} size={11} color={Colors.textBody} />
+                <Text style={styles.comparisonText}>{comparison.label}</Text>
+              </View>
+            )}
+          </>
         }
       />
       <IconSymbol name="chevron.right" size={19} color={Colors.textPlaceholder} />
@@ -81,5 +95,11 @@ const styles = StyleSheet.create({
     borderRadius: 12,
     padding: 10,
   },
-  summary: { ...Typography.footnote, color: Colors.textMuted },
+  // カテゴリチップ・概要・前回比較の3要素がmetaRow内で横並びになるため、幅が足りない場合は
+  // 概要(summary)側を縮めて前回比較(comparison)が切れないようにする
+  summary: { ...Typography.footnote, color: Colors.textMuted, flexShrink: 1 },
+  // 前回比較の増減は、カテゴリ色（塗りつぶし色）・Colors.danger（エラー色）との衝突を避けるため
+  // 色ではなく上下矢印アイコンで方向を表現し、文字色は中立なtextBodyに統一している
+  comparison: { flexDirection: 'row', alignItems: 'center', gap: 2, flexShrink: 0 },
+  comparisonText: { ...Typography.footnote, fontWeight: '700', color: Colors.textBody },
 });

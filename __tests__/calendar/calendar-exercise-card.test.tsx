@@ -14,6 +14,7 @@ function render(props: Partial<Parameters<typeof CalendarExerciseCard>[0]> = {})
     measurementType: 'weight_reps',
     sets: [{ weight: 60, reps: 8, durationSeconds: null, distanceMeters: null, completedAt: 1 }],
     isBest: false,
+    comparison: null,
     onPress,
     ...props,
   };
@@ -102,5 +103,35 @@ describe('CalendarExerciseCard', () => {
     });
     const texts = root.root.findAllByType(Text).map((t) => t.props.children);
     expect(texts.some((t) => typeof t === 'string' && t.includes('60kg'))).toBe(true);
+  });
+
+  describe('前回比較(comparison)', () => {
+    it('comparisonが無ければ比較表示をしない', () => {
+      const root = render({ comparison: null });
+      const texts = root.root.findAllByType(Text).map((t) => t.props.children);
+      expect(texts).not.toContain('+2.5kg');
+    });
+
+    it('増加していれば上矢印アイコン＋ラベルを表示する', () => {
+      const root = render({ comparison: { field: 'weight', delta: 2.5, label: '+2.5kg' } });
+      const texts = root.root.findAllByType(Text).map((t) => t.props.children);
+      expect(texts).toContain('+2.5kg');
+      const icon = root.root.findAllByProps({ name: 'arrow.up' });
+      expect(icon.length).toBeGreaterThan(0);
+    });
+
+    it('減少していれば下矢印アイコン＋ラベルを表示する（色は使わず矢印の向きだけで表現する）', () => {
+      const root = render({ comparison: { field: 'reps', delta: -2, label: '-2回' } });
+      const texts = root.root.findAllByType(Text).map((t) => t.props.children);
+      expect(texts).toContain('-2回');
+      const icon = root.root.findAllByProps({ name: 'arrow.down' });
+      expect(icon.length).toBeGreaterThan(0);
+    });
+
+    it('accessibilityLabelに前回比較を含む', () => {
+      const root = render({ comparison: { field: 'weight', delta: 2.5, label: '+2.5kg' } });
+      const label = root.root.findByType(TouchableOpacity).props.accessibilityLabel as string;
+      expect(label).toContain('+2.5kg');
+    });
   });
 });

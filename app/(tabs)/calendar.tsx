@@ -126,6 +126,7 @@ export default function CalendarScreen() {
                   measurementType={card.measurementType}
                   sets={card.sets}
                   isBest={card.isBest}
+                  comparison={card.comparison}
                   onPress={handlePressExercise}
                 />
               ))}
