@@ -37,7 +37,6 @@ const Palette = {
   red600: '#DC2626',
 
   purple600: '#9333EA',
-  teal600: '#0D9488',
   green600: '#16A34A',
   pink500: '#EC4899',
 } as const;
@@ -81,12 +80,13 @@ export const Colors = {
   shadow: Palette.slate900,
 
   // カレンダー機能の日別マーカー・凡例用。既存10カテゴリを7グループに圧縮した色
-  // （lib/calendar/category-color.ts）。デザイン案の脚・お尻はaccentと同値だったため
-  // teal600に変更済み。shoulder/cardioOtherはfavorite/textPlaceholderと値が同じだが、
-  // 画面上の文脈が異なり実害が薄いためデザイン案の指定通り据え置いている
+  // （lib/calendar/category-color.ts）。脚・お尻は一時teal600に変更していたが、
+  // accentとの衝突を承知の上でデザイン案指定のblue600に統一（2026-07-19確定）。
+  // shoulder/cardioOtherもfavorite/textPlaceholderと値が同じだが、画面上の文脈が異なり
+  // 実害が薄いためデザイン案の指定通り据え置いている
   categoryChest: Palette.red500,
   categoryBack: Palette.purple600,
-  categoryLegGlute: Palette.teal600,
+  categoryLegGlute: Palette.blue600,
   categoryAbsCore: Palette.green600,
   categoryShoulder: Palette.amber500,
   categoryArm: Palette.pink500,

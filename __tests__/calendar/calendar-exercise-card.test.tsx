@@ -36,16 +36,16 @@ describe('CalendarExerciseCard', () => {
     expect(texts.some((t) => typeof t === 'string' && t.includes('60kg'))).toBe(true);
   });
 
-  it('isBest=trueのとき自己ベストバッジを表示する', () => {
+  it('isBest=trueのとき自己ベストバッジを表示する（表示文言は2行折返し防止のため「ベスト」に短縮）', () => {
     const root = render({ isBest: true });
     const texts = root.root.findAllByType(Text).map((t) => t.props.children);
-    expect(texts).toContain('自己ベスト');
+    expect(texts).toContain('ベスト');
   });
 
   it('isBest=falseのとき自己ベストバッジを表示しない', () => {
     const root = render({ isBest: false });
     const texts = root.root.findAllByType(Text).map((t) => t.props.children);
-    expect(texts).not.toContain('自己ベスト');
+    expect(texts).not.toContain('ベスト');
   });
 
   it('カード（全体）をタップするとexerciseIdを渡してonPressが呼ばれる', () => {
