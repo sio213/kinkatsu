@@ -1,12 +1,15 @@
 import { CalendarExerciseCard } from '@/components/calendar/calendar-exercise-card';
 import { CategoryColorLegend } from '@/components/calendar/category-color-legend';
+import { DayEmptyState } from '@/components/calendar/day-empty-state';
 import { SwipeableMonthView } from '@/components/calendar/swipeable-month-view';
 import { IconSymbol } from '@/components/ui/icon-symbol';
+import { ResumeWorkoutBanner } from '@/components/workout/resume-workout-banner';
 import { Colors, Typography } from '@/constants/theme';
 import { useCalendarDayExercises } from '@/hooks/use-calendar-day-exercises';
 import { useCalendarMonthRecords } from '@/hooks/use-calendar-month-records';
 import { useDebouncedPush } from '@/hooks/use-debounced-push';
-import { addMonths } from '@/lib/calendar/date-grid';
+import { useWorkoutSessions } from '@/hooks/use-workout-session';
+import { addMonths, isSameDay } from '@/lib/calendar/date-grid';
 import { formatMonthGroup, formatSessionDateGroup } from '@/lib/workout/summary';
 import { Stack } from 'expo-router';
 import { useCallback, useMemo, useState } from 'react';
@@ -71,6 +74,20 @@ export default function CalendarScreen() {
     [pushDebounced],
   );
 
+  const isSelectedToday = isSameDay(selectedDate, today);
+  const { activeSession } = useWorkoutSessions();
+  // 今日の空状態は進行中セッション(endedAtがnull)のendedAtがnullなためuseCalendarDayExercises
+  // 側では「記録なし」に見えている状態でも起こりうる（今日開始したが1セットも確定していない等）。
+  // その場合「トレーニングを開始」ボタンのまま無言でそのセッションに合流すると、新規に始めたい
+  // ユーザーの意図と実際の挙動がズレるため、記録タブ(app/(tabs)/index.tsx)と同じ
+  // ResumeWorkoutBannerに出し分けて「再開」であることを明示する
+  const handleResumeToday = useCallback(() => {
+    if (activeSession) pushDebounced(`/workout/${activeSession.id}`);
+  }, [activeSession, pushDebounced]);
+  const handleStartToday = useCallback(() => {
+    pushDebounced('/workout/start-chooser');
+  }, [pushDebounced]);
+
   return (
     <SafeAreaView style={styles.safeArea} edges={[]}>
       <Stack.Screen
@@ -112,7 +129,13 @@ export default function CalendarScreen() {
               </TouchableOpacity>
             </View>
           ) : dayCards.length === 0 ? (
-            <Text style={styles.dayEmptyText}>記録がありません</Text>
+            isSelectedToday && activeSession ? (
+              <ResumeWorkoutBanner onPress={handleResumeToday} />
+            ) : isSelectedToday ? (
+              <DayEmptyState buttonIcon="play.fill" actionLabel="トレーニングを開始" onPressAction={handleStartToday} />
+            ) : (
+              <Text style={styles.dayEmptyText}>記録がありません</Text>
+            )
           ) : (
             <View style={styles.dayCardList}>
               {dayCards.map((card) => (

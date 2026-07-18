@@ -18,6 +18,7 @@ export function PrimaryButton({ label, onPress, disabled = false, accessibilityL
       style={[styles.button, disabled && styles.disabled, style]}
       onPress={onPress}
       disabled={disabled}
+      accessibilityRole="button"
       accessibilityLabel={accessibilityLabel ?? label}
     >
       {icon}
