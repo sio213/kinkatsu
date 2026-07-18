@@ -16,7 +16,9 @@ type Props = {
   onChangeMonth: (delta: number) => void;
   // 前月/当月/翌月をまたぐ範囲を1回のクエリでまとめて取得したもの（呼び出し元が用意）。
   // 3つのMonthGridで共通のMapをそのまま参照させ、ここでは分割しない
-  dayCategories: Map<string, string>;
+  primaryCategoryByDay: Map<string, string>;
+  categorySetByDay: Map<string, Set<string>>;
+  activeFilter: string | null;
 };
 
 // このくらい動かした/このくらいの速度が出ていれば「月を切り替える意図」とみなすしきい値。
@@ -37,7 +39,9 @@ export function SwipeableMonthView({
   selectedDate,
   onSelectDate,
   onChangeMonth,
-  dayCategories,
+  primaryCategoryByDay,
+  categorySetByDay,
+  activeFilter,
 }: Props) {
   const [containerWidth, setContainerWidth] = useState(0);
   // 月ごとに4〜6週で行数が変わる（lib/calendar/date-grid.tsのweeksInMonthGrid）ため、
@@ -122,7 +126,9 @@ export function SwipeableMonthView({
                 today={today}
                 selectedDate={selectedDate}
                 onSelectDate={onSelectDate}
-                dayCategories={dayCategories}
+                primaryCategoryByDay={primaryCategoryByDay}
+                categorySetByDay={categorySetByDay}
+                activeFilter={activeFilter}
               />
             </View>
             <View style={{ width: containerWidth }} onLayout={handleCurrentMonthLayout}>
@@ -132,7 +138,9 @@ export function SwipeableMonthView({
                 today={today}
                 selectedDate={selectedDate}
                 onSelectDate={onSelectDate}
-                dayCategories={dayCategories}
+                primaryCategoryByDay={primaryCategoryByDay}
+                categorySetByDay={categorySetByDay}
+                activeFilter={activeFilter}
               />
             </View>
             <View style={{ width: containerWidth }}>
@@ -142,7 +150,9 @@ export function SwipeableMonthView({
                 today={today}
                 selectedDate={selectedDate}
                 onSelectDate={onSelectDate}
-                dayCategories={dayCategories}
+                primaryCategoryByDay={primaryCategoryByDay}
+                categorySetByDay={categorySetByDay}
+                activeFilter={activeFilter}
               />
             </View>
           </Animated.View>

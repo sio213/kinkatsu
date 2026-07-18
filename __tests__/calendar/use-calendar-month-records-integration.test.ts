@@ -8,7 +8,7 @@
 import Database from 'better-sqlite3';
 import fs from 'node:fs';
 import path from 'node:path';
-import { aggregateDailyPrimaryCategory } from '@/lib/calendar/day-category';
+import { aggregateDailyCategorySet, aggregateDailyPrimaryCategory } from '@/lib/calendar/day-category';
 import { toDateKey } from '@/lib/calendar/date-grid';
 
 const DRIZZLE_DIR = path.join(__dirname, '../../drizzle');
@@ -93,6 +93,28 @@ function getCalendarMonthRecordsSql(db: Database.Database, startMs: number, endM
     .all(startMs, endMs) as { startedAt: number; category: string }[];
 
   return aggregateDailyPrimaryCategory(
+    rows.map((r) => ({ dateKey: toDateKey(new Date(r.startedAt)), category: r.category })),
+  );
+}
+
+// カテゴリフィルター用のcategorySetByDay経路も同じSQLから独立に検証する（既存の
+// getCalendarMonthRecordsSqlの戻り値型を変えると既存6件のテストに影響するため、あえて別関数にする）
+function getCalendarMonthCategorySetSql(db: Database.Database, startMs: number, endMs: number): Map<string, Set<string>> {
+  const rows = db
+    .prepare(
+      `SELECT ws.started_at AS startedAt, e.category AS category
+       FROM sets s
+       JOIN workout_session_exercises wse ON s.workout_session_exercise_id = wse.id
+       JOIN workout_sessions ws ON wse.session_id = ws.id
+       JOIN exercises e ON wse.exercise_id = e.id
+       WHERE ws.started_at >= ? AND ws.started_at < ?
+         AND ws.ended_at IS NOT NULL
+         AND s.completed_at IS NOT NULL
+       ORDER BY ws.started_at ASC, ws.id ASC, wse.order_index ASC`,
+    )
+    .all(startMs, endMs) as { startedAt: number; category: string }[];
+
+  return aggregateDailyCategorySet(
     rows.map((r) => ({ dateKey: toDateKey(new Date(r.startedAt)), category: r.category })),
   );
 }
@@ -191,5 +213,22 @@ describe('useCalendarMonthRecordsのSQLクエリ（実SQLite）', () => {
     const result = getCalendarMonthRecordsSql(db, 0, Number.MAX_SAFE_INTEGER);
     // セット数は同数(2)なので、orderIndexが先(0)のarmが代表カテゴリになる
     expect(result.get('2026-07-16')).toBe('arm');
+  });
+
+  it('categorySetByDay経路: 代表カテゴリでは埋もれるカテゴリも実SQLite経由で集合に含まれる（カテゴリフィルター用）', () => {
+    const chest = insertExercise(db, 'ベンチプレス', 'chest');
+    const arm = insertExercise(db, 'ダンベルカール', 'arm');
+    const session = insertSession(db, new Date(2026, 6, 16).getTime(), new Date(2026, 6, 16, 1).getTime());
+    const chestCard = insertCard(db, session, chest, 0);
+    insertSet(db, session, chest, chestCard, 1, true);
+    insertSet(db, session, chest, chestCard, 2, true);
+    insertSet(db, session, chest, chestCard, 3, true);
+    const armCard = insertCard(db, session, arm, 1);
+    insertSet(db, session, arm, armCard, 1, true); // armは1セットのみ、代表カテゴリでは埋もれる
+
+    const primary = getCalendarMonthRecordsSql(db, 0, Number.MAX_SAFE_INTEGER);
+    const categorySet = getCalendarMonthCategorySetSql(db, 0, Number.MAX_SAFE_INTEGER);
+    expect(primary.get('2026-07-16')).toBe('chest');
+    expect(categorySet.get('2026-07-16')).toEqual(new Set(['chest', 'arm']));
   });
 });

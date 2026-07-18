@@ -15,7 +15,11 @@ type Props = {
   selectedDate: Date;
   onSelectDate: (date: Date) => void;
   // 日付キー(YYYY-MM-DD)→代表カテゴリ(10種のslug)。実績がある日だけキーを持つ
-  dayCategories: Map<string, string>;
+  primaryCategoryByDay: Map<string, string>;
+  // 日付キー→その日実施した全カテゴリの集合。カテゴリフィルター中の判定にのみ使う
+  categorySetByDay: Map<string, Set<string>>;
+  // カテゴリフィルターチップで選択中のカテゴリ。CATEGORY_ALL（絞り込みなし）ならnull
+  activeFilter: string | null;
 };
 
 // 曜日ラベル行の日曜(index 0)・土曜(index 6)だけ色を付ける。日付の数字自体は
@@ -33,7 +37,9 @@ export const MonthGrid = memo(function MonthGrid({
   today,
   selectedDate,
   onSelectDate,
-  dayCategories,
+  primaryCategoryByDay,
+  categorySetByDay,
+  activeFilter,
 }: Props) {
   const dates = useMemo(() => buildMonthGridDates(year, month), [year, month]);
 
@@ -65,21 +71,35 @@ export const MonthGrid = memo(function MonthGrid({
             );
           }
 
-          const category = dayCategories.get(toDateKey(date));
+          const dateKey = toDateKey(date);
+          const category = primaryCategoryByDay.get(dateKey);
           const hasRecord = category != null;
           // 実績が無い日はアクセント色、ある日はその代表カテゴリの色を「今日/選択中」の
           // 枠線・下線・強調文字色として使う（塗りつぶしが無いときの既定色がアクセント）
           const accentOrCategoryColor = hasRecord ? getCalendarCategoryColor(category) : Colors.accent;
           // 塗りつぶしは「実施日 かつ 選択中でない」場合のみ（選択中は枠線表現に切り替わる）
           const showFill = hasRecord && !isSelected;
+          // フィルター中、該当カテゴリを実施していない日は目立たなくする（完全に消すと
+          // 「その日は何もしていない」ように見え情報が失われるため、実施の有無自体は残す）
+          const isFilteredOut = activeFilter != null && !(categorySetByDay.get(dateKey)?.has(activeFilter) ?? false);
+          // 塗りつぶし(showFill)がある日は、コンテナ全体にopacityを掛けると白背景と白文字
+          // (cellTextOnFill)が両方とも白ページへ向かってブレンドされ文字がほぼ消えてしまう
+          // （フィルターが最も伝えたい「別カテゴリの実施日」情報が最も読めなくなる本末転倒な状態）。
+          // そのためshowFill中はopacityではなく、背景をカテゴリ色の薄いトーン（アルファ付き16進）
+          // に、文字をカテゴリ色そのもの（白ではなく）に切り替える、accent/dangerSurface等
+          // 既存の「薄い背景+濃い文字」パターンと同じ考え方で対応する。
+          // 塗りつぶしが無い日（記録なし、または選択中で枠線表現）はopacityで十分読める
+          // （選択中は枠線・今日の判定自体を隠したくないためopacity対象から外す）
+          const dimWithOpacity = isFilteredOut && !showFill && !isSelected;
+          const filteredFillColor = `${accentOrCategoryColor}33`; // 約20%アルファの薄いトーン
 
           return (
             <TouchableOpacity
               key={date.getTime()}
-              style={styles.cellTouchable}
+              style={[styles.cellTouchable, dimWithOpacity && styles.cellFilteredOut]}
               hitSlop={{ top: 4, bottom: 4, left: 4, right: 4 }}
               accessibilityRole="button"
-              accessibilityLabel={`${date.getMonth() + 1}月${date.getDate()}日${isToday ? '、今日' : ''}${hasRecord ? `、実施日、${getCategoryLabel(category)}` : ''}`}
+              accessibilityLabel={`${date.getMonth() + 1}月${date.getDate()}日${isToday ? '、今日' : ''}${hasRecord ? `、実施日、${getCategoryLabel(category)}` : ''}${isFilteredOut ? '、絞り込み対象外' : ''}`}
               accessibilityState={{ selected: isSelected }}
               onPress={() => onSelectDate(date)}
             >
@@ -87,7 +107,7 @@ export const MonthGrid = memo(function MonthGrid({
                 style={[
                   styles.cell,
                   isSelected && { borderColor: accentOrCategoryColor },
-                  showFill && { backgroundColor: accentOrCategoryColor },
+                  showFill && { backgroundColor: isFilteredOut ? filteredFillColor : accentOrCategoryColor },
                 ]}
               >
                 {/* digitWrapperは幅を明示せず数字テキストの実寸に自然にフィットさせる
@@ -99,7 +119,9 @@ export const MonthGrid = memo(function MonthGrid({
                     style={[
                       styles.cellText,
                       showFill
-                        ? styles.cellTextOnFill
+                        ? isFilteredOut
+                          ? [styles.cellTextEmphasis, { color: accentOrCategoryColor }]
+                          : styles.cellTextOnFill
                         : (isToday || isSelected) && [styles.cellTextEmphasis, { color: accentOrCategoryColor }],
                     ]}
                   >
@@ -109,7 +131,7 @@ export const MonthGrid = memo(function MonthGrid({
                     <View
                       style={[
                         styles.cellTodayUnderlineBar,
-                        { backgroundColor: showFill ? Colors.onAccent : accentOrCategoryColor },
+                        { backgroundColor: showFill && !isFilteredOut ? Colors.onAccent : accentOrCategoryColor },
                       ]}
                     />
                   )}
@@ -140,6 +162,11 @@ const styles = StyleSheet.create({
 
   grid: { flexDirection: 'row', flexWrap: 'wrap' },
   cellTouchable: { width: CELL_WIDTH_PERCENT, aspectRatio: 1, padding: 1 },
+  // 塗りつぶしが無い日（実施記録なし、または選択中で枠線表現）にのみ使う簡易的な非強調表現。
+  // switch.tsxのdisabled(opacity:0.5)よりやや強めに落としているが、月グリッド上で
+  // 「対象外」であることを一目で伝えたいための意図的な差分（塗りつぶしがある日はopacityで
+  // なく色そのものを変えて対応するため、この値は「無塗りの日」専用）
+  cellFilteredOut: { opacity: 0.35 },
   cell: {
     flex: 1,
     borderRadius: 9,

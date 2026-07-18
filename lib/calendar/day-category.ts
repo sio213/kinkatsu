@@ -49,3 +49,19 @@ export function aggregateDailyPrimaryCategory(rows: DailyCategoryRow[]): Map<str
   }
   return result;
 }
+
+// カテゴリフィルターチップ用。「その日に該当カテゴリを1件でも実施したか」の判定に使う。
+// aggregateDailyPrimaryCategoryの代表カテゴリ（1日1つ）とは別に、日ごとの実施カテゴリ
+// 集合をそのまま返す（同じrows入力から両方を独立に計算できる）
+export function aggregateDailyCategorySet(rows: DailyCategoryRow[]): Map<string, Set<string>> {
+  const result = new Map<string, Set<string>>();
+  for (const row of rows) {
+    let categories = result.get(row.dateKey);
+    if (!categories) {
+      categories = new Set();
+      result.set(row.dateKey, categories);
+    }
+    categories.add(row.category);
+  }
+  return result;
+}

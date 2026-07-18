@@ -2,19 +2,25 @@ import { CalendarExerciseCard } from '@/components/calendar/calendar-exercise-ca
 import { CategoryColorLegend } from '@/components/calendar/category-color-legend';
 import { DayEmptyState } from '@/components/calendar/day-empty-state';
 import { SwipeableMonthView } from '@/components/calendar/swipeable-month-view';
+import { CategoryFilterChips } from '@/components/exercises/category-filter-chips';
 import { IconSymbol } from '@/components/ui/icon-symbol';
 import { ResumeWorkoutBanner } from '@/components/workout/resume-workout-banner';
 import { Colors, Typography } from '@/constants/theme';
-import { useCalendarDayExercises } from '@/hooks/use-calendar-day-exercises';
+import { useCalendarDayExercises, type CalendarDayCard } from '@/hooks/use-calendar-day-exercises';
 import { useCalendarMonthRecords } from '@/hooks/use-calendar-month-records';
 import { useDebouncedPush } from '@/hooks/use-debounced-push';
 import { useWorkoutSessions } from '@/hooks/use-workout-session';
 import { addMonths, isSameDay } from '@/lib/calendar/date-grid';
+import { CATEGORY_ALL, EXERCISE_CATEGORIES, getCategoryLabel } from '@/lib/exercises/constants';
 import { formatMonthGroup, formatSessionDateGroup } from '@/lib/workout/summary';
 import { Stack } from 'expo-router';
 import { useCallback, useMemo, useState } from 'react';
 import { ActivityIndicator, ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
+
+// カレンダーのカテゴリフィルターは「全て」+全カテゴリのみ（★お気に入りは種目単位の概念で
+// 日別の実施記録には意味を持たないため、種目一覧等と共通のCATEGORY_FILTER_LISTは使わない）
+const CALENDAR_FILTER_CATEGORIES = [CATEGORY_ALL, ...EXERCISE_CATEGORIES] as const;
 
 function MonthNavButton({
   direction,
@@ -54,6 +60,10 @@ export default function CalendarScreen() {
     setViewed((prev) => addMonths(prev.year, prev.month, delta));
   }, []);
 
+  // カテゴリフィルターチップの選択状態。CATEGORY_ALL（絞り込みなし）がデフォルト
+  const [activeCategory, setActiveCategory] = useState<string>(CATEGORY_ALL);
+  const activeFilter = activeCategory === CATEGORY_ALL ? null : activeCategory;
+
   // SwipeableMonthViewは前月/当月/翌月の3ヶ月分を同時に描画するため、実績データも
   // その3ヶ月分をまとめて1回のクエリで取得する（月ごとに3クエリ張るとスワイプ時に
   // 無駄な再購読が増えるため）
@@ -65,9 +75,18 @@ export default function CalendarScreen() {
       rangeEnd: new Date(endExclusive.year, endExclusive.month, 1).getTime(),
     };
   }, [viewed.year, viewed.month]);
-  const dayCategories = useCalendarMonthRecords(rangeStart, rangeEnd);
+  const { primaryCategoryByDay, categorySetByDay } = useCalendarMonthRecords(rangeStart, rangeEnd);
 
   const { cards: dayCards, retry: retryDayCards } = useCalendarDayExercises(selectedDate);
+  // フィルター中は選択日パネルも該当カテゴリの種目だけに絞る。開始/再開ボタンの出し分け
+  // （下のisSelectedToday && dayCards.length===0判定）はフィルターの影響を受けず、
+  // その日に実績があるかどうかは常に未フィルターのdayCardsで判定する
+  const visibleDayCards: CalendarDayCard[] | null = useMemo(() => {
+    if (!Array.isArray(dayCards)) return null;
+    if (activeFilter == null) return dayCards;
+    return dayCards.filter((c) => c.category === activeFilter);
+  }, [dayCards, activeFilter]);
+
   const pushDebounced = useDebouncedPush();
   const handlePressExercise = useCallback(
     (exerciseId: number) => pushDebounced(`/exercise/${exerciseId}`),
@@ -98,6 +117,13 @@ export default function CalendarScreen() {
         }}
       />
       <ScrollView contentContainerStyle={styles.content}>
+        <View style={styles.filterRow}>
+          <CategoryFilterChips
+            activeCategory={activeCategory}
+            onChange={setActiveCategory}
+            categories={CALENDAR_FILTER_CATEGORIES}
+          />
+        </View>
         <SwipeableMonthView
           year={viewed.year}
           month={viewed.month}
@@ -105,14 +131,23 @@ export default function CalendarScreen() {
           selectedDate={selectedDate}
           onSelectDate={setSelectedDate}
           onChangeMonth={goToMonth}
-          dayCategories={dayCategories}
+          primaryCategoryByDay={primaryCategoryByDay}
+          categorySetByDay={categorySetByDay}
+          activeFilter={activeFilter}
         />
         <View style={styles.legend}>
           <CategoryColorLegend />
         </View>
 
         <View style={styles.dayPanel}>
-          <Text style={styles.dayHeading}>{formatSessionDateGroup(selectedDate.getTime())}</Text>
+          <Text style={styles.dayHeading}>
+            {formatSessionDateGroup(selectedDate.getTime())}
+            {/* その日自体に記録が無ければ絞り込みは無関係なので、Array.isArrayかつ非空のときだけ
+                バッジを出す（無いと「フィルターのせいで何も出ていない」と誤読されかねない） */}
+            {activeFilter && Array.isArray(dayCards) && dayCards.length > 0 && (
+              <Text style={styles.dayHeadingFilter}> （{getCategoryLabel(activeFilter)}で絞り込み中）</Text>
+            )}
+          </Text>
           {dayCards === null ? (
             <ActivityIndicator style={styles.dayLoading} color={Colors.accent} />
           ) : dayCards === 'error' ? (
@@ -136,9 +171,11 @@ export default function CalendarScreen() {
             ) : (
               <Text style={styles.dayEmptyText}>記録がありません</Text>
             )
+          ) : visibleDayCards!.length === 0 ? (
+            <Text style={styles.dayEmptyText}>{getCategoryLabel(activeFilter!)}の記録はありません</Text>
           ) : (
             <View style={styles.dayCardList}>
-              {dayCards.map((card) => (
+              {visibleDayCards!.map((card) => (
                 <CalendarExerciseCard
                   key={card.workoutSessionExerciseId}
                   exerciseId={card.exerciseId}
@@ -165,12 +202,15 @@ const styles = StyleSheet.create({
   safeArea: { flex: 1, backgroundColor: Colors.background },
   content: { paddingHorizontal: 16, paddingTop: 8, paddingBottom: 24 },
   navButton: { width: 36, height: 36, alignItems: 'center', justifyContent: 'center' },
+  filterRow: { marginBottom: 10 },
   legend: { marginTop: 10 },
 
   dayPanel: { marginTop: 16, paddingTop: 12, borderTopWidth: 1, borderTopColor: Colors.border },
   // 記録タブ(app/(tabs)/index.tsx)の日付グループ見出しと同じ役割（formatSessionDateGroupを
   // 使う日付見出し）のため、同じトークン（caption/textMuted/700）に揃える
   dayHeading: { ...Typography.caption, fontWeight: '700', color: Colors.textMuted, marginBottom: 10 },
+  // 絞り込み中バッジはdayHeadingへのネストTextなのでfontWeightだけ通常に戻す（太字が続くと目立ちすぎるため）
+  dayHeadingFilter: { fontWeight: '400' },
   dayLoading: { marginTop: 12 },
   dayEmptyText: { ...Typography.body, color: Colors.textMuted },
   dayErrorWrapper: { flexDirection: 'row', alignItems: 'center', gap: 8, flexWrap: 'wrap' },
