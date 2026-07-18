@@ -1,19 +1,12 @@
 import { IconSymbol } from '@/components/ui/icon-symbol';
-import { MonthGrid } from '@/components/calendar/month-grid';
+import { SwipeableMonthView } from '@/components/calendar/swipeable-month-view';
 import { Colors } from '@/constants/theme';
 import { addMonths } from '@/lib/calendar/date-grid';
 import { formatMonthGroup } from '@/lib/workout/summary';
 import { Stack } from 'expo-router';
-import { useCallback, useMemo, useState } from 'react';
+import { useCallback, useState } from 'react';
 import { StyleSheet, TouchableOpacity, View } from 'react-native';
-import { Gesture, GestureDetector } from 'react-native-gesture-handler';
-import { runOnJS } from 'react-native-reanimated';
 import { SafeAreaView } from 'react-native-safe-area-context';
-
-// スワイプで月を切り替えるための移動量しきい値(pt)。小さすぎると縦スクロールや
-// セルタップの誤反応と区別しにくくなるため、ヘッダーの矢印タップと並ぶ「明確な操作」と
-// 感じられる程度の距離を要求する
-const SWIPE_THRESHOLD = 50;
 
 function MonthNavButton({
   direction,
@@ -53,24 +46,6 @@ export default function CalendarScreen() {
     setViewed((prev) => addMonths(prev.year, prev.month, delta));
   }, []);
 
-  // 左右スワイプで前月/翌月に移動する。onEndはUIスレッド(worklet)で実行されるため、
-  // Reactのstate更新(goToMonth)はrunOnJSでJSスレッドに戻して呼び出す必要がある。
-  // activeOffsetXで横方向にある程度動いた場合のみ発火させ、日付セルの縦方向タップや
-  // 誤タップと区別する
-  const swipeGesture = useMemo(
-    () =>
-      Gesture.Pan()
-        .activeOffsetX([-20, 20])
-        .onEnd((e) => {
-          if (e.translationX <= -SWIPE_THRESHOLD) {
-            runOnJS(goToMonth)(1);
-          } else if (e.translationX >= SWIPE_THRESHOLD) {
-            runOnJS(goToMonth)(-1);
-          }
-        }),
-    [goToMonth],
-  );
-
   return (
     <SafeAreaView style={styles.safeArea} edges={[]}>
       <Stack.Screen
@@ -80,17 +55,16 @@ export default function CalendarScreen() {
           headerRight: () => <MonthNavButton direction="next" onPress={() => goToMonth(1)} />,
         }}
       />
-      <GestureDetector gesture={swipeGesture}>
-        <View style={styles.content}>
-          <MonthGrid
-            year={viewed.year}
-            month={viewed.month}
-            today={today}
-            selectedDate={selectedDate}
-            onSelectDate={setSelectedDate}
-          />
-        </View>
-      </GestureDetector>
+      <View style={styles.content}>
+        <SwipeableMonthView
+          year={viewed.year}
+          month={viewed.month}
+          today={today}
+          selectedDate={selectedDate}
+          onSelectDate={setSelectedDate}
+          onChangeMonth={goToMonth}
+        />
+      </View>
     </SafeAreaView>
   );
 }

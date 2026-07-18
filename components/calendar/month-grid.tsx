@@ -64,14 +64,14 @@ export const MonthGrid = memo(function MonthGrid({ year, month, today, selectedD
               accessibilityState={{ selected: isSelected }}
               onPress={() => onSelectDate(date)}
             >
-              <View
-                style={[
-                  styles.cell,
-                  isSelected && styles.cellSelectedBorder,
-                  isToday && styles.cellTodayUnderline,
-                ]}
-              >
-                <Text style={[styles.cellText, (isToday || isSelected) && styles.cellTextAccent]}>
+              <View style={[styles.cell, isSelected && styles.cellSelectedBorder]}>
+                <Text
+                  style={[
+                    styles.cellText,
+                    (isToday || isSelected) && styles.cellTextAccent,
+                    isToday && styles.cellTextUnderline,
+                  ]}
+                >
                   {date.getDate()}
                 </Text>
               </View>
@@ -109,8 +109,11 @@ const styles = StyleSheet.create({
     borderColor: 'transparent',
   },
   cellSelectedBorder: { borderColor: Colors.accent },
-  cellTodayUnderline: { borderBottomColor: Colors.accent, borderBottomWidth: 2 },
   cellText: { ...Typography.metric, color: Colors.textBody },
   cellTextMuted: { color: Colors.textPlaceholder },
   cellTextAccent: { color: Colors.accent, fontWeight: '800' },
+  // デザイン案は下線をセルの枠(border-bottom)ではなく日付の数字自体の
+  // text-decorationとして描画している（枠だとborderRadiusの丸みで角が
+  // 欠けて見えてしまう）。RNでも同じくTextのtextDecorationLineで表現する
+  cellTextUnderline: { textDecorationLine: 'underline', textDecorationColor: Colors.accent },
 });
