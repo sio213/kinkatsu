@@ -1,13 +1,17 @@
-import { IconSymbol, type IconSymbolName } from '@/components/ui/icon-symbol';
+import { DesignIcon, type DesignIconName } from '@/components/ui/design-icon';
 import { Colors, Typography } from '@/constants/theme';
 import { formatHourMinute, getTimeOfDay, getTimeOfDayLabel, type TimeOfDay } from '@/lib/calendar/time-of-day';
 import { StyleSheet, Text, View } from 'react-native';
 
-const TIME_OF_DAY_STYLE: Record<TimeOfDay, { icon: IconSymbolName; color: string }> = {
-  morning: { icon: 'sun.max.fill', color: Colors.timeOfDayMorning },
-  midday: { icon: 'sun.min.fill', color: Colors.timeOfDayMidday },
-  evening: { icon: 'sunset.fill', color: Colors.timeOfDayEvening },
-  night: { icon: 'moon.stars.fill', color: Colors.timeOfDayNight },
+// SF Symbols/MaterialIconsのクラシック版には塗りつぶし版が無い、または形状が異なる
+// （calendar-month/nightlight等）ため、デザイン案（Material Symbols Rounded塗り）の
+// 公式パスをDesignIconでそのまま使い、3プラットフォームで見た目を一致させる
+const TIME_OF_DAY_STYLE: Record<TimeOfDay, { icon: DesignIconName; color: string }> = {
+  morning: { icon: 'wb-sunny', color: Colors.timeOfDayMorning },
+  // 昼は朝と同じアイコン（wb-sunny）を使い、色（timeOfDayMidday）だけで区別する（ユーザー指示）
+  midday: { icon: 'wb-sunny', color: Colors.timeOfDayMidday },
+  evening: { icon: 'wb-twilight', color: Colors.timeOfDayEvening },
+  night: { icon: 'nightlight', color: Colors.timeOfDayNight },
 };
 
 type Props = {
@@ -25,7 +29,7 @@ export function SessionTimeGroupHeader({ sessionStartedAt }: Props) {
   const label = `${getTimeOfDayLabel(period)} ${formatHourMinute(new Date(sessionStartedAt))}`;
   return (
     <View style={styles.row} accessible accessibilityRole="header" accessibilityLabel={label}>
-      <IconSymbol name={icon} size={17} color={color} />
+      <DesignIcon name={icon} size={17} color={color} />
       <Text style={styles.label}>{label}</Text>
     </View>
   );

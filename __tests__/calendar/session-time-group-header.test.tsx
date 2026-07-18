@@ -28,11 +28,12 @@ describe('SessionTimeGroupHeader', () => {
   });
 
   it.each([
-    ['朝(7:10)', new Date(2026, 6, 16, 7, 10).getTime(), 'sun.max.fill', 'timeOfDayMorning'],
-    ['昼(12:00)', new Date(2026, 6, 16, 12, 0).getTime(), 'sun.min.fill', 'timeOfDayMidday'],
-    ['夕方(17:30)', new Date(2026, 6, 16, 17, 30).getTime(), 'sunset.fill', 'timeOfDayEvening'],
-    ['夜(21:00)', new Date(2026, 6, 16, 21, 0).getTime(), 'moon.stars.fill', 'timeOfDayNight'],
-  ] as const)('%sはsessionStartedAtから時間帯を導出し、%sアイコン・%sの色を使う', (_label, sessionStartedAt, iconName, colorKey) => {
+    ['朝(7:10)', 'wb-sunny', 'timeOfDayMorning', new Date(2026, 6, 16, 7, 10).getTime()],
+    // 昼は朝と同じアイコン(wb-sunny)を使い、色だけで区別する（ユーザー指示）
+    ['昼(12:00)', 'wb-sunny', 'timeOfDayMidday', new Date(2026, 6, 16, 12, 0).getTime()],
+    ['夕方(17:30)', 'wb-twilight', 'timeOfDayEvening', new Date(2026, 6, 16, 17, 30).getTime()],
+    ['夜(21:00)', 'nightlight', 'timeOfDayNight', new Date(2026, 6, 16, 21, 0).getTime()],
+  ] as const)('%sはsessionStartedAtから時間帯を導出し、%sアイコン・%sの色を使う', (_label, iconName, colorKey, sessionStartedAt) => {
     const root = render({ sessionStartedAt });
     const icon = root.root.findAllByProps({ name: iconName })[0];
     expect(icon).toBeDefined();

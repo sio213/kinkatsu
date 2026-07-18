@@ -1,6 +1,8 @@
 // jest.mock はホイストされるため、変数は var で定義してスコープを合わせる
 /* eslint-disable no-var */
 var mockLiveQueryData: unknown[] | undefined;
+var mockSessionsSignalData: unknown[] | undefined;
+var mockUseLiveQuery: jest.Mock;
 
 jest.mock('@/db/client', () => {
   const chain = {
@@ -31,9 +33,18 @@ jest.mock('drizzle-orm', () => ({
   asc: jest.fn((col) => ({ col, dir: 'asc' })),
 }));
 
-jest.mock('drizzle-orm/expo-sqlite', () => ({
-  useLiveQuery: jest.fn(() => ({ data: mockLiveQueryData })),
-}));
+// フック内でuseLiveQueryが2回呼ばれる（①workoutSessionsだけの軽量な購読=session変更検知用、
+// ②sets起点のメインクエリ）ため、呼び出し順で戻り値を出し分ける。①の戻り値はdeps経由で
+// ②の再購読トリガーに使われるだけでデータ内容自体は参照されないため、mockSessionsSignalDataは
+// 「参照が変わったこと」を検証する目的でのみ使う
+jest.mock('drizzle-orm/expo-sqlite', () => {
+  const fn: jest.Mock = jest.fn((_query: unknown, _deps: unknown) => {
+    const data = fn.mock.calls.length % 2 === 1 ? mockSessionsSignalData : mockLiveQueryData;
+    return { data };
+  });
+  mockUseLiveQuery = fn;
+  return { useLiveQuery: fn };
+});
 
 import React from 'react';
 import { act, create } from 'react-test-renderer';
@@ -53,6 +64,8 @@ function renderHook(startMs: number, endMs: number) {
 
 beforeEach(() => {
   mockLiveQueryData = undefined;
+  mockSessionsSignalData = undefined;
+  mockUseLiveQuery.mockClear();
 });
 
 describe('useCalendarMonthRecords', () => {
@@ -79,5 +92,53 @@ describe('useCalendarMonthRecords', () => {
         ['2026-07-17', new Set(['leg'])],
       ]),
     });
+  });
+
+  it('useLiveQueryを2回呼ぶ（①workoutSessions単体の軽量購読 ②sets起点のメインクエリ）', () => {
+    renderHook(0, Number.MAX_SAFE_INTEGER);
+    expect(mockUseLiveQuery).toHaveBeenCalledTimes(2);
+  });
+
+  it('メインクエリのuseLiveQueryには、[startMs, endMs, workoutSessions側の購読結果]をdepsとして渡す（トレーニング終了時にsetsテーブルへの書き込みが無くても再フェッチさせるため）', () => {
+    // mockLiveQueryData（②メインクエリの戻り値）と区別可能な値にしておき、
+    // depsに渡っているのが確かに①(sessionsInRangeSignal)の戻り値であって
+    // ②自身の戻り値ではないことを判別できるようにする
+    mockSessionsSignalData = [{ id: 999, endedAt: 123 }];
+    mockLiveQueryData = [];
+    renderHook(0, Number.MAX_SAFE_INTEGER);
+    // 2回目の呼び出し（メインクエリ）の第2引数(deps)が配列であり、①の戻り値を含んでいること
+    const secondCallArgs = mockUseLiveQuery.mock.calls[1];
+    expect(secondCallArgs[1]).toEqual([0, Number.MAX_SAFE_INTEGER, mockSessionsSignalData]);
+  });
+
+  it('軽量購読(①)のuseLiveQueryには[startMs, endMs]をdepsとして渡す（月送りでrangeが変わったときに再購読させるため）', () => {
+    renderHook(123, 456);
+    const firstCallArgs = mockUseLiveQuery.mock.calls[0];
+    expect(firstCallArgs[1]).toEqual([123, 456]);
+  });
+
+  it('月送りでstartMs/endMsが変わったら、両方のuseLiveQueryのdepsも新しい範囲に更新される（マウント時のクロージャに固定されないこと）', () => {
+    let startMs = 0;
+    let endMs = 100;
+    function Probe() {
+      useCalendarMonthRecords(startMs, endMs);
+      return null;
+    }
+    let root!: ReturnType<typeof create>;
+    act(() => {
+      root = create(React.createElement(Probe));
+    });
+    expect(mockUseLiveQuery.mock.calls[0][1]).toEqual([0, 100]);
+
+    // 月送り相当: startMs/endMsを変えて再レンダーする
+    startMs = 200;
+    endMs = 300;
+    act(() => {
+      root.update(React.createElement(Probe));
+    });
+    const calls = mockUseLiveQuery.mock.calls;
+    // 再レンダーで軽量購読(①)・メインクエリ(②)とも新しいrangeで再度呼ばれていること
+    expect(calls[calls.length - 2][1]).toEqual([200, 300]);
+    expect(calls[calls.length - 1][1]).toEqual([200, 300, mockSessionsSignalData]);
   });
 });

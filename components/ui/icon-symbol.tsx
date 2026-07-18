@@ -19,7 +19,6 @@ const MAPPING = {
   'chevron.left.forwardslash.chevron.right': 'code',
   'chevron.left': 'chevron-left',
   'chevron.right': 'chevron-right',
-  calendar: 'calendar-month',
   ellipsis: 'more-vert',
   'dumbbell.fill': 'fitness-center',
   'list.bullet.clipboard': 'assignment',
@@ -37,10 +36,6 @@ const MAPPING = {
   'arrow.up.right.square': 'open-in-new',
   sparkles: 'auto-awesome',
   'list.bullet': 'list-alt',
-  'sun.max.fill': 'wb-sunny',
-  'sun.min.fill': 'sunny',
-  'sunset.fill': 'wb-twilight',
-  'moon.stars.fill': 'nightlight',
 } as IconMapping;
 
 /**
