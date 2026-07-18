@@ -7,7 +7,7 @@ import { getExerciseImages, type ExerciseImages } from '@/lib/exercises/images';
 import type { SetComparison } from '@/lib/workout/comparison';
 import { summarizeExerciseSets, type SetLike } from '@/lib/workout/set-format';
 import { memo } from 'react';
-import { StyleSheet, Text, TouchableOpacity, View } from 'react-native';
+import { StyleSheet, Text, TouchableOpacity } from 'react-native';
 
 // getSessionExerciseCards由来のsetsは、プリフィル用途で✓未確定(completedAt null)のセットも
 // 含んだまま返ってくる。自己ベスト判定(computePersonalBestIds)は確定セットしか見ていないため、
@@ -71,10 +71,9 @@ export const CalendarExerciseCard = memo(function CalendarExerciseCard({
               {summary}
             </Text>
             {comparison && (
-              <View style={styles.comparison}>
-                <IconSymbol name={isIncrease ? 'arrow.up' : 'arrow.down'} size={11} color={Colors.textBody} />
-                <Text style={styles.comparisonText}>{comparison.label}</Text>
-              </View>
+              <Text style={[styles.comparisonText, { color: isIncrease ? Colors.success : Colors.danger }]}>
+                {comparison.label}
+              </Text>
             )}
           </>
         }
@@ -98,8 +97,7 @@ const styles = StyleSheet.create({
   // カテゴリチップ・概要・前回比較の3要素がmetaRow内で横並びになるため、幅が足りない場合は
   // 概要(summary)側を縮めて前回比較(comparison)が切れないようにする
   summary: { ...Typography.footnote, color: Colors.textMuted, flexShrink: 1 },
-  // 前回比較の増減は、カテゴリ色（塗りつぶし色）・Colors.danger（エラー色）との衝突を避けるため
-  // 色ではなく上下矢印アイコンで方向を表現し、文字色は中立なtextBodyに統一している
-  comparison: { flexDirection: 'row', alignItems: 'center', gap: 2, flexShrink: 0 },
-  comparisonText: { ...Typography.footnote, fontWeight: '700', color: Colors.textBody },
+  // デザイン案指定の色分け（増加#15803D/減少#DC2626のプレーンなテキスト、アイコンは無し）に
+  // そのまま合わせる。サイズはBestBadgeと同じ「バッジ的な強調テキスト」の役割のためTypography.badgeを使う
+  comparisonText: { ...Typography.badge, flexShrink: 0 },
 });

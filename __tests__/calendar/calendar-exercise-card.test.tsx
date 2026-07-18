@@ -1,6 +1,7 @@
 import { act, create } from 'react-test-renderer';
 import { Text, TouchableOpacity } from 'react-native';
 import { CalendarExerciseCard } from '@/components/calendar/calendar-exercise-card';
+import { Colors } from '@/constants/theme';
 
 const onPress = jest.fn();
 
@@ -112,20 +113,16 @@ describe('CalendarExerciseCard', () => {
       expect(texts).not.toContain('+2.5kg');
     });
 
-    it('増加していれば上矢印アイコン＋ラベルを表示する', () => {
+    it('増加していれば緑文字(デザイン案指定の#15803D)でラベルを表示する', () => {
       const root = render({ comparison: { field: 'weight', delta: 2.5, label: '+2.5kg' } });
-      const texts = root.root.findAllByType(Text).map((t) => t.props.children);
-      expect(texts).toContain('+2.5kg');
-      const icon = root.root.findAllByProps({ name: 'arrow.up' });
-      expect(icon.length).toBeGreaterThan(0);
+      const text = root.root.findAllByType(Text).find((t) => t.props.children === '+2.5kg')!;
+      expect(text.props.style).toEqual(expect.arrayContaining([expect.objectContaining({ color: Colors.success })]));
     });
 
-    it('減少していれば下矢印アイコン＋ラベルを表示する（色は使わず矢印の向きだけで表現する）', () => {
+    it('減少していれば赤文字(デザイン案指定の#DC2626、Colors.dangerと同値)でラベルを表示する', () => {
       const root = render({ comparison: { field: 'reps', delta: -2, label: '-2回' } });
-      const texts = root.root.findAllByType(Text).map((t) => t.props.children);
-      expect(texts).toContain('-2回');
-      const icon = root.root.findAllByProps({ name: 'arrow.down' });
-      expect(icon.length).toBeGreaterThan(0);
+      const text = root.root.findAllByType(Text).find((t) => t.props.children === '-2回')!;
+      expect(text.props.style).toEqual(expect.arrayContaining([expect.objectContaining({ color: Colors.danger })]));
     });
 
     it('accessibilityLabelに前回比較を含む', () => {
