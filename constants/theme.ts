@@ -179,14 +179,16 @@ export const headerOptions: NativeStackNavigationOptions = {
 };
 
 /**
- * タブ画面（記録・種目ライブラリ・リマインダー）共通のヘッダー設定。
+ * タブ画面（記録・種目ライブラリ・カレンダー・リマインダー）共通のヘッダー設定。
  * Tabsナビゲータ自身のヘッダー（@react-navigation/bottom-tabs）が対象。
- * push画面はネイティブのUINavigationBarが右端に標準マージンを自動で入れるが、
- * bottom-tabsのヘッダーはJS実装で自動マージンを持たないため、headerRightContainerStyleで
- * 明示的に右端の余白を入れないとheaderRightのボタンが画面端に張り付いて見える。
+ * push画面はネイティブのUINavigationBarが左右端に標準マージンを自動で入れるが、
+ * bottom-tabsのヘッダーはJS実装で自動マージンを持たないため、headerLeft/RightContainerStyleで
+ * 明示的に左右端の余白を入れないとheaderLeft/headerRightのボタンが画面端に張り付いて見える
+ * （左右どちらか一方だけ余白を入れると、タイトルに対してボタンが左右非対称に見えてしまう）。
  */
 export const tabHeaderOptions: BottomTabNavigationOptions = {
   ...sharedHeaderStyle,
+  headerLeftContainerStyle: { paddingStart: 16 },
   headerRightContainerStyle: { paddingEnd: 16 },
 };
 

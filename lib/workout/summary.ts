@@ -82,7 +82,8 @@ export function formatRelativeDaysAgo(startedAt: number, now: number = Date.now(
   return `${years}年前`;
 }
 
-// 「記録から読み込む」画面の月グループ見出し用（例:「2026年7月」）
+// 月グループ見出し用（例:「2026年7月」）。「記録から読み込む」画面の月グループ見出しと
+// カレンダー画面(app/(tabs)/calendar.tsx)のヘッダータイトルの両方で使う
 export function formatMonthGroup(startedAt: number): string {
   const d = new Date(startedAt);
   return `${d.getFullYear()}年${d.getMonth() + 1}月`;
