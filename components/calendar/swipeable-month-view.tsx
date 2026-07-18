@@ -14,6 +14,9 @@ type Props = {
   // 呼び出し元(app/(tabs)/calendar.tsx)のviewed state更新。スワイプが確定した後に
   // 1回だけ呼ばれる（アニメーションの途中経過ではstateを更新しない）
   onChangeMonth: (delta: number) => void;
+  // 前月/当月/翌月をまたぐ範囲を1回のクエリでまとめて取得したもの（呼び出し元が用意）。
+  // 3つのMonthGridで共通のMapをそのまま参照させ、ここでは分割しない
+  dayCategories: Map<string, string>;
 };
 
 // このくらい動かした/このくらいの速度が出ていれば「月を切り替える意図」とみなすしきい値。
@@ -27,7 +30,15 @@ const SNAP_DURATION_MS = 240;
 // 「隣の月へスナップ」か「元に戻る」かをアニメーションさせるカルーセル。
 // タップ操作（onSelectDate）はactiveOffsetXの範囲内では発火しないため、日付セルの
 // TouchableOpacityと共存できる
-export function SwipeableMonthView({ year, month, today, selectedDate, onSelectDate, onChangeMonth }: Props) {
+export function SwipeableMonthView({
+  year,
+  month,
+  today,
+  selectedDate,
+  onSelectDate,
+  onChangeMonth,
+  dayCategories,
+}: Props) {
   const [containerWidth, setContainerWidth] = useState(0);
   const translateX = useSharedValue(0);
 
@@ -99,10 +110,18 @@ export function SwipeableMonthView({ year, month, today, selectedDate, onSelectD
                 today={today}
                 selectedDate={selectedDate}
                 onSelectDate={onSelectDate}
+                dayCategories={dayCategories}
               />
             </View>
             <View style={{ width: containerWidth }}>
-              <MonthGrid year={year} month={month} today={today} selectedDate={selectedDate} onSelectDate={onSelectDate} />
+              <MonthGrid
+                year={year}
+                month={month}
+                today={today}
+                selectedDate={selectedDate}
+                onSelectDate={onSelectDate}
+                dayCategories={dayCategories}
+              />
             </View>
             <View style={{ width: containerWidth }}>
               <MonthGrid
@@ -111,6 +130,7 @@ export function SwipeableMonthView({ year, month, today, selectedDate, onSelectD
                 today={today}
                 selectedDate={selectedDate}
                 onSelectDate={onSelectDate}
+                dayCategories={dayCategories}
               />
             </View>
           </Animated.View>

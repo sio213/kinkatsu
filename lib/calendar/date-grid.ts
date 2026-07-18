@@ -29,6 +29,17 @@ export function buildMonthGridDates(year: number, month: number): Date[] {
   });
 }
 
+// 日付を「YYYY-MM-DD」のローカルカレンダー基準キーに変換する。日別集計（実績・予定の
+// 突合）のキーとして使う。toISOString()等のUTC変換は使わないこと
+// （ユーザーのタイムゾーンによっては日付がずれるため。isSameDayと同じくgetFullYear/
+// getMonth/getDateのみで組み立てる）
+export function toDateKey(date: Date): string {
+  const y = date.getFullYear();
+  const m = String(date.getMonth() + 1).padStart(2, '0');
+  const d = String(date.getDate()).padStart(2, '0');
+  return `${y}-${m}-${d}`;
+}
+
 // ヘッダーの「YYYY年M月」表示・前月/翌月ナビゲーション用に、月単位でズラしたDateを返す
 export function addMonths(year: number, month: number, delta: number): { year: number; month: number } {
   // Dateコンストラクタはmonthが0-11の範囲外でも年をまたいで正規化してくれるため、
