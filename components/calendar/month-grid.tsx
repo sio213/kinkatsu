@@ -65,15 +65,16 @@ export const MonthGrid = memo(function MonthGrid({ year, month, today, selectedD
               onPress={() => onSelectDate(date)}
             >
               <View style={[styles.cell, isSelected && styles.cellSelectedBorder]}>
-                <Text
-                  style={[
-                    styles.cellText,
-                    (isToday || isSelected) && styles.cellTextAccent,
-                    isToday && styles.cellTextUnderline,
-                  ]}
-                >
-                  {date.getDate()}
-                </Text>
+                {/* digitWrapperは幅を明示せず数字テキストの実寸に自然にフィットさせる
+                    （親cellのalignItems:'center'により伸長されない）。下線バーは
+                    alignSelf:'stretch'でdigitWrapperと同じ幅になり、結果として
+                    「桁数に応じて数字とぴったり同じ幅の下線」をtext-decoration無しで再現する */}
+                <View style={styles.cellDigitWrapper}>
+                  <Text style={[styles.cellText, (isToday || isSelected) && styles.cellTextAccent]}>
+                    {date.getDate()}
+                  </Text>
+                  {isToday && <View style={styles.cellTodayUnderlineBar} />}
+                </View>
               </View>
             </TouchableOpacity>
           );
@@ -109,11 +110,13 @@ const styles = StyleSheet.create({
     borderColor: 'transparent',
   },
   cellSelectedBorder: { borderColor: Colors.accent },
+  cellDigitWrapper: { alignItems: 'center' },
   cellText: { ...Typography.metric, color: Colors.textBody },
   cellTextMuted: { color: Colors.textPlaceholder },
   cellTextAccent: { color: Colors.accent, fontWeight: '800' },
   // デザイン案は下線をセルの枠(border-bottom)ではなく日付の数字自体の
-  // text-decorationとして描画している（枠だとborderRadiusの丸みで角が
-  // 欠けて見えてしまう）。RNでも同じくTextのtextDecorationLineで表現する
-  cellTextUnderline: { textDecorationLine: 'underline', textDecorationColor: Colors.accent },
+  // text-decorationとして描画しており、text-underline-offsetで数字との間に
+  // 隙間を空けている。RNのTextはtextDecorationLineにoffsetを指定できないため、
+  // 数字の下に間隔を空けた専用バーを敷いて同じ見た目を再現する
+  cellTodayUnderlineBar: { alignSelf: 'stretch', height: 2, marginTop: 3, borderRadius: 1, backgroundColor: Colors.accent },
 });

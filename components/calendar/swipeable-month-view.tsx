@@ -1,5 +1,5 @@
 import { addMonths } from '@/lib/calendar/date-grid';
-import { useCallback, useMemo, useState } from 'react';
+import { useCallback, useLayoutEffect, useMemo, useState } from 'react';
 import { StyleSheet, View, type LayoutChangeEvent } from 'react-native';
 import { Gesture, GestureDetector } from 'react-native-gesture-handler';
 import Animated, { runOnJS, useAnimatedStyle, useSharedValue, withTiming } from 'react-native-reanimated';
@@ -35,16 +35,25 @@ export function SwipeableMonthView({ year, month, today, selectedDate, onSelectD
     setContainerWidth(e.nativeEvent.layout.width);
   }, []);
 
-  // アニメーションが隣の月の位置まで完全にスナップし終えたタイミングでのみ呼ばれる。
-  // ここでviewed stateを実際に切り替え、同じフレームでtranslateXを0に戻す
-  // （切り替え後は「新しい当月」がちょうどこの位置に描画されるため、見た目のジャンプが起きない）
+  // アニメーションが隣の月の位置まで完全にスナップし終えたタイミングでonChangeMonthを呼び、
+  // year/monthを実際に切り替える。ここでtranslateXを即0に戻さないのがポイント：
+  // onChangeMonth(setState)は非同期に反映されるため、同じ関数内でtranslateXを先に0へ戻すと
+  // 「新しいprops(year/month)がまだ反映されていない一瞬」に0の位置(=古い当月)が見えてしまい、
+  // 数字が一瞬別の月にズレて見える不具合になる。リセットは下のuseLayoutEffectでprops反映後に行う
   const commitMonthChange = useCallback(
     (delta: number) => {
       onChangeMonth(delta);
-      translateX.value = 0;
     },
-    [onChangeMonth, translateX],
+    [onChangeMonth],
   );
+
+  // year/monthのprops更新がコミットされた直後（画面に描画される前）にtranslateXを0へ戻す。
+  // useEffectだと描画後になり1フレーム分ズレて見えることがあるため、描画前に同期実行される
+  // useLayoutEffectを使う。ヘッダーの矢印タップ（スワイプを経ない月送り）でもtranslateXは
+  // 元々0のままなので、ここでの再代入は無害
+  useLayoutEffect(() => {
+    translateX.value = 0;
+  }, [year, month, translateX]);
 
   const panGesture = useMemo(
     () =>
