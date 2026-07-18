@@ -33,7 +33,13 @@ const Palette = {
   amber800: '#92400E',
 
   red100: '#FEE2E2',
+  red500: '#EF4444',
   red600: '#DC2626',
+
+  purple600: '#9333EA',
+  teal600: '#0D9488',
+  green600: '#16A34A',
+  pink500: '#EC4899',
 } as const;
 
 export const Colors = {
@@ -73,6 +79,18 @@ export const Colors = {
   tint: Palette.blue600,
 
   shadow: Palette.slate900,
+
+  // カレンダー機能の日別マーカー・凡例用。既存10カテゴリを7グループに圧縮した色
+  // （lib/calendar/category-color.ts）。デザイン案の脚・お尻はaccentと同値だったため
+  // teal600に変更済み。shoulder/cardioOtherはfavorite/textPlaceholderと値が同じだが、
+  // 画面上の文脈が異なり実害が薄いためデザイン案の指定通り据え置いている
+  categoryChest: Palette.red500,
+  categoryBack: Palette.purple600,
+  categoryLegGlute: Palette.teal600,
+  categoryAbsCore: Palette.green600,
+  categoryShoulder: Palette.amber500,
+  categoryArm: Palette.pink500,
+  categoryCardioOther: Palette.slate400,
 };
 
 /** シャドウトークン。各キーがスタイルオブジェクト。`{...Shadows.switchKnob}` のようにスプレッドして使う */
