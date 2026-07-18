@@ -6,12 +6,12 @@ import { CategoryFilterChips } from '@/components/exercises/category-filter-chip
 import { IconSymbol } from '@/components/ui/icon-symbol';
 import { ResumeWorkoutBanner } from '@/components/workout/resume-workout-banner';
 import { Colors, Typography } from '@/constants/theme';
-import { useCalendarDayExercises, type CalendarDayCard } from '@/hooks/use-calendar-day-exercises';
+import { useCalendarDayExercises } from '@/hooks/use-calendar-day-exercises';
 import { useCalendarMonthRecords } from '@/hooks/use-calendar-month-records';
 import { useDebouncedPush } from '@/hooks/use-debounced-push';
 import { useWorkoutSessions } from '@/hooks/use-workout-session';
 import { addMonths, isSameDay } from '@/lib/calendar/date-grid';
-import { CATEGORY_ALL, EXERCISE_CATEGORIES, getCategoryLabel } from '@/lib/exercises/constants';
+import { CATEGORY_ALL, EXERCISE_CATEGORIES } from '@/lib/exercises/constants';
 import { formatMonthGroup, formatSessionDateGroup } from '@/lib/workout/summary';
 import { Stack } from 'expo-router';
 import { useCallback, useMemo, useState } from 'react';
@@ -77,15 +77,9 @@ export default function CalendarScreen() {
   }, [viewed.year, viewed.month]);
   const { primaryCategoryByDay, categorySetByDay } = useCalendarMonthRecords(rangeStart, rangeEnd);
 
+  // カテゴリフィルターは月グリッドのマーカー表示だけに作用する（デザイン案「確定：カテゴリ
+  // フィルタ適用」の仕様通り）。選択日パネルはフィルターの影響を受けず常に全記録を表示する
   const { cards: dayCards, retry: retryDayCards } = useCalendarDayExercises(selectedDate);
-  // フィルター中は選択日パネルも該当カテゴリの種目だけに絞る。開始/再開ボタンの出し分け
-  // （下のisSelectedToday && dayCards.length===0判定）はフィルターの影響を受けず、
-  // その日に実績があるかどうかは常に未フィルターのdayCardsで判定する
-  const visibleDayCards: CalendarDayCard[] | null = useMemo(() => {
-    if (!Array.isArray(dayCards)) return null;
-    if (activeFilter == null) return dayCards;
-    return dayCards.filter((c) => c.category === activeFilter);
-  }, [dayCards, activeFilter]);
 
   const pushDebounced = useDebouncedPush();
   const handlePressExercise = useCallback(
@@ -140,14 +134,7 @@ export default function CalendarScreen() {
         </View>
 
         <View style={styles.dayPanel}>
-          <Text style={styles.dayHeading}>
-            {formatSessionDateGroup(selectedDate.getTime())}
-            {/* その日自体に記録が無ければ絞り込みは無関係なので、Array.isArrayかつ非空のときだけ
-                バッジを出す（無いと「フィルターのせいで何も出ていない」と誤読されかねない） */}
-            {activeFilter && Array.isArray(dayCards) && dayCards.length > 0 && (
-              <Text style={styles.dayHeadingFilter}> （{getCategoryLabel(activeFilter)}で絞り込み中）</Text>
-            )}
-          </Text>
+          <Text style={styles.dayHeading}>{formatSessionDateGroup(selectedDate.getTime())}</Text>
           {dayCards === null ? (
             <ActivityIndicator style={styles.dayLoading} color={Colors.accent} />
           ) : dayCards === 'error' ? (
@@ -171,11 +158,9 @@ export default function CalendarScreen() {
             ) : (
               <Text style={styles.dayEmptyText}>記録がありません</Text>
             )
-          ) : visibleDayCards!.length === 0 ? (
-            <Text style={styles.dayEmptyText}>{getCategoryLabel(activeFilter!)}の記録はありません</Text>
           ) : (
             <View style={styles.dayCardList}>
-              {visibleDayCards!.map((card) => (
+              {dayCards.map((card) => (
                 <CalendarExerciseCard
                   key={card.workoutSessionExerciseId}
                   exerciseId={card.exerciseId}
@@ -209,8 +194,6 @@ const styles = StyleSheet.create({
   // 記録タブ(app/(tabs)/index.tsx)の日付グループ見出しと同じ役割（formatSessionDateGroupを
   // 使う日付見出し）のため、同じトークン（caption/textMuted/700）に揃える
   dayHeading: { ...Typography.caption, fontWeight: '700', color: Colors.textMuted, marginBottom: 10 },
-  // 絞り込み中バッジはdayHeadingへのネストTextなのでfontWeightだけ通常に戻す（太字が続くと目立ちすぎるため）
-  dayHeadingFilter: { fontWeight: '400' },
   dayLoading: { marginTop: 12 },
   dayEmptyText: { ...Typography.body, color: Colors.textMuted },
   dayErrorWrapper: { flexDirection: 'row', alignItems: 'center', gap: 8, flexWrap: 'wrap' },

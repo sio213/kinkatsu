@@ -202,93 +202,82 @@ describe('MonthGrid', () => {
     });
   });
 
+  // デザイン案「確定：カテゴリフィルタ「胸」適用（該当過去/未来・非該当過去/未来）」の仕様:
+  // 該当日は通常通り塗りつぶし、非該当日は過去/未来問わず塗りつぶさずグレーの点のみ
   describe('カテゴリフィルター(activeFilter)の反映', () => {
-    it('activeFilterがnull（絞り込みなし）なら通常のopacityで表示される', () => {
+    it('activeFilterがnull（絞り込みなし）なら実績がある日は通常通り塗りつぶされ、グレードットも付かない', () => {
       const root = render({
+        selectedDate: new Date(2026, 6, 18),
         activeFilter: null,
+        primaryCategoryByDay: new Map([['2026-07-05', 'chest']]),
         categorySetByDay: new Map([['2026-07-05', new Set(['chest'])]]),
       });
       const touchable = findTouchableForDay(root, '7月5日');
-      expect(touchable.props.style).not.toEqual(
-        expect.arrayContaining([expect.objectContaining({ opacity: expect.anything() })]),
+      const cellView = touchable.findAllByType(View)[1];
+      expect(cellView.props.style).toEqual(
+        expect.arrayContaining([expect.objectContaining({ backgroundColor: getCalendarCategoryColor('chest') })]),
       );
+      const dot = cellView.findAllByType(View).find((v) => {
+        const style = [v.props.style].flat();
+        return style.some((s) => s && s.backgroundColor === Colors.borderStrong);
+      });
+      expect(dot).toBeUndefined();
     });
 
-    it('その日が該当カテゴリを実施していれば薄くならない', () => {
+    it('該当カテゴリを実施した日は通常通りカテゴリ色で塗りつぶされる（グレードットは付かない）', () => {
       const root = render({
+        selectedDate: new Date(2026, 6, 18),
         activeFilter: 'chest',
+        primaryCategoryByDay: new Map([['2026-07-05', 'chest']]),
         categorySetByDay: new Map([['2026-07-05', new Set(['chest', 'arm'])]]),
       });
       const touchable = findTouchableForDay(root, '7月5日');
-      expect(touchable.props.style).not.toEqual(
-        expect.arrayContaining([expect.objectContaining({ opacity: expect.anything() })]),
+      const cellView = touchable.findAllByType(View)[1];
+      expect(cellView.props.style).toEqual(
+        expect.arrayContaining([expect.objectContaining({ backgroundColor: getCalendarCategoryColor('chest') })]),
       );
     });
 
-    it('その日が該当カテゴリを実施していなければ薄く(opacity)表示される', () => {
+    it('実績はあるが該当カテゴリを実施していない日は、塗りつぶさずグレードット(Colors.borderStrong)のみ表示する', () => {
       const root = render({
+        selectedDate: new Date(2026, 6, 18),
         activeFilter: 'chest',
+        primaryCategoryByDay: new Map([['2026-07-05', 'leg']]),
         categorySetByDay: new Map([['2026-07-05', new Set(['leg'])]]),
       });
       const touchable = findTouchableForDay(root, '7月5日');
-      expect(touchable.props.style).toEqual(expect.arrayContaining([expect.objectContaining({ opacity: 0.35 })]));
+      const cellView = touchable.findAllByType(View)[1];
+      // 塗りつぶし色は付かない
+      expect(cellView.props.style).not.toEqual(
+        expect.arrayContaining([expect.objectContaining({ backgroundColor: expect.anything() })]),
+      );
+      // グレードットが表示される
+      const dot = cellView.findAllByType(View).find((v) => {
+        const style = [v.props.style].flat();
+        return style.some((s) => s && s.backgroundColor === Colors.borderStrong);
+      });
+      expect(dot).toBeDefined();
     });
 
-    it('実績が全く無い日にフィルターがかかっていても薄く表示される', () => {
+    it('実績が全く無い日は、フィルターがかかっていてもグレードットを表示しない（未実施日と区別する）', () => {
       const root = render({
         activeFilter: 'chest',
+        primaryCategoryByDay: new Map(),
         categorySetByDay: new Map(),
       });
       const touchable = findTouchableForDay(root, '7月5日');
-      expect(touchable.props.style).toEqual(expect.arrayContaining([expect.objectContaining({ opacity: 0.35 })]));
+      const cellView = touchable.findAllByType(View)[1];
+      const dot = cellView.findAllByType(View).find((v) => {
+        const style = [v.props.style].flat();
+        return style.some((s) => s && s.backgroundColor === Colors.borderStrong);
+      });
+      expect(dot).toBeUndefined();
     });
 
-    it('塗りつぶし(実績)がある日がフィルター対象外の場合は、コンテナのopacityではなく背景色を薄いトーンに・文字をカテゴリ色に切り替える（白文字が白背景に埋もれて読めなくなるのを防ぐ）', () => {
+    it('フィルター対象外の日のaccessibilityLabelには「絞り込み対象外」を含む', () => {
       const root = render({
-        selectedDate: new Date(2026, 6, 18), // 5日は選択中でない＝塗りつぶし表現になる
         activeFilter: 'chest',
         primaryCategoryByDay: new Map([['2026-07-05', 'leg']]),
-        categorySetByDay: new Map([['2026-07-05', new Set(['leg'])]]),
-      });
-      const touchable = findTouchableForDay(root, '7月5日');
-      // コンテナ自体にはopacityを掛けない
-      expect(touchable.props.style).not.toEqual(
-        expect.arrayContaining([expect.objectContaining({ opacity: expect.anything() })]),
-      );
-      const cellView = touchable.findAllByType(View)[1];
-      // 背景はカテゴリ色そのものではなく薄いトーン(アルファ付き)になる
-      expect(cellView.props.style).toEqual(
-        expect.arrayContaining([expect.objectContaining({ backgroundColor: `${getCalendarCategoryColor('leg')}33` })]),
-      );
-      const digitText = touchable.findAllByType(Text)[0];
-      // 文字色は白(onAccent)固定ではなくカテゴリ色そのものになり、薄い背景の上でも読める
-      // （styleは[cellText, [cellTextEmphasis, {color}]]のようにネストするためflat()してから比較する）
-      expect((digitText.props.style as unknown[]).flat()).toEqual(
-        expect.arrayContaining([expect.objectContaining({ color: getCalendarCategoryColor('leg') })]),
-      );
-    });
-
-    it('塗りつぶしがあり該当カテゴリの日（フィルター対象内）は通常通りカテゴリ色で塗りつぶされ白文字のまま', () => {
-      const root = render({
-        selectedDate: new Date(2026, 6, 18),
-        activeFilter: 'leg',
-        primaryCategoryByDay: new Map([['2026-07-05', 'leg']]),
-        categorySetByDay: new Map([['2026-07-05', new Set(['leg'])]]),
-      });
-      const touchable = findTouchableForDay(root, '7月5日');
-      const cellView = touchable.findAllByType(View)[1];
-      expect(cellView.props.style).toEqual(
-        expect.arrayContaining([expect.objectContaining({ backgroundColor: getCalendarCategoryColor('leg') })]),
-      );
-      const digitText = touchable.findAllByType(Text)[0];
-      expect(digitText.props.style).toEqual(
-        expect.arrayContaining([expect.objectContaining({ color: Colors.onAccent })]),
-      );
-    });
-
-    it('フィルター対象外の日のaccessibilityLabelには「絞り込み対象外」を含む（opacityが伝わらないVoiceOver向け）', () => {
-      const root = render({
-        activeFilter: 'chest',
         categorySetByDay: new Map([['2026-07-05', new Set(['leg'])]]),
       });
       expect(findTouchableForDay(root, '7月5日').props.accessibilityLabel).toContain('絞り込み対象外');
@@ -297,6 +286,7 @@ describe('MonthGrid', () => {
     it('フィルター対象内の日のaccessibilityLabelには「絞り込み対象外」を含まない', () => {
       const root = render({
         activeFilter: 'leg',
+        primaryCategoryByDay: new Map([['2026-07-05', 'leg']]),
         categorySetByDay: new Map([['2026-07-05', new Set(['leg'])]]),
       });
       expect(findTouchableForDay(root, '7月5日').props.accessibilityLabel).not.toContain('絞り込み対象外');
@@ -305,7 +295,7 @@ describe('MonthGrid', () => {
     it('前月/翌月セル(inCurrentMonthがfalse)はactiveFilter中でも通常のグレー表示のまま変化しない', () => {
       const root = render({
         activeFilter: 'chest',
-        categorySetByDay: new Map(), // 当月全日が対象外になる状態にしても
+        categorySetByDay: new Map(),
       });
       // 前月/翌月はそもそもTouchableOpacityを持たない（既存仕様）ため、
       // 当月と同じ31件のまま増減しないことで前月/翌月セルが影響を受けていないことを確認する

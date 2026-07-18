@@ -34,8 +34,8 @@ jest.mock('@/components/calendar/swipeable-month-view', () => ({
 }));
 
 import React from 'react';
-import { act, create, type ReactTestInstance } from 'react-test-renderer';
-import { Text, TouchableOpacity } from 'react-native';
+import { act, create } from 'react-test-renderer';
+import { TouchableOpacity } from 'react-native';
 import CalendarScreen from '@/app/(tabs)/calendar';
 
 function render() {
@@ -44,12 +44,6 @@ function render() {
     instance = create(React.createElement(CalendarScreen));
   });
   return instance.root;
-}
-
-// {value}文言のように複数の子要素に分割されるJSXは、findByPropsの単一文字列一致では
-// 見つからないため、childrenを結合してから比較する（他のスクリーンテストと同じ手法）
-function findTextByJoinedChildren(root: ReactTestInstance, text: string) {
-  return root.findAllByType(Text).find((t) => [t.props.children].flat().join('') === text);
 }
 
 beforeEach(() => {
@@ -133,7 +127,9 @@ describe('CalendarScreen カテゴリフィルター', () => {
     expect(root.findByProps({ children: 'スクワット' })).toBeDefined();
   });
 
-  test('カテゴリチップを選ぶと、選択日パネルも該当カテゴリの種目だけに絞られる', () => {
+  // デザイン案「確定：カテゴリフィルタ適用」の仕様上、フィルターは月グリッドのマーカー表示
+  // だけに作用し、選択日パネルは常に全記録を表示する（選択した日の記録を隠す必要はない）
+  test('カテゴリチップを選んでも、選択日パネルの表示は変わらず全カードのまま', () => {
     mockUseCalendarDayExercises.mockReturnValue({
       cards: [card({ workoutSessionExerciseId: 1, category: 'chest' }), card({ workoutSessionExerciseId: 2, category: 'leg', name: 'スクワット' })],
       retry: jest.fn(),
@@ -143,76 +139,10 @@ describe('CalendarScreen カテゴリフィルター', () => {
     const chestChip = root.findAllByType(TouchableOpacity).find((t) => t.props.accessibilityLabel === '胸')!;
     act(() => {
       chestChip.props.onPress();
-    });
-
-    expect(root.findByProps({ children: 'ベンチプレス' })).toBeDefined();
-    expect(root.findAllByProps({ children: 'スクワット' }).length).toBe(0);
-  });
-
-  test('記録はあるが選択中のカテゴリに該当するものが無い日は「(カテゴリ)の記録はありません」を表示する', () => {
-    mockUseCalendarDayExercises.mockReturnValue({
-      cards: [card({ workoutSessionExerciseId: 1, category: 'leg', name: 'スクワット' })],
-      retry: jest.fn(),
-    });
-    const root = render();
-
-    const chestChip = root.findAllByType(TouchableOpacity).find((t) => t.props.accessibilityLabel === '胸')!;
-    act(() => {
-      chestChip.props.onPress();
-    });
-
-    expect(findTextByJoinedChildren(root, '胸の記録はありません')).toBeDefined();
-  });
-
-  test('見出しにフィルター中であることを示すバッジが付く', () => {
-    mockUseCalendarDayExercises.mockReturnValue({ cards: [card()], retry: jest.fn() });
-    const root = render();
-
-    const chestChip = root.findAllByType(TouchableOpacity).find((t) => t.props.accessibilityLabel === '胸')!;
-    act(() => {
-      chestChip.props.onPress();
-    });
-
-    expect(findTextByJoinedChildren(root, ' （胸で絞り込み中）')).toBeDefined();
-  });
-
-  test('その日に記録が全く無い場合、フィルター中でも「(カテゴリ)の記録はありません」ではなく通常の空状態を表示する', () => {
-    mockUseCalendarDayExercises.mockReturnValue({ cards: [], retry: jest.fn() });
-    const root = render();
-
-    const chestChip = root.findAllByType(TouchableOpacity).find((t) => t.props.accessibilityLabel === '胸')!;
-    act(() => {
-      chestChip.props.onPress();
-    });
-
-    expect(findTextByJoinedChildren(root, '胸の記録はありません')).toBeUndefined();
-    // 今日選択中・進行中セッション無しなので通常の開始ボタンが出る
-    expect(root.findByProps({ children: 'トレーニングを開始' })).toBeDefined();
-    // 記録が無い日にフィルターバッジを出す意味は薄く誤読を招くため表示しない
-    expect(findTextByJoinedChildren(root, ' （胸で絞り込み中）')).toBeUndefined();
-  });
-
-  test('「全て」に戻すと絞り込みが解除され、全カード表示とバッジ消去が復元される', () => {
-    mockUseCalendarDayExercises.mockReturnValue({
-      cards: [card({ workoutSessionExerciseId: 1, category: 'chest' }), card({ workoutSessionExerciseId: 2, category: 'leg', name: 'スクワット' })],
-      retry: jest.fn(),
-    });
-    const root = render();
-
-    const chestChip = root.findAllByType(TouchableOpacity).find((t) => t.props.accessibilityLabel === '胸')!;
-    act(() => {
-      chestChip.props.onPress();
-    });
-    expect(root.findAllByProps({ children: 'スクワット' }).length).toBe(0);
-
-    const allChip = root.findAllByType(TouchableOpacity).find((t) => t.props.accessibilityLabel === '全て')!;
-    act(() => {
-      allChip.props.onPress();
     });
 
     expect(root.findByProps({ children: 'ベンチプレス' })).toBeDefined();
     expect(root.findByProps({ children: 'スクワット' })).toBeDefined();
-    expect(findTextByJoinedChildren(root, ' （胸で絞り込み中）')).toBeUndefined();
   });
 
   test('選択中カテゴリ(activeFilter)・日別カテゴリ集合(categorySetByDay)がSwipeableMonthViewへ正しく渡る', () => {
