@@ -1,13 +1,16 @@
-import { IconSymbol } from '@/components/ui/icon-symbol';
+import { CalendarExerciseCard } from '@/components/calendar/calendar-exercise-card';
 import { CategoryColorLegend } from '@/components/calendar/category-color-legend';
 import { SwipeableMonthView } from '@/components/calendar/swipeable-month-view';
-import { Colors } from '@/constants/theme';
+import { IconSymbol } from '@/components/ui/icon-symbol';
+import { Colors, Typography } from '@/constants/theme';
+import { useCalendarDayExercises } from '@/hooks/use-calendar-day-exercises';
 import { useCalendarMonthRecords } from '@/hooks/use-calendar-month-records';
+import { useDebouncedPush } from '@/hooks/use-debounced-push';
 import { addMonths } from '@/lib/calendar/date-grid';
-import { formatMonthGroup } from '@/lib/workout/summary';
+import { formatMonthGroup, formatSessionDateGroup } from '@/lib/workout/summary';
 import { Stack } from 'expo-router';
 import { useCallback, useMemo, useState } from 'react';
-import { StyleSheet, TouchableOpacity, View } from 'react-native';
+import { ActivityIndicator, ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 function MonthNavButton({
@@ -61,6 +64,13 @@ export default function CalendarScreen() {
   }, [viewed.year, viewed.month]);
   const dayCategories = useCalendarMonthRecords(rangeStart, rangeEnd);
 
+  const { cards: dayCards, retry: retryDayCards } = useCalendarDayExercises(selectedDate);
+  const pushDebounced = useDebouncedPush();
+  const handlePressExercise = useCallback(
+    (exerciseId: number) => pushDebounced(`/exercise/${exerciseId}`),
+    [pushDebounced],
+  );
+
   return (
     <SafeAreaView style={styles.safeArea} edges={[]}>
       <Stack.Screen
@@ -70,7 +80,7 @@ export default function CalendarScreen() {
           headerRight: () => <MonthNavButton direction="next" onPress={() => goToMonth(1)} />,
         }}
       />
-      <View style={styles.content}>
+      <ScrollView contentContainerStyle={styles.content}>
         <SwipeableMonthView
           year={viewed.year}
           month={viewed.month}
@@ -83,14 +93,64 @@ export default function CalendarScreen() {
         <View style={styles.legend}>
           <CategoryColorLegend />
         </View>
-      </View>
+
+        <View style={styles.dayPanel}>
+          <Text style={styles.dayHeading}>{formatSessionDateGroup(selectedDate.getTime())}</Text>
+          {dayCards === null ? (
+            <ActivityIndicator style={styles.dayLoading} color={Colors.accent} />
+          ) : dayCards === 'error' ? (
+            <View style={styles.dayErrorWrapper}>
+              <IconSymbol name="exclamationmark.triangle.fill" size={18} color={Colors.danger} />
+              <Text style={styles.dayErrorText}>記録を読み込めませんでした</Text>
+              <TouchableOpacity
+                onPress={retryDayCards}
+                accessibilityRole="button"
+                accessibilityLabel="再試行"
+                hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+              >
+                <Text style={styles.dayRetryText}>再試行</Text>
+              </TouchableOpacity>
+            </View>
+          ) : dayCards.length === 0 ? (
+            <Text style={styles.dayEmptyText}>記録がありません</Text>
+          ) : (
+            <View style={styles.dayCardList}>
+              {dayCards.map((card) => (
+                <CalendarExerciseCard
+                  key={card.workoutSessionExerciseId}
+                  exerciseId={card.exerciseId}
+                  name={card.name}
+                  category={card.category}
+                  source={card.source}
+                  slug={card.slug}
+                  measurementType={card.measurementType}
+                  sets={card.sets}
+                  isBest={card.isBest}
+                  onPress={handlePressExercise}
+                />
+              ))}
+            </View>
+          )}
+        </View>
+      </ScrollView>
     </SafeAreaView>
   );
 }
 
 const styles = StyleSheet.create({
   safeArea: { flex: 1, backgroundColor: Colors.background },
-  content: { paddingHorizontal: 16, paddingTop: 8 },
+  content: { paddingHorizontal: 16, paddingTop: 8, paddingBottom: 24 },
   navButton: { width: 36, height: 36, alignItems: 'center', justifyContent: 'center' },
   legend: { marginTop: 10 },
+
+  dayPanel: { marginTop: 16, paddingTop: 12, borderTopWidth: 1, borderTopColor: Colors.border },
+  // 記録タブ(app/(tabs)/index.tsx)の日付グループ見出しと同じ役割（formatSessionDateGroupを
+  // 使う日付見出し）のため、同じトークン（caption/textMuted/700）に揃える
+  dayHeading: { ...Typography.caption, fontWeight: '700', color: Colors.textMuted, marginBottom: 10 },
+  dayLoading: { marginTop: 12 },
+  dayEmptyText: { ...Typography.body, color: Colors.textMuted },
+  dayErrorWrapper: { flexDirection: 'row', alignItems: 'center', gap: 8, flexWrap: 'wrap' },
+  dayErrorText: { ...Typography.body, color: Colors.danger },
+  dayRetryText: { ...Typography.bodyStrong, color: Colors.accent },
+  dayCardList: { gap: 8 },
 });

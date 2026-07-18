@@ -1,5 +1,5 @@
-import { CategoryChip } from '@/components/exercises/category-chip';
 import { ExerciseCardMenu } from '@/components/exercises/exercise-card-menu';
+import { ExerciseIdentity } from '@/components/exercises/exercise-identity';
 import { RoutineTemplateSetRow, type RoutineTemplateSetRowHandle } from '@/components/routines/routine-template-set-row';
 import { IconSymbol } from '@/components/ui/icon-symbol';
 import { Colors, Typography } from '@/constants/theme';
@@ -9,7 +9,6 @@ import { getExerciseImages } from '@/lib/exercises/images';
 import { useRoutineDraftStore } from '@/lib/routines/draft-store';
 import type { DraftExercise } from '@/lib/routines/validation';
 import { MEASUREMENT_COLUMNS, summarizeExerciseSets } from '@/lib/workout/set-format';
-import { Image } from 'expo-image';
 import { forwardRef, memo, useCallback, useImperativeHandle, useRef, useState } from 'react';
 import { Alert, LayoutAnimation, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 
@@ -172,20 +171,18 @@ export const RoutineTemplateExerciseCard = memo(
         accessibilityLabel={expanded ? `${exercise.name}を折りたたむ` : `${exercise.name}、${collapsedSummary}、展開する`}
         accessibilityState={{ expanded }}
       >
-        <Image source={images.thumbnail} style={styles.thumbnail} contentFit="cover" />
-        <View style={styles.info}>
-          <Text style={styles.name} numberOfLines={1}>
-            {exercise.name}
-          </Text>
-          <View style={styles.metaRow}>
-            <CategoryChip category={exercise.category} />
-            {!expanded && (
+        <ExerciseIdentity
+          images={images}
+          name={exercise.name}
+          category={exercise.category}
+          metaTrailing={
+            !expanded && (
               <Text style={styles.collapsedSummaryText} numberOfLines={1}>
                 {collapsedSummary}
               </Text>
-            )}
-          </View>
-        </View>
+            )
+          }
+        />
         <View style={styles.trailing}>
           <TouchableOpacity
             onPress={handlePressInfo}
@@ -282,23 +279,10 @@ const styles = StyleSheet.create({
   // ⓘボタンとchevronの間に一定の余白を確保する。header全体のgap(10)だけに頼ると、
   // ⓘのhitSlop(14pt)と視覚的に密集して見えるため
   trailing: { flexDirection: 'row', alignItems: 'center', gap: 14 },
-  // カテゴリチップと折りたたみ時のサマリーを横並びにする行。チップは内容幅のまま、
-  // サマリー側だけflexShrinkさせて長い場合は末尾を省略する
-  metaRow: { flexDirection: 'row', alignItems: 'center', gap: 6 },
   // 折りたたみ時のサマリーは重量×回数などの実データを含む一次情報のため、非活性を示す
   // textPlaceholderではなくtextMuted（WCAG AA 4.5:1適合）を使う（session-exercise-card.tsxと統一）
   collapsedSummaryText: { ...Typography.footnote, fontWeight: '600', color: Colors.textMuted, flexShrink: 1 },
   collapsedChevron: { transform: [{ rotate: '90deg' }] },
-  thumbnail: {
-    width: 46,
-    height: 46,
-    borderRadius: 7,
-    backgroundColor: Colors.surfaceSubtle,
-    borderWidth: 1,
-    borderColor: Colors.border,
-  },
-  info: { flex: 1, gap: 3 },
-  name: { ...Typography.cardTitle, color: Colors.textPrimary },
 
   body: { padding: 10 },
   bodyHidden: { display: 'none' },

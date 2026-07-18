@@ -5,9 +5,9 @@
 // （フィルターチップ等の絞り込みは10種のまま。色分けだけがこの7グループ単位になる）。
 //
 // 実際の色値はconstants/theme.tsのColors（category*）を参照する。legGluteの色は
-// 元デザイン案では#2563EB（Colors.accentと同値）だったが、アプリ全体で「選択中/操作可能」を
-// 意味するaccentと衝突し、塗りつぶされたセルを誤って操作可能な要素と誤認しやすくなるため、
-// 別の色相（teal）に差し替えている。
+// アプリ全体で「選択中/操作可能」を意味するColors.accentと同値（#2563EB）で、一時的に
+// 別の色相（teal）に差し替えていたが、デザイン案通りの表示を優先し衝突を承知の上でblueに
+// 統一した（2026-07-19、ユーザー指示）。
 import { Colors } from '@/constants/theme';
 import type { ExerciseCategory } from '@/lib/exercises/constants';
 

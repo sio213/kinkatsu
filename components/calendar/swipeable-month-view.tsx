@@ -40,10 +40,19 @@ export function SwipeableMonthView({
   dayCategories,
 }: Props) {
   const [containerWidth, setContainerWidth] = useState(0);
+  // 月ごとに4〜6週で行数が変わる（lib/calendar/date-grid.tsのweeksInMonthGrid）ため、
+  // 3ヶ月分を横に並べたtrackの高さをそのままviewportに使うと「一番週数が多い月」の高さに
+  // 固定され、週数の少ない月を見ている間は下に余白ができてしまう。currentHeightで
+  // 「今表示中(=中央)の月」だけの実測高さをviewportへ明示的に適用し、それ以外は
+  // overflow:hiddenで切り詰めることで、常に表示中の月にぴったり合った高さにする
+  const [currentHeight, setCurrentHeight] = useState(0);
   const translateX = useSharedValue(0);
 
   const handleLayout = useCallback((e: LayoutChangeEvent) => {
     setContainerWidth(e.nativeEvent.layout.width);
+  }, []);
+  const handleCurrentMonthLayout = useCallback((e: LayoutChangeEvent) => {
+    setCurrentHeight(e.nativeEvent.layout.height);
   }, []);
 
   // アニメーションが隣の月の位置まで完全にスナップし終えたタイミングでonChangeMonthを呼び、
@@ -70,6 +79,9 @@ export function SwipeableMonthView({
     () =>
       Gesture.Pan()
         .activeOffsetX([-10, 10])
+        // 縦方向に一定量動いたら即座にこのPanジェスチャーを失敗させ、親のScrollView（縦スクロール）
+        // へ調停を譲る。activeOffsetXだけだと斜めフリック時に意図せず月送りが発火する余地があった
+        .failOffsetY([-15, 15])
         .onUpdate((e) => {
           translateX.value = e.translationX;
         })
@@ -100,7 +112,7 @@ export function SwipeableMonthView({
 
   return (
     <GestureDetector gesture={panGesture}>
-      <View onLayout={handleLayout} style={styles.viewport}>
+      <View onLayout={handleLayout} style={[styles.viewport, currentHeight > 0 && { height: currentHeight }]}>
         {containerWidth > 0 && (
           <Animated.View style={[styles.track, { width: containerWidth * 3 }, animatedTrackStyle]}>
             <View style={{ width: containerWidth }}>
@@ -113,7 +125,7 @@ export function SwipeableMonthView({
                 dayCategories={dayCategories}
               />
             </View>
-            <View style={{ width: containerWidth }}>
+            <View style={{ width: containerWidth }} onLayout={handleCurrentMonthLayout}>
               <MonthGrid
                 year={year}
                 month={month}
@@ -142,5 +154,7 @@ export function SwipeableMonthView({
 
 const styles = StyleSheet.create({
   viewport: { overflow: 'hidden' },
-  track: { flexDirection: 'row' },
+  // alignItems:'flex-start'で各月をそれぞれの自然な高さのまま並べる（デフォルトのstretchだと
+  // 3ヶ月のうち一番週数が多い月の高さに全部揃ってしまい、currentHeightの実測が意味を持たなくなる）
+  track: { flexDirection: 'row', alignItems: 'flex-start' },
 });

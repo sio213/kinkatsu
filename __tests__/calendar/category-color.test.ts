@@ -56,7 +56,7 @@ describe('CALENDAR_COLOR_GROUP_COLORS', () => {
   it.each([
     ['chest', '#EF4444'],
     ['back', '#9333EA'],
-    ['legGlute', '#0D9488'],
+    ['legGlute', '#2563EB'],
     ['absCore', '#16A34A'],
     ['shoulder', '#F59E0B'],
     ['arm', '#EC4899'],
@@ -70,12 +70,16 @@ describe('CALENDAR_COLOR_GROUP_COLORS', () => {
     expect(new Set(values).size).toBe(values.length);
   });
 
-  it.each(CALENDAR_COLOR_GROUPS)(
+  it.each(CALENDAR_COLOR_GROUPS.filter((g) => g !== 'legGlute'))(
     '%s の色はColors.accent(選択中/操作可能を示す色)と衝突しない',
     (group) => {
       expect(CALENDAR_COLOR_GROUP_COLORS[group]).not.toBe(Colors.accent);
     },
   );
+
+  it('legGlueの色は意図的にColors.accentと同値になっている（デザイン案優先の判断、2026-07-19確定）', () => {
+    expect(CALENDAR_COLOR_GROUP_COLORS.legGlute).toBe(Colors.accent);
+  });
 });
 
 describe('getCalendarCategoryColor', () => {

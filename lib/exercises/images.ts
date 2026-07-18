@@ -1,7 +1,7 @@
 import type { Exercise } from '@/db/schema';
 import { isPresetExercise } from './constants';
 
-type ExerciseImages = { source?: number; thumbnail: number };
+export type ExerciseImages = { source?: number; thumbnail: number };
 
 const IMAGES: Record<string, { source: number; thumbnail: number }> = {
   dumbbell_curl: {
