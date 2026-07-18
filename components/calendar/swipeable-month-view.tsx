@@ -70,6 +70,9 @@ export function SwipeableMonthView({
     () =>
       Gesture.Pan()
         .activeOffsetX([-10, 10])
+        // 縦方向に一定量動いたら即座にこのPanジェスチャーを失敗させ、親のScrollView（縦スクロール）
+        // へ調停を譲る。activeOffsetXだけだと斜めフリック時に意図せず月送りが発火する余地があった
+        .failOffsetY([-15, 15])
         .onUpdate((e) => {
           translateX.value = e.translationX;
         })

@@ -1,3 +1,4 @@
+import { BestBadge } from '@/components/workout/best-badge';
 import { DesignIcon } from '@/components/ui/design-icon';
 import { Colors, Typography } from '@/constants/theme';
 import type { HistoryEntry } from '@/lib/workout/history';
@@ -41,12 +42,7 @@ export const HistoryEntryCard = memo(function HistoryEntryCard({
           <View style={styles.dateRow}>
             <Text style={styles.date}>{dateLabel}</Text>
             {relativeLabel && <Text style={styles.relative}>{relativeLabel}</Text>}
-            {isBest && (
-              <View style={styles.bestBadge}>
-                <DesignIcon name="star" size={11} color={Colors.warningText} />
-                <Text style={styles.bestBadgeText}>自己ベスト</Text>
-              </View>
-            )}
+            {isBest && <BestBadge />}
           </View>
           <Text style={styles.summary} numberOfLines={1}>
             {summary}
@@ -86,16 +82,6 @@ const styles = StyleSheet.create({
   dateRow: { flexDirection: 'row', alignItems: 'center', gap: 6, flexWrap: 'wrap' },
   date: { ...Typography.cardTitle, color: Colors.textPrimary },
   relative: { ...Typography.caption, color: Colors.textMuted },
-  bestBadge: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 3,
-    backgroundColor: Colors.warningSurface,
-    borderRadius: 999,
-    paddingHorizontal: 7,
-    paddingVertical: 2,
-  },
-  bestBadgeText: { ...Typography.badge, color: Colors.warningText },
   loadButton: {
     flexDirection: 'row',
     alignItems: 'center',
