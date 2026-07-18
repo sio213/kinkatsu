@@ -37,6 +37,10 @@ const MAPPING = {
   'arrow.up.right.square': 'open-in-new',
   sparkles: 'auto-awesome',
   'list.bullet': 'list-alt',
+  'sun.max.fill': 'wb-sunny',
+  'sun.min.fill': 'sunny',
+  'sunset.fill': 'wb-twilight',
+  'moon.stars.fill': 'nightlight',
 } as IconMapping;
 
 /**

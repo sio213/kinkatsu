@@ -34,8 +34,8 @@ jest.mock('@/components/calendar/swipeable-month-view', () => ({
 }));
 
 import React from 'react';
-import { act, create } from 'react-test-renderer';
-import { TouchableOpacity } from 'react-native';
+import { act, create, type ReactTestInstance } from 'react-test-renderer';
+import { Text, TouchableOpacity } from 'react-native';
 import CalendarScreen from '@/app/(tabs)/calendar';
 
 function render() {
@@ -44,6 +44,10 @@ function render() {
     instance = create(React.createElement(CalendarScreen));
   });
   return instance.root;
+}
+
+function findTextByJoinedChildren(root: ReactTestInstance, text: string) {
+  return root.findAllByType(Text).find((t) => [t.props.children].flat().join('') === text);
 }
 
 beforeEach(() => {
@@ -110,6 +114,7 @@ describe('CalendarScreen カテゴリフィルター', () => {
       source: 'preset',
       slug: 'bench-press',
       sessionId: 1,
+      sessionStartedAt: new Date(2026, 6, 16, 7, 10).getTime(),
       isBest: false,
       comparison: null,
       sets: [{ weight: 60, reps: 8, durationSeconds: null, distanceMeters: null, completedAt: 1 }],
@@ -157,5 +162,133 @@ describe('CalendarScreen カテゴリフィルター', () => {
     });
 
     expect(mockSwipeableMonthView).toHaveBeenLastCalledWith(expect.objectContaining({ activeFilter: 'chest' }));
+  });
+});
+
+describe('CalendarScreen 時間帯グループ', () => {
+  function card(overrides: Record<string, unknown> = {}) {
+    return {
+      workoutSessionExerciseId: 1,
+      exerciseId: 1,
+      name: 'ベンチプレス',
+      category: 'chest',
+      measurementType: 'weight_reps',
+      source: 'preset',
+      slug: 'bench-press',
+      sessionId: 1,
+      sessionStartedAt: new Date(2026, 6, 16, 7, 10).getTime(),
+      isBest: false,
+      comparison: null,
+      sets: [{ weight: 60, reps: 8, durationSeconds: null, distanceMeters: null, completedAt: 1 }],
+      ...overrides,
+    };
+  }
+
+  test('セッションが1件だけの日は時間帯見出しを表示しない（従来通りのフラット表示）', () => {
+    mockUseCalendarDayExercises.mockReturnValue({
+      cards: [card({ sessionId: 1, sessionStartedAt: new Date(2026, 6, 16, 7, 10).getTime() })],
+      retry: jest.fn(),
+    });
+    const root = render();
+
+    expect(findTextByJoinedChildren(root, '朝 07:10')).toBeUndefined();
+    expect(root.findByProps({ children: 'ベンチプレス' })).toBeDefined();
+  });
+
+  test('同日に複数セッションがあれば時間帯見出し(朝/夜)が時刻順に表示される', () => {
+    mockUseCalendarDayExercises.mockReturnValue({
+      cards: [
+        card({
+          workoutSessionExerciseId: 1,
+          sessionId: 1,
+          sessionStartedAt: new Date(2026, 6, 16, 7, 10).getTime(),
+          name: '朝の種目',
+        }),
+        card({
+          workoutSessionExerciseId: 2,
+          sessionId: 2,
+          sessionStartedAt: new Date(2026, 6, 16, 21, 30).getTime(),
+          name: '夜の種目',
+        }),
+      ],
+      retry: jest.fn(),
+    });
+    const root = render();
+
+    expect(findTextByJoinedChildren(root, '朝 07:10')).toBeDefined();
+    expect(findTextByJoinedChildren(root, '夜 21:30')).toBeDefined();
+    // 見出しの並び順が時刻順（朝→夜）であることを、Textツリー上の出現順で確認する
+    const allTexts = root.findAllByType(Text).map((t) => [t.props.children].flat().join(''));
+    const morningIndex = allTexts.indexOf('朝 07:10');
+    const nightIndex = allTexts.indexOf('夜 21:30');
+    expect(morningIndex).toBeGreaterThanOrEqual(0);
+    expect(nightIndex).toBeGreaterThan(morningIndex);
+  });
+
+  test('各グループには自分のセッションの種目カードだけが入る', () => {
+    mockUseCalendarDayExercises.mockReturnValue({
+      cards: [
+        card({
+          workoutSessionExerciseId: 1,
+          sessionId: 1,
+          sessionStartedAt: new Date(2026, 6, 16, 7, 10).getTime(),
+          name: '朝の種目',
+        }),
+        card({
+          workoutSessionExerciseId: 2,
+          sessionId: 2,
+          sessionStartedAt: new Date(2026, 6, 16, 21, 30).getTime(),
+          name: '夜の種目',
+        }),
+      ],
+      retry: jest.fn(),
+    });
+    const root = render();
+
+    expect(root.findByProps({ children: '朝の種目' })).toBeDefined();
+    expect(root.findByProps({ children: '夜の種目' })).toBeDefined();
+  });
+
+  test('同じ時間帯(朝)に2セッションあっても、片方に潰れず2つの見出しが別々に表示される', () => {
+    mockUseCalendarDayExercises.mockReturnValue({
+      cards: [
+        card({
+          workoutSessionExerciseId: 1,
+          sessionId: 1,
+          sessionStartedAt: new Date(2026, 6, 16, 6, 0).getTime(),
+          name: '朝1の種目',
+        }),
+        card({
+          workoutSessionExerciseId: 2,
+          sessionId: 2,
+          sessionStartedAt: new Date(2026, 6, 16, 9, 30).getTime(),
+          name: '朝2の種目',
+        }),
+      ],
+      retry: jest.fn(),
+    });
+    const root = render();
+
+    expect(findTextByJoinedChildren(root, '朝 06:00')).toBeDefined();
+    expect(findTextByJoinedChildren(root, '朝 09:30')).toBeDefined();
+    expect(root.findByProps({ children: '朝1の種目' })).toBeDefined();
+    expect(root.findByProps({ children: '朝2の種目' })).toBeDefined();
+  });
+
+  test('3セッション以上でも全て時刻順に見出しが並ぶ', () => {
+    mockUseCalendarDayExercises.mockReturnValue({
+      cards: [
+        card({ workoutSessionExerciseId: 1, sessionId: 1, sessionStartedAt: new Date(2026, 6, 16, 20, 0).getTime(), name: '夜の種目' }),
+        card({ workoutSessionExerciseId: 2, sessionId: 2, sessionStartedAt: new Date(2026, 6, 16, 7, 0).getTime(), name: '朝の種目' }),
+        card({ workoutSessionExerciseId: 3, sessionId: 3, sessionStartedAt: new Date(2026, 6, 16, 12, 0).getTime(), name: '昼の種目' }),
+      ],
+      retry: jest.fn(),
+    });
+    const root = render();
+    const allTexts = root.findAllByType(Text).map((t) => [t.props.children].flat().join(''));
+    const idx = (s: string) => allTexts.indexOf(s);
+    expect(idx('朝 07:00')).toBeGreaterThanOrEqual(0);
+    expect(idx('昼 12:00')).toBeGreaterThan(idx('朝 07:00'));
+    expect(idx('夜 20:00')).toBeGreaterThan(idx('昼 12:00'));
   });
 });

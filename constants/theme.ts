@@ -40,6 +40,10 @@ const Palette = {
   green600: '#16A34A',
   green700: '#15803D',
   pink500: '#EC4899',
+
+  amber400: '#FBBF24',
+  orange400: '#FB923C',
+  indigo500: '#6366F1',
 } as const;
 
 export const Colors = {
@@ -97,6 +101,14 @@ export const Colors = {
   categoryShoulder: Palette.amber500,
   categoryArm: Palette.pink500,
   categoryCardioOther: Palette.slate400,
+
+  // 選択日パネルの同日複数セッションの時間帯グループ見出し用（デザイン案「複数18」）。
+  // timeOfDayMorningはcategoryShoulder/warningAccentと同値で衝突するが、デザイン案が
+  // 指定する新規の値のため無断で変更せずそのまま採用している（要相談としてPRで提示）
+  timeOfDayMorning: Palette.amber500,
+  timeOfDayMidday: Palette.amber400,
+  timeOfDayEvening: Palette.orange400,
+  timeOfDayNight: Palette.indigo500,
 };
 
 /** シャドウトークン。各キーがスタイルオブジェクト。`{...Shadows.switchKnob}` のようにスプレッドして使う */
