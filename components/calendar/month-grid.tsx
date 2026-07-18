@@ -15,7 +15,11 @@ type Props = {
   selectedDate: Date;
   onSelectDate: (date: Date) => void;
   // 日付キー(YYYY-MM-DD)→代表カテゴリ(10種のslug)。実績がある日だけキーを持つ
-  dayCategories: Map<string, string>;
+  primaryCategoryByDay: Map<string, string>;
+  // 日付キー→その日実施した全カテゴリの集合。カテゴリフィルター中の判定にのみ使う
+  categorySetByDay: Map<string, Set<string>>;
+  // カテゴリフィルターチップで選択中のカテゴリ。CATEGORY_ALL（絞り込みなし）ならnull
+  activeFilter: string | null;
 };
 
 // 曜日ラベル行の日曜(index 0)・土曜(index 6)だけ色を付ける。日付の数字自体は
@@ -33,7 +37,9 @@ export const MonthGrid = memo(function MonthGrid({
   today,
   selectedDate,
   onSelectDate,
-  dayCategories,
+  primaryCategoryByDay,
+  categorySetByDay,
+  activeFilter,
 }: Props) {
   const dates = useMemo(() => buildMonthGridDates(year, month), [year, month]);
 
@@ -65,13 +71,21 @@ export const MonthGrid = memo(function MonthGrid({
             );
           }
 
-          const category = dayCategories.get(toDateKey(date));
+          const dateKey = toDateKey(date);
+          const category = primaryCategoryByDay.get(dateKey);
           const hasRecord = category != null;
           // 実績が無い日はアクセント色、ある日はその代表カテゴリの色を「今日/選択中」の
           // 枠線・下線・強調文字色として使う（塗りつぶしが無いときの既定色がアクセント）
           const accentOrCategoryColor = hasRecord ? getCalendarCategoryColor(category) : Colors.accent;
-          // 塗りつぶしは「実施日 かつ 選択中でない」場合のみ（選択中は枠線表現に切り替わる）
-          const showFill = hasRecord && !isSelected;
+          // フィルター中、該当カテゴリを実施していない日は「非該当」扱い（デザイン案
+          // 「確定：カテゴリフィルタ適用」の凡例通り、過去/未来問わずグレーの点のみで
+          // 塗りつぶさない。完全に消すと「その日は何もしていない」ように見えるため、
+          // 実施の有無自体はグレードットで残す）
+          const isFilteredOut = activeFilter != null && !(categorySetByDay.get(dateKey)?.has(activeFilter) ?? false);
+          // 塗りつぶしは「実施日 かつ 選択中でない かつ フィルター対象内（非該当でない）」場合のみ。
+          // 選択中は枠線表現に切り替わり、フィルターで非該当の日は塗りつぶさずグレードットに切り替わる
+          const showFill = hasRecord && !isSelected && !isFilteredOut;
+          const showGrayDot = hasRecord && !isSelected && isFilteredOut;
 
           return (
             <TouchableOpacity
@@ -79,7 +93,7 @@ export const MonthGrid = memo(function MonthGrid({
               style={styles.cellTouchable}
               hitSlop={{ top: 4, bottom: 4, left: 4, right: 4 }}
               accessibilityRole="button"
-              accessibilityLabel={`${date.getMonth() + 1}月${date.getDate()}日${isToday ? '、今日' : ''}${hasRecord ? `、実施日、${getCategoryLabel(category)}` : ''}`}
+              accessibilityLabel={`${date.getMonth() + 1}月${date.getDate()}日${isToday ? '、今日' : ''}${hasRecord ? `、実施日、${getCategoryLabel(category)}` : ''}${isFilteredOut ? '、絞り込み対象外' : ''}`}
               accessibilityState={{ selected: isSelected }}
               onPress={() => onSelectDate(date)}
             >
@@ -114,6 +128,10 @@ export const MonthGrid = memo(function MonthGrid({
                     />
                   )}
                 </View>
+                {/* グレードットはcellDigitWrapperの外（cell自体）に置き、bottomで絶対配置する。
+                    親cellのalignItems:'center'はabsolute配置の子にも効くため、
+                    left/transformを指定しなくても水平中央に来る（RN/Yogaの挙動） */}
+                {showGrayDot && <View style={styles.filterDot} />}
               </View>
             </TouchableOpacity>
           );
@@ -147,6 +165,15 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     borderWidth: 2,
     borderColor: 'transparent',
+  },
+  // デザイン案「確定：カテゴリフィルタ適用」の非該当日マーカー（グレードット、5x5円）
+  filterDot: {
+    position: 'absolute',
+    bottom: 4,
+    width: 5,
+    height: 5,
+    borderRadius: 2.5,
+    backgroundColor: Colors.borderStrong,
   },
   cellDigitWrapper: { alignItems: 'center' },
   cellText: { ...Typography.metric, color: Colors.textBody },

@@ -1,17 +1,25 @@
 import { db } from '@/db/client';
 import { exercises, sets, workoutSessionExercises, workoutSessions } from '@/db/schema';
-import { aggregateDailyPrimaryCategory, type DailyCategoryRow } from '@/lib/calendar/day-category';
+import { aggregateDailyCategorySet, aggregateDailyPrimaryCategory, type DailyCategoryRow } from '@/lib/calendar/day-category';
 import { toDateKey } from '@/lib/calendar/date-grid';
 import { and, asc, eq, gte, isNotNull, lt } from 'drizzle-orm';
 import { useLiveQuery } from 'drizzle-orm/expo-sqlite';
 import { useMemo } from 'react';
 
-// カレンダーの日別マーカー用。[startMs, endMs)の範囲に開始した実績（✓確定セットを持つ完了済み
-// セッション）を日付ごとに集計し、代表カテゴリ（lib/calendar/day-category.ts参照）のMapを返す。
-// startMs/endMsは表示中の月グリッド（前月/当月/翌月をまたぐ場合はそれを含む範囲）をカバーする
-// 呼び出し側の責務とする。sets単位でJOINし、完了済みセット1件につき1行取得することで
-// 「セット数が最も多いカテゴリ」の集計にそのまま使える形にしている
-export function useCalendarMonthRecords(startMs: number, endMs: number): Map<string, string> {
+export type CalendarMonthRecords = {
+  // 日付キー(YYYY-MM-DD)→代表カテゴリ（月グリッドのセル塗りつぶし色に使う。実績がある日だけキーを持つ）
+  primaryCategoryByDay: Map<string, string>;
+  // 日付キー→その日に実施した全カテゴリの集合（カテゴリフィルターの「該当カテゴリを1件でも
+  // 実施したか」判定に使う。代表カテゴリだけでは埋もれる少数セットのカテゴリも拾うため別に持つ）
+  categorySetByDay: Map<string, Set<string>>;
+};
+
+// カレンダーの日別マーカー・カテゴリフィルター用。[startMs, endMs)の範囲に開始した実績
+// （✓確定セットを持つ完了済みセッション）を日付ごとに集計する。startMs/endMsは表示中の月グリッド
+// （前月/当月/翌月をまたぐ場合はそれを含む範囲）をカバーする呼び出し側の責務とする。sets単位で
+// JOINし、完了済みセット1件につき1行取得することで「セット数が最も多いカテゴリ」の集計に
+// そのまま使える形にしている
+export function useCalendarMonthRecords(startMs: number, endMs: number): CalendarMonthRecords {
   const { data } = useLiveQuery(
     db
       .select({
@@ -43,6 +51,9 @@ export function useCalendarMonthRecords(startMs: number, endMs: number): Map<str
       dateKey: toDateKey(new Date(r.startedAt)),
       category: r.category,
     }));
-    return aggregateDailyPrimaryCategory(rows);
+    return {
+      primaryCategoryByDay: aggregateDailyPrimaryCategory(rows),
+      categorySetByDay: aggregateDailyCategorySet(rows),
+    };
   }, [data]);
 }

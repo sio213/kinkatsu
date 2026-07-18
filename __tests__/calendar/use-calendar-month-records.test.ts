@@ -37,10 +37,10 @@ jest.mock('drizzle-orm/expo-sqlite', () => ({
 
 import React from 'react';
 import { act, create } from 'react-test-renderer';
-import { useCalendarMonthRecords } from '@/hooks/use-calendar-month-records';
+import { useCalendarMonthRecords, type CalendarMonthRecords } from '@/hooks/use-calendar-month-records';
 
 function renderHook(startMs: number, endMs: number) {
-  let result: Map<string, string> | undefined;
+  let result: CalendarMonthRecords | undefined;
   function Probe() {
     result = useCalendarMonthRecords(startMs, endMs);
     return null;
@@ -56,24 +56,28 @@ beforeEach(() => {
 });
 
 describe('useCalendarMonthRecords', () => {
-  it('useLiveQueryの結果が未定義(初回ロード中)なら空のMapを返す', () => {
+  it('useLiveQueryの結果が未定義(初回ロード中)なら両方とも空のMapを返す', () => {
     mockLiveQueryData = undefined;
     const getResult = renderHook(0, 1);
-    expect(getResult()).toEqual(new Map());
+    expect(getResult()).toEqual({ primaryCategoryByDay: new Map(), categorySetByDay: new Map() });
   });
 
-  it('取得した行をtoDateKeyでローカル日付キーに変換し、日別代表カテゴリのMapを返す', () => {
+  it('取得した行をtoDateKeyでローカル日付キーに変換し、日別代表カテゴリ・日別カテゴリ集合のMapを返す', () => {
     mockLiveQueryData = [
       { startedAt: new Date(2026, 6, 16, 7, 0).getTime(), category: 'chest' },
       { startedAt: new Date(2026, 6, 16, 7, 0).getTime(), category: 'chest' },
       { startedAt: new Date(2026, 6, 17, 20, 0).getTime(), category: 'leg' },
     ];
     const getResult = renderHook(0, Number.MAX_SAFE_INTEGER);
-    expect(getResult()).toEqual(
-      new Map([
+    expect(getResult()).toEqual({
+      primaryCategoryByDay: new Map([
         ['2026-07-16', 'chest'],
         ['2026-07-17', 'leg'],
       ]),
-    );
+      categorySetByDay: new Map([
+        ['2026-07-16', new Set(['chest'])],
+        ['2026-07-17', new Set(['leg'])],
+      ]),
+    });
   });
 });

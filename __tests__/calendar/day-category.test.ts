@@ -1,4 +1,4 @@
-import { aggregateDailyPrimaryCategory, type DailyCategoryRow } from '@/lib/calendar/day-category';
+import { aggregateDailyCategorySet, aggregateDailyPrimaryCategory, type DailyCategoryRow } from '@/lib/calendar/day-category';
 
 describe('aggregateDailyPrimaryCategory', () => {
   it('1日1カテゴリのみなら、そのカテゴリが代表になる', () => {
@@ -126,5 +126,56 @@ describe('aggregateDailyPrimaryCategory', () => {
       { dateKey: '2026-07-16', category: 'leg' }, // 4セット、最多
     ];
     expect(aggregateDailyPrimaryCategory(rows).get('2026-07-16')).toBe('leg');
+  });
+});
+
+describe('aggregateDailyCategorySet', () => {
+  it('1日1カテゴリなら、そのカテゴリだけを含む1件集合になる', () => {
+    const rows: DailyCategoryRow[] = [
+      { dateKey: '2026-07-16', category: 'chest' },
+      { dateKey: '2026-07-16', category: 'chest' },
+    ];
+    expect(aggregateDailyCategorySet(rows)).toEqual(new Map([['2026-07-16', new Set(['chest'])]]));
+  });
+
+  it('代表カテゴリでは埋もれるカテゴリ（セット数が少ない方）も集合には含まれる', () => {
+    const rows: DailyCategoryRow[] = [
+      { dateKey: '2026-07-16', category: 'chest' },
+      { dateKey: '2026-07-16', category: 'chest' },
+      { dateKey: '2026-07-16', category: 'chest' },
+      { dateKey: '2026-07-16', category: 'arm' },
+    ];
+    // 代表カテゴリはchestだが、armも1セットやっているのでフィルター判定には拾いたい
+    expect(aggregateDailyCategorySet(rows).get('2026-07-16')).toEqual(new Set(['chest', 'arm']));
+  });
+
+  it('複数日が混在していても日付ごとに独立して集計される', () => {
+    const rows: DailyCategoryRow[] = [
+      { dateKey: '2026-07-16', category: 'chest' },
+      { dateKey: '2026-07-17', category: 'leg' },
+      { dateKey: '2026-07-17', category: 'back' },
+    ];
+    expect(aggregateDailyCategorySet(rows)).toEqual(
+      new Map([
+        ['2026-07-16', new Set(['chest'])],
+        ['2026-07-17', new Set(['leg', 'back'])],
+      ]),
+    );
+  });
+
+  it('空配列なら空のMapを返す', () => {
+    expect(aggregateDailyCategorySet([])).toEqual(new Map());
+  });
+
+  it('1日に3カテゴリ以上実施していても全て集合に含まれる', () => {
+    const rows: DailyCategoryRow[] = [
+      { dateKey: '2026-07-16', category: 'chest' },
+      { dateKey: '2026-07-16', category: 'back' },
+      { dateKey: '2026-07-16', category: 'shoulder' },
+      { dateKey: '2026-07-16', category: 'arm' },
+    ];
+    expect(aggregateDailyCategorySet(rows).get('2026-07-16')).toEqual(
+      new Set(['chest', 'back', 'shoulder', 'arm']),
+    );
   });
 });
