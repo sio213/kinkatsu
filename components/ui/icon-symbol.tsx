@@ -35,6 +35,8 @@ const MAPPING = {
   'clock.arrow.circlepath': 'history',
   'exclamationmark.triangle.fill': 'warning',
   'arrow.up.right.square': 'open-in-new',
+  sparkles: 'auto-awesome',
+  'list.bullet': 'list-alt',
 } as IconMapping;
 
 /**
