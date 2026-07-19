@@ -6,6 +6,8 @@ var mockInsertValues: jest.Mock;
 var mockReturning: jest.Mock;
 var mockDeleteWhere: jest.Mock;
 var mockSelectWhere: jest.Mock;
+// getReminderIdsWithSkips(PR10-6c)は.where()を挟まずdb.select({...}).from(table)を直接awaitする
+var mockSelectFromRows: unknown[];
 
 jest.mock('@/db/client', () => {
   mockReturning = jest.fn().mockResolvedValue([{ id: 42 }]);
@@ -17,7 +19,11 @@ jest.mock('@/db/client', () => {
       insert: jest.fn((table: unknown) => ({ values: (...args: unknown[]) => mockInsertValues(table, ...args) })),
       delete: jest.fn((table: unknown) => ({ where: (...args: unknown[]) => mockDeleteWhere(table, ...args) })),
       select: jest.fn(() => ({
-        from: jest.fn(() => ({ where: (...args: unknown[]) => mockSelectWhere(...args) })),
+        from: jest.fn(() => ({
+          where: (...args: unknown[]) => mockSelectWhere(...args),
+          then: (onFulfilled: (rows: unknown[]) => unknown, onRejected?: (e: unknown) => unknown) =>
+            Promise.resolve(mockSelectFromRows).then(onFulfilled, onRejected),
+        })),
       })),
     },
   };
@@ -35,6 +41,8 @@ jest.mock('drizzle-orm', () => ({
 
 import {
   addReminderScheduleSkip,
+  getReminderIdsWithSkips,
+  hasAnyReminderScheduleSkip,
   hasReminderScheduleSkip,
   pruneExpiredReminderScheduleSkips,
   removeReminderScheduleSkip,
@@ -46,6 +54,7 @@ beforeEach(() => {
   mockDeleteWhere.mockClear();
   mockSelectWhere.mockClear();
   mockSelectWhere.mockResolvedValue([]);
+  mockSelectFromRows = [];
 });
 
 describe('addReminderScheduleSkip', () => {
@@ -96,6 +105,35 @@ describe('hasReminderScheduleSkip', () => {
         { col: 'skippedDate', val: '2026-08-03' },
       ],
     });
+  });
+});
+
+describe('hasAnyReminderScheduleSkip (PR10-6c: ネイティブ方式の一時キュー化判定に使う)', () => {
+  it('該当reminderIdの行が1件でもあればtrueを返す(日付は問わない)', async () => {
+    mockSelectWhere.mockResolvedValue([{ id: 1, reminderId: 1, skippedDate: '2026-07-27' }]);
+    expect(await hasAnyReminderScheduleSkip(1)).toBe(true);
+  });
+
+  it('該当reminderIdの行が無ければfalseを返す', async () => {
+    mockSelectWhere.mockResolvedValue([]);
+    expect(await hasAnyReminderScheduleSkip(1)).toBe(false);
+  });
+});
+
+describe('getReminderIdsWithSkips (PR10-6c: refillAllReminders等の一括判定に使う)', () => {
+  it('スキップ記録が存在する全reminderIdをSetで返す(重複は畳まれる)', async () => {
+    mockSelectFromRows = [
+      { reminderId: 1 },
+      { reminderId: 3 },
+      { reminderId: 1 },
+    ];
+    const ids = await getReminderIdsWithSkips();
+    expect(ids).toEqual(new Set([1, 3]));
+  });
+
+  it('スキップ記録が無ければ空のSetを返す', async () => {
+    mockSelectFromRows = [];
+    expect(await getReminderIdsWithSkips()).toEqual(new Set());
   });
 });
 

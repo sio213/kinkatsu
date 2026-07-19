@@ -89,10 +89,11 @@ export default function ScheduleTimePickerScreen() {
       // 「今回だけ差し替え」（PR10-6b）: 元のリマインダー予定をこの日だけスキップしてから、
       // 選んだ新しいルーティンを手動予定として追加する。「差し替え = スキップ + 手動予定追加」という
       // 計画フェーズの合成方針の通り、既存のskipReminderOccurrence/createScheduledWorkoutを
-      // そのまま2回呼ぶだけで実現する（専用の差し替えテーブルは持たない）。ネイティブ方式リマインダー
-      // (毎日/毎週/単純な毎月)は個別キャンセルできない制約(PR10-6c対応予定)があるため、
-      // notificationSuppressedを保持しておき、通常のスキップ(handleSkipReminder)と同じく
-      // 抑止できなかった場合は後で警告する(@reviewer Major指摘: この経路だけ戻り値を握り潰していた)
+      // そのまま2回呼ぶだけで実現する（専用の差し替えテーブルは持たない）。PR10-6cにより
+      // ネイティブ方式リマインダーも一時キュー化で通知を止められるようになったため、
+      // notificationSuppressedはトリガー方式ではなく通知API側の想定外エラーのみを示す。
+      // 通常のスキップ(handleSkipReminder)と同じく、抑止できなかった場合は後で警告する
+      // (@reviewer Major指摘: この経路だけ戻り値を握り潰していた)
       let notificationSuppressed = true;
       if (isReplaceMode && replaceReminderId) {
         const result = await skipReminderOccurrence(Number(replaceReminderId), dateKey);
@@ -107,13 +108,16 @@ export default function ScheduleTimePickerScreen() {
       // scheduled-workout-scheduler.tsから公開されたbuildScheduledWorkoutFireDateを再利用する
       const fireDate = buildScheduledWorkoutFireDate(dateKey, hour, minute);
       const isPastTime = fireDate.getTime() <= Date.now();
-      const nativeNoticeWarning =
+      // 「通知停止処理」という表現は不正確——ネイティブ方式の実体はcancelReminderOsNotifications
+      // (個別に.catch(()=>{})で握りつぶすため実質失敗しない)ではなく、その後の一時キュー化で
+      // 新しい通知を登録するscheduleQueueNotification側が失敗している可能性が高い(@reviewer指摘)
+      const notificationSuppressionWarning =
         isReplaceMode && !notificationSuppressed
-          ? 'この予定は「毎日」「毎週」などの繰り返し方式のため、元の通知は差し替え後も届く場合があります。'
+          ? '元の予定の新しい通知の登録処理に失敗した可能性があります。念のため指定時刻に通知が届いていないかご確認ください。'
           : null;
       // 画面2→画面1→カレンダー画面の2階層を一度に閉じる
       // (app/workout/routine-load.tsxのrouter.dismiss(2)と同じ考え方)
-      if (isPastTime || nativeNoticeWarning) {
+      if (isPastTime || notificationSuppressionWarning) {
         const lines = [
           isReplaceMode
             ? isPastTime
@@ -121,7 +125,7 @@ export default function ScheduleTimePickerScreen() {
               : '差し替えが完了しました。'
             : '通知は届きませんが、予定はカレンダーに追加されました。',
         ];
-        if (nativeNoticeWarning) lines.push(nativeNoticeWarning);
+        if (notificationSuppressionWarning) lines.push(notificationSuppressionWarning);
         // cancelable:falseが無いと、Android物理戻るボタンでこのAlertを無視できてしまう。isSubmitting系は
         // Alert表示前(finally節)で既に解除済みのため、その場合ボタンが再度押せる状態のまま画面に残り、
         // 同じ予定を重複作成できてしまう(自動レビュー指摘: Major)

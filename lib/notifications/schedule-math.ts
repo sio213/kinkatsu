@@ -160,6 +160,27 @@ export function nextDailyFireDate(
   return new Date(candidate.getTime() + 86400000);
 }
 
+// 毎日(interval, intervalDays=1)をキュー方式で扱う場合の複数件版。ネイティブ方式リマインダーを
+// スキップ日除外のため一時的にキュー方式へ切り替える際(PR10-6c)に使う。nextDailyFireDateを
+// 1件ずつ前進させて呼ぶだけで、後続の呼び出しは前回の結果ちょうどの時刻を渡すため
+// setHM(candidate,...)がcandidate自身と一致し「> from」を満たさず必ず+1日される
+// (=重複なく連続した日が並ぶ)
+export function computeDailyFireDates(
+  from: Date,
+  hour: number,
+  minute: number,
+  count: number,
+): Date[] {
+  const results: Date[] = [];
+  let cursor = from;
+  for (let i = 0; i < count; i++) {
+    const next = nextDailyFireDate(cursor, hour, minute);
+    results.push(next);
+    cursor = next;
+  }
+  return results;
+}
+
 export function nextWeeklyFireDate(
   from: Date,
   weekdays: number[],

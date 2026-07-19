@@ -31,6 +31,24 @@ export async function hasReminderScheduleSkip(reminderId: number, skippedDate: s
   return rows.length > 0;
 }
 
+// ネイティブ方式リマインダーの一時キュー化判定(PR10-6c)用。「このリマインダーに未来含め
+// 何らかのスキップ記録が1件でも残っているか」だけを見る(日付は問わない。過去分は
+// pruneExpiredReminderScheduleSkipsで先に消える前提のため、実質「今日以降のスキップの有無」)
+export async function hasAnyReminderScheduleSkip(reminderId: number): Promise<boolean> {
+  const rows = await db
+    .select()
+    .from(reminderScheduleSkips)
+    .where(eq(reminderScheduleSkips.reminderId, reminderId));
+  return rows.length > 0;
+}
+
+// refillAllReminders(全リマインダー一括補充)向け。1件ずつhasAnyReminderScheduleSkipを
+// 呼ぶとリマインダー数だけN+1クエリになるため、全件のreminderIdをまとめてSetで返す
+export async function getReminderIdsWithSkips(): Promise<Set<number>> {
+  const rows = await db.select({ reminderId: reminderScheduleSkips.reminderId }).from(reminderScheduleSkips);
+  return new Set(rows.map((r) => r.reminderId));
+}
+
 // アプリ起動時(app/_layout.tsxのonAppStart)に呼ぶ。過去日分のスキップ記録はcards/月グリッド
 // どちらの判定にも二度と使われないため、pruneExpiredNotifications(lib/notifications/scheduler.ts、
 // reminderNotifications向け)と同じ考え方でクエリ対象から掃除する(@reviewer指摘: 蓄積して
