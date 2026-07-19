@@ -9,6 +9,7 @@ import { ResumeWorkoutBanner } from '@/components/workout/resume-workout-banner'
 import { Colors, Typography } from '@/constants/theme';
 import { useCalendarDayExercises, type CalendarDayCard } from '@/hooks/use-calendar-day-exercises';
 import { useCalendarMonthRecords } from '@/hooks/use-calendar-month-records';
+import { useCalendarMonthSchedule } from '@/hooks/use-calendar-month-schedule';
 import { useDebouncedPush } from '@/hooks/use-debounced-push';
 import { useWorkoutSessions } from '@/hooks/use-workout-session';
 import { addMonths, isSameDay } from '@/lib/calendar/date-grid';
@@ -108,6 +109,14 @@ export default function CalendarScreen() {
     };
   }, [viewed.year, viewed.month]);
   const { primaryCategoryByDay, categorySetByDay } = useCalendarMonthRecords(rangeStart, rangeEnd);
+  // 予定（ルーティン紐付きリマインダー由来）はtodayStart以降のみを対象にする
+  // （過去日は上のuseCalendarMonthRecordsが担当する実績のみを表示する）
+  const todayStart = useMemo(() => new Date(today.getFullYear(), today.getMonth(), today.getDate()).getTime(), [today]);
+  const { primaryCategoryByScheduleDay, categorySetByScheduleDay } = useCalendarMonthSchedule(
+    rangeStart,
+    rangeEnd,
+    todayStart,
+  );
 
   // カテゴリフィルターは月グリッドのマーカー表示だけに作用する（デザイン案「確定：カテゴリ
   // フィルタ適用」の仕様通り）。選択日パネルはフィルターの影響を受けず常に全記録を表示する
@@ -166,11 +175,20 @@ export default function CalendarScreen() {
           onChangeMonth={goToMonth}
           primaryCategoryByDay={primaryCategoryByDay}
           categorySetByDay={categorySetByDay}
+          primaryCategoryByScheduleDay={primaryCategoryByScheduleDay}
+          categorySetByScheduleDay={categorySetByScheduleDay}
           activeFilter={activeFilter}
         />
         <View style={styles.legend}>
           <CategoryColorLegend />
         </View>
+        {/* 予定（リング/ドット表現）が実際に画面上にある場合だけ表示する。予定を使っていない
+            （＝ルーティン紐付きリマインダーを設定していない）ユーザーには不要な説明のため
+            常時表示にはしない（@designer指摘: 塗り=実施/リング・ドット=予定の凡例が無いと
+            初見で誤読されるおそれがあるとの指摘への対応） */}
+        {primaryCategoryByScheduleDay.size > 0 && (
+          <Text style={styles.scheduleLegendHint}>塗りつぶし＝実施済み、輪郭・点＝予定（リマインダー由来）</Text>
+        )}
 
         <View style={styles.dayPanel}>
           <Text style={styles.dayHeading}>{formatSessionDateGroup(selectedDate.getTime())}</Text>
@@ -221,6 +239,7 @@ const styles = StyleSheet.create({
   navButton: { width: 36, height: 36, alignItems: 'center', justifyContent: 'center' },
   filterRow: { marginBottom: 10 },
   legend: { marginTop: 10 },
+  scheduleLegendHint: { ...Typography.caption, color: Colors.textPlaceholder, marginTop: 6 },
 
   dayPanel: { marginTop: 16, paddingTop: 12, borderTopWidth: 1, borderTopColor: Colors.border },
   // 記録タブ(app/(tabs)/index.tsx)の日付グループ見出しと同じ役割（formatSessionDateGroupを
