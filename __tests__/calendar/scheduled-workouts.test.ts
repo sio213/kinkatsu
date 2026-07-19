@@ -42,6 +42,22 @@ describe('addScheduledWorkout', () => {
     expect(values).toMatchObject({ routineId: 10, scheduledDate: '2026-07-25', hour: 19, minute: 30 });
     expect(id).toBe(42);
   });
+
+  it('hour/minuteの境界値(0, 23, 59)はinsertされる', async () => {
+    await addScheduledWorkout(10, '2026-07-25', 0, 0);
+    await addScheduledWorkout(10, '2026-07-25', 23, 59);
+    expect(mockInsertValues).toHaveBeenCalledTimes(2);
+  });
+
+  it.each([
+    ['hour=24(範囲外)', 24, 0],
+    ['hour=-1(範囲外)', -1, 0],
+    ['minute=60(範囲外)', 19, 60],
+    ['minute=-1(範囲外)', 19, -1],
+  ])('%s はinsertを呼ばず例外を投げる', async (_label, hour, minute) => {
+    await expect(addScheduledWorkout(10, '2026-07-25', hour, minute)).rejects.toThrow();
+    expect(mockInsertValues).not.toHaveBeenCalled();
+  });
 });
 
 describe('deleteScheduledWorkout', () => {

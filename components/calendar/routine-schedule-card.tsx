@@ -147,5 +147,7 @@ const styles = StyleSheet.create({
     paddingVertical: 6,
   },
   timeText: { ...Typography.footnote, color: Colors.textBody, fontWeight: '600' },
-  oneTimeText: { ...Typography.badge, color: Colors.textMuted },
+  // textMuted(slate500)だとsurfaceSubtle背景とのコントラスト比がWCAG AA(4.5:1)をわずかに
+  // 下回るため、一段濃いtextSecondary(slate600)にする（デザイン指摘対応）
+  oneTimeText: { ...Typography.badge, color: Colors.textSecondary },
 });

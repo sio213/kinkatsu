@@ -74,6 +74,7 @@ function AddScheduleGhostButton({ onPress }: { onPress: () => void }) {
       onPress={onPress}
       accessibilityRole="button"
       accessibilityLabel="予定を追加"
+      hitSlop={{ top: 6, bottom: 6, left: 8, right: 8 }}
     >
       <DesignIcon name="add-circle" size={18} color={Colors.accent} />
       <Text style={styles.addScheduleGhostText}>予定を追加</Text>

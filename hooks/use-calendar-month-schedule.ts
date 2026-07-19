@@ -70,6 +70,10 @@ export function useCalendarMonthSchedule(rangeStart: number, rangeEnd: number, t
     }
     for (const m of manuals) {
       if (m.scheduledDate < effectiveStartKey || m.scheduledDate >= rangeEndKey) continue;
+      // hooks/use-calendar-day-manual-schedule.tsの選択日パネル側は種目0件のルーティンでも
+      // {exerciseCount:0, categories:[]}にフォールバックしてカードを表示するが、こちらは
+      // 月グリッドのリング/ドットの「色」を決めるための集計であり、そもそも塗る色が無いため
+      // フォールバックできない（意図した非対称。日パネルには出るが月グリッドには出ない）
       const category = summaries.get(m.routineId)?.categories[0];
       if (category === undefined) continue;
       fireRows.push({ dateKey: m.scheduledDate, hour: m.hour, minute: m.minute, category });

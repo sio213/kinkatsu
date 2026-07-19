@@ -60,9 +60,11 @@ export default function ScheduleTimePickerScreen() {
   }, [routineId, dateKey, hour, minute, router]);
 
   // 前画面(schedule-routine-picker.tsx)は必ず数値のroutineId・'YYYY-MM-DD'形式のdateKeyを
-  // paramsで渡すが、app/workout/routine-load.tsxと同じく不正な直リンク等への防御として
-  // 明示的にガードする（dateKeyが不正なままparseDateKeyに渡るとクラッシュするため）
-  if (!Number.isFinite(routineId) || !isValidDateKey(dateKey)) {
+  // paramsで渡すが、不正な直リンク等への防御として明示的にガードする（dateKeyが不正なまま
+  // parseDateKeyに渡るとクラッシュするため）。routineIdはDBの自動採番id(1始まりの整数)なので、
+  // Number.isFiniteだけでは通ってしまう""(0扱い)・"0"・負数・小数の文字列まで弾くため
+  // Number.isInteger + 正の数であることまで確認する
+  if (!Number.isInteger(routineId) || routineId <= 0 || !isValidDateKey(dateKey)) {
     return (
       <SafeAreaView style={styles.safeArea} edges={['bottom']}>
         <Stack.Screen options={{ title: '時刻を選択' }} />
@@ -75,8 +77,15 @@ export default function ScheduleTimePickerScreen() {
     <SafeAreaView style={styles.safeArea} edges={['bottom']}>
       <Stack.Screen
         options={{
+          // 画面1(schedule-routine-picker.tsx)はタイトル=アクション名(「ルーティンを選択」)・
+          // サブタイトル=日付という情報階層のため、こちらも合わせてタイトルをアクション名にし、
+          // 日付・ルーティン名はサブタイトル側にまとめる（デザイン指摘: 隣接画面で主従が
+          // 逆転していると視線移動が不自然になるため）
           headerTitle: () => (
-            <HeaderTitle title={formatSessionDateGroup(parseDateKey(dateKey).getTime())} subtitle={routineName} />
+            <HeaderTitle
+              title="時刻を選択"
+              subtitle={`${formatSessionDateGroup(parseDateKey(dateKey).getTime())}・${routineName}`}
+            />
           ),
         }}
       />
