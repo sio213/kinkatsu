@@ -213,6 +213,11 @@ describe('skipReminderOccurrence', () => {
     await expect(skipReminderOccurrence(1, '2026-07-27')).rejects.toThrow('db error');
   });
 
+  it('reminderIdが既にcascade削除済みの場合(FOREIGN KEY constraint failed)も、UNIQUE制約と同様に握りつぶさずそのままrejectする(@tester指摘: ルーティン削除直後にゴーストカードが残ったまま⋮操作される競合を想定)', async () => {
+    mockAddReminderScheduleSkip.mockRejectedValueOnce(new Error('FOREIGN KEY constraint failed'));
+    await expect(skipReminderOccurrence(1, '2026-07-27')).rejects.toThrow('FOREIGN KEY constraint failed');
+  });
+
   it('同一reminderId+日付への同時呼び出し(TOCTOU再現: どちらもhasReminderScheduleSkip=falseで存在チェックをすり抜けた後、片方だけがinsertに先勝ちしもう片方がUNIQUE制約違反になる)を、実際にPromise.allで並行実行しても両方成功として解決する(@reviewer Major指摘: 逐次呼び出しのテストしか無くTOCTOU対策の実効性が並行実行で検証されていなかった)', async () => {
     mockHasReminderScheduleSkip.mockResolvedValue(false);
     mockAddReminderScheduleSkip

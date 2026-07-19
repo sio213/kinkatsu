@@ -23,13 +23,13 @@ import { addMonths, isSameDay, toDateKey } from '@/lib/calendar/date-grid';
 import { CATEGORY_ALL, EXERCISE_CATEGORIES } from '@/lib/exercises/constants';
 import { buildTodayTimeline, groupCardsBySession } from '@/lib/calendar/session-groups';
 import { mergeScheduleCards, type UnifiedScheduleCard } from '@/lib/calendar/schedule';
-import { formatHourMinute, formatHourMinuteParts } from '@/lib/calendar/time-of-day';
+import { formatHourMinute, formatHourMinuteParts, timeOfDayOffsetMs } from '@/lib/calendar/time-of-day';
 import { formatKindSummary } from '@/lib/notifications/format';
 import { skipReminderOccurrence, unskipReminderOccurrence } from '@/lib/notifications/reminder-skip-scheduler';
 import { removeScheduledWorkout } from '@/lib/notifications/scheduled-workout-scheduler';
 import { formatMonthGroup, formatSessionDateGroup } from '@/lib/workout/summary';
 import { Stack } from 'expo-router';
-import { useCallback, useMemo, useState } from 'react';
+import { useCallback, useMemo, useRef, useState } from 'react';
 import { ActivityIndicator, Alert, ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
@@ -240,7 +240,7 @@ export default function CalendarScreen() {
         ...daySchedule.skipped.map((s) => ({
           kind: 'skipped' as const,
           key: `skip-${s.reminderId}`,
-          sortAt: selectedDayStart + s.hour * 3_600_000 + s.minute * 60_000,
+          sortAt: selectedDayStart + timeOfDayOffsetMs(s.hour, s.minute),
           skipped: s,
         })),
       ].sort((a, b) => a.sortAt - b.sortAt),
@@ -252,13 +252,13 @@ export default function CalendarScreen() {
         ...mergedSchedule.map((card) => ({
           kind: 'card' as const,
           key: card.key,
-          sortAt: card.hour * 3_600_000 + card.minute * 60_000,
+          sortAt: timeOfDayOffsetMs(card.hour, card.minute),
           card,
         })),
         ...daySchedule.skipped.map((s) => ({
           kind: 'skipped' as const,
           key: `skip-${s.reminderId}`,
-          sortAt: s.hour * 3_600_000 + s.minute * 60_000,
+          sortAt: timeOfDayOffsetMs(s.hour, s.minute),
           skipped: s,
         })),
       ].sort((a, b) => a.sortAt - b.sortAt),
@@ -335,14 +335,24 @@ export default function CalendarScreen() {
     },
     [selectedDate],
   );
-  // スキップ済みゴーストカードの「元に戻す」用
+  // スキップ済みゴーストカードの「元に戻す」用。unskipReminderOccurrence自体は
+  // (skipReminderOccurrenceと違い)TOCTOU対策を持たないため、連打すると
+  // cancelExistingNotificationsForDate→scheduleQueueNotificationの区間が競合し
+  // 通知が二重登録されうる(@reviewer/@tester指摘)。schedule-time-picker.tsxのisSubmittingRefと
+  // 同じ「同期refで多重起動を防ぐ」パターンをここでも使う。reminderIdごとに独立して連打防止する
+  // 必要があるため(複数のゴーストカードを別々に操作しうる)、単一boolean refではなくSetで管理する
+  const undoInFlightRef = useRef<Set<number>>(new Set());
   const handleUndoSkipReminder = useCallback(
     async (reminderId: number) => {
+      if (undoInFlightRef.current.has(reminderId)) return;
+      undoInFlightRef.current.add(reminderId);
       try {
         await unskipReminderOccurrence(reminderId, toDateKey(selectedDate));
       } catch (e) {
         console.error('[unskip reminder occurrence]', e);
         Alert.alert('エラー', 'スキップを元に戻せませんでした。');
+      } finally {
+        undoInFlightRef.current.delete(reminderId);
       }
     },
     [selectedDate],

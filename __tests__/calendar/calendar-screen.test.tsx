@@ -1055,6 +1055,37 @@ describe('CalendarScreen 予定（PR9-2: リマインダー由来の未来予定
       expect(Alert.alert).toHaveBeenCalledWith('エラー', '予定をスキップできませんでした。');
     });
 
+    test('「元に戻す」を連打しても、1回分の処理が完了するまでunskipReminderOccurrenceは1回しか呼ばれない(@reviewer/@tester指摘: TOCTOU/連打対策)', async () => {
+      let resolveUnskip!: () => void;
+      mockUnskipReminderOccurrence.mockReturnValue(
+        new Promise<void>((resolve) => {
+          resolveUnskip = resolve;
+        }),
+      );
+      const root = render();
+      const future = new Date();
+      future.setDate(future.getDate() + 5);
+      mockUseCalendarDaySchedule.mockReturnValue(
+        daySchedule([], [{ reminderId: 1, routineId: 10, routineName: '胸の日', hour: 20, minute: 0 }]),
+      );
+      selectDate(future);
+
+      const undoBtn = root
+        .findAllByType(TouchableOpacity)
+        .find((t) => t.props.accessibilityLabel === '「胸の日」20:00のスキップを元に戻す')!;
+      await act(async () => {
+        undoBtn.props.onPress();
+        undoBtn.props.onPress();
+        undoBtn.props.onPress();
+        await Promise.resolve();
+      });
+      expect(mockUnskipReminderOccurrence).toHaveBeenCalledTimes(1);
+
+      await act(async () => {
+        resolveUnskip();
+      });
+    });
+
     test('元に戻すに失敗した場合はエラーAlertを表示する', async () => {
       mockUnskipReminderOccurrence.mockRejectedValueOnce(new Error('fail'));
       jest.spyOn(console, 'error').mockImplementation(() => {});

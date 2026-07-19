@@ -33,3 +33,10 @@ export function formatHourMinute(date: Date): string {
 export function formatHourMinuteParts(hour: number, minute: number): string {
   return `${String(hour).padStart(2, '0')}:${String(minute).padStart(2, '0')}`;
 }
+
+// hour/minuteを「その日の0時からのオフセットms」に変換する。予定の時刻順ソートキー計算で
+// app/(tabs)/calendar.tsx内に複製されていた式(hour*3_600_000+minute*60_000)を1本化する
+// (@reviewer指摘)
+export function timeOfDayOffsetMs(hour: number, minute: number): number {
+  return hour * 3_600_000 + minute * 60_000;
+}

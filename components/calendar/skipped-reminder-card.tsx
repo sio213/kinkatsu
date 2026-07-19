@@ -49,8 +49,11 @@ const styles = StyleSheet.create({
     borderStyle: 'dashed',
     borderColor: Colors.borderStrong,
     borderRadius: 10,
-    paddingVertical: 11,
-    paddingHorizontal: 13,
+    // routine-schedule-card.tsx(padding: 13)と揃える。アクティブなカードとゴーストカードが
+    // 時刻順に隣接して並ぶようになった(PR10-6aレビュー3巡目対応)ため、高さの微妙な差が
+    // 目立つようになった(@designer指摘)。44pt相当のタップ領域はundoButton自身のpadding/hitSlopで
+    // 確保しているため、カード全体のpaddingをここで縮めても実際のタップ領域は変わらない
+    padding: 13,
   },
   info: { flexDirection: 'row', alignItems: 'center', gap: 8, flex: 1, minWidth: 0 },
   textGroup: { flex: 1, minWidth: 0, gap: 2 },
