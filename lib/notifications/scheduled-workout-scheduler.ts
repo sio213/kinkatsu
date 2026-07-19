@@ -38,7 +38,6 @@ type ScheduledWorkoutLike = {
 async function scheduleNotificationCore(sw: ScheduledWorkoutLike, routineName: string, fireDate: Date): Promise<void> {
   const data: ScheduledWorkoutNotificationData = {
     type: SCHEDULED_WORKOUT_NOTIFICATION_TYPE,
-    scheduledWorkoutId: sw.id,
     routineId: sw.routineId,
   };
   await Notifications.scheduleNotificationAsync({

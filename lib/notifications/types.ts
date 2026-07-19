@@ -47,8 +47,5 @@ export const SCHEDULED_WORKOUT_NOTIFICATION_TYPE = 'scheduled_workout' as const;
 
 export type ScheduledWorkoutNotificationData = {
   type: typeof SCHEDULED_WORKOUT_NOTIFICATION_TYPE;
-  // tap-handler.tsは現状routineIdしか消費しないが、複数の手動予定が同時刻・同ルーティンで
-  // 存在する場合の切り分けや、将来の個別キャンセル等のデバッグ/機能追加に備えて保持する
-  scheduledWorkoutId: number;
   routineId: number;
 };

@@ -588,7 +588,7 @@ describe('CalendarScreen 予定（PR9-2: リマインダー由来の未来予定
         expect(findMenuTrigger(root, '胸の日')).toBeUndefined();
       });
 
-      test('⋮→削除で確認Alertを出し、確認するとdeleteScheduledWorkoutにscheduledWorkoutIdを渡す', async () => {
+      test('⋮→削除で確認Alertを出し、確認するとremoveScheduledWorkoutにscheduledWorkoutIdを渡す', async () => {
         const root = selectFutureDayWithManualCard();
         act(() => {
           findMenuTrigger(root, '脚の日')!.props.onPress();
@@ -613,7 +613,7 @@ describe('CalendarScreen 予定（PR9-2: リマインダー由来の未来予定
         expect(mockRemoveScheduledWorkout).toHaveBeenCalledWith(1);
       });
 
-      test('確認Alertで「キャンセル」相当（confirmを呼ばない）場合はdeleteScheduledWorkoutが呼ばれない', () => {
+      test('確認Alertで「キャンセル」相当（confirmを呼ばない）場合はremoveScheduledWorkoutが呼ばれない', () => {
         const root = selectFutureDayWithManualCard();
         act(() => {
           findMenuTrigger(root, '脚の日')!.props.onPress();
@@ -648,7 +648,7 @@ describe('CalendarScreen 予定（PR9-2: リマインダー由来の未来予定
         expect(root.findByProps({ children: '脚の日' })).toBeDefined();
       });
 
-      test('deleteScheduledWorkoutが例外を投げずresolveした場合（対象行が既に無い場合等のサイレント成功仕様）、エラーAlertは出ない', async () => {
+      test('removeScheduledWorkoutが例外を投げずresolveした場合（対象行が既に無い場合等のサイレント成功仕様）、エラーAlertは出ない', async () => {
         const root = selectFutureDayWithManualCard();
         act(() => {
           findMenuTrigger(root, '脚の日')!.props.onPress();
@@ -746,7 +746,7 @@ describe('CalendarScreen 予定（PR9-2: リマインダー由来の未来予定
         expect(findMenuTrigger(root, '今日だけの脚の日')).toBeDefined();
       });
 
-      test('今日自身の手動予定の⋮→削除で確認Alert→confirmでdeleteScheduledWorkoutが呼ばれる', async () => {
+      test('今日自身の手動予定の⋮→削除で確認Alert→confirmでremoveScheduledWorkoutが呼ばれる', async () => {
         mockUseCalendarDayManualSchedule.mockReturnValue([manualCard({ routineName: '今日だけの脚の日' })]);
         const root = render();
 

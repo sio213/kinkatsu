@@ -54,10 +54,10 @@ async function onAppStart() {
     await pruneExpiredNotifications();
     const state = await getPermissionState();
     if (state === 'granted') {
-      await refillAllReminders();
+      // reminders/scheduledWorkoutsは別テーブル・独立処理のため並列実行できる（自動レビュー指摘）。
       // OS再起動・アプリ再インストールで保留通知が消えた場合や、権限を後から許可した場合に
       // 手動予定(scheduledWorkouts)の通知を再スケジュールして追従する（PR10-5）
-      await syncScheduledWorkoutNotifications();
+      await Promise.all([refillAllReminders(), syncScheduledWorkoutNotifications()]);
     }
   } finally {
     appStarting = false;

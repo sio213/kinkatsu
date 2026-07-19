@@ -116,7 +116,6 @@ describe('createScheduledWorkout', () => {
     expect(request.content.title).toBe('胸の日');
     expect(request.content.data).toEqual({
       type: 'scheduled_workout',
-      scheduledWorkoutId: 42,
       routineId: 10,
     });
     expect(request.content.channelId).toBe('reminders');
