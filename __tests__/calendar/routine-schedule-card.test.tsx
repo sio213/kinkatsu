@@ -108,17 +108,17 @@ describe('RoutineScheduleCard', () => {
   describe('⋮メニュー(onDelete、PR10-3)', () => {
     it('onDeleteを渡さない場合（リマインダー予定）、⋮メニューは表示されない', () => {
       const root = render();
-      expect(findByAccessibilityLabel(root.root, '「胸の日」のメニューを開く')).toBeUndefined();
+      expect(findByAccessibilityLabel(root.root, '「胸の日」毎週 日曜 07:00のメニューを開く')).toBeUndefined();
     });
 
     it('onDeleteを渡した場合（手動予定）、⋮メニューが表示される（accessibilityLabelにルーティン名を含み、複数カードが並んでも区別できる）', () => {
       const root = render({ onDelete });
-      expect(findByAccessibilityLabel(root.root, '「胸の日」のメニューを開く')).toBeDefined();
+      expect(findByAccessibilityLabel(root.root, '「胸の日」毎週 日曜 07:00のメニューを開く')).toBeDefined();
     });
 
     it('⋮メニューを開いて「削除」を押すとonDeleteが呼ばれ、カード本体のonPressは呼ばれない', () => {
       const root = render({ onDelete });
-      const menuTrigger = findByAccessibilityLabel(root.root, '「胸の日」のメニューを開く')!;
+      const menuTrigger = findByAccessibilityLabel(root.root, '「胸の日」毎週 日曜 07:00のメニューを開く')!;
       act(() => {
         menuTrigger.props.onPress();
       });
@@ -135,7 +135,7 @@ describe('RoutineScheduleCard', () => {
     it('「削除」を押した後、メニュー自体が閉じる', () => {
       const root = render({ onDelete });
       act(() => {
-        findByAccessibilityLabel(root.root, '「胸の日」のメニューを開く')!.props.onPress();
+        findByAccessibilityLabel(root.root, '「胸の日」毎週 日曜 07:00のメニューを開く')!.props.onPress();
       });
       expect(findByAccessibilityLabel(root.root, '削除')).toBeDefined();
 
@@ -147,7 +147,7 @@ describe('RoutineScheduleCard', () => {
 
     it('onPressStartがある場合（今日自身の予定）でもonDeleteを渡せば⋮メニューが表示される', () => {
       const root = render({ onPressStart, onDelete });
-      expect(findByAccessibilityLabel(root.root, '「胸の日」のメニューを開く')).toBeDefined();
+      expect(findByAccessibilityLabel(root.root, '「胸の日」毎週 日曜 07:00のメニューを開く')).toBeDefined();
     });
   });
 });

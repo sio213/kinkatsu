@@ -20,8 +20,8 @@ export async function addScheduledWorkout(routineId: number, scheduledDate: stri
   return inserted.id;
 }
 
-// 呼び出し元は本PR(PR10-1)時点では未配線（削除UIは後続PRで追加予定、2026-07-19確定）。
-// DB層とテストだけ先に用意している
+// 選択日パネルの手動予定カードの⋮メニュー「削除」から呼ばれる（PR10-3、
+// components/calendar/routine-schedule-card.tsx・app/(tabs)/calendar.tsxのhandleDeleteSchedule）
 export async function deleteScheduledWorkout(id: number): Promise<void> {
   await db.delete(scheduledWorkouts).where(eq(scheduledWorkouts.id, id));
 }

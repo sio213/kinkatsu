@@ -560,14 +560,19 @@ describe('CalendarScreen 予定（PR9-2: リマインダー由来の未来予定
         return root;
       }
 
+      // accessibilityLabelは「「routineName」timeLabelのメニューを開く」形式（timeLabelも含めて
+      // 一意にする、PRレビュー指摘対応）。呼び出し側では時刻までは指定せずroutineNameだけで
+      // 引っかけたいのでstartsWithで判定する
       function findMenuTrigger(root: ReactTestInstance, routineName: string) {
-        return root.findAllByType(TouchableOpacity).find((t) => t.props.accessibilityLabel === `「${routineName}」のメニューを開く`);
+        return root
+          .findAllByType(TouchableOpacity)
+          .find((t) => typeof t.props.accessibilityLabel === 'string' && t.props.accessibilityLabel.startsWith(`「${routineName}」`) && t.props.accessibilityLabel.endsWith('のメニューを開く'));
       }
 
       function findAllMenuTriggers(root: ReactTestInstance) {
         return root
           .findAllByType(TouchableOpacity)
-          .filter((t) => typeof t.props.accessibilityLabel === 'string' && t.props.accessibilityLabel.endsWith('」のメニューを開く'));
+          .filter((t) => typeof t.props.accessibilityLabel === 'string' && t.props.accessibilityLabel.endsWith('のメニューを開く'));
       }
 
       test('手動予定カードには⋮メニューがあり、リマインダー予定カードには無い', () => {
