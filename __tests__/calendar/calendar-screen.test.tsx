@@ -44,9 +44,9 @@ jest.mock('@/lib/workout/session', () => ({
   startWorkoutFromRoutine: (...args: unknown[]) => mockStartWorkoutFromRoutine(...args),
 }));
 
-const mockDeleteScheduledWorkout = jest.fn();
-jest.mock('@/lib/calendar/scheduled-workouts', () => ({
-  deleteScheduledWorkout: (...args: unknown[]) => mockDeleteScheduledWorkout(...args),
+const mockRemoveScheduledWorkout = jest.fn();
+jest.mock('@/lib/notifications/scheduled-workout-scheduler', () => ({
+  removeScheduledWorkout: (...args: unknown[]) => mockRemoveScheduledWorkout(...args),
 }));
 
 // 日付選択UI自体（スワイプ・グリッド）はmonth-grid.test.tsx等の責務のため、
@@ -588,7 +588,7 @@ describe('CalendarScreen 予定（PR9-2: リマインダー由来の未来予定
         expect(findMenuTrigger(root, '胸の日')).toBeUndefined();
       });
 
-      test('⋮→削除で確認Alertを出し、確認するとdeleteScheduledWorkoutにscheduledWorkoutIdを渡す', async () => {
+      test('⋮→削除で確認Alertを出し、確認するとremoveScheduledWorkoutにscheduledWorkoutIdを渡す', async () => {
         const root = selectFutureDayWithManualCard();
         act(() => {
           findMenuTrigger(root, '脚の日')!.props.onPress();
@@ -600,20 +600,20 @@ describe('CalendarScreen 予定（PR9-2: リマインダー由来の未来予定
 
         expect(Alert.alert).toHaveBeenCalledWith(
           'この予定を削除しますか？',
-          '「脚の日」の予定を削除します。ルーティン自体や記録には影響しません。',
+          '「脚の日」の予定を削除します。ルーティン自体や記録には影響しませんが、設定していた通知も届かなくなります。',
           expect.any(Array),
         );
-        expect(mockDeleteScheduledWorkout).not.toHaveBeenCalled();
+        expect(mockRemoveScheduledWorkout).not.toHaveBeenCalled();
 
         const alertCall = (Alert.alert as jest.Mock).mock.calls[0];
         const confirmAction = alertCall[2].find((b: { text?: string }) => b.text === '削除');
         await act(async () => {
           await confirmAction.onPress();
         });
-        expect(mockDeleteScheduledWorkout).toHaveBeenCalledWith(1);
+        expect(mockRemoveScheduledWorkout).toHaveBeenCalledWith(1);
       });
 
-      test('確認Alertで「キャンセル」相当（confirmを呼ばない）場合はdeleteScheduledWorkoutが呼ばれない', () => {
+      test('確認Alertで「キャンセル」相当（confirmを呼ばない）場合はremoveScheduledWorkoutが呼ばれない', () => {
         const root = selectFutureDayWithManualCard();
         act(() => {
           findMenuTrigger(root, '脚の日')!.props.onPress();
@@ -623,11 +623,11 @@ describe('CalendarScreen 予定（PR9-2: リマインダー由来の未来予定
           deleteItem.props.onPress();
         });
 
-        expect(mockDeleteScheduledWorkout).not.toHaveBeenCalled();
+        expect(mockRemoveScheduledWorkout).not.toHaveBeenCalled();
       });
 
-      test('削除に失敗した場合はエラーAlertを表示し、mockDeleteScheduledWorkoutの呼び出し以外は何も壊れない', async () => {
-        mockDeleteScheduledWorkout.mockRejectedValueOnce(new Error('fail'));
+      test('削除に失敗した場合はエラーAlertを表示し、mockRemoveScheduledWorkoutの呼び出し以外は何も壊れない', async () => {
+        mockRemoveScheduledWorkout.mockRejectedValueOnce(new Error('fail'));
         jest.spyOn(console, 'error').mockImplementation(() => {});
         const root = selectFutureDayWithManualCard();
         act(() => {
@@ -648,7 +648,7 @@ describe('CalendarScreen 予定（PR9-2: リマインダー由来の未来予定
         expect(root.findByProps({ children: '脚の日' })).toBeDefined();
       });
 
-      test('deleteScheduledWorkoutが例外を投げずresolveした場合（対象行が既に無い場合等のサイレント成功仕様）、エラーAlertは出ない', async () => {
+      test('removeScheduledWorkoutが例外を投げずresolveした場合（対象行が既に無い場合等のサイレント成功仕様）、エラーAlertは出ない', async () => {
         const root = selectFutureDayWithManualCard();
         act(() => {
           findMenuTrigger(root, '脚の日')!.props.onPress();
@@ -689,7 +689,7 @@ describe('CalendarScreen 予定（PR9-2: リマインダー由来の未来予定
 
           expect(Alert.alert).toHaveBeenCalledWith(
             'この予定を削除しますか？',
-            '「背中の日」の予定を削除します。ルーティン自体や記録には影響しません。',
+            '「背中の日」の予定を削除します。ルーティン自体や記録には影響しませんが、設定していた通知も届かなくなります。',
             expect.any(Array),
           );
           const alertCall = (Alert.alert as jest.Mock).mock.calls[0];
@@ -697,8 +697,8 @@ describe('CalendarScreen 予定（PR9-2: リマインダー由来の未来予定
           await act(async () => {
             await confirmAction.onPress();
           });
-          expect(mockDeleteScheduledWorkout).toHaveBeenCalledWith(2);
-          expect(mockDeleteScheduledWorkout).not.toHaveBeenCalledWith(1);
+          expect(mockRemoveScheduledWorkout).toHaveBeenCalledWith(2);
+          expect(mockRemoveScheduledWorkout).not.toHaveBeenCalledWith(1);
         });
 
         test('リマインダー予定・手動予定が2件ずつ混在しても、⋮は手動予定の件数分だけ表示される', () => {
@@ -746,7 +746,7 @@ describe('CalendarScreen 予定（PR9-2: リマインダー由来の未来予定
         expect(findMenuTrigger(root, '今日だけの脚の日')).toBeDefined();
       });
 
-      test('今日自身の手動予定の⋮→削除で確認Alert→confirmでdeleteScheduledWorkoutが呼ばれる', async () => {
+      test('今日自身の手動予定の⋮→削除で確認Alert→confirmでremoveScheduledWorkoutが呼ばれる', async () => {
         mockUseCalendarDayManualSchedule.mockReturnValue([manualCard({ routineName: '今日だけの脚の日' })]);
         const root = render();
 
@@ -763,11 +763,11 @@ describe('CalendarScreen 予定（PR9-2: リマインダー由来の未来予定
           await confirmAction.onPress();
         });
 
-        expect(mockDeleteScheduledWorkout).toHaveBeenCalledWith(1);
+        expect(mockRemoveScheduledWorkout).toHaveBeenCalledWith(1);
       });
 
       test('今日自身の手動予定の削除に失敗した場合もエラーAlertを表示する（開始ボタン付きレイアウトでも共通ハンドラが機能すること、PR10-4）', async () => {
-        mockDeleteScheduledWorkout.mockRejectedValueOnce(new Error('fail'));
+        mockRemoveScheduledWorkout.mockRejectedValueOnce(new Error('fail'));
         jest.spyOn(console, 'error').mockImplementation(() => {});
         mockUseCalendarDayManualSchedule.mockReturnValue([manualCard({ routineName: '今日だけの脚の日' })]);
         const root = render();

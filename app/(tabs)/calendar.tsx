@@ -21,9 +21,9 @@ import { addMonths, isSameDay, toDateKey } from '@/lib/calendar/date-grid';
 import { CATEGORY_ALL, EXERCISE_CATEGORIES } from '@/lib/exercises/constants';
 import { buildTodayTimeline, groupCardsBySession } from '@/lib/calendar/session-groups';
 import { mergeScheduleCards } from '@/lib/calendar/schedule';
-import { deleteScheduledWorkout } from '@/lib/calendar/scheduled-workouts';
 import { formatHourMinute, formatHourMinuteParts } from '@/lib/calendar/time-of-day';
 import { formatKindSummary } from '@/lib/notifications/format';
+import { removeScheduledWorkout } from '@/lib/notifications/scheduled-workout-scheduler';
 import { formatMonthGroup, formatSessionDateGroup } from '@/lib/workout/summary';
 import { Stack } from 'expo-router';
 import { useCallback, useMemo, useState } from 'react';
@@ -230,27 +230,32 @@ export default function CalendarScreen() {
     () => pushDebounced({ pathname: '/calendar/schedule-routine-picker', params: { dateKey: toDateKey(selectedDate) } }),
     [pushDebounced, selectedDate],
   );
-  // 手動予定カードの⋮メニュー「削除」用（PR10-3）。app/routine/index.tsxのhandleDeleteや
-  // session-exercise-card.tsxのhandleDeleteExerciseと同じAlert確認→try/catch+Alert.alertパターン。
-  // 削除後はuseCalendarDayManualSchedule/useCalendarMonthScheduleがuseLiveQueryで自動再購読する
-  // ため、追加の状態更新は不要（LayoutAnimationは非同期のDB書き込み・再購読を挟むと配置タイミングが
-  // ずれ効かないため、他の非同期削除処理と同じくここでは使わない）
+  // 手動予定カードの⋮メニュー「削除」用（PR10-3、PR10-5で通知キャンセルも合わせて行うよう変更）。
+  // app/routine/index.tsxのhandleDeleteやsession-exercise-card.tsxのhandleDeleteExerciseと同じ
+  // Alert確認→try/catch+Alert.alertパターン。削除後はuseCalendarDayManualSchedule/
+  // useCalendarMonthScheduleがuseLiveQueryで自動再購読するため、追加の状態更新は不要
+  // （LayoutAnimationは非同期のDB書き込み・再購読を挟むと配置タイミングがずれ効かないため、
+  // 他の非同期削除処理と同じくここでは使わない）
   const handleDeleteSchedule = useCallback((scheduledWorkoutId: number, routineName: string) => {
-    Alert.alert('この予定を削除しますか？', `「${routineName}」の予定を削除します。ルーティン自体や記録には影響しません。`, [
-      { text: 'キャンセル', style: 'cancel' },
-      {
-        text: '削除',
-        style: 'destructive',
-        onPress: async () => {
-          try {
-            await deleteScheduledWorkout(scheduledWorkoutId);
-          } catch (e) {
-            console.error('[delete scheduled workout]', e);
-            Alert.alert('エラー', '予定を削除できませんでした。');
-          }
+    Alert.alert(
+      'この予定を削除しますか？',
+      `「${routineName}」の予定を削除します。ルーティン自体や記録には影響しませんが、設定していた通知も届かなくなります。`,
+      [
+        { text: 'キャンセル', style: 'cancel' },
+        {
+          text: '削除',
+          style: 'destructive',
+          onPress: async () => {
+            try {
+              await removeScheduledWorkout(scheduledWorkoutId);
+            } catch (e) {
+              console.error('[delete scheduled workout]', e);
+              Alert.alert('エラー', '予定を削除できませんでした。');
+            }
+          },
         },
-      },
-    ]);
+      ],
+    );
   }, []);
 
   const { activeSession } = useWorkoutSessions();

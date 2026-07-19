@@ -81,6 +81,7 @@ jest.mock('@/db/schema', () => ({
     setNumber: 'routineSets.setNumber',
   },
   reminders: { id: 'reminders.id', routineId: 'reminders.routineId' },
+  scheduledWorkouts: { id: 'scheduledWorkouts.id', routineId: 'scheduledWorkouts.routineId' },
   exercises: {
     id: 'exercises.id',
     name: 'exercises.name',
@@ -105,6 +106,12 @@ jest.mock('@/lib/notifications/scheduler', () => ({
   deleteReminder: (...args: unknown[]) => mockDeleteReminder(...args),
   createReminder: (...args: unknown[]) => mockCreateReminder(...args),
   updateReminder: (...args: unknown[]) => mockUpdateReminder(...args),
+}));
+
+const mockCancelScheduledWorkoutNotificationsForRoutine = jest.fn();
+jest.mock('@/lib/notifications/scheduled-workout-scheduler', () => ({
+  cancelScheduledWorkoutNotificationsForRoutine: (...args: unknown[]) =>
+    mockCancelScheduledWorkoutNotificationsForRoutine(...args),
 }));
 
 const mockGetPreviousSets = jest.fn();
@@ -137,6 +144,7 @@ beforeEach(() => {
   mockDeleteReminder.mockReset().mockResolvedValue(undefined);
   mockCreateReminder.mockReset().mockResolvedValue(1);
   mockUpdateReminder.mockReset().mockResolvedValue(undefined);
+  mockCancelScheduledWorkoutNotificationsForRoutine.mockReset().mockResolvedValue(undefined);
   mockGetPreviousSets.mockReset().mockResolvedValue([]);
 });
 
@@ -382,11 +390,14 @@ describe('deleteRoutine', () => {
     expect(mockDeleteWhere).toHaveBeenCalledWith(routines, expect.anything());
   });
 
-  test('紐づくリマインダーが1件あれば、deleteReminder→routines削除の順で実行される', async () => {
+  test('紐づくリマインダーが1件あれば、deleteReminder→手動予定の通知キャンセル→routines削除の順で実行される', async () => {
     mockSelectWhere.mockResolvedValueOnce([{ id: 42 }]);
     const calls: string[] = [];
     mockDeleteReminder.mockImplementation(async (id: number) => {
       calls.push(`deleteReminder:${id}`);
+    });
+    mockCancelScheduledWorkoutNotificationsForRoutine.mockImplementation(async (id: number) => {
+      calls.push(`cancelScheduledWorkoutNotifications:${id}`);
     });
     mockDeleteWhere.mockImplementation(() => {
       calls.push('deleteRoutines');
@@ -395,7 +406,7 @@ describe('deleteRoutine', () => {
 
     await deleteRoutine(1);
 
-    expect(calls).toEqual(['deleteReminder:42', 'deleteRoutines']);
+    expect(calls).toEqual(['deleteReminder:42', 'cancelScheduledWorkoutNotifications:1', 'deleteRoutines']);
   });
 
   test('紐づくリマインダーが複数ある(本来想定外だが)場合、防御的に全件deleteReminderされる', async () => {
@@ -406,6 +417,17 @@ describe('deleteRoutine', () => {
     expect(mockDeleteReminder).toHaveBeenCalledTimes(2);
     expect(mockDeleteReminder).toHaveBeenNthCalledWith(1, 1);
     expect(mockDeleteReminder).toHaveBeenNthCalledWith(2, 2);
+  });
+
+  // PR10-5: scheduledWorkouts.routineIdはON DELETE CASCADEでDB行は自動的に消えるが、それだけでは
+  // OS側の保留通知が残留してしまう(reminders同様の理由)。routines削除前に必ず通知だけを
+  // キャンセルすることを保証する回帰テスト
+  test('手動予定(scheduledWorkouts)の通知は、routines削除前に必ずキャンセルされる', async () => {
+    mockSelectWhere.mockResolvedValueOnce([]); // 紐づくリマインダーは無し
+
+    await deleteRoutine(1);
+
+    expect(mockCancelScheduledWorkoutNotificationsForRoutine).toHaveBeenCalledWith(1);
   });
 });
 

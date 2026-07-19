@@ -5,6 +5,7 @@ import migrations from '@/drizzle/migrations';
 import { useColorScheme } from '@/hooks/use-color-scheme';
 import { ensureAndroidChannel } from '@/lib/notifications/channels';
 import { getPermissionState } from '@/lib/notifications/permissions';
+import { syncScheduledWorkoutNotifications } from '@/lib/notifications/scheduled-workout-scheduler';
 import {
   pruneExpiredNotifications,
   refillAllReminders,
@@ -52,7 +53,12 @@ async function onAppStart() {
     await ensureAndroidChannel();
     await pruneExpiredNotifications();
     const state = await getPermissionState();
-    if (state === 'granted') await refillAllReminders();
+    if (state === 'granted') {
+      // reminders/scheduledWorkoutsは別テーブル・独立処理のため並列実行できる（自動レビュー指摘）。
+      // OS再起動・アプリ再インストールで保留通知が消えた場合や、権限を後から許可した場合に
+      // 手動予定(scheduledWorkouts)の通知を再スケジュールして追従する（PR10-5）
+      await Promise.all([refillAllReminders(), syncScheduledWorkoutNotifications()]);
+    }
   } finally {
     appStarting = false;
   }

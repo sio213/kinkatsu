@@ -157,4 +157,61 @@ describe('resolveReminderTapDestination', () => {
       ).rejects.toThrow('start error');
     });
   });
+
+  // 手動予定(scheduledWorkouts)の通知(PR10-5)。単発かつ必ずroutineIdを持つため、リマインダーと
+  // 違いdataのroutineIdをそのまま使い、DBを引き直さない(mockWhereが呼ばれないことで確認する)
+  describe('手動予定(scheduled_workout)由来の通知', () => {
+    test('routineIdが欠落/非number(不正データ)なら遷移せず、DBも引かない', async () => {
+      expect(await resolveReminderTapDestination(makeResponse({ type: 'scheduled_workout' }))).toBeNull();
+      expect(
+        await resolveReminderTapDestination(
+          makeResponse({ type: 'scheduled_workout', scheduledWorkoutId: 1, routineId: '42' }),
+        ),
+      ).toBeNull();
+      expect(mockWhere).not.toHaveBeenCalled();
+    });
+
+    test('進行中セッションが無ければ、data.routineIdからワークアウトを開始しそのセッション画面への遷移を返す(DBは引かない)', async () => {
+      mockStartWorkoutFromRoutine.mockResolvedValue({ sessionId: 7, cards: [] });
+
+      const route = await resolveReminderTapDestination(
+        makeResponse({ type: 'scheduled_workout', scheduledWorkoutId: 1, routineId: 42 }),
+      );
+
+      expect(mockWhere).not.toHaveBeenCalled();
+      expect(mockStartWorkoutFromRoutine).toHaveBeenCalledWith(42);
+      expect(route).toBe('/workout/7');
+    });
+
+    test('既にトレーニングが進行中の場合、新規セッションは開始せずその進行中のセッション画面への遷移を返す', async () => {
+      mockGetActiveSession.mockResolvedValue({ id: 9, startedAt: 0, endedAt: null });
+
+      const route = await resolveReminderTapDestination(
+        makeResponse({ type: 'scheduled_workout', scheduledWorkoutId: 1, routineId: 42 }),
+      );
+
+      expect(mockStartWorkoutFromRoutine).not.toHaveBeenCalled();
+      expect(route).toBe('/workout/9');
+    });
+
+    test('該当ルーティンが見つからない場合(startWorkoutFromRoutineがnullを返す)は記録タブへの遷移を返す', async () => {
+      mockStartWorkoutFromRoutine.mockResolvedValue(null);
+
+      const route = await resolveReminderTapDestination(
+        makeResponse({ type: 'scheduled_workout', scheduledWorkoutId: 1, routineId: 42 }),
+      );
+
+      expect(route).toBe('/');
+    });
+
+    test('ワークアウト開始が失敗した場合、握りつぶさずそのままrejectする', async () => {
+      mockStartWorkoutFromRoutine.mockRejectedValue(new Error('start error'));
+
+      await expect(
+        resolveReminderTapDestination(
+          makeResponse({ type: 'scheduled_workout', scheduledWorkoutId: 1, routineId: 42 }),
+        ),
+      ).rejects.toThrow('start error');
+    });
+  });
 });

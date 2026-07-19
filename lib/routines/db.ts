@@ -11,6 +11,7 @@ import {
   type RoutineSet,
 } from '@/db/schema';
 import { createReminder, deleteReminder, updateReminder } from '@/lib/notifications/scheduler';
+import { cancelScheduledWorkoutNotificationsForRoutine } from '@/lib/notifications/scheduled-workout-scheduler';
 import type { ReminderInput } from '@/lib/notifications/types';
 import { withRoutineReminderContent } from '@/lib/routines/reminder-input';
 import { getPreviousSets, hasAnyValue } from '@/lib/workout/history';
@@ -234,7 +235,9 @@ export async function duplicateRoutine(routineId: number): Promise<number> {
 
 // ルーティンに紐づくリマインダーがあれば、OS通知のキャンセルまで行うdeleteReminder()を先に
 // 経由してから消す。reminders.routineIdのON DELETE SET NULLはあくまで安全網であり、
-// それに任せて生カスケードで行だけ消すとOS通知が残留してしまうため
+// それに任せて生カスケードで行だけ消すとOS通知が残留してしまうため。手動予定(scheduledWorkouts、
+// PR10-5で通知を持つようになった)も同じ理由でルーティン削除前に明示的に通知だけキャンセルする
+// (DB行自体はscheduledWorkouts.routineIdのON DELETE CASCADEに任せる)
 export async function deleteRoutine(routineId: number): Promise<void> {
   const linked = await db
     .select({ id: reminders.id })
@@ -243,6 +246,7 @@ export async function deleteRoutine(routineId: number): Promise<void> {
   for (const r of linked) {
     await deleteReminder(r.id);
   }
+  await cancelScheduledWorkoutNotificationsForRoutine(routineId);
   await db.delete(routines).where(eq(routines.id, routineId));
 }
 
