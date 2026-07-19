@@ -101,6 +101,7 @@ beforeEach(() => {
   mockUseWorkoutSessions.mockReturnValue({ sessions: [], activeSession: null });
   jest.spyOn(Alert, 'alert').mockImplementation(() => {});
   mockStartWorkoutFromRoutine.mockResolvedValue({ sessionId: 77, cards: [] });
+  mockSkipReminderOccurrence.mockResolvedValue({ notificationSuppressed: true });
 });
 
 describe('CalendarScreen 今日・記録なしパネル', () => {
@@ -1008,6 +1009,29 @@ describe('CalendarScreen 予定（PR9-2: リマインダー由来の未来予定
 
       expect(Alert.alert).not.toHaveBeenCalled();
       expect(mockSkipReminderOccurrence).toHaveBeenCalledWith(1, toDateKey(future));
+    });
+
+    test('ネイティブ方式のリマインダーで通知を止められなかった場合(notificationSuppressed: false)、その旨のAlertを表示する（PR10-6a review fix）', async () => {
+      mockSkipReminderOccurrence.mockResolvedValueOnce({ notificationSuppressed: false });
+      const root = render();
+      const future = new Date();
+      future.setDate(future.getDate() + 5);
+      mockUseCalendarDaySchedule.mockReturnValue(daySchedule([skipCard()]));
+      selectDate(future);
+
+      act(() => {
+        findMenuTrigger(root, '胸の日')!.props.onPress();
+      });
+      const skipItem = root.findAllByType(TouchableOpacity).find((t) => t.props.accessibilityLabel === '今回だけスキップ')!;
+      await act(async () => {
+        skipItem.props.onPress();
+        await Promise.resolve();
+      });
+
+      expect(Alert.alert).toHaveBeenCalledWith(
+        '予定をスキップしました',
+        'この予定は「毎日」「毎週」などの繰り返し方式のため、通知は表示のスキップ後も届く場合があります。',
+      );
     });
 
     test('スキップに失敗した場合はエラーAlertを表示する', async () => {

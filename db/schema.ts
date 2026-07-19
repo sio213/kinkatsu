@@ -273,7 +273,8 @@ export const reminderScheduleSkips = sqliteTable(
     createdAt: integer('created_at').notNull(),
   },
   (t) => ({
-    byReminder: index('idx_rss_reminder').on(t.reminderId),
+    // reminderId単体の絞り込みはこの複合ユニークインデックスの先頭列でカバーされるため、
+    // 単独インデックスは冗長として持たない(@reviewer指摘)
     uniqueSkip: uniqueIndex('idx_rss_unique').on(t.reminderId, t.skippedDate),
   }),
 );

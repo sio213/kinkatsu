@@ -274,11 +274,21 @@ export default function CalendarScreen() {
 
   // リマインダー予定の⋮メニュー「今回だけスキップ」用（PR10-6a）。取り消せる操作
   // （ゴーストカードの「元に戻す」で戻せる）なので、手動予定の削除と違い確認Alertを挟まない
-  // （@designer方針: 気軽に試して気軽に戻せることを優先）。日付は選択日で確定済み
+  // （@designer方針: 気軽に試して気軽に戻せることを優先）。日付は選択日で確定済み。
+  // 毎日/毎週/単純な毎月の「ネイティブ方式」リマインダーはOS側の繰り返しトリガーの性質上、
+  // 1回だけの通知キャンセルができない（PR10-6cで対応予定）。表示は「スキップ済み」になる
+  // 一方で通知自体は届いてしまう既知のギャップがあるため、notificationSuppressed=falseの
+  // 場合はその場で一言知らせる（@reviewer指摘: 無言だと「スキップしたのに鳴った」で信頼を損なう）
   const handleSkipReminder = useCallback(
     async (reminderId: number) => {
       try {
-        await skipReminderOccurrence(reminderId, toDateKey(selectedDate));
+        const { notificationSuppressed } = await skipReminderOccurrence(reminderId, toDateKey(selectedDate));
+        if (!notificationSuppressed) {
+          Alert.alert(
+            '予定をスキップしました',
+            'この予定は「毎日」「毎週」などの繰り返し方式のため、通知は表示のスキップ後も届く場合があります。',
+          );
+        }
       } catch (e) {
         console.error('[skip reminder occurrence]', e);
         Alert.alert('エラー', '予定をスキップできませんでした。');

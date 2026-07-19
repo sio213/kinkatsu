@@ -6,6 +6,4 @@ CREATE TABLE `reminder_schedule_skips` (
 	FOREIGN KEY (`reminder_id`) REFERENCES `reminders`(`id`) ON UPDATE no action ON DELETE cascade
 );
 --> statement-breakpoint
-CREATE INDEX `idx_rss_reminder` ON `reminder_schedule_skips` (`reminder_id`);
---> statement-breakpoint
 CREATE UNIQUE INDEX `idx_rss_unique` ON `reminder_schedule_skips` (`reminder_id`,`skipped_date`);
