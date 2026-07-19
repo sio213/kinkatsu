@@ -63,6 +63,17 @@ describe('removeReminderScheduleSkip', () => {
     await removeReminderScheduleSkip(1, '2026-07-27');
     expect(mockDeleteWhere).toHaveBeenCalledTimes(1);
   });
+
+  it('reminderId/skippedDateの実引数がeq条件に正しく渡る(取り違えバグの検知、@reviewer指摘)', async () => {
+    await removeReminderScheduleSkip(7, '2026-08-03');
+    const [, condition] = mockDeleteWhere.mock.calls[0];
+    expect(condition).toEqual({
+      conds: [
+        { col: 'reminderId', val: 7 },
+        { col: 'skippedDate', val: '2026-08-03' },
+      ],
+    });
+  });
 });
 
 describe('hasReminderScheduleSkip', () => {
@@ -74,6 +85,17 @@ describe('hasReminderScheduleSkip', () => {
   it('該当する行が無ければfalseを返す', async () => {
     mockSelectWhere.mockResolvedValue([]);
     expect(await hasReminderScheduleSkip(1, '2026-07-27')).toBe(false);
+  });
+
+  it('reminderId/skippedDateの実引数がeq条件に正しく渡る(取り違えバグの検知、@reviewer指摘)', async () => {
+    await hasReminderScheduleSkip(7, '2026-08-03');
+    const [condition] = mockSelectWhere.mock.calls[0];
+    expect(condition).toEqual({
+      conds: [
+        { col: 'reminderId', val: 7 },
+        { col: 'skippedDate', val: '2026-08-03' },
+      ],
+    });
   });
 });
 

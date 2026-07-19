@@ -228,6 +228,42 @@ export default function CalendarScreen() {
         : [],
     [isSelectedToday, dayCardGroups, mergedSchedule, selectedDayStart],
   );
+  // スキップ済みゴーストカード(daySchedule.skipped)を、アクティブな予定/実績と同じ時刻順の
+  // 1つのリストに統合する（@reviewer指摘: 別ループでリスト末尾にまとめて描画すると、時刻の
+  // 早い予定をスキップした場合にゴーストが遅い時刻のカードより下に来てしまい、一日の流れを
+  // 直感的に追えなくなる）。buildTodayTimeline(session-groups.ts、実績セッションとの統合も担う
+  // 共有の純粋関数)の型は変更せず、その出力とゴーストをこのコンポーネント内だけでマージする
+  const todayDisplayEntries = useMemo(
+    () =>
+      [
+        ...todayTimeline.map((entry) => ({ kind: 'timeline' as const, key: entry.key, sortAt: entry.sortAt, entry })),
+        ...daySchedule.skipped.map((s) => ({
+          kind: 'skipped' as const,
+          key: `skip-${s.reminderId}`,
+          sortAt: selectedDayStart + s.hour * 3_600_000 + s.minute * 60_000,
+          skipped: s,
+        })),
+      ].sort((a, b) => a.sortAt - b.sortAt),
+    [todayTimeline, daySchedule.skipped, selectedDayStart],
+  );
+  const futureDisplayEntries = useMemo(
+    () =>
+      [
+        ...mergedSchedule.map((card) => ({
+          kind: 'card' as const,
+          key: card.key,
+          sortAt: card.hour * 3_600_000 + card.minute * 60_000,
+          card,
+        })),
+        ...daySchedule.skipped.map((s) => ({
+          kind: 'skipped' as const,
+          key: `skip-${s.reminderId}`,
+          sortAt: s.hour * 3_600_000 + s.minute * 60_000,
+          skipped: s,
+        })),
+      ].sort((a, b) => a.sortAt - b.sortAt),
+    [mergedSchedule, daySchedule.skipped],
+  );
 
   const pushDebounced = useDebouncedPush();
   const handlePressExercise = useCallback(
@@ -286,7 +322,10 @@ export default function CalendarScreen() {
         if (!notificationSuppressed) {
           Alert.alert(
             '予定をスキップしました',
-            'この予定は「毎日」「毎週」などの繰り返し方式のため、通知は表示のスキップ後も届く場合があります。',
+            // タイトル(成功)と本文(注意喚起)が混在すると結局成功したのか不安になるとの指摘への
+            // 対応として、本文冒頭で「表示のスキップ自体は完了している」ことを明示してから
+            // 通知面の既知の制約を伝える(@reviewer指摘)
+            'スキップ自体は完了しています。ただしこの予定は「毎日」「毎週」などの繰り返し方式のため、通知は届く場合があります。',
           );
         }
       } catch (e) {
@@ -392,23 +431,37 @@ export default function CalendarScreen() {
                   （PR6で発見したバグ「無言で古いセッションに合流」の再発防止を、実績+予定が
                   混在するようになった今回のPR9-2でも一貫させる） */}
               {activeSession && <ResumeWorkoutBanner onPress={handleResumeToday} />}
-              {todayTimeline.length === 0 && daySchedule.skipped.length === 0 ? (
+              {todayDisplayEntries.length === 0 ? (
                 !activeSession && (
                   <DayEmptyState buttonIcon="play.fill" actionLabel="トレーニングを開始" onPressAction={handleStartToday} />
                 )
               ) : (
                 <>
-                  {todayTimeline.map((entry) =>
-                    entry.kind === 'session' ? (
-                      <View key={entry.key} style={styles.dayGroup}>
-                        {todayTimeline.length > 1 && <SessionTimeGroupHeader sessionStartedAt={entry.group.sessionStartedAt} />}
-                        <DayCardList cards={entry.group.cards} onPressExercise={handlePressExercise} />
-                      </View>
-                    ) : (
-                      // 予定エントリは常にentry1件=カード1枚（グルーピングされない）で、
-                      // RoutineScheduleCard自身が時刻バッジを持つため、SessionTimeGroupHeaderを
-                      // 重ねると同じ時刻が2回表示されてしまっていた（@designer指摘、PR10-4で削除）
-                      <View key={entry.key} style={styles.dayGroup}>
+                  {todayDisplayEntries.map((item) => {
+                    if (item.kind === 'skipped') {
+                      return (
+                        <SkippedReminderCard
+                          key={item.key}
+                          routineName={item.skipped.routineName}
+                          timeLabel={`今日 ${formatHourMinuteParts(item.skipped.hour, item.skipped.minute)}`}
+                          onUndo={() => handleUndoSkipReminder(item.skipped.reminderId)}
+                        />
+                      );
+                    }
+                    const entry = item.entry;
+                    if (entry.kind === 'session') {
+                      return (
+                        <View key={item.key} style={styles.dayGroup}>
+                          {todayTimeline.length > 1 && <SessionTimeGroupHeader sessionStartedAt={entry.group.sessionStartedAt} />}
+                          <DayCardList cards={entry.group.cards} onPressExercise={handlePressExercise} />
+                        </View>
+                      );
+                    }
+                    // 予定エントリは常にentry1件=カード1枚（グルーピングされない）で、
+                    // RoutineScheduleCard自身が時刻バッジを持つため、SessionTimeGroupHeaderを
+                    // 重ねると同じ時刻が2回表示されてしまっていた（@designer指摘、PR10-4で削除）
+                    return (
+                      <View key={item.key} style={styles.dayGroup}>
                         <ScheduleEntryCard
                           card={entry.card}
                           timeLabel={`今日 ${formatHourMinute(new Date(entry.sortAt))}`}
@@ -418,16 +471,8 @@ export default function CalendarScreen() {
                           onSkip={handleSkipReminder}
                         />
                       </View>
-                    ),
-                  )}
-                  {daySchedule.skipped.map((s) => (
-                    <SkippedReminderCard
-                      key={`skip-${s.reminderId}`}
-                      routineName={s.routineName}
-                      timeLabel={`今日 ${formatHourMinuteParts(s.hour, s.minute)}`}
-                      onUndo={() => handleUndoSkipReminder(s.reminderId)}
-                    />
-                  ))}
+                    );
+                  })}
                   <AddExerciseButton
                     onPress={handlePressAddSchedule}
                     label="予定を追加"
@@ -437,7 +482,7 @@ export default function CalendarScreen() {
               )}
             </View>
           ) : isFutureDay ? (
-            mergedSchedule.length === 0 && daySchedule.skipped.length === 0 ? (
+            futureDisplayEntries.length === 0 ? (
               <DayEmptyState
                 buttonIcon="plus"
                 actionLabel="予定を追加"
@@ -446,24 +491,29 @@ export default function CalendarScreen() {
               />
             ) : (
               <View style={styles.dayCardList}>
-                {mergedSchedule.map((card) => (
-                  <ScheduleEntryCard
-                    key={card.key}
-                    card={card}
-                    timeLabel={card.source === 'reminder' ? formatKindSummary(card.reminder) : formatHourMinuteParts(card.hour, card.minute)}
-                    onPress={() => handlePressRoutine(card.routineId)}
-                    onDelete={handleDeleteSchedule}
-                    onSkip={handleSkipReminder}
-                  />
-                ))}
-                {daySchedule.skipped.map((s) => (
-                  <SkippedReminderCard
-                    key={`skip-${s.reminderId}`}
-                    routineName={s.routineName}
-                    timeLabel={formatHourMinuteParts(s.hour, s.minute)}
-                    onUndo={() => handleUndoSkipReminder(s.reminderId)}
-                  />
-                ))}
+                {futureDisplayEntries.map((item) =>
+                  item.kind === 'skipped' ? (
+                    <SkippedReminderCard
+                      key={item.key}
+                      routineName={item.skipped.routineName}
+                      timeLabel={formatHourMinuteParts(item.skipped.hour, item.skipped.minute)}
+                      onUndo={() => handleUndoSkipReminder(item.skipped.reminderId)}
+                    />
+                  ) : (
+                    <ScheduleEntryCard
+                      key={item.key}
+                      card={item.card}
+                      timeLabel={
+                        item.card.source === 'reminder'
+                          ? formatKindSummary(item.card.reminder)
+                          : formatHourMinuteParts(item.card.hour, item.card.minute)
+                      }
+                      onPress={() => handlePressRoutine(item.card.routineId)}
+                      onDelete={handleDeleteSchedule}
+                      onSkip={handleSkipReminder}
+                    />
+                  ),
+                )}
                 <AddExerciseButton
                   onPress={handlePressAddSchedule}
                   label="予定を追加"

@@ -1030,7 +1030,7 @@ describe('CalendarScreen 予定（PR9-2: リマインダー由来の未来予定
 
       expect(Alert.alert).toHaveBeenCalledWith(
         '予定をスキップしました',
-        'この予定は「毎日」「毎週」などの繰り返し方式のため、通知は表示のスキップ後も届く場合があります。',
+        'スキップ自体は完了しています。ただしこの予定は「毎日」「毎週」などの繰り返し方式のため、通知は届く場合があります。',
       );
     });
 
@@ -1097,6 +1097,42 @@ describe('CalendarScreen 予定（PR9-2: リマインダー由来の未来予定
         await Promise.resolve();
       });
       expect(mockUnskipReminderOccurrence).toHaveBeenCalledWith(1, toDateKey(future));
+    });
+
+    test('未来日: スキップ済みのゴーストカードは末尾固定ではなく、アクティブな予定と時刻順に混ざって表示される(@reviewer指摘: 7:00をスキップし19:00の予定が別にある場合、ゴーストは19:00カードより前に来るべき)', async () => {
+      const root = render();
+      const future = new Date();
+      future.setDate(future.getDate() + 5);
+      mockUseCalendarDaySchedule.mockReturnValue(
+        daySchedule([skipCard({ reminderId: 2, routineId: 11, routineName: '背中の日', hour: 19, minute: 0 })], [
+          { reminderId: 1, routineId: 10, routineName: '胸の日', hour: 7, minute: 0 },
+        ]),
+      );
+      selectDate(future);
+
+      const texts = root.findAllByType(Text).map((t) => (Array.isArray(t.props.children) ? t.props.children.join('') : t.props.children));
+      const ghostIndex = texts.indexOf('07:00・スキップ済み');
+      const activeIndex = texts.findIndex((t) => t === '背中の日');
+      expect(ghostIndex).toBeGreaterThanOrEqual(0);
+      expect(activeIndex).toBeGreaterThanOrEqual(0);
+      expect(ghostIndex).toBeLessThan(activeIndex);
+    });
+
+    test('今日: スキップ済みのゴーストカードは末尾固定ではなく、実績・アクティブな予定と時刻順に混ざって表示される(@reviewer指摘)', async () => {
+      mockUseCalendarDaySchedule.mockReturnValue(
+        daySchedule([skipCard({ reminderId: 2, routineId: 11, routineName: '背中の日', hour: 19, minute: 0 })], [
+          { reminderId: 1, routineId: 10, routineName: '胸の日', hour: 7, minute: 0 },
+        ]),
+      );
+      const root = render();
+      // selectDateしない=今日が選択されたまま
+
+      const texts = root.findAllByType(Text).map((t) => (Array.isArray(t.props.children) ? t.props.children.join('') : t.props.children));
+      const ghostIndex = texts.indexOf('今日 07:00・スキップ済み');
+      const activeIndex = texts.findIndex((t) => t === '背中の日');
+      expect(ghostIndex).toBeGreaterThanOrEqual(0);
+      expect(activeIndex).toBeGreaterThanOrEqual(0);
+      expect(ghostIndex).toBeLessThan(activeIndex);
     });
 
     test('未来日: スキップ済みの予定のみ(手動予定0件)でも「予定がありません」の空状態は出ない', () => {

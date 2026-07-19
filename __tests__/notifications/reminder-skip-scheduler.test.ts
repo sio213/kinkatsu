@@ -212,6 +212,26 @@ describe('skipReminderOccurrence', () => {
     mockAddReminderScheduleSkip.mockRejectedValueOnce(new Error('db error'));
     await expect(skipReminderOccurrence(1, '2026-07-27')).rejects.toThrow('db error');
   });
+
+  it('同一reminderId+日付への同時呼び出し(TOCTOU再現: どちらもhasReminderScheduleSkip=falseで存在チェックをすり抜けた後、片方だけがinsertに先勝ちしもう片方がUNIQUE制約違反になる)を、実際にPromise.allで並行実行しても両方成功として解決する(@reviewer Major指摘: 逐次呼び出しのテストしか無くTOCTOU対策の実効性が並行実行で検証されていなかった)', async () => {
+    mockHasReminderScheduleSkip.mockResolvedValue(false);
+    mockAddReminderScheduleSkip
+      .mockResolvedValueOnce(1)
+      .mockRejectedValueOnce(
+        new Error(
+          'UNIQUE constraint failed: reminder_schedule_skips.reminder_id, reminder_schedule_skips.skipped_date',
+        ),
+      );
+    mockReminderRows = [];
+
+    const results = await Promise.all([
+      skipReminderOccurrence(1, '2026-07-27'),
+      skipReminderOccurrence(1, '2026-07-27'),
+    ]);
+
+    expect(results).toEqual([{ notificationSuppressed: true }, { notificationSuppressed: true }]);
+    expect(mockAddReminderScheduleSkip).toHaveBeenCalledTimes(2);
+  });
 });
 
 describe('unskipReminderOccurrence', () => {

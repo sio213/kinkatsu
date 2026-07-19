@@ -29,7 +29,8 @@ export const SkippedReminderCard = memo(function SkippedReminderCard({ routineNa
       </View>
       <TouchableOpacity
         onPress={onUndo}
-        hitSlop={{ top: 14, bottom: 14, left: 14, right: 14 }}
+        style={styles.undoButton}
+        hitSlop={{ top: 4, bottom: 4, left: 14, right: 14 }}
         accessibilityRole="button"
         accessibilityLabel={`「${routineName}」${timeLabel}のスキップを元に戻す`}
       >
@@ -57,5 +58,10 @@ const styles = StyleSheet.create({
   // textPlaceholderは白背景でWCAG AA(4.5:1)を大きく下回るため、DayEmptyStateの本文と同じ
   // textMutedに揃える（@designer指摘: 視覚的な弱さは取り消し線・破線ボーダーで十分表現できている）
   caption: { ...Typography.caption, color: Colors.textMuted },
+  // hitSlop(旧14pt)がカード間の余白(dayCardList: gap 8)を超えて隣接カードの領域まで
+  // タップ判定を広げてしまう指摘への対応。paddingVertical(実レイアウト分の余白、隣接カードとの
+  // 間隔を実際に押し広げるためhitSlopと違って隣を侵食しない)でタップ領域を44pt相当まで確保し、
+  // hitSlopは隣接カードとのgapの半分(4pt)に収まる範囲だけの微調整に留める(@reviewer指摘)
+  undoButton: { paddingVertical: 11, paddingHorizontal: 4 },
   undoText: { ...Typography.bodyStrong, color: Colors.accent },
 });
