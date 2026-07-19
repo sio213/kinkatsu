@@ -31,6 +31,10 @@ type Props = {
   // （「今回だけスキップ」1項目）を表示する。取り消せる操作（選択日パネルの「元に戻す」で戻せる）
   // のためdanger扱いにはしない（@designer方針、「削除」との危険度の違いを色で表す）
   onSkip?: () => void;
+  // リマインダー予定（PR10-6b）のときだけ呼び出し側が渡す。onSkipと同じメニュー内に
+  // 「今回だけ差し替え」項目を追加で表示する（スキップ・差し替えは別項目として並列提示する、
+  // @designer方針）。onSkipと同時に渡ってonSkip単独で表示されるケースと両立する
+  onReplace?: () => void;
 };
 
 // routine-card-menu.tsx/exercise-card-menu.tsxと同じ「const items配列を作ってgroupsに渡す」書き方に揃える
@@ -38,8 +42,16 @@ function deleteMenuItems(onDelete: () => void): DropdownMenuItem[] {
   return [{ key: 'delete', label: '削除', icon: 'delete-outline', danger: true, onPress: onDelete }];
 }
 
-function skipMenuItems(onSkip: () => void): DropdownMenuItem[] {
-  return [{ key: 'skip', label: '今回だけスキップ', icon: 'event-busy', onPress: onSkip }];
+// スキップ（その場で完結する取り消し可能な操作）と差し替え（2画面遷移を伴いデータを追加する
+// 操作）は性質が異なるため、同じ1グループにまとめず別グループにしてDropdownMenu標準の
+// 区切り線で分ける（@designer指摘: ラベルが「今回だけ」まで一致し末尾でしか区別できないため）
+function reminderMenuGroups(onSkip?: () => void, onReplace?: () => void): DropdownMenuItem[][] {
+  return [
+    ...(onSkip ? [[{ key: 'skip', label: '今回だけスキップ', icon: 'event-busy' as const, onPress: onSkip }]] : []),
+    ...(onReplace
+      ? [[{ key: 'replace', label: '今回だけ差し替え', icon: 'swap-horiz' as const, onPress: onReplace }]]
+      : []),
+  ];
 }
 
 // 選択日パネルの予定カード（デザイン案「未来01/未来03/今日01」）。ルーティン紐付き
@@ -62,10 +74,16 @@ export const RoutineScheduleCard = memo(function RoutineScheduleCard({
   oneTime = false,
   onDelete,
   onSkip,
+  onReplace,
 }: Props) {
-  // onDelete(手動予定)・onSkip(リマインダー予定)は排他的に渡される想定(出所で分岐する呼び出し側の
-  // 責務)。どちらもメニュー内容が違うだけで見た目・トリガーの構造は共通のためここでまとめる
-  const menuGroups = onDelete ? [deleteMenuItems(onDelete)] : onSkip ? [skipMenuItems(onSkip)] : null;
+  // onDelete(手動予定)・onSkip/onReplace(リマインダー予定)は出所で分岐する呼び出し側の責務により
+  // 排他的に渡される想定(手動予定にはonSkip/onReplaceは渡らない)。onSkip/onReplaceは同じ
+  // メニュー内に区切り線で分けた別グループとして並べて出す(@designer方針)
+  const menuGroups = onDelete
+    ? [deleteMenuItems(onDelete)]
+    : onSkip || onReplace
+      ? reminderMenuGroups(onSkip, onReplace)
+      : null;
   // routine-card.tsxの一覧カードと同じ情報構成（名前・カテゴリ・種目数・スケジュール）で
   // 読み上げ単位をまとめる。カレンダー/一覧のどちらでルーティンを見てもVoiceOver体験が
   // 揃うようにする（@designer指摘）
@@ -90,7 +108,8 @@ export const RoutineScheduleCard = memo(function RoutineScheduleCard({
             <DropdownMenu
               groups={menuGroups}
               // routine-card-menu.tsx/exercise-card-menu.tsxは項目5つのため160、
-              // こちらは「削除」/「今回だけスキップ」1項目のみのため少し狭い140で十分
+              // こちらは「削除」単独、または「今回だけスキップ」/「今回だけ差し替え」の最大2項目
+              // までのため少し狭い140で十分（各ラベルの文字数は既存の5項目パターンと大差ない）
               minWidth={140}
               renderTrigger={({ open, onPress: onOpenMenu }) => (
                 <TouchableOpacity

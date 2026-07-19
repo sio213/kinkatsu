@@ -16,9 +16,19 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 // カレンダー選択日パネル「予定を追加」フローの画面1（PR10、手動での予定追加）。
 // app/workout/routine-picker.tsxと同じ「一覧から1件選ぶだけ」の画面で、見た目・データ取得
 // (useRoutines/useRoutineExerciseSummaries)もそのまま流用する。日付は選択日パネルで
-// 既に確定しているため選び直させず、dateKeyをparamsで次画面へそのまま引き継ぐだけ
+// 既に確定しているため選び直させず、dateKeyをparamsで次画面へそのまま引き継ぐだけ。
+// リマインダー予定の「今回だけ差し替え」（PR10-6b）でもこの画面を再利用する。差し替え元の
+// reminderId等（replaceXxx、下記4項目はセットで渡る）が付いている場合だけ見出し・サブタイトルを
+// 差し替え用に出し分け、次画面へもそのまま引き継ぐ
 export default function ScheduleRoutinePickerScreen() {
-  const { dateKey } = useLocalSearchParams<{ dateKey: string }>();
+  const { dateKey, replaceReminderId, replaceRoutineName, replaceHour, replaceMinute } = useLocalSearchParams<{
+    dateKey: string;
+    replaceReminderId?: string;
+    replaceRoutineName?: string;
+    replaceHour?: string;
+    replaceMinute?: string;
+  }>();
+  const isReplaceMode = replaceReminderId !== undefined;
   const router = useRouter();
   const pushDebounced = useDebouncedPush();
   const { routines } = useRoutines();
@@ -28,10 +38,15 @@ export default function ScheduleRoutinePickerScreen() {
     (routine: Routine) => {
       pushDebounced({
         pathname: '/calendar/schedule-time-picker',
-        params: { dateKey, routineId: String(routine.id), routineName: routine.name },
+        params: {
+          dateKey,
+          routineId: String(routine.id),
+          routineName: routine.name,
+          ...(isReplaceMode ? { replaceReminderId, replaceHour, replaceMinute } : {}),
+        },
       });
     },
-    [pushDebounced, dateKey],
+    [pushDebounced, dateKey, isReplaceMode, replaceReminderId, replaceHour, replaceMinute],
   );
 
   const renderItem = useCallback(
@@ -67,7 +82,14 @@ export default function ScheduleRoutinePickerScreen() {
       <Stack.Screen
         options={{
           headerTitle: () => (
-            <HeaderTitle title="ルーティンを選択" subtitle={formatSessionDateGroup(parseDateKey(dateKey).getTime())} />
+            <HeaderTitle
+              title={isReplaceMode ? '差し替えるルーティンを選択' : 'ルーティンを選択'}
+              subtitle={
+                isReplaceMode
+                  ? `${formatSessionDateGroup(parseDateKey(dateKey).getTime())}・「${replaceRoutineName}」を差し替え`
+                  : formatSessionDateGroup(parseDateKey(dateKey).getTime())
+              }
+            />
           ),
         }}
       />
