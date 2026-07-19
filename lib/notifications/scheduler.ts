@@ -314,18 +314,38 @@ export async function rescheduleReminderFromDb(reminderId: number): Promise<void
   await scheduleReminder(parseReminder(r));
 }
 
+// 有効な全リマインダーのうち「実効的にqueue方式」(base=queue、または一時キュー化されているnative)
+// かどうかを判定する。resolveQueueDepth/refillReminder/refillAllRemindersが同じ判定を
+// 別々に再実装していた重複を解消する(@reviewer Minor指摘)
+function isEffectiveQueueReminder(r: Reminder, skipReminderIds: Set<number>): boolean {
+  return resolveTriggerType(parseReminder(r)) === 'queue' || skipReminderIds.has(r.id);
+}
+
+async function countEffectiveQueueReminders(): Promise<number> {
+  const allEnabled = await db.select().from(reminders).where(eq(reminders.enabled, true));
+  const skipReminderIds = await getReminderIdsWithSkips();
+  return allEnabled.filter((rem) => isEffectiveQueueReminder(rem, skipReminderIds)).length;
+}
+
+// queue方式で予約する際のdepthを、OS通知上限(MAX_OS_NOTIFICATIONS)を考慮して決定する。
+// 種別ごとの基本depth(queueDepthFor)と、実効的にqueue方式の全リマインダー数で按分した予算
+// (computeQuotaPerReminder、refillReminder/refillAllRemindersと同じ計算式)の小さい方を採用する。
+// 以前は一時キュー化(スキップ)時のみ固定depthを無条件で積んでおり、他にqueue方式リマインダーが
+// 多い状態でスキップを連打すると、OS側の保留通知上限(iOS ~64件)を超えて無関係な他のリマインダーの
+// 通知が静かに欠落しうる問題があった(@reviewer Major指摘)。DBクエリ1回分のコストは、iOS通知
+// 予算という共有リソースを守る正しさより優先すべきではないため、通常のqueue方式リマインダー
+// (createReminder/updateReminder経由)にもこの予算計算を一貫して適用する
+async function resolveQueueDepth(r: ParsedReminder): Promise<number> {
+  const queueCount = await countEffectiveQueueReminders();
+  return Math.min(queueDepthFor(r.kind as ReminderKind), computeQuotaPerReminder(Math.max(1, queueCount)));
+}
+
 async function scheduleReminder(r: ParsedReminder): Promise<void> {
   const tt = await resolveEffectiveTriggerType(r);
   if (tt === 'native') {
     await scheduleNative(r);
   } else {
-    // 一時キュー化(base='native'だがスキップにより effective='queue')の場合も、通常のqueue方式
-    // リマインダーと同じ固定depth(queueDepthFor)で予約する。createReminder時点のqueue方式
-    // リマインダーも同様に固定depthで、予算(OS通知上限)を考慮した絞り込みはrefillReminder/
-    // refillAllRemindersの補充サイクル側の責務としている既存の役割分担に合わせた
-    // (skip時点でcomputeQuotaPerReminderまで計算すると、スキップという軽い操作のたびに
-    // 全リマインダーを読んでeffective typeを解決するN+1コストが乗ってしまう)
-    await scheduleQueue(r, queueDepthFor(r.kind as ReminderKind));
+    await scheduleQueue(r, await resolveQueueDepth(r));
   }
 }
 
@@ -495,20 +515,9 @@ export async function refillReminder(reminderId: number): Promise<void> {
   const tt = await resolveEffectiveTriggerType(parsed);
   if (tt === 'native') return; // ネイティブ(スキップ無し)は補充不要
 
-  // queueCountは「本来のqueue方式」+「スキップにより一時キュー化されているnative」の合計。
-  // 後者を含めないと、一時キュー中のリマインダーがdepth計算の分母から漏れ、他の通常queue
-  // リマインダーの予算(computeQuotaPerReminder)が過大評価されてしまう
-  const allEnabled = await db.select().from(reminders).where(eq(reminders.enabled, true));
-  const skipReminderIds = await getReminderIdsWithSkips();
-  const queueCount = allEnabled.filter(
-    (rem) => resolveTriggerType(parseReminder(rem)) === 'queue' || skipReminderIds.has(rem.id),
-  ).length;
-
-  const depth = Math.min(
-    queueDepthFor(parsed.kind as ReminderKind),
-    computeQuotaPerReminder(Math.max(1, queueCount)),
-  );
-  await scheduleQueue(parsed, depth);
+  // depthの算出(予算按分含む)はscheduleReminderの一時キュー化分岐と同じresolveQueueDepthに
+  // 統一する(@reviewer Minor指摘: 同じ判定ロジックが複数箇所に再実装されていた重複の解消)
+  await scheduleQueue(parsed, await resolveQueueDepth(parsed));
 }
 
 export async function refillAllReminders(now = new Date()): Promise<void> {
@@ -518,11 +527,12 @@ export async function refillAllReminders(now = new Date()): Promise<void> {
     .where(eq(reminders.enabled, true));
 
   // 一時キュー化されているnative(スキップにより effective='queue')も補充サイクルに含める
-  // (@reviewer Major指摘想定: 含めないとキューが14日窓を使い切って通知が止まってしまう)
+  // (@reviewer Major指摘想定: 含めないとキューが14日窓を使い切って通知が止まってしまう)。
+  // 判定はisEffectiveQueueReminderに共通化(@reviewer Minor指摘)。ここは対象リストと件数を
+  // 1回のクエリ結果からまとめて算出できるため、resolveQueueDepth(reminderId単体を再クエリする)
+  // ではなくこの場でquotaを計算する
   const skipReminderIds = await getReminderIdsWithSkips();
-  const queueReminders = enabledReminders.filter(
-    (r) => resolveTriggerType(parseReminder(r)) === 'queue' || skipReminderIds.has(r.id),
-  );
+  const queueReminders = enabledReminders.filter((r) => isEffectiveQueueReminder(r, skipReminderIds));
   const quota = computeQuotaPerReminder(queueReminders.length);
 
   for (const r of queueReminders) {
