@@ -1,4 +1,4 @@
-import { groupCardsBySession } from '@/lib/calendar/session-groups';
+import { buildTodayTimeline, groupCardsBySession } from '@/lib/calendar/session-groups';
 
 type TestCard = { sessionId: number; sessionStartedAt: number; name: string };
 
@@ -56,5 +56,59 @@ describe('groupCardsBySession', () => {
     const groups = groupCardsBySession(cards);
     const groupA = groups.find((g) => g.sessionId === 1)!;
     expect(groupA.cards.map((c) => c.name)).toEqual(['A1', 'A2']);
+  });
+});
+
+describe('buildTodayTimeline', () => {
+  const dayStart = new Date(2026, 6, 20).getTime();
+
+  it('実績セッションと予定を時刻順に混ぜる', () => {
+    const sessionGroups = groupCardsBySession([
+      card({ sessionId: 1, sessionStartedAt: dayStart + 19 * 3_600_000, name: '夜の実績' }), // 19:00
+    ]);
+    const scheduleCards = [{ reminderId: 100, hour: 7, minute: 0, routineName: '朝の予定' }];
+    const timeline = buildTodayTimeline(sessionGroups, scheduleCards, dayStart);
+    expect(timeline.map((e) => e.kind)).toEqual(['schedule', 'session']);
+  });
+
+  it('予定側のsortAtはdayStart+hour:minuteから組み立てられる', () => {
+    const scheduleCards = [{ reminderId: 1, hour: 20, minute: 30, routineName: 'x' }];
+    const timeline = buildTodayTimeline([], scheduleCards, dayStart);
+    expect(timeline[0].sortAt).toBe(dayStart + 20 * 3_600_000 + 30 * 60_000);
+  });
+
+  it('セッション・予定とも0件なら空配列', () => {
+    expect(buildTodayTimeline([], [], dayStart)).toEqual([]);
+  });
+
+  it('セッション・予定それぞれ複数件あっても正しく時刻順にマージされる', () => {
+    const sessionGroups = groupCardsBySession([
+      card({ sessionId: 1, sessionStartedAt: dayStart + 12 * 3_600_000, name: '昼の実績' }),
+    ]);
+    const scheduleCards = [
+      { reminderId: 1, hour: 19, minute: 0, routineName: '夜の予定' },
+      { reminderId: 2, hour: 7, minute: 0, routineName: '朝の予定' },
+    ];
+    const timeline = buildTodayTimeline(sessionGroups, scheduleCards, dayStart);
+    expect(timeline.map((e) => e.key)).toEqual(['schedule-2', 'session-1', 'schedule-1']);
+  });
+
+  it('各エントリのkeyはkind+idで一意になる（sessionIdとreminderIdの値域が重複しても衝突しない）', () => {
+    const sessionGroups = groupCardsBySession([
+      card({ sessionId: 1, sessionStartedAt: dayStart + 7 * 3_600_000, name: 'A' }),
+    ]);
+    const scheduleCards = [{ reminderId: 1, hour: 19, minute: 0, routineName: 'x' }];
+    const timeline = buildTodayTimeline(sessionGroups, scheduleCards, dayStart);
+    const keys = timeline.map((e) => e.key);
+    expect(new Set(keys).size).toBe(keys.length);
+  });
+
+  it('セッションと予定のsortAtが完全一致する場合、セッションが先に来る（Array.sortの安定性への暗黙依存を固定する回帰テスト）', () => {
+    const sessionGroups = groupCardsBySession([
+      card({ sessionId: 1, sessionStartedAt: dayStart + 7 * 3_600_000, name: 'A' }),
+    ]);
+    const scheduleCards = [{ reminderId: 1, hour: 7, minute: 0, routineName: 'x' }];
+    const timeline = buildTodayTimeline(sessionGroups, scheduleCards, dayStart);
+    expect(timeline.map((e) => e.key)).toEqual(['session-1', 'schedule-1']);
   });
 });

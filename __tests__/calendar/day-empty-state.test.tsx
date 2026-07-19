@@ -4,11 +4,16 @@ import { DayEmptyState } from '@/components/calendar/day-empty-state';
 
 const onPressAction = jest.fn();
 
-function render() {
+function render(props: Partial<Parameters<typeof DayEmptyState>[0]> = {}) {
   let root!: ReturnType<typeof create>;
   act(() => {
     root = create(
-      <DayEmptyState buttonIcon="play.fill" actionLabel="トレーニングを開始" onPressAction={onPressAction} />,
+      <DayEmptyState
+        buttonIcon="play.fill"
+        actionLabel="トレーニングを開始"
+        onPressAction={onPressAction}
+        {...props}
+      />,
     );
   });
   return root;
@@ -31,5 +36,16 @@ describe('DayEmptyState', () => {
       root.root.findByType(TouchableOpacity).props.onPress();
     });
     expect(onPressAction).toHaveBeenCalledTimes(1);
+  });
+
+  it('textを渡すと「記録がありません」の代わりにそのテキストを表示する（未来日の「予定がありません」用）', () => {
+    const root = render({ text: '予定がありません' });
+    expect(root.root.findByProps({ children: '予定がありません' })).toBeDefined();
+    expect(() => root.root.findByProps({ children: '記録がありません' })).toThrow();
+  });
+
+  it('disabled=trueならボタンのTouchableOpacityにdisabledが渡る（PR10未実装の「予定を追加」用）', () => {
+    const root = render({ disabled: true, actionLabel: '予定を追加' });
+    expect(root.root.findByType(TouchableOpacity).props.disabled).toBe(true);
   });
 });

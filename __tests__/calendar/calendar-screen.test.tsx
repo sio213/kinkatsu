@@ -1,6 +1,7 @@
 const mockPush = jest.fn();
 const mockUseWorkoutSessions = jest.fn();
 const mockUseCalendarDayExercises = jest.fn();
+const mockUseCalendarDaySchedule = jest.fn();
 const mockSwipeableMonthView = jest.fn();
 
 jest.mock('@/hooks/use-debounced-push', () => ({
@@ -27,6 +28,17 @@ jest.mock('@/hooks/use-calendar-month-schedule', () => ({
   useCalendarMonthSchedule: () => ({ primaryCategoryByScheduleDay: new Map(), categorySetByScheduleDay: new Map() }),
 }));
 
+jest.mock('@/hooks/use-calendar-day-schedule', () => ({
+  useCalendarDaySchedule: () => mockUseCalendarDaySchedule(),
+}));
+
+const mockEndWorkoutSession = jest.fn();
+const mockStartWorkoutFromRoutine = jest.fn();
+jest.mock('@/lib/workout/session', () => ({
+  endWorkoutSession: (...args: unknown[]) => mockEndWorkoutSession(...args),
+  startWorkoutFromRoutine: (...args: unknown[]) => mockStartWorkoutFromRoutine(...args),
+}));
+
 // 日付選択UI自体（スワイプ・グリッド）はmonth-grid.test.tsx等の責務のため、
 // このテストでは「今日・記録なし」パネルの配線だけを見たいので軽量スタブに差し替える。
 // mockSwipeableMonthViewでpropsを記録し、activeFilter等が正しく中継されることも検証できるようにする
@@ -39,7 +51,7 @@ jest.mock('@/components/calendar/swipeable-month-view', () => ({
 
 import React from 'react';
 import { act, create, type ReactTestInstance } from 'react-test-renderer';
-import { Text, TouchableOpacity } from 'react-native';
+import { Alert, Text, TouchableOpacity } from 'react-native';
 import CalendarScreen from '@/app/(tabs)/calendar';
 
 function render() {
@@ -54,10 +66,22 @@ function findTextByJoinedChildren(root: ReactTestInstance, text: string) {
   return root.findAllByType(Text).find((t) => [t.props.children].flat().join('') === text);
 }
 
+function selectDate(date: Date) {
+  const lastCall = mockSwipeableMonthView.mock.calls[mockSwipeableMonthView.mock.calls.length - 1][0] as {
+    onSelectDate: (d: Date) => void;
+  };
+  act(() => {
+    lastCall.onSelectDate(date);
+  });
+}
+
 beforeEach(() => {
   jest.clearAllMocks();
   mockUseCalendarDayExercises.mockReturnValue({ cards: [], retry: jest.fn() });
+  mockUseCalendarDaySchedule.mockReturnValue([]);
   mockUseWorkoutSessions.mockReturnValue({ sessions: [], activeSession: null });
+  jest.spyOn(Alert, 'alert').mockImplementation(() => {});
+  mockStartWorkoutFromRoutine.mockResolvedValue({ sessionId: 77, cards: [] });
 });
 
 describe('CalendarScreen 今日・記録なしパネル', () => {
@@ -294,5 +318,197 @@ describe('CalendarScreen 時間帯グループ', () => {
     expect(idx('朝 07:00')).toBeGreaterThanOrEqual(0);
     expect(idx('昼 12:00')).toBeGreaterThan(idx('朝 07:00'));
     expect(idx('夜 20:00')).toBeGreaterThan(idx('昼 12:00'));
+  });
+});
+
+describe('CalendarScreen 予定（PR9-2: リマインダー由来の未来予定表示）', () => {
+  function scheduleCard(overrides: Record<string, unknown> = {}) {
+    return {
+      reminderId: 1,
+      routineId: 10,
+      routineName: '胸の日',
+      categories: ['chest', 'shoulder'],
+      exerciseCount: 4,
+      hour: 20,
+      minute: 0,
+      reminder: {
+        id: 1,
+        routineId: 10,
+        title: '胸の日',
+        body: '',
+        kind: 'weekly',
+        hour: 20,
+        minute: 0,
+        weekdays: '[0]',
+        monthdays: null,
+        anchorDate: null,
+        intervalDays: null,
+        intervalMonths: null,
+        nthWeek: null,
+        nthWeekdays: null,
+        enabled: true,
+        createdAt: 0,
+        updatedAt: 0,
+      },
+      ...overrides,
+    };
+  }
+
+  test('今日、実績が無く予定だけある場合、予定カードに「今日 HH:MM」と開始ボタンが表示される', () => {
+    mockUseCalendarDaySchedule.mockReturnValue([scheduleCard()]);
+    const root = render();
+
+    expect(root.findByProps({ children: '胸の日' })).toBeDefined();
+    expect(findTextByJoinedChildren(root, '今日 20:00')).toBeDefined();
+    expect(root.findAllByProps({ children: '開始' }).length).toBeGreaterThan(0);
+  });
+
+  test('今日、予定が1件だけ（実績0件）の場合は時間帯見出しを表示しない（既存の「1件だけの日は見出し無し」ルールを予定単独でも踏襲）', () => {
+    mockUseCalendarDaySchedule.mockReturnValue([scheduleCard()]);
+    const root = render();
+    expect(findTextByJoinedChildren(root, '予定')).toBeUndefined();
+  });
+
+  test('今日、実績と予定が両方ある場合、時刻順に混ざって表示され、予定側にだけ「予定」ラベルが付く', () => {
+    mockUseCalendarDayExercises.mockReturnValue({
+      cards: [
+        {
+          workoutSessionExerciseId: 1,
+          exerciseId: 1,
+          name: '朝の種目',
+          category: 'chest',
+          measurementType: 'weight_reps',
+          source: 'preset',
+          slug: 'bench-press',
+          sessionId: 1,
+          sessionStartedAt: new Date(2026, 6, 16, 7, 10).getTime(),
+          isBest: false,
+          comparison: null,
+          sets: [{ weight: 60, reps: 8, durationSeconds: null, distanceMeters: null, completedAt: 1 }],
+        },
+      ],
+      retry: jest.fn(),
+    });
+    mockUseCalendarDaySchedule.mockReturnValue([scheduleCard({ hour: 20, minute: 0 })]);
+    const root = render();
+
+    expect(findTextByJoinedChildren(root, '朝 07:10')).toBeDefined();
+    expect(root.findByProps({ children: '朝の種目' })).toBeDefined();
+    expect(root.findByProps({ children: '胸の日' })).toBeDefined();
+    expect(findTextByJoinedChildren(root, '予定')).toBeDefined();
+
+    const allTexts = root.findAllByType(Text).map((t) => [t.props.children].flat().join(''));
+    const morningIndex = allTexts.indexOf('朝 07:10');
+    const scheduleTagIndex = allTexts.indexOf('予定');
+    expect(scheduleTagIndex).toBeGreaterThan(morningIndex);
+  });
+
+  test('今日、進行中セッションがあり予定もある場合、再開バナーと予定カードの両方が表示される', () => {
+    mockUseWorkoutSessions.mockReturnValue({
+      sessions: [{ id: 9, startedAt: 0, endedAt: null }],
+      activeSession: { id: 9, startedAt: 0, endedAt: null },
+    });
+    mockUseCalendarDaySchedule.mockReturnValue([scheduleCard()]);
+    const root = render();
+
+    expect(
+      root.findAllByType(TouchableOpacity).find((t) => t.props.accessibilityLabel === '進行中のトレーニングを再開する'),
+    ).toBeDefined();
+    expect(root.findByProps({ children: '胸の日' })).toBeDefined();
+  });
+
+  test('未来日を選択すると、予定カードは開始ボタン無しで表示され、時刻ラベルは頻度表示になる', () => {
+    const root = render();
+    const future = new Date();
+    future.setDate(future.getDate() + 5);
+    mockUseCalendarDaySchedule.mockReturnValue([scheduleCard()]);
+    selectDate(future);
+
+    expect(root.findByProps({ children: '胸の日' })).toBeDefined();
+    expect(root.findAllByProps({ children: '開始' }).length).toBe(0);
+    expect(findTextByJoinedChildren(root, '今日 20:00')).toBeUndefined();
+  });
+
+  test('未来日を選択して予定が無い場合、「予定がありません」と無効化された「予定を追加」ボタンを表示する', () => {
+    const root = render();
+    const future = new Date();
+    future.setDate(future.getDate() + 5);
+    selectDate(future);
+
+    expect(root.findByProps({ children: '予定がありません' })).toBeDefined();
+    const addBtn = root.findAllByType(TouchableOpacity).find((t) => t.props.accessibilityLabel === '予定を追加');
+    expect(addBtn).toBeDefined();
+    expect(addBtn!.props.disabled).toBe(true);
+  });
+
+  test('過去日を選択すると、useCalendarDayScheduleが予定を返していても表示されない（過去日は実績のみ）', () => {
+    const root = render();
+    const past = new Date();
+    past.setDate(past.getDate() - 5);
+    mockUseCalendarDaySchedule.mockReturnValue([scheduleCard()]);
+    mockUseCalendarDayExercises.mockReturnValue({ cards: [], retry: jest.fn() });
+    selectDate(past);
+
+    expect(root.findAllByProps({ children: '胸の日' }).length).toBe(0);
+    expect(root.findByProps({ children: '記録がありません' })).toBeDefined();
+  });
+
+  describe('今日の予定カードの「開始」ボタン(handleStartRoutine)', () => {
+    function findStartButton(root: ReactTestInstance) {
+      return root
+        .findAllByType(TouchableOpacity)
+        .find((t) => t.props.accessibilityLabel === '「胸の日」のトレーニングを開始')!;
+    }
+
+    test('進行中セッションが無ければAlertを出さず、そのままstartWorkoutFromRoutineでワークアウトを開始する', async () => {
+      mockUseCalendarDaySchedule.mockReturnValue([scheduleCard()]);
+      const root = render();
+      await act(async () => {
+        await findStartButton(root).props.onPress();
+      });
+      expect(Alert.alert).not.toHaveBeenCalled();
+      expect(mockStartWorkoutFromRoutine).toHaveBeenCalledWith(10);
+      expect(mockPush).toHaveBeenCalledWith('/workout/77');
+    });
+
+    test('進行中セッションがある場合、開始ボタンを押しても無言で遷移せず確認Alertを出す', () => {
+      mockUseWorkoutSessions.mockReturnValue({
+        sessions: [{ id: 9, startedAt: 0, endedAt: null }],
+        activeSession: { id: 9, startedAt: 0, endedAt: null },
+      });
+      mockUseCalendarDaySchedule.mockReturnValue([scheduleCard()]);
+      const root = render();
+      act(() => {
+        findStartButton(root).props.onPress();
+      });
+      expect(Alert.alert).toHaveBeenCalledWith(
+        '実施中のトレーニングを終了しますか？',
+        'ここまでの記録を保存して「胸の日」を開始しますか？',
+        expect.any(Array),
+      );
+      expect(mockStartWorkoutFromRoutine).not.toHaveBeenCalled();
+      expect(mockPush).not.toHaveBeenCalledWith('/workout/77');
+    });
+
+    test('Alertで「記録して開始」を選ぶと、endWorkoutSession→startWorkoutFromRoutineの順に呼ばれ、そのセッションへ遷移する', async () => {
+      mockUseWorkoutSessions.mockReturnValue({
+        sessions: [{ id: 9, startedAt: 0, endedAt: null }],
+        activeSession: { id: 9, startedAt: 0, endedAt: null },
+      });
+      mockUseCalendarDaySchedule.mockReturnValue([scheduleCard()]);
+      const root = render();
+      act(() => {
+        findStartButton(root).props.onPress();
+      });
+      const alertCall = (Alert.alert as jest.Mock).mock.calls[0];
+      const confirmAction = alertCall[2].find((b: { text?: string }) => b.text === '記録して開始');
+      await act(async () => {
+        await confirmAction.onPress();
+      });
+
+      expect(mockEndWorkoutSession).toHaveBeenCalledWith(9);
+      expect(mockStartWorkoutFromRoutine).toHaveBeenCalledWith(10);
+      expect(mockPush).toHaveBeenCalledWith('/workout/77');
+    });
   });
 });

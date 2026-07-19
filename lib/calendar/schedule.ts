@@ -1,52 +1,9 @@
 // カレンダーの未来予定表示（ルーティン紐付きリマインダー由来）用の集計純粋関数群。
 // DB非依存でJestからテストできる（lib/calendar/day-category.tsと同じ考え方）。
-// 実績集計(day-category.ts)とは判定軸が異なる別物のためあえて共有しない:
-// - day-category.ts: 完了済みセット単位、代表カテゴリは「セット数最多、タイは先にやった種目」
-// - この関数群: リマインダーの発火単位、代表カテゴリは「そのルーティンで種目数最多、タイは
-//   先に追加した種目」。日をまたいだ代表カテゴリのタイブレークは「その日最も早い時刻の予定」
-
-export type RoutineExerciseCategoryRow = {
-  routineId: number;
-  category: string;
-  orderIndex: number;
-};
-
-// 1ルーティンにつき代表カテゴリを1つ決める（種目数最多、タイはorderIndexが最小=先に追加した種目）
-export function pickRoutineRepresentativeCategories(rows: RoutineExerciseCategoryRow[]): Map<number, string> {
-  const byRoutine = new Map<number, Map<string, { count: number; minOrderIndex: number }>>();
-
-  for (const row of rows) {
-    let counts = byRoutine.get(row.routineId);
-    if (!counts) {
-      counts = new Map();
-      byRoutine.set(row.routineId, counts);
-    }
-    const existing = counts.get(row.category);
-    if (existing) {
-      existing.count += 1;
-      existing.minOrderIndex = Math.min(existing.minOrderIndex, row.orderIndex);
-    } else {
-      counts.set(row.category, { count: 1, minOrderIndex: row.orderIndex });
-    }
-  }
-
-  const result = new Map<number, string>();
-  for (const [routineId, counts] of byRoutine) {
-    let best: string | undefined;
-    let bestCount = -1;
-    let bestOrderIndex = Infinity;
-    for (const [category, { count, minOrderIndex }] of counts) {
-      const isBetter = count > bestCount || (count === bestCount && minOrderIndex < bestOrderIndex);
-      if (best === undefined || isBetter) {
-        best = category;
-        bestCount = count;
-        bestOrderIndex = minOrderIndex;
-      }
-    }
-    result.set(routineId, best!);
-  }
-  return result;
-}
+// 「ルーティンの代表カテゴリ」自体はhooks/use-routines.tsのuseRoutineExerciseSummaries
+// （ルーティン一覧カードと同じ集計）を流用するためここには持たない。ここにあるのは
+// 「日をまたいだ代表カテゴリの決定（最も早い時刻の予定を優先）」という、実績集計
+// (day-category.ts、セット数最多を優先)とは軸が異なる集計だけ
 
 export type ScheduleFireRow = {
   dateKey: string;

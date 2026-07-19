@@ -7,12 +7,22 @@ type Props = {
   onPress: () => void;
   disabled?: boolean;
   accessibilityLabel?: string;
+  // 無効化理由の補足読み上げ（例:「準備中の機能です」）。disabled=falseのときは無視される
+  accessibilityHint?: string;
   style?: StyleProp<ViewStyle>;
   // 「過去の記録から読み込む」画面のダウンロードアイコン等、ラベル前に小さいアイコンを添える場合に使う
   icon?: ReactNode;
 };
 
-export function PrimaryButton({ label, onPress, disabled = false, accessibilityLabel, style, icon }: Props) {
+export function PrimaryButton({
+  label,
+  onPress,
+  disabled = false,
+  accessibilityLabel,
+  accessibilityHint,
+  style,
+  icon,
+}: Props) {
   return (
     <TouchableOpacity
       style={[styles.button, disabled && styles.disabled, style]}
@@ -20,6 +30,8 @@ export function PrimaryButton({ label, onPress, disabled = false, accessibilityL
       disabled={disabled}
       accessibilityRole="button"
       accessibilityLabel={accessibilityLabel ?? label}
+      accessibilityState={{ disabled }}
+      accessibilityHint={disabled ? accessibilityHint : undefined}
     >
       {icon}
       <Text style={styles.text}>{label}</Text>

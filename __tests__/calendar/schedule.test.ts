@@ -1,43 +1,4 @@
-import {
-  aggregateSchedulePrimaryCategoryByDay,
-  pickRoutineRepresentativeCategories,
-  type RoutineExerciseCategoryRow,
-  type ScheduleFireRow,
-} from '@/lib/calendar/schedule';
-
-describe('pickRoutineRepresentativeCategories', () => {
-  it('1種目のみなら、そのカテゴリが代表になる', () => {
-    const rows: RoutineExerciseCategoryRow[] = [{ routineId: 1, category: 'chest', orderIndex: 0 }];
-    expect(pickRoutineRepresentativeCategories(rows)).toEqual(new Map([[1, 'chest']]));
-  });
-
-  it('種目数が最も多いカテゴリが代表になる', () => {
-    const rows: RoutineExerciseCategoryRow[] = [
-      { routineId: 1, category: 'chest', orderIndex: 0 },
-      { routineId: 1, category: 'shoulder', orderIndex: 1 },
-      { routineId: 1, category: 'shoulder', orderIndex: 2 },
-    ];
-    expect(pickRoutineRepresentativeCategories(rows).get(1)).toBe('shoulder');
-  });
-
-  it('種目数が同数の場合は先に追加した種目(orderIndexが最小)のカテゴリが代表になる', () => {
-    const rows: RoutineExerciseCategoryRow[] = [
-      { routineId: 1, category: 'arm', orderIndex: 1 }, // 後から追加
-      { routineId: 1, category: 'chest', orderIndex: 0 }, // 先に追加
-    ];
-    expect(pickRoutineRepresentativeCategories(rows).get(1)).toBe('chest');
-  });
-
-  it('複数ルーティンを同時に集計できる', () => {
-    const rows: RoutineExerciseCategoryRow[] = [
-      { routineId: 1, category: 'chest', orderIndex: 0 },
-      { routineId: 2, category: 'leg', orderIndex: 0 },
-    ];
-    const result = pickRoutineRepresentativeCategories(rows);
-    expect(result.get(1)).toBe('chest');
-    expect(result.get(2)).toBe('leg');
-  });
-});
+import { aggregateSchedulePrimaryCategoryByDay, type ScheduleFireRow } from '@/lib/calendar/schedule';
 
 describe('aggregateSchedulePrimaryCategoryByDay', () => {
   it('1日1件のみならそのカテゴリになる', () => {

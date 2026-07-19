@@ -6,11 +6,10 @@ import { Colors, Typography } from '@/constants/theme';
 import type { Routine } from '@/db/schema';
 import { useDebouncedPush } from '@/hooks/use-debounced-push';
 import { useRoutineExerciseSummaries, useRoutineReminders, useRoutines } from '@/hooks/use-routines';
+import { useStartRoutineWithConfirm } from '@/hooks/use-start-routine-with-confirm';
 import { useWorkoutSessions } from '@/hooks/use-workout-session';
-import { useWorkoutStarter } from '@/hooks/use-workout-starter';
 import { useRoutineDraftStore } from '@/lib/routines/draft-store';
 import { getRoutineScheduleDisplay } from '@/lib/routines/format';
-import { endWorkoutSession, startWorkoutFromRoutine } from '@/lib/workout/session';
 import { Stack } from 'expo-router';
 import { useCallback, useRef } from 'react';
 import { Alert, FlatList, StyleSheet, Text, View } from 'react-native';
@@ -23,7 +22,7 @@ export default function RoutineListScreen() {
   const { activeSession } = useWorkoutSessions();
   const pushDebounced = useDebouncedPush();
   const resetDraft = useRoutineDraftStore((state) => state.reset);
-  const startWorkout = useWorkoutStarter((sessionId) => pushDebounced(`/workout/${sessionId}`));
+  const startRoutine = useStartRoutineWithConfirm(activeSession, (sessionId) => pushDebounced(`/workout/${sessionId}`));
 
   const handleCreate = useCallback(() => {
     // app/routine/new.tsx自身のマウント時resetに加えてここでも空にしておくことで、
@@ -41,34 +40,11 @@ export default function RoutineListScreen() {
   );
 
   // カードの「開始」ボタン専用の処理（カード本体タップは編集画面へ、@designerレビュー）。
-  // 別のトレーニングが既に進行中の場合、無言でそちらへ合流すると「押したのに違うものが開いた」
-  // という違和感になる（実機フィードバックで指摘）ため確認を挟む。「記録して開始」では
-  // 進行中セッションをendWorkoutSessionで終了（記録は保存されたまま）した上で、選んだ
-  // ルーティンのセッションを新規に開始する
+  // 進行中セッションがある場合の確認ダイアログを含むロジックはuseStartRoutineWithConfirmに
+  // 共通化してある（カレンダー選択日パネルの予定カード「開始」ボタンと挙動が同一のため）
   const handleStartWorkout = useCallback(
-    (routine: Routine) => {
-      if (activeSession) {
-        Alert.alert(
-          '実施中のトレーニングを終了しますか？',
-          `ここまでの記録を保存して「${routine.name}」を開始しますか？`,
-          [
-            { text: 'キャンセル', style: 'cancel' },
-            {
-              text: '記録して開始',
-              onPress: () => {
-                startWorkout(async () => {
-                  await endWorkoutSession(activeSession.id);
-                  return (await startWorkoutFromRoutine(routine.id))?.sessionId ?? null;
-                });
-              },
-            },
-          ],
-        );
-        return;
-      }
-      startWorkout(async () => (await startWorkoutFromRoutine(routine.id))?.sessionId ?? null);
-    },
-    [activeSession, startWorkout],
+    (routine: Routine) => startRoutine(routine.id, routine.name),
+    [startRoutine],
   );
 
   // 複製メニュー。作っただけで一覧に戻すと「コピー」の名前のまま放置されがちなので、複製直後に
