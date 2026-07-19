@@ -18,6 +18,8 @@ type Props = {
   // 3つのMonthGridで共通のMapをそのまま参照させ、ここでは分割しない
   primaryCategoryByDay: Map<string, string>;
   categorySetByDay: Map<string, Set<string>>;
+  primaryCategoryByScheduleDay: Map<string, string>;
+  categorySetByScheduleDay: Map<string, Set<string>>;
   activeFilter: string | null;
 };
 
@@ -41,6 +43,8 @@ export function SwipeableMonthView({
   onChangeMonth,
   primaryCategoryByDay,
   categorySetByDay,
+  primaryCategoryByScheduleDay,
+  categorySetByScheduleDay,
   activeFilter,
 }: Props) {
   const [containerWidth, setContainerWidth] = useState(0);
@@ -128,6 +132,8 @@ export function SwipeableMonthView({
                 onSelectDate={onSelectDate}
                 primaryCategoryByDay={primaryCategoryByDay}
                 categorySetByDay={categorySetByDay}
+                primaryCategoryByScheduleDay={primaryCategoryByScheduleDay}
+                categorySetByScheduleDay={categorySetByScheduleDay}
                 activeFilter={activeFilter}
               />
             </View>
@@ -140,6 +146,8 @@ export function SwipeableMonthView({
                 onSelectDate={onSelectDate}
                 primaryCategoryByDay={primaryCategoryByDay}
                 categorySetByDay={categorySetByDay}
+                primaryCategoryByScheduleDay={primaryCategoryByScheduleDay}
+                categorySetByScheduleDay={categorySetByScheduleDay}
                 activeFilter={activeFilter}
               />
             </View>
@@ -152,6 +160,8 @@ export function SwipeableMonthView({
                 onSelectDate={onSelectDate}
                 primaryCategoryByDay={primaryCategoryByDay}
                 categorySetByDay={categorySetByDay}
+                primaryCategoryByScheduleDay={primaryCategoryByScheduleDay}
+                categorySetByScheduleDay={categorySetByScheduleDay}
                 activeFilter={activeFilter}
               />
             </View>

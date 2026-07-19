@@ -19,6 +19,7 @@ import {
   computeMonthlyQueueFireDates,
   computeNthWeekdayFireDates,
   computeYearlyFireDates,
+  getFireDatesInRange,
   getNextFireDate,
   nextDailyFireDate,
   nextWeeklyFireDate,
@@ -542,6 +543,74 @@ describe('getNextFireDate (統合)', () => {
       nthWeekdays: [],
     };
     expect(getNextFireDate(r, FROM)).toBeNull();
+  });
+});
+
+// ─────────────────────────────────────────────
+// getFireDatesInRange
+// ─────────────────────────────────────────────
+describe('getFireDatesInRange', () => {
+  const base = {
+    id: 1,
+    routineId: 10,
+    title: 'test',
+    body: 'test',
+    hour: H,
+    minute: M,
+    anchorDate: null,
+    intervalDays: null,
+    intervalMonths: null,
+    nthWeek: null,
+    nthWeekdays: null,
+    enabled: true,
+    createdAt: 0,
+    updatedAt: 0,
+  };
+
+  test('毎日(interval)は範囲内の全日を昇順で返す', () => {
+    const r = { ...base, kind: 'interval', intervalDays: 1, weekdays: null, monthdays: null };
+    const start = d('2026-01-05T00:00:00');
+    const end = d('2026-01-08T00:00:00');
+    const dates = getFireDatesInRange(r, start, end);
+    expect(dates).toEqual([
+      d('2026-01-05T07:00:00'),
+      d('2026-01-06T07:00:00'),
+      d('2026-01-07T07:00:00'),
+    ]);
+  });
+
+  test('range開始ちょうど(gte)の発火は含み、range終了ちょうど(lt)の発火は含まない', () => {
+    const r = { ...base, kind: 'interval', intervalDays: 1, weekdays: null, monthdays: null };
+    // 2026-01-06T07:00:00 ちょうどをrangeStartにする
+    const start = d('2026-01-06T07:00:00');
+    const end = d('2026-01-07T07:00:00'); // 次の発火(01-07T07:00:00)と同時刻
+    expect(getFireDatesInRange(r, start, end)).toEqual([d('2026-01-06T07:00:00')]);
+  });
+
+  test('weekly(火曜)は範囲内の複数週分を返す', () => {
+    const r = { ...base, kind: 'weekly', weekdays: [2], monthdays: null };
+    const start = d('2026-01-05T00:00:00'); // 月曜
+    const end = d('2026-01-27T00:00:00');
+    // 火曜: 1/6, 1/13, 1/20, 1/27(rangeEnd未満でないので除外)
+    expect(getFireDatesInRange(r, start, end)).toEqual([
+      d('2026-01-06T07:00:00'),
+      d('2026-01-13T07:00:00'),
+      d('2026-01-20T07:00:00'),
+    ]);
+  });
+
+  test('範囲内に発火が無ければ空配列', () => {
+    const r = { ...base, kind: 'weekly', weekdays: [2], monthdays: null };
+    const start = d('2026-01-06T08:00:00'); // 火曜07:00の発火直後
+    const end = d('2026-01-13T07:00:00'); // 次の火曜07:00ちょうど(lt条件で除外)
+    expect(getFireDatesInRange(r, start, end)).toEqual([]);
+  });
+
+  test('yearly等、範囲より遠い先にしか発火が無ければ空配列（無限ループしない）', () => {
+    const r = { ...base, kind: 'yearly', weekdays: null, monthdays: [15], anchorDate: d('2026-06-15T00:00:00').getTime() };
+    const start = d('2026-01-01T00:00:00');
+    const end = d('2026-02-01T00:00:00');
+    expect(getFireDatesInRange(r, start, end)).toEqual([]);
   });
 });
 

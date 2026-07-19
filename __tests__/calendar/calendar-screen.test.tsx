@@ -23,6 +23,10 @@ jest.mock('@/hooks/use-calendar-month-records', () => ({
   useCalendarMonthRecords: () => ({ primaryCategoryByDay: new Map(), categorySetByDay: new Map() }),
 }));
 
+jest.mock('@/hooks/use-calendar-month-schedule', () => ({
+  useCalendarMonthSchedule: () => ({ primaryCategoryByScheduleDay: new Map(), categorySetByScheduleDay: new Map() }),
+}));
+
 // 日付選択UI自体（スワイプ・グリッド）はmonth-grid.test.tsx等の責務のため、
 // このテストでは「今日・記録なし」パネルの配線だけを見たいので軽量スタブに差し替える。
 // mockSwipeableMonthViewでpropsを記録し、activeFilter等が正しく中継されることも検証できるようにする

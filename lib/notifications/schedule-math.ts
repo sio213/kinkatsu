@@ -372,6 +372,25 @@ export function getNextFireDate(r: ParsedReminder, from: Date): Date | null {
   return null;
 }
 
+// カレンダーの未来予定表示用。[rangeStart, rangeEnd)の範囲で発火する日時を昇順で全て返す。
+// getNextFireDateが「fromより厳密に後の最初の1件」を返す契約を利用し、結果をcursorとして
+// 前進させることで重複なく範囲内の全件を列挙する。interval(毎日)等で件数が膨らみうるため
+// 安全上限を設ける（呼び出し元のカレンダー画面は前月〜翌月+1の最大約92日分しか渡さないため、
+// 毎日リマインダーでも実際は100件を超えない。200は十分な安全マージン）
+const MAX_FIRE_DATES_IN_RANGE = 200;
+
+export function getFireDatesInRange(r: ParsedReminder, rangeStart: Date, rangeEnd: Date): Date[] {
+  const result: Date[] = [];
+  let cursor = new Date(rangeStart.getTime() - 1);
+  for (let i = 0; i < MAX_FIRE_DATES_IN_RANGE; i++) {
+    const next = getNextFireDate(r, cursor);
+    if (next === null || next.getTime() >= rangeEnd.getTime()) break;
+    result.push(next);
+    cursor = next;
+  }
+  return result;
+}
+
 // ── ヘルパー ─────────────────────────────────────────
 
 // parseReminder/resolveLegacyYearlyMonthdaysはReminder(db/schema)の生の行を扱うため

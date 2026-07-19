@@ -41,6 +41,7 @@ export {
   computeNthWeekdayFireDates,
   computeQuotaPerReminder,
   computeYearlyFireDates,
+  getFireDatesInRange,
   getNextFireDate,
   MAX_OS_NOTIFICATIONS,
   nextDailyFireDate,

@@ -18,6 +18,11 @@ type Props = {
   primaryCategoryByDay: Map<string, string>;
   // 日付キー→その日実施した全カテゴリの集合。カテゴリフィルター中の判定にのみ使う
   categorySetByDay: Map<string, Set<string>>;
+  // 日付キー→予定の代表カテゴリ（ルーティン紐付きリマインダー由来）。実績がある日は
+  // hasRecordが優先されるため参照しない
+  primaryCategoryByScheduleDay: Map<string, string>;
+  // 日付キー→その日に予定がある全カテゴリの集合。カテゴリフィルター中の判定にのみ使う
+  categorySetByScheduleDay: Map<string, Set<string>>;
   // カテゴリフィルターチップで選択中のカテゴリ。CATEGORY_ALL（絞り込みなし）ならnull
   activeFilter: string | null;
 };
@@ -39,6 +44,8 @@ export const MonthGrid = memo(function MonthGrid({
   onSelectDate,
   primaryCategoryByDay,
   categorySetByDay,
+  primaryCategoryByScheduleDay,
+  categorySetByScheduleDay,
   activeFilter,
 }: Props) {
   const dates = useMemo(() => buildMonthGridDates(year, month), [year, month]);
@@ -74,18 +81,33 @@ export const MonthGrid = memo(function MonthGrid({
           const dateKey = toDateKey(date);
           const category = primaryCategoryByDay.get(dateKey);
           const hasRecord = category != null;
-          // 実績が無い日はアクセント色、ある日はその代表カテゴリの色を「今日/選択中」の
-          // 枠線・下線・強調文字色として使う（塗りつぶしが無いときの既定色がアクセント）
-          const accentOrCategoryColor = hasRecord ? getCalendarCategoryColor(category) : Colors.accent;
+          // 予定（ルーティン紐付きリマインダー由来）は実績が無い日だけ意味を持つ
+          // （実績がある日は「実施済み」を優先し、予定リング/ドットは出さない）
+          const scheduleCategory = hasRecord ? undefined : primaryCategoryByScheduleDay.get(dateKey);
+          const hasSchedule = scheduleCategory != null;
+          // 実績が無い日はアクセント色、実績がある日はその代表カテゴリ、予定のみある日は
+          // 予定の代表カテゴリの色を「今日/選択中」の枠線・下線・強調文字色として使う
+          // （塗りつぶしが無いときの既定色がアクセント。実績は塗りつぶし、予定は輪郭のみで
+          // 区別する仕様のため、選択中の枠線色はどちらでも同じ仕組みを使い分けなく共有できる）
+          const accentOrCategoryColor = hasRecord
+            ? getCalendarCategoryColor(category)
+            : hasSchedule
+              ? getCalendarCategoryColor(scheduleCategory)
+              : Colors.accent;
           // フィルター中、該当カテゴリを実施していない日は「非該当」扱い（デザイン案
           // 「確定：カテゴリフィルタ適用」の凡例通り、過去/未来問わずグレーの点のみで
           // 塗りつぶさない。完全に消すと「その日は何もしていない」ように見えるため、
           // 実施の有無自体はグレードットで残す）
           const isFilteredOut = activeFilter != null && !(categorySetByDay.get(dateKey)?.has(activeFilter) ?? false);
+          const isScheduleFilteredOut =
+            activeFilter != null && !(categorySetByScheduleDay.get(dateKey)?.has(activeFilter) ?? false);
           // 塗りつぶしは「実施日 かつ 選択中でない かつ フィルター対象内（非該当でない）」場合のみ。
           // 選択中は枠線表現に切り替わり、フィルターで非該当の日は塗りつぶさずグレードットに切り替わる
           const showFill = hasRecord && !isSelected && !isFilteredOut;
           const showGrayDot = hasRecord && !isSelected && isFilteredOut;
+          // 予定は実績と違い塗りつぶさず、選択中でなければ小さいドットのみで示す
+          // （デザイン案「確定：未来の日付を選択（19日＝予定・カテゴリ色枠）」で確認済みの仕様）
+          const showScheduleDot = hasSchedule && !isSelected;
 
           return (
             <TouchableOpacity
@@ -93,7 +115,7 @@ export const MonthGrid = memo(function MonthGrid({
               style={styles.cellTouchable}
               hitSlop={{ top: 4, bottom: 4, left: 4, right: 4 }}
               accessibilityRole="button"
-              accessibilityLabel={`${date.getMonth() + 1}月${date.getDate()}日${isToday ? '、今日' : ''}${hasRecord ? `、実施日、${getCategoryLabel(category)}` : ''}${isFilteredOut ? '、絞り込み対象外' : ''}`}
+              accessibilityLabel={`${date.getMonth() + 1}月${date.getDate()}日${isToday ? '、今日' : ''}${hasRecord ? `、実施日、${getCategoryLabel(category)}` : ''}${hasSchedule ? `、予定あり、${getCategoryLabel(scheduleCategory)}` : ''}${(hasRecord && isFilteredOut) || (hasSchedule && isScheduleFilteredOut) ? '、絞り込み対象外' : ''}`}
               accessibilityState={{ selected: isSelected }}
               onPress={() => onSelectDate(date)}
             >
@@ -132,6 +154,16 @@ export const MonthGrid = memo(function MonthGrid({
                     親cellのalignItems:'center'はabsolute配置の子にも効くため、
                     left/transformを指定しなくても水平中央に来る（RN/Yogaの挙動） */}
                 {showGrayDot && <View style={styles.filterDot} />}
+                {/* 予定ドットはfilterDotと同じ位置・サイズを共有し、色だけカテゴリ色/グレーで
+                    出し分ける（フィルターで非該当の予定はグレー、それ以外はカテゴリ色） */}
+                {showScheduleDot && (
+                  <View
+                    style={[
+                      styles.filterDot,
+                      !isScheduleFilteredOut && { backgroundColor: getCalendarCategoryColor(scheduleCategory) },
+                    ]}
+                  />
+                )}
               </View>
             </TouchableOpacity>
           );
