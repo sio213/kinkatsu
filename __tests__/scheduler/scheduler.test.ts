@@ -14,6 +14,7 @@ jest.mock('@/lib/notifications/channels', () => ({ REMINDER_CHANNEL_ID: 'reminde
 
 import {
   computeBiweeklyFireDates,
+  computeDailyFireDates,
   computeIntervalFireDates,
   computeMonthIntervalFireDates,
   computeMonthlyQueueFireDates,
@@ -190,6 +191,30 @@ describe('毎日リマインド', () => {
     expect(morning).toEqual(d('2026-01-06T07:00:00'));
     // 夜21時はまだ来ていないので当日
     expect(evening).toEqual(d('2026-01-05T21:00:00'));
+  });
+});
+
+// ─────────────────────────────────────────────
+// computeDailyFireDates(毎日を一時的にキュー方式で複数件生成、PR10-6c)
+// ─────────────────────────────────────────────
+describe('computeDailyFireDates', () => {
+  test('連続したN日分を返す(前日の結果ちょうどの時刻を渡しても重複しない)', () => {
+    const dates = computeDailyFireDates(FROM, H, M, 3);
+    expect(dates).toEqual([
+      d('2026-01-06T07:00:00'),
+      d('2026-01-07T07:00:00'),
+      d('2026-01-08T07:00:00'),
+    ]);
+  });
+
+  test('通知時刻前のfromなら当日分から始まる', () => {
+    const from = d('2026-01-05T06:00:00');
+    const dates = computeDailyFireDates(from, H, M, 2);
+    expect(dates).toEqual([d('2026-01-05T07:00:00'), d('2026-01-06T07:00:00')]);
+  });
+
+  test('count=0なら空配列', () => {
+    expect(computeDailyFireDates(FROM, H, M, 0)).toEqual([]);
   });
 });
 

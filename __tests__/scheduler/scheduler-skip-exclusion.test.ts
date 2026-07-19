@@ -26,8 +26,12 @@ jest.mock('@/db/client', () => ({
       },
     })),
     select: jest.fn(() => ({
-      from: (table: unknown) => ({
-        where: () => {
+      from: (table: unknown) => {
+        // getReminderIdsWithSkips(lib/calendar/reminder-skips.ts)は.where()を挟まず
+        // db.select({...}).from(table)を直接awaitするため、.from()の戻り値自体もthenableに
+        // しておく(PR10-6c: refillReminder/refillAllRemindersが一時キュー中nativeも数えるために
+        // 使う)。既存の.where()呼び出し経由の分岐は従来通り維持する
+        const resolveRows = () => {
           if (table === 'reminderScheduleSkips') return Promise.resolve(mockSkipRows);
           if (table === 'reminders') {
             // refillReminderは同じ'reminders'テーブルに対し
@@ -40,8 +44,13 @@ jest.mock('@/db/client', () => ({
           }
           // 既存キュー検索(reminderNotifications)は常に空(=まだ何も予約されていない/補充前提)
           return Promise.resolve([]);
-        },
-      }),
+        };
+        return {
+          where: () => resolveRows(),
+          then: (onFulfilled: (rows: unknown[]) => unknown, onRejected?: (e: unknown) => unknown) =>
+            resolveRows().then(onFulfilled, onRejected),
+        };
+      },
     })),
   },
 }));

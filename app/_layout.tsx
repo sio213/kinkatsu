@@ -9,6 +9,7 @@ import { getPermissionState } from '@/lib/notifications/permissions';
 import { syncScheduledWorkoutNotifications } from '@/lib/notifications/scheduled-workout-scheduler';
 import {
   pruneExpiredNotifications,
+  reconcileNativeReminderSchedules,
   refillAllReminders,
 } from '@/lib/notifications/scheduler';
 import { resolveReminderTapDestination } from '@/lib/notifications/tap-handler';
@@ -47,7 +48,9 @@ export const unstable_settings = {
 };
 
 let appStarting = false;
-async function onAppStart() {
+// テスト用にexport(呼び出し順序: prune→(権限があれば)reconcile→refill、をシステムレベルの
+// 統合として検証する。RootLayout全体をレンダーせずにこの関数単体を叩けるようにするため)
+export async function onAppStart() {
   if (appStarting) return;
   appStarting = true;
   try {
@@ -56,6 +59,10 @@ async function onAppStart() {
     await Promise.all([pruneExpiredNotifications(), pruneExpiredReminderScheduleSkips()]);
     const state = await getPermissionState();
     if (state === 'granted') {
+      // ネイティブ⇄一時キュー(PR10-6c)の整合を取ってから補充する。reconcile自体が
+      // scheduleNative/scheduleQueueで通知を再登録しDBの状態を変えるため、その結果を見る
+      // refillAllRemindersより先に直列で実行する必要がある(並列化不可)
+      await reconcileNativeReminderSchedules();
       // reminders/scheduledWorkoutsは別テーブル・独立処理のため並列実行できる（自動レビュー指摘）。
       // OS再起動・アプリ再インストールで保留通知が消えた場合や、権限を後から許可した場合に
       // 手動予定(scheduledWorkouts)の通知を再スケジュールして追従する（PR10-5）

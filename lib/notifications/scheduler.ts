@@ -7,6 +7,7 @@ import {
   type Reminder,
 } from '@/db/schema';
 import { toDateKey } from '@/lib/calendar/date-grid';
+import { getReminderIdsWithSkips, hasAnyReminderScheduleSkip } from '@/lib/calendar/reminder-skips';
 import { and, eq, gt, lte } from 'drizzle-orm';
 import * as Notifications from 'expo-notifications';
 import { REMINDER_CHANNEL_ID } from './channels';
@@ -16,6 +17,7 @@ import { REMINDER_CHANNEL_ID } from './channels';
 // 変更不要にする
 import {
   computeBiweeklyFireDates,
+  computeDailyFireDates,
   computeIntervalFireDates,
   computeMonthIntervalFireDates,
   computeMonthlyQueueFireDates,
@@ -26,6 +28,7 @@ import {
   queueDepthFor,
   REFILL_THRESHOLD,
   resolveTriggerType,
+  type TriggerType,
 } from './schedule-math';
 import {
   REMINDER_NOTIFICATION_TYPE,
@@ -37,6 +40,7 @@ import {
 
 export {
   computeBiweeklyFireDates,
+  computeDailyFireDates,
   computeIntervalFireDates,
   computeMonthIntervalFireDates,
   computeMonthlyQueueFireDates,
@@ -214,6 +218,10 @@ async function scheduleQueue(r: ParsedReminder, depth: number): Promise<void> {
   let dates: Date[] = [];
   if (r.kind === 'interval' && r.intervalDays && r.intervalDays > 1 && r.anchorDate) {
     dates = computeIntervalFireDates(from, r.anchorDate, r.intervalDays, r.hour, r.minute, need);
+  } else if (r.kind === 'interval' && (r.intervalDays ?? 1) === 1) {
+    // 毎日(ネイティブ方式が基本)を、未来のスキップがある間だけ一時的にキュー方式へ切り替える
+    // 際に使う(PR10-6c)。通常のネイティブ方式運用ではこの分岐には来ない
+    dates = computeDailyFireDates(from, r.hour, r.minute, need);
   } else if (r.kind === 'weekly' && r.weekdays?.length && r.anchorDate) {
     const iw = Math.max(1, Math.round((r.intervalDays ?? 14) / 7));
     const allDates: Date[] = [];
@@ -281,12 +289,72 @@ async function scheduleQueue(r: ParsedReminder, depth: number): Promise<void> {
   }
 }
 
+// 「今回だけスキップ」(PR10-6a)は、ネイティブ方式(毎日/毎週/単純な毎月)のリマインダーだと
+// OSの永続的な繰り返しトリガーの性質上1件だけを狙い撃ちでキャンセルできない制約があった。
+// PR10-6cではこれを解消するため、ネイティブ方式でも未来のスキップが1件でも残っている間は
+// 一時的にキュー方式(個別のDATEトリガーを複数予約する方式)へ切り替え、スキップ日だけ除外して
+// 予約する。切り替え状態は専用カラムを持たず、実際に予約されている行(reminderNotifications)と
+// スキップ記録(reminderScheduleSkips)から都度導出する——cancelReminderOsNotificationsが
+// 再スケジュール前に必ず全行を消すため、1つのリマインダーがnative行とqueue行を混在させることは
+// 無く、判定が曖昧になる余地がない(新カラム方式は、マイグレーション追加+全CRUDパスでの
+// フラグ同期という故障面が増えるため見送った)
+export async function resolveEffectiveTriggerType(r: ParsedReminder): Promise<TriggerType> {
+  const base = resolveTriggerType(r);
+  if (base === 'queue') return 'queue';
+  return (await hasAnyReminderScheduleSkip(r.id)) ? 'queue' : 'native';
+}
+
+// updateReminder/setReminderEnabledの「全キャンセル→DB再読込→再スケジュール」と同じ処理を
+// 共通化(@reviewer指摘の重複解消と同じ方針)。ネイティブ⇄一時キューの切り替えは、OS側の
+// 繰り返しトリガーを個別にキャンセルする手段が無いため、全消し→作り直しが唯一の手段になる
+export async function rescheduleReminderFromDb(reminderId: number): Promise<void> {
+  await cancelReminderOsNotifications(reminderId);
+  const [r] = await db.select().from(reminders).where(eq(reminders.id, reminderId));
+  if (!r || !r.enabled) return;
+  await scheduleReminder(parseReminder(r));
+}
+
 async function scheduleReminder(r: ParsedReminder): Promise<void> {
-  const tt = resolveTriggerType(r);
+  const tt = await resolveEffectiveTriggerType(r);
   if (tt === 'native') {
     await scheduleNative(r);
   } else {
+    // 一時キュー化(base='native'だがスキップにより effective='queue')の場合も、通常のqueue方式
+    // リマインダーと同じ固定depth(queueDepthFor)で予約する。createReminder時点のqueue方式
+    // リマインダーも同様に固定depthで、予算(OS通知上限)を考慮した絞り込みはrefillReminder/
+    // refillAllRemindersの補充サイクル側の責務としている既存の役割分担に合わせた
+    // (skip時点でcomputeQuotaPerReminderまで計算すると、スキップという軽い操作のたびに
+    // 全リマインダーを読んでeffective typeを解決するN+1コストが乗ってしまう)
     await scheduleQueue(r, queueDepthFor(r.kind as ReminderKind));
+  }
+}
+
+// アプリ起動時(app/_layout.tsxのonAppStart)に、ネイティブ⇄一時キューの整合を取る。
+// - スキップが残っているのにnative行のまま(未変換。PR10-6a/6bの間に書かれた既存データとの
+//   後方互換も兼ねる) → キュー化
+// - スキップが無いのにqueue行が残っている(スキップ日経過後の取り残し) → ネイティブへ自動リバート
+// pruneExpiredReminderScheduleSkipsが先に実行される前提のため、ここで残るスキップは今日以降のみ
+export async function reconcileNativeReminderSchedules(): Promise<void> {
+  const enabledReminders = await db.select().from(reminders).where(eq(reminders.enabled, true));
+  const skipReminderIds = await getReminderIdsWithSkips();
+  // getReminderIdsWithSkipsと対称に、queue化済みのreminderId集合も1クエリでまとめて取得する
+  // (@reviewer指摘: 従来はループ内でリマインダーごとに1クエリ発行するN+1になっていた)
+  const queueRows = await db
+    .select({ reminderId: reminderNotifications.reminderId })
+    .from(reminderNotifications)
+    .where(eq(reminderNotifications.triggerType, 'queue'));
+  const queuedReminderIds = new Set(queueRows.map((row) => row.reminderId));
+
+  for (const r of enabledReminders) {
+    const parsed = parseReminder(r);
+    if (resolveTriggerType(parsed) !== 'native') continue; // base-queueは常にqueueのままなので対象外
+
+    const hasSkip = skipReminderIds.has(r.id);
+    const isQueued = queuedReminderIds.has(r.id);
+
+    if (hasSkip !== isQueued) {
+      await rescheduleReminderFromDb(r.id);
+    }
   }
 }
 
@@ -424,12 +492,16 @@ export async function refillReminder(reminderId: number): Promise<void> {
   if (!r || !r.enabled) return;
 
   const parsed = parseReminder(r);
-  const tt = resolveTriggerType(parsed);
-  if (tt === 'native') return; // ネイティブは補充不要
+  const tt = await resolveEffectiveTriggerType(parsed);
+  if (tt === 'native') return; // ネイティブ(スキップ無し)は補充不要
 
+  // queueCountは「本来のqueue方式」+「スキップにより一時キュー化されているnative」の合計。
+  // 後者を含めないと、一時キュー中のリマインダーがdepth計算の分母から漏れ、他の通常queue
+  // リマインダーの予算(computeQuotaPerReminder)が過大評価されてしまう
   const allEnabled = await db.select().from(reminders).where(eq(reminders.enabled, true));
+  const skipReminderIds = await getReminderIdsWithSkips();
   const queueCount = allEnabled.filter(
-    (rem) => resolveTriggerType(parseReminder(rem)) === 'queue',
+    (rem) => resolveTriggerType(parseReminder(rem)) === 'queue' || skipReminderIds.has(rem.id),
   ).length;
 
   const depth = Math.min(
@@ -445,8 +517,11 @@ export async function refillAllReminders(now = new Date()): Promise<void> {
     .from(reminders)
     .where(eq(reminders.enabled, true));
 
+  // 一時キュー化されているnative(スキップにより effective='queue')も補充サイクルに含める
+  // (@reviewer Major指摘想定: 含めないとキューが14日窓を使い切って通知が止まってしまう)
+  const skipReminderIds = await getReminderIdsWithSkips();
   const queueReminders = enabledReminders.filter(
-    (r) => resolveTriggerType(parseReminder(r)) === 'queue',
+    (r) => resolveTriggerType(parseReminder(r)) === 'queue' || skipReminderIds.has(r.id),
   );
   const quota = computeQuotaPerReminder(queueReminders.length);
 

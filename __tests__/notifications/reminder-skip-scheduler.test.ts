@@ -14,6 +14,13 @@ const mockInsertValues = jest.fn();
 // 捕捉する。dayBoundsが計算した実際のepoch値がどこにも検証されていなかった問題への対応
 // (@reviewer Major指摘#8: 日境界のバグ(月/年またぎ・うるう年等)が検出できない)
 const mockSelectWhere = jest.fn();
+// PR10-6c: ネイティブ方式リマインダーの通知抑止は、rescheduleReminderFromDb(scheduler.ts、
+// 「全キャンセル→スキップ記録から再判定→作り直し」)への委譲一本になった。scheduleQueue自体の
+// 日付生成・既存件数計算はscheduler.test.ts/scheduler-skip-exclusion.test.tsの責務のため、
+// ここではreminder-skip-scheduler.ts自身の分岐(native→委譲する/queue→既存の単日処理のまま)
+// だけを検証する目的でモック化する。parseReminder/resolveTriggerType/scheduleQueueNotificationは
+// db/notificationsに触れない純粋寄りの関数のため実体のまま使う
+const mockRescheduleReminderFromDb = jest.fn();
 
 jest.mock('@/db/client', () => ({
   db: {
@@ -57,10 +64,18 @@ jest.mock('@/lib/calendar/reminder-skips', () => ({
 jest.mock('@/lib/notifications/channels', () => ({ REMINDER_CHANNEL_ID: 'reminders' }));
 
 jest.mock('expo-notifications', () => ({
-  SchedulableTriggerInputTypes: { DATE: 'date' },
+  SchedulableTriggerInputTypes: { DATE: 'date', DAILY: 'daily', WEEKLY: 'weekly', MONTHLY: 'monthly' },
   scheduleNotificationAsync: (...args: unknown[]) => mockScheduleNotificationAsync(...args),
   cancelScheduledNotificationAsync: (...args: unknown[]) => mockCancelScheduledNotificationAsync(...args),
 }));
+
+jest.mock('@/lib/notifications/scheduler', () => {
+  const actual = jest.requireActual('@/lib/notifications/scheduler');
+  return {
+    ...actual,
+    rescheduleReminderFromDb: (...args: unknown[]) => mockRescheduleReminderFromDb(...args),
+  };
+});
 
 import { skipReminderOccurrence, unskipReminderOccurrence } from '@/lib/notifications/reminder-skip-scheduler';
 import { parseDateKey, toDateKey } from '@/lib/calendar/date-grid';
@@ -81,6 +96,7 @@ const BASE_REMINDER = {
 };
 
 // 隔週(weekly, intervalDays=14) = キュー方式。単純な毎週(intervalDays=7 or未設定) = ネイティブ方式
+// (PR10-6cにより、未来のスキップが残る間は一時的にキュー方式へ切り替わる)
 function queueReminder(overrides: Record<string, unknown> = {}) {
   return { ...BASE_REMINDER, id: 1, routineId: 10, kind: 'weekly', intervalDays: 14, hour: 7, minute: 0, ...overrides };
 }
@@ -120,6 +136,7 @@ beforeEach(() => {
   mockCancelScheduledNotificationAsync.mockResolvedValue(undefined);
   mockDeleteWhere.mockResolvedValue(undefined);
   mockInsertValues.mockResolvedValue(undefined);
+  mockRescheduleReminderFromDb.mockResolvedValue(undefined);
   jest.spyOn(console, 'error').mockImplementation(() => {});
 });
 
@@ -142,12 +159,13 @@ describe('skipReminderOccurrence', () => {
     await expect(skipReminderOccurrence(1, '2026-07-27')).resolves.toEqual({ notificationSuppressed: true });
   });
 
-  it('キュー方式かつ該当日に予約済みの通知があれば、その1件をキャンセル+DB削除する', async () => {
+  it('キュー方式かつ該当日に予約済みの通知があれば、その1件をキャンセル+DB削除する(rescheduleReminderFromDbには委譲しない)', async () => {
     mockReminderRows = [queueReminder()];
     mockNotificationRows = [{ id: 5, osNotificationId: 'os-abc', reminderId: 1, fireAt: 123 }];
     await expect(skipReminderOccurrence(1, '2026-07-27')).resolves.toEqual({ notificationSuppressed: true });
     expect(mockCancelScheduledNotificationAsync).toHaveBeenCalledWith('os-abc');
     expect(mockDeleteWhere).toHaveBeenCalledWith('reminderNotifications', expect.anything());
+    expect(mockRescheduleReminderFromDb).not.toHaveBeenCalled();
   });
 
   it('該当日の範囲判定(gte/lt)が実際にその1日分の開始・終了epochになっている(@reviewer Major指摘#8: 日境界の未検証を解消)', async () => {
@@ -187,10 +205,11 @@ describe('skipReminderOccurrence', () => {
     expect(mockDeleteWhere).not.toHaveBeenCalled();
   });
 
-  it('ネイティブ方式(毎週等)の場合、通知の予約有無に関わらずキャンセルせず、notificationSuppressed: falseを返す(PR10-6aの既知の制約。呼び出し元はこれを見てユーザーに一言伝える)', async () => {
+  it('ネイティブ方式(毎週等)の場合、rescheduleReminderFromDbに委譲して一時キュー化し、notificationSuppressed: trueを返す(PR10-6c: 個別キャンセルできない制約を解消)', async () => {
     mockReminderRows = [nativeReminder()];
-    mockNotificationRows = [{ id: 5, osNotificationId: 'os-abc', reminderId: 1, fireAt: 123 }];
-    await expect(skipReminderOccurrence(1, '2026-07-27')).resolves.toEqual({ notificationSuppressed: false });
+    await expect(skipReminderOccurrence(1, '2026-07-27')).resolves.toEqual({ notificationSuppressed: true });
+    expect(mockRescheduleReminderFromDb).toHaveBeenCalledWith(1);
+    // ネイティブ方式は該当日だけの単発キャンセル(dayBounds経由)はそもそも行わない
     expect(mockCancelScheduledNotificationAsync).not.toHaveBeenCalled();
   });
 
@@ -199,12 +218,19 @@ describe('skipReminderOccurrence', () => {
     await skipReminderOccurrence(1, '2026-07-27');
     expect(mockAddReminderScheduleSkip).toHaveBeenCalledWith(1, '2026-07-27');
     expect(mockCancelScheduledNotificationAsync).not.toHaveBeenCalled();
+    expect(mockRescheduleReminderFromDb).not.toHaveBeenCalled();
   });
 
-  it('通知キャンセル処理が例外を投げても、握りつぶしてrejectせずnotificationSuppressed: falseを返す', async () => {
+  it('通知キャンセル処理が例外を投げても、握りつぶしてrejectせずnotificationSuppressed: falseを返す(キュー方式)', async () => {
     mockReminderRows = [queueReminder()];
     mockNotificationRows = [{ id: 5, osNotificationId: 'os-abc', reminderId: 1, fireAt: 123 }];
     mockDeleteWhere.mockRejectedValueOnce(new Error('db error'));
+    await expect(skipReminderOccurrence(1, '2026-07-27')).resolves.toEqual({ notificationSuppressed: false });
+  });
+
+  it('rescheduleReminderFromDbが例外を投げても、握りつぶしてrejectせずnotificationSuppressed: falseを返す(ネイティブ方式)', async () => {
+    mockReminderRows = [nativeReminder()];
+    mockRescheduleReminderFromDb.mockRejectedValueOnce(new Error('reschedule failed'));
     await expect(skipReminderOccurrence(1, '2026-07-27')).resolves.toEqual({ notificationSuppressed: false });
   });
 
@@ -246,7 +272,7 @@ describe('unskipReminderOccurrence', () => {
     expect(mockRemoveReminderScheduleSkip).toHaveBeenCalledWith(1, futureDateKeyOffsetDays(7));
   });
 
-  it('キュー方式かつ未来日であれば、その1件を単発DATEトリガーで再登録する', async () => {
+  it('キュー方式かつ未来日であれば、その1件を単発DATEトリガーで再登録する(rescheduleReminderFromDbには委譲しない)', async () => {
     mockReminderRows = [queueReminder()];
     const dateKey = futureDateKeyOffsetDays(7);
     await unskipReminderOccurrence(1, dateKey);
@@ -263,9 +289,10 @@ describe('unskipReminderOccurrence', () => {
       'reminderNotifications',
       expect.objectContaining({ reminderId: 1, osNotificationId: 'os-id-1', triggerType: 'queue' }),
     );
+    expect(mockRescheduleReminderFromDb).not.toHaveBeenCalled();
   });
 
-  it('再登録前に、その日に残っている古いreminderNotifications行(先行するキャンセルが途中失敗して残った物等)を先に掃除してから作り直す(@reviewer Minor指摘#4: 通知の二重登録防止)', async () => {
+  it('再登録前に、その日に残っている古いreminderNotifications行(先行するキャンセルが途中失敗して残った物等)を先に掃除してから作り直す(@reviewer Minor指摘#4: 通知の二重登録防止、キュー方式)', async () => {
     mockReminderRows = [queueReminder()];
     mockNotificationRows = [{ id: 9, osNotificationId: 'os-stale', reminderId: 1, fireAt: 123 }];
     const dateKey = futureDateKeyOffsetDays(7);
@@ -278,33 +305,49 @@ describe('unskipReminderOccurrence', () => {
     expect(mockInsertValues).toHaveBeenCalledTimes(1);
   });
 
-  it('過去日であれば通知は再登録しない', async () => {
+  it('過去日であれば通知は再登録しない(キュー方式)', async () => {
     mockReminderRows = [queueReminder()];
     await unskipReminderOccurrence(1, '2020-01-01');
     expect(mockScheduleNotificationAsync).not.toHaveBeenCalled();
   });
 
-  it('ネイティブ方式の場合は通知を再登録しない(元々個別キャンセルしていないため)', async () => {
+  it('ネイティブ方式の場合はrescheduleReminderFromDbに委譲する(PR10-6c: 残っているスキップの有無でnative復帰/キュー継続のどちらが正しいかが変わるため、全消し→再判定に一本化)', async () => {
     mockReminderRows = [nativeReminder()];
     await unskipReminderOccurrence(1, futureDateKeyOffsetDays(7));
+    expect(mockRescheduleReminderFromDb).toHaveBeenCalledWith(1);
+    // ネイティブ方式は単発DATEトリガーでの直接復元はしない(rescheduleReminderFromDb側の責務)
     expect(mockScheduleNotificationAsync).not.toHaveBeenCalled();
   });
 
-  it('リマインダーが無効化されている場合は通知を再登録しない', async () => {
+  it('ネイティブ方式かつ過去日でも、rescheduleReminderFromDbへの委譲自体は行う(未来日判定はscheduler.ts側の責務のため、ここでは呼び出しの有無だけを見る)', async () => {
+    mockReminderRows = [nativeReminder()];
+    await unskipReminderOccurrence(1, '2020-01-01');
+    expect(mockRescheduleReminderFromDb).toHaveBeenCalledWith(1);
+  });
+
+  it('リマインダーが無効化されている場合は通知を再登録しない(キュー方式)', async () => {
     mockReminderRows = [queueReminder({ enabled: false })];
     await unskipReminderOccurrence(1, futureDateKeyOffsetDays(7));
     expect(mockScheduleNotificationAsync).not.toHaveBeenCalled();
+    expect(mockRescheduleReminderFromDb).not.toHaveBeenCalled();
   });
 
   it('リマインダーが見つからない場合は通知を再登録しない', async () => {
     mockReminderRows = [];
     await unskipReminderOccurrence(1, futureDateKeyOffsetDays(7));
     expect(mockScheduleNotificationAsync).not.toHaveBeenCalled();
+    expect(mockRescheduleReminderFromDb).not.toHaveBeenCalled();
   });
 
-  it('通知の再登録が失敗しても、握りつぶしてrejectしない', async () => {
+  it('通知の再登録が失敗しても、握りつぶしてrejectしない(キュー方式)', async () => {
     mockReminderRows = [queueReminder()];
     mockScheduleNotificationAsync.mockRejectedValueOnce(new Error('schedule failed'));
+    await expect(unskipReminderOccurrence(1, futureDateKeyOffsetDays(7))).resolves.toBeUndefined();
+  });
+
+  it('rescheduleReminderFromDbが失敗しても、握りつぶしてrejectしない(ネイティブ方式)', async () => {
+    mockReminderRows = [nativeReminder()];
+    mockRescheduleReminderFromDb.mockRejectedValueOnce(new Error('reschedule failed'));
     await expect(unskipReminderOccurrence(1, futureDateKeyOffsetDays(7))).resolves.toBeUndefined();
   });
 

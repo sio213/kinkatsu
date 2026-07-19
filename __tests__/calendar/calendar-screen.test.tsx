@@ -1011,7 +1011,7 @@ describe('CalendarScreen 予定（PR9-2: リマインダー由来の未来予定
       expect(mockSkipReminderOccurrence).toHaveBeenCalledWith(1, toDateKey(future));
     });
 
-    test('ネイティブ方式のリマインダーで通知を止められなかった場合(notificationSuppressed: false)、その旨のAlertを表示する（PR10-6a review fix）', async () => {
+    test('notificationSuppressed: falseの場合(通知APIの想定外エラー等)、その旨のAlertを表示する（PR10-6a review fix、PR10-6cでネイティブ方式も抑止可能になったため文言更新）', async () => {
       mockSkipReminderOccurrence.mockResolvedValueOnce({ notificationSuppressed: false });
       const root = render();
       const future = new Date();
@@ -1030,7 +1030,7 @@ describe('CalendarScreen 予定（PR9-2: リマインダー由来の未来予定
 
       expect(Alert.alert).toHaveBeenCalledWith(
         '予定をスキップしました',
-        'スキップ自体は完了しています。ただしこの予定は「毎日」「毎週」などの繰り返し方式のため、通知は届く場合があります。',
+        'スキップ自体は完了しています。ただし通知の停止処理に失敗した可能性があるため、念のため指定時刻に通知が届いていないかご確認ください。',
       );
     });
 
