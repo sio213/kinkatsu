@@ -22,6 +22,10 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 // spinner、Androidはボタン+モーダル、スタイルも同一に揃える）をそのまま踏襲する。デフォルト18:00も
 // reminder-form.tsxの新規リマインダーのデフォルトと揃え、アプリ内での「トレーニングの標準時刻」感を
 // 一貫させる
+function isPositiveInteger(n: number): boolean {
+  return Number.isInteger(n) && n > 0;
+}
+
 export default function ScheduleTimePickerScreen() {
   const {
     dateKey,
@@ -43,10 +47,9 @@ export default function ScheduleTimePickerScreen() {
   const routineId = Number(routineIdParam);
   // routineIdと同じ理由(不正な直リンク対策)で、replaceReminderIdもNumber.isInteger等で
   // 検証してから使う。素通しだとNaNのreminderIdでskipReminderOccurrence/DB書き込みを
-  // 試みることになる(@reviewer指摘)
+  // 試みることになる(@reviewer指摘)。isPositiveIntegerは下のroutineIdガードとも共有する
   const replaceReminderIdNum = replaceReminderId !== undefined ? Number(replaceReminderId) : undefined;
-  const isReplaceMode =
-    replaceReminderIdNum !== undefined && Number.isInteger(replaceReminderIdNum) && replaceReminderIdNum > 0;
+  const isReplaceMode = replaceReminderIdNum !== undefined && isPositiveInteger(replaceReminderIdNum);
   const router = useRouter();
   const isSubmittingRef = useRef(false);
 
@@ -54,8 +57,17 @@ export default function ScheduleTimePickerScreen() {
   const [showAndroidTimePicker, setShowAndroidTimePicker] = useState(false);
   // 差し替え時は元のリマインダーの時刻をデフォルトにする(差し替えたいのは基本的に「中身」であって
   // 「時間帯」ではないため、毎回18:00から手動で直す手間を無くす、@designer方針)
-  const [hour, setHour] = useState(() => (isReplaceMode && replaceHour ? Number(replaceHour) : 18));
-  const [minute, setMinute] = useState(() => (isReplaceMode && replaceMinute ? Number(replaceMinute) : 0));
+  // replaceHour/replaceMinuteもreplaceReminderIdと同じ直リンク対策が必要(@reviewer追加指摘)。
+  // 不正値(例:"abc")のまま素通しするとhour/minute stateがNaNになり、DateTimePickerに
+  // Invalid Dateが渡ってしまうため、範囲外ならデフォルトの18:00にフォールバックする
+  const [hour, setHour] = useState(() => {
+    const h = replaceHour !== undefined ? Number(replaceHour) : NaN;
+    return isReplaceMode && Number.isInteger(h) && h >= 0 && h <= 23 ? h : 18;
+  });
+  const [minute, setMinute] = useState(() => {
+    const m = replaceMinute !== undefined ? Number(replaceMinute) : NaN;
+    return isReplaceMode && Number.isInteger(m) && m >= 0 && m <= 59 ? m : 0;
+  });
   // isSubmittingRefは連打防止用の同期ガード、こちらはボタンの見た目のフィードバック用
   // (ensurePermission()がOSネイティブの許可ダイアログ応答待ちで数秒ブロックしうるため、
   // 押した直後に何も反応が無く見えるのを防ぐ、@designerレビュー指摘)
@@ -171,8 +183,8 @@ export default function ScheduleTimePickerScreen() {
   // paramsで渡すが、不正な直リンク等への防御として明示的にガードする（dateKeyが不正なまま
   // parseDateKeyに渡るとクラッシュするため）。routineIdはDBの自動採番id(1始まりの整数)なので、
   // Number.isFiniteだけでは通ってしまう""(0扱い)・"0"・負数・小数の文字列まで弾くため
-  // Number.isInteger + 正の数であることまで確認する
-  if (!Number.isInteger(routineId) || routineId <= 0 || !isValidDateKey(dateKey)) {
+  // Number.isInteger + 正の数であることまで確認する(isPositiveInteger、replaceReminderIdNumと共有)
+  if (!isPositiveInteger(routineId) || !isValidDateKey(dateKey)) {
     return (
       <SafeAreaView style={styles.safeArea} edges={['bottom']}>
         <Stack.Screen options={{ title: '時刻を選択' }} />
