@@ -27,11 +27,19 @@ type Props = {
   // （「削除」1項目、components/routines/routine-card-menu.tsxと同じDropdownMenuの使い方）を表示する。
   // リマインダー予定（削除不可）には渡さないため⋮自体が出ない
   onDelete?: () => void;
+  // リマインダー予定（削除不可、PR10-6a）のときだけ呼び出し側が渡す。渡された場合のみ⋮メニュー
+  // （「今回だけスキップ」1項目）を表示する。取り消せる操作（選択日パネルの「元に戻す」で戻せる）
+  // のためdanger扱いにはしない（@designer方針、「削除」との危険度の違いを色で表す）
+  onSkip?: () => void;
 };
 
 // routine-card-menu.tsx/exercise-card-menu.tsxと同じ「const items配列を作ってgroupsに渡す」書き方に揃える
 function deleteMenuItems(onDelete: () => void): DropdownMenuItem[] {
   return [{ key: 'delete', label: '削除', icon: 'delete-outline', danger: true, onPress: onDelete }];
+}
+
+function skipMenuItems(onSkip: () => void): DropdownMenuItem[] {
+  return [{ key: 'skip', label: '今回だけスキップ', icon: 'event-busy', onPress: onSkip }];
 }
 
 // 選択日パネルの予定カード（デザイン案「未来01/未来03/今日01」）。ルーティン紐付き
@@ -53,7 +61,11 @@ export const RoutineScheduleCard = memo(function RoutineScheduleCard({
   onPressStart,
   oneTime = false,
   onDelete,
+  onSkip,
 }: Props) {
+  // onDelete(手動予定)・onSkip(リマインダー予定)は排他的に渡される想定(出所で分岐する呼び出し側の
+  // 責務)。どちらもメニュー内容が違うだけで見た目・トリガーの構造は共通のためここでまとめる
+  const menuGroups = onDelete ? [deleteMenuItems(onDelete)] : onSkip ? [skipMenuItems(onSkip)] : null;
   // routine-card.tsxの一覧カードと同じ情報構成（名前・カテゴリ・種目数・スケジュール）で
   // 読み上げ単位をまとめる。カレンダー/一覧のどちらでルーティンを見てもVoiceOver体験が
   // 揃うようにする（@designer指摘）
@@ -73,12 +85,12 @@ export const RoutineScheduleCard = memo(function RoutineScheduleCard({
         <Text style={styles.name} numberOfLines={1}>
           {routineName}
         </Text>
-        {onDelete && (
+        {menuGroups && (
           <View style={styles.menuSlot}>
             <DropdownMenu
-              groups={[deleteMenuItems(onDelete)]}
+              groups={menuGroups}
               // routine-card-menu.tsx/exercise-card-menu.tsxは項目5つのため160、
-              // こちらは「削除」1項目のみのため少し狭い140で十分
+              // こちらは「削除」/「今回だけスキップ」1項目のみのため少し狭い140で十分
               minWidth={140}
               renderTrigger={({ open, onPress: onOpenMenu }) => (
                 <TouchableOpacity

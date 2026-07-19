@@ -1,3 +1,5 @@
+import { timeOfDayOffsetMs } from '@/lib/calendar/time-of-day';
+
 // 選択日パネルで同日複数セッションを時間帯ごとに分けて表示するための純粋関数。
 // セッション単位（sessionId）でグルーピングし、開始時刻の早い順に並べる
 // （デザイン案「複数03: 複数予定（3件・時刻順）」と同じ「時刻順」の原則）
@@ -48,7 +50,7 @@ export function buildTodayTimeline<TSession, TSchedule extends { key: string; ho
   const scheduleEntries: TodayTimelineEntry<TSession, TSchedule>[] = scheduleCards.map((card) => ({
     kind: 'schedule',
     key: card.key,
-    sortAt: dayStart + card.hour * 3_600_000 + card.minute * 60_000,
+    sortAt: dayStart + timeOfDayOffsetMs(card.hour, card.minute),
     card,
   }));
   return [...sessionEntries, ...scheduleEntries].sort((a, b) => a.sortAt - b.sortAt);

@@ -1,7 +1,12 @@
 import { db } from '@/db/client';
-import { reminders, scheduledWorkouts } from '@/db/schema';
+import { reminderScheduleSkips, reminders, scheduledWorkouts } from '@/db/schema';
 import { useRoutineExerciseSummaries } from '@/hooks/use-routines';
-import { aggregateSchedulePrimaryCategoryByDay, type ScheduleFireRow } from '@/lib/calendar/schedule';
+import {
+  aggregateSchedulePrimaryCategoryByDay,
+  buildReminderSkipKey,
+  buildReminderSkipSet,
+  type ScheduleFireRow,
+} from '@/lib/calendar/schedule';
 import { aggregateDailyCategorySet } from '@/lib/calendar/day-category';
 import { toDateKey } from '@/lib/calendar/date-grid';
 import { getFireDatesInRange, parseReminder } from '@/lib/notifications/scheduler';
@@ -36,10 +41,12 @@ export function useCalendarMonthSchedule(rangeStart: number, rangeEnd: number, t
   // useLiveQueryの再購読はdeps([]固定)でしか効かず、月送りでrangeStart/rangeEndが変わっても
   // 再購読されないため、範囲での絞り込みは下のuseMemo側で行う)
   const { data: manualRows } = useLiveQuery(db.select().from(scheduledWorkouts));
+  const { data: skipRows } = useLiveQuery(db.select().from(reminderScheduleSkips));
 
   return useMemo(() => {
     const rows = reminderRows ?? [];
     const manuals = manualRows ?? [];
+    const skips = skipRows ?? [];
     if (rows.length === 0 && manuals.length === 0) {
       return { primaryCategoryByScheduleDay: new Map(), categorySetByScheduleDay: new Map() };
     }
@@ -51,6 +58,7 @@ export function useCalendarMonthSchedule(rangeStart: number, rangeEnd: number, t
     // 文字列のdateKeyで表した境界と比較する（'YYYY-MM-DD'はゼロ埋め済みなので文字列比較で日付順と一致する）
     const effectiveStartKey = toDateKey(effectiveStartDate);
     const rangeEndKey = toDateKey(rangeEndDate);
+    const skipSet = buildReminderSkipSet(skips);
 
     const fireRows: ScheduleFireRow[] = [];
     for (const r of rows) {
@@ -65,7 +73,10 @@ export function useCalendarMonthSchedule(rangeStart: number, rangeEnd: number, t
         continue;
       }
       for (const fireDate of fireDates) {
-        fireRows.push({ dateKey: toDateKey(fireDate), hour: fireDate.getHours(), minute: fireDate.getMinutes(), category });
+        const dateKey = toDateKey(fireDate);
+        // 「今回だけスキップ」(PR10-6a)された日は月グリッドのリング/ドットにも反映させない
+        if (skipSet.has(buildReminderSkipKey(r.id, dateKey))) continue;
+        fireRows.push({ dateKey, hour: fireDate.getHours(), minute: fireDate.getMinutes(), category });
       }
     }
     for (const m of manuals) {
@@ -83,5 +94,5 @@ export function useCalendarMonthSchedule(rangeStart: number, rangeEnd: number, t
       primaryCategoryByScheduleDay: aggregateSchedulePrimaryCategoryByDay(fireRows),
       categorySetByScheduleDay: aggregateDailyCategorySet(fireRows),
     };
-  }, [reminderRows, manualRows, summaries, rangeStart, rangeEnd, todayStart]);
+  }, [reminderRows, manualRows, skipRows, summaries, rangeStart, rangeEnd, todayStart]);
 }
