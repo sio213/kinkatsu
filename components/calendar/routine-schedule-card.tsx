@@ -1,5 +1,6 @@
 import { CategoryChip } from '@/components/exercises/category-chip';
 import { DesignIcon } from '@/components/ui/design-icon';
+import { DropdownMenu, type DropdownMenuItem } from '@/components/ui/dropdown-menu';
 import { IconSymbol } from '@/components/ui/icon-symbol';
 import { PrimaryButton } from '@/components/ui/primary-button';
 import { Colors, Typography } from '@/constants/theme';
@@ -22,11 +23,20 @@ type Props = {
   // （例:「毎週月曜 07:00」）ではなく素の時刻のみになり、見た目だけでは繰り返し予定と
   // 区別しづらいため、視覚(バッジ)・読み上げ(accessibilityLabel)の両方で明示する（@designer指摘）
   oneTime?: boolean;
+  // 手動予定（PR10-3、削除可）のときだけ呼び出し側が渡す。渡された場合のみ⋮メニュー
+  // （「削除」1項目、components/routines/routine-card-menu.tsxと同じDropdownMenuの使い方）を表示する。
+  // リマインダー予定（削除不可）には渡さないため⋮自体が出ない
+  onDelete?: () => void;
 };
 
+// routine-card-menu.tsx/exercise-card-menu.tsxと同じ「const items配列を作ってgroupsに渡す」書き方に揃える
+function deleteMenuItems(onDelete: () => void): DropdownMenuItem[] {
+  return [{ key: 'delete', label: '削除', icon: 'delete-outline', danger: true, onPress: onDelete }];
+}
+
 // 選択日パネルの予定カード（デザイン案「未来01/未来03/今日01」）。ルーティン紐付き
-// リマインダーから算出した「予定」を表す読み取り専用カードで、実績を表す
-// CalendarExerciseCardとは別コンポーネント（種目単位のセット概要・自己ベスト・前回比較を
+// リマインダーから算出した「予定」、または手動追加した予定（PR10-3、削除操作を持つ）を表す。
+// 実績を表すCalendarExerciseCardとは別コンポーネント（種目単位のセット概要・自己ベスト・前回比較を
 // 前提にしたCalendarExerciseCardをそのまま流用すると、予定には無いデータの空欄が不自然に
 // 出てしまうため）。タップでルーティン編集画面へ遷移する（このアプリにはルーティンの中身を
 // 見るだけの読み取り専用画面が無く、一覧・リマインダーのルーティンバッジタップも同じ
@@ -39,6 +49,7 @@ export const RoutineScheduleCard = memo(function RoutineScheduleCard({
   onPress,
   onPressStart,
   oneTime = false,
+  onDelete,
 }: Props) {
   // routine-card.tsxの一覧カードと同じ情報構成（名前・カテゴリ・種目数・スケジュール）で
   // 読み上げ単位をまとめる。カレンダー/一覧のどちらでルーティンを見てもVoiceOver体験が
@@ -70,7 +81,28 @@ export const RoutineScheduleCard = memo(function RoutineScheduleCard({
           {oneTime && <Text style={styles.oneTimeText}>1回のみ</Text>}
         </View>
       </View>
-      <IconSymbol name="chevron.right" size={22} color={Colors.textPlaceholder} />
+      <View style={styles.trailingActions}>
+        {onDelete && (
+          <DropdownMenu
+            groups={[deleteMenuItems(onDelete)]}
+            // routine-card-menu.tsx/exercise-card-menu.tsxは項目5つのため160、
+            // こちらは「削除」1項目のみのため少し狭い140で十分
+            minWidth={140}
+            renderTrigger={({ open, onPress: onOpenMenu }) => (
+              <TouchableOpacity
+                onPress={onOpenMenu}
+                hitSlop={{ top: 14, bottom: 14, left: 14, right: 14 }}
+                accessibilityRole="button"
+                accessibilityLabel={`「${routineName}」のメニューを開く`}
+                accessibilityState={{ expanded: open }}
+              >
+                <IconSymbol name="ellipsis" size={20} color={open ? Colors.accent : Colors.textPlaceholder} />
+              </TouchableOpacity>
+            )}
+          />
+        )}
+        <IconSymbol name="chevron.right" size={22} color={Colors.textPlaceholder} />
+      </View>
     </>
   );
 
@@ -132,6 +164,10 @@ const styles = StyleSheet.create({
   },
   row: { flexDirection: 'row', alignItems: 'center', gap: 8 },
   info: { flex: 1, minWidth: 0, gap: 10 },
+  // ⋮トリガーのhitSlop(14pt)がchevronの領域まで食い込み、chevron寄りをタップしたつもりで
+  // ⋮メニューが開いてしまう誤操作を防ぐため、⋮とchevronの間だけgapを14以上に広げる
+  // （components/routines/routine-template-exercise-card.tsxで同種の問題に既に使われている対策と同じ）
+  trailingActions: { flexDirection: 'row', alignItems: 'center', gap: 14 },
   name: { ...Typography.bodyStrong, color: Colors.textPrimary },
   chipsRow: { flexDirection: 'row', alignItems: 'center', gap: 7, flexWrap: 'wrap' },
   overflow: { ...Typography.caption, fontWeight: '700', color: Colors.textPlaceholder },

@@ -21,12 +21,13 @@ import { addMonths, isSameDay, toDateKey } from '@/lib/calendar/date-grid';
 import { CATEGORY_ALL, EXERCISE_CATEGORIES } from '@/lib/exercises/constants';
 import { buildTodayTimeline, groupCardsBySession } from '@/lib/calendar/session-groups';
 import { mergeScheduleCards } from '@/lib/calendar/schedule';
+import { deleteScheduledWorkout } from '@/lib/calendar/scheduled-workouts';
 import { formatHourMinute, formatHourMinuteParts } from '@/lib/calendar/time-of-day';
 import { formatKindSummary } from '@/lib/notifications/format';
 import { formatMonthGroup, formatSessionDateGroup } from '@/lib/workout/summary';
 import { Stack } from 'expo-router';
 import { useCallback, useMemo, useState } from 'react';
-import { ActivityIndicator, ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
+import { ActivityIndicator, Alert, ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 // カレンダーのカテゴリフィルターは「全て」+全カテゴリのみ（★お気に入りは種目単位の概念で
@@ -207,6 +208,28 @@ export default function CalendarScreen() {
     () => pushDebounced({ pathname: '/calendar/schedule-routine-picker', params: { dateKey: toDateKey(selectedDate) } }),
     [pushDebounced, selectedDate],
   );
+  // 手動予定カードの⋮メニュー「削除」用（PR10-3）。app/routine/index.tsxのhandleDeleteや
+  // session-exercise-card.tsxのhandleDeleteExerciseと同じAlert確認→try/catch+Alert.alertパターン。
+  // 削除後はuseCalendarDayManualSchedule/useCalendarMonthScheduleがuseLiveQueryで自動再購読する
+  // ため、追加の状態更新は不要（LayoutAnimationは非同期のDB書き込み・再購読を挟むと配置タイミングが
+  // ずれ効かないため、他の非同期削除処理と同じくここでは使わない）
+  const handleDeleteSchedule = useCallback((scheduledWorkoutId: number, routineName: string) => {
+    Alert.alert('この予定を削除しますか？', `「${routineName}」の予定を削除します。ルーティン自体や記録には影響しません。`, [
+      { text: 'キャンセル', style: 'cancel' },
+      {
+        text: '削除',
+        style: 'destructive',
+        onPress: async () => {
+          try {
+            await deleteScheduledWorkout(scheduledWorkoutId);
+          } catch (e) {
+            console.error('[delete scheduled workout]', e);
+            Alert.alert('エラー', '予定を削除できませんでした。');
+          }
+        },
+      },
+    ]);
+  }, []);
 
   const { activeSession } = useWorkoutSessions();
   // 今日の空状態は進行中セッション(endedAtがnull)のendedAtがnullなためuseCalendarDayExercises
@@ -337,6 +360,12 @@ export default function CalendarScreen() {
                     timeLabel={card.source === 'reminder' ? formatKindSummary(card.reminder) : formatHourMinuteParts(card.hour, card.minute)}
                     onPress={() => handlePressRoutine(card.routineId)}
                     oneTime={card.source === 'manual'}
+                    // リマインダー予定は削除不可のためonDeleteを渡さない（⋮メニュー自体が出ない）
+                    onDelete={
+                      card.source === 'manual'
+                        ? () => handleDeleteSchedule(card.scheduledWorkoutId, card.routineName)
+                        : undefined
+                    }
                   />
                 ))}
                 <AddScheduleGhostButton onPress={handlePressAddSchedule} />

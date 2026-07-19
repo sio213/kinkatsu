@@ -1,9 +1,10 @@
-import { act, create } from 'react-test-renderer';
+import { act, create, type ReactTestInstance } from 'react-test-renderer';
 import { Text, TouchableOpacity } from 'react-native';
 import { RoutineScheduleCard } from '@/components/calendar/routine-schedule-card';
 
 const onPress = jest.fn();
 const onPressStart = jest.fn();
+const onDelete = jest.fn();
 
 function render(props: Partial<Parameters<typeof RoutineScheduleCard>[0]> = {}) {
   const merged = {
@@ -21,9 +22,14 @@ function render(props: Partial<Parameters<typeof RoutineScheduleCard>[0]> = {}) 
   return root;
 }
 
+function findByAccessibilityLabel(root: ReactTestInstance, label: string) {
+  return root.findAllByType(TouchableOpacity).find((t) => t.props.accessibilityLabel === label);
+}
+
 beforeEach(() => {
   onPress.mockClear();
   onPressStart.mockClear();
+  onDelete.mockClear();
 });
 
 describe('RoutineScheduleCard', () => {
@@ -97,5 +103,51 @@ describe('RoutineScheduleCard', () => {
     const root = render();
     const texts = root.root.findAllByType(Text).map((t) => t.props.children);
     expect(texts).not.toContain('1回のみ');
+  });
+
+  describe('⋮メニュー(onDelete、PR10-3)', () => {
+    it('onDeleteを渡さない場合（リマインダー予定）、⋮メニューは表示されない', () => {
+      const root = render();
+      expect(findByAccessibilityLabel(root.root, '「胸の日」のメニューを開く')).toBeUndefined();
+    });
+
+    it('onDeleteを渡した場合（手動予定）、⋮メニューが表示される（accessibilityLabelにルーティン名を含み、複数カードが並んでも区別できる）', () => {
+      const root = render({ onDelete });
+      expect(findByAccessibilityLabel(root.root, '「胸の日」のメニューを開く')).toBeDefined();
+    });
+
+    it('⋮メニューを開いて「削除」を押すとonDeleteが呼ばれ、カード本体のonPressは呼ばれない', () => {
+      const root = render({ onDelete });
+      const menuTrigger = findByAccessibilityLabel(root.root, '「胸の日」のメニューを開く')!;
+      act(() => {
+        menuTrigger.props.onPress();
+      });
+
+      const deleteItem = findByAccessibilityLabel(root.root, '削除')!;
+      act(() => {
+        deleteItem.props.onPress();
+      });
+
+      expect(onDelete).toHaveBeenCalledTimes(1);
+      expect(onPress).not.toHaveBeenCalled();
+    });
+
+    it('「削除」を押した後、メニュー自体が閉じる', () => {
+      const root = render({ onDelete });
+      act(() => {
+        findByAccessibilityLabel(root.root, '「胸の日」のメニューを開く')!.props.onPress();
+      });
+      expect(findByAccessibilityLabel(root.root, '削除')).toBeDefined();
+
+      act(() => {
+        findByAccessibilityLabel(root.root, '削除')!.props.onPress();
+      });
+      expect(findByAccessibilityLabel(root.root, '削除')).toBeUndefined();
+    });
+
+    it('onPressStartがある場合（今日自身の予定）でもonDeleteを渡せば⋮メニューが表示される', () => {
+      const root = render({ onPressStart, onDelete });
+      expect(findByAccessibilityLabel(root.root, '「胸の日」のメニューを開く')).toBeDefined();
+    });
   });
 });

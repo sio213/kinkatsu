@@ -44,6 +44,11 @@ jest.mock('@/lib/workout/session', () => ({
   startWorkoutFromRoutine: (...args: unknown[]) => mockStartWorkoutFromRoutine(...args),
 }));
 
+const mockDeleteScheduledWorkout = jest.fn();
+jest.mock('@/lib/calendar/scheduled-workouts', () => ({
+  deleteScheduledWorkout: (...args: unknown[]) => mockDeleteScheduledWorkout(...args),
+}));
+
 // 日付選択UI自体（スワイプ・グリッド）はmonth-grid.test.tsx等の責務のため、
 // このテストでは「今日・記録なし」パネルの配線だけを見たいので軽量スタブに差し替える。
 // mockSwipeableMonthViewでpropsを記録し、activeFilter等が正しく中継されることも検証できるようにする
@@ -542,6 +547,197 @@ describe('CalendarScreen 予定（PR9-2: リマインダー由来の未来予定
       expect(mockPush).toHaveBeenCalledWith({
         pathname: '/calendar/schedule-routine-picker',
         params: { dateKey: expectedDateKey },
+      });
+    });
+
+    describe('⋮メニューからの削除(PR10-3)', () => {
+      function selectFutureDayWithManualCard() {
+        const root = render();
+        const future = new Date();
+        future.setDate(future.getDate() + 5);
+        mockUseCalendarDayManualSchedule.mockReturnValue([manualCard()]);
+        selectDate(future);
+        return root;
+      }
+
+      function findMenuTrigger(root: ReactTestInstance, routineName: string) {
+        return root.findAllByType(TouchableOpacity).find((t) => t.props.accessibilityLabel === `「${routineName}」のメニューを開く`);
+      }
+
+      function findAllMenuTriggers(root: ReactTestInstance) {
+        return root
+          .findAllByType(TouchableOpacity)
+          .filter((t) => typeof t.props.accessibilityLabel === 'string' && t.props.accessibilityLabel.endsWith('」のメニューを開く'));
+      }
+
+      test('手動予定カードには⋮メニューがあり、リマインダー予定カードには無い', () => {
+        const root = render();
+        const future = new Date();
+        future.setDate(future.getDate() + 5);
+        mockUseCalendarDaySchedule.mockReturnValue([scheduleCard({ routineId: 10, routineName: '胸の日' })]);
+        mockUseCalendarDayManualSchedule.mockReturnValue([manualCard({ routineId: 20, routineName: '脚の日' })]);
+        selectDate(future);
+
+        expect(findAllMenuTriggers(root).length).toBe(1);
+        expect(findMenuTrigger(root, '脚の日')).toBeDefined();
+        expect(findMenuTrigger(root, '胸の日')).toBeUndefined();
+      });
+
+      test('⋮→削除で確認Alertを出し、確認するとdeleteScheduledWorkoutにscheduledWorkoutIdを渡す', async () => {
+        const root = selectFutureDayWithManualCard();
+        act(() => {
+          findMenuTrigger(root, '脚の日')!.props.onPress();
+        });
+        const deleteItem = root.findAllByType(TouchableOpacity).find((t) => t.props.accessibilityLabel === '削除')!;
+        act(() => {
+          deleteItem.props.onPress();
+        });
+
+        expect(Alert.alert).toHaveBeenCalledWith(
+          'この予定を削除しますか？',
+          '「脚の日」の予定を削除します。ルーティン自体や記録には影響しません。',
+          expect.any(Array),
+        );
+        expect(mockDeleteScheduledWorkout).not.toHaveBeenCalled();
+
+        const alertCall = (Alert.alert as jest.Mock).mock.calls[0];
+        const confirmAction = alertCall[2].find((b: { text?: string }) => b.text === '削除');
+        await act(async () => {
+          await confirmAction.onPress();
+        });
+        expect(mockDeleteScheduledWorkout).toHaveBeenCalledWith(1);
+      });
+
+      test('確認Alertで「キャンセル」相当（confirmを呼ばない）場合はdeleteScheduledWorkoutが呼ばれない', () => {
+        const root = selectFutureDayWithManualCard();
+        act(() => {
+          findMenuTrigger(root, '脚の日')!.props.onPress();
+        });
+        const deleteItem = root.findAllByType(TouchableOpacity).find((t) => t.props.accessibilityLabel === '削除')!;
+        act(() => {
+          deleteItem.props.onPress();
+        });
+
+        expect(mockDeleteScheduledWorkout).not.toHaveBeenCalled();
+      });
+
+      test('削除に失敗した場合はエラーAlertを表示し、mockDeleteScheduledWorkoutの呼び出し以外は何も壊れない', async () => {
+        mockDeleteScheduledWorkout.mockRejectedValueOnce(new Error('fail'));
+        jest.spyOn(console, 'error').mockImplementation(() => {});
+        const root = selectFutureDayWithManualCard();
+        act(() => {
+          findMenuTrigger(root, '脚の日')!.props.onPress();
+        });
+        const deleteItem = root.findAllByType(TouchableOpacity).find((t) => t.props.accessibilityLabel === '削除')!;
+        act(() => {
+          deleteItem.props.onPress();
+        });
+        const alertCall = (Alert.alert as jest.Mock).mock.calls[0];
+        const confirmAction = alertCall[2].find((b: { text?: string }) => b.text === '削除');
+        await act(async () => {
+          await confirmAction.onPress();
+        });
+
+        expect(Alert.alert).toHaveBeenCalledWith('エラー', '予定を削除できませんでした。');
+        // 削除失敗後もカード自体はクラッシュせず残っている
+        expect(root.findByProps({ children: '脚の日' })).toBeDefined();
+      });
+
+      test('deleteScheduledWorkoutが例外を投げずresolveした場合（対象行が既に無い場合等のサイレント成功仕様）、エラーAlertは出ない', async () => {
+        const root = selectFutureDayWithManualCard();
+        act(() => {
+          findMenuTrigger(root, '脚の日')!.props.onPress();
+        });
+        const deleteItem = root.findAllByType(TouchableOpacity).find((t) => t.props.accessibilityLabel === '削除')!;
+        act(() => {
+          deleteItem.props.onPress();
+        });
+        const alertCall = (Alert.alert as jest.Mock).mock.calls[0];
+        const confirmAction = alertCall[2].find((b: { text?: string }) => b.text === '削除');
+        await act(async () => {
+          await confirmAction.onPress();
+        });
+
+        expect(Alert.alert).not.toHaveBeenCalledWith('エラー', expect.anything());
+      });
+
+      describe('複数の手動予定・リマインダー予定が混在する場合', () => {
+        function secondManualCard() {
+          return manualCard({ scheduledWorkoutId: 2, routineId: 21, routineName: '背中の日', hour: 20, minute: 0 });
+        }
+
+        test('2件目の手動予定の⋮→削除では、2件目のscheduledWorkoutIdとルーティン名が渡る', async () => {
+          const root = render();
+          const future = new Date();
+          future.setDate(future.getDate() + 5);
+          mockUseCalendarDayManualSchedule.mockReturnValue([manualCard(), secondManualCard()]);
+          selectDate(future);
+
+          expect(findAllMenuTriggers(root).length).toBe(2);
+          act(() => {
+            findMenuTrigger(root, '背中の日')!.props.onPress();
+          });
+          const deleteItem = root.findAllByType(TouchableOpacity).find((t) => t.props.accessibilityLabel === '削除')!;
+          act(() => {
+            deleteItem.props.onPress();
+          });
+
+          expect(Alert.alert).toHaveBeenCalledWith(
+            'この予定を削除しますか？',
+            '「背中の日」の予定を削除します。ルーティン自体や記録には影響しません。',
+            expect.any(Array),
+          );
+          const alertCall = (Alert.alert as jest.Mock).mock.calls[0];
+          const confirmAction = alertCall[2].find((b: { text?: string }) => b.text === '削除');
+          await act(async () => {
+            await confirmAction.onPress();
+          });
+          expect(mockDeleteScheduledWorkout).toHaveBeenCalledWith(2);
+          expect(mockDeleteScheduledWorkout).not.toHaveBeenCalledWith(1);
+        });
+
+        test('リマインダー予定・手動予定が2件ずつ混在しても、⋮は手動予定の件数分だけ表示される', () => {
+          const root = render();
+          const future = new Date();
+          future.setDate(future.getDate() + 5);
+          mockUseCalendarDaySchedule.mockReturnValue([
+            scheduleCard({ reminderId: 1, routineId: 10, routineName: '胸の日' }),
+            scheduleCard({ reminderId: 2, routineId: 11, routineName: '肩の日' }),
+          ]);
+          mockUseCalendarDayManualSchedule.mockReturnValue([manualCard(), secondManualCard()]);
+          selectDate(future);
+
+          expect(findAllMenuTriggers(root).length).toBe(2);
+        });
+
+        test('1件削除すると、削除対象だけが消え他方は残る（useLiveQueryの再購読をモック更新+再選択で模擬）', () => {
+          const root = render();
+          const future = new Date();
+          future.setDate(future.getDate() + 5);
+          mockUseCalendarDayManualSchedule.mockReturnValue([manualCard(), secondManualCard()]);
+          selectDate(future);
+          expect(root.findByProps({ children: '脚の日' })).toBeDefined();
+          expect(root.findByProps({ children: '背中の日' })).toBeDefined();
+
+          // 「脚の日」(id=1)だけ削除された後の状態をモックに反映。selectedDateは同じ日でも
+          // 新しいDateインスタンスで渡さないと、setStateが同一参照とみなして再レンダーされない
+          mockUseCalendarDayManualSchedule.mockReturnValue([secondManualCard()]);
+          selectDate(new Date(future));
+
+          // findAllByProps({children:'脚の日'})はTextの内部ホスト要素まで二重にマッチするため、
+          // ⋮トリガーのaccessibilityLabel(ルーティン名を含む)で存在確認する
+          expect(findMenuTrigger(root, '脚の日')).toBeUndefined();
+          expect(findMenuTrigger(root, '背中の日')).toBeDefined();
+        });
+      });
+
+      test('今日自身の手動予定には⋮メニューが出ない（今日タイムラインへの統合は後続PR、意図的なスコープ外の回帰ガード）', () => {
+        const root = render();
+        mockUseCalendarDayManualSchedule.mockReturnValue([manualCard({ routineName: '今日だけの脚の日' })]);
+        // selectDateしない=今日が選択されたまま
+
+        expect(root.findAllByProps({ children: '今日だけの脚の日' }).length).toBe(0);
+        expect(findAllMenuTriggers(root).length).toBe(0);
       });
     });
   });
