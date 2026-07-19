@@ -24,5 +24,12 @@ export function getTimeOfDayLabel(period: TimeOfDay): string {
 }
 
 export function formatHourMinute(date: Date): string {
-  return `${String(date.getHours()).padStart(2, '0')}:${String(date.getMinutes()).padStart(2, '0')}`;
+  return formatHourMinuteParts(date.getHours(), date.getMinutes());
+}
+
+// DBのhour/minute(0-23, 0-59の数値列)をそのまま整形したいだけの箇所（Dateオブジェクトを
+// 経由する意味が無い）向け。「HH:MM」フォーマットの実体はここに1本化し、呼び出し側で
+// ダミーのDateを組み立てさせない
+export function formatHourMinuteParts(hour: number, minute: number): string {
+  return `${String(hour).padStart(2, '0')}:${String(minute).padStart(2, '0')}`;
 }

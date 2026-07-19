@@ -29,3 +29,59 @@ export function aggregateSchedulePrimaryCategoryByDay(rows: ScheduleFireRow[]): 
   }
   return byDay;
 }
+
+export type UnifiedScheduleCardInput = {
+  routineId: number;
+  routineName: string;
+  categories: string[];
+  exerciseCount: number;
+  hour: number;
+  minute: number;
+};
+
+export type UnifiedScheduleCard<TReminder> =
+  | (UnifiedScheduleCardInput & { key: string; source: 'reminder'; reminder: TReminder })
+  | (UnifiedScheduleCardInput & { key: string; source: 'manual'; scheduledWorkoutId: number });
+
+// 選択日パネル用。リマインダー由来の予定（非永続・削除不可）と手動予定（DB永続・削除可、PR10）を
+// 1つの時刻順リストにまとめる。同じルーティンが同日に両方あると同一予定が二重に見えて紛らわしい
+// ため、routineId単位で手動予定を優先し、対応するリマインダー予定は畳む
+// （2026-07-19確定: 「胸→背中に差し替え」のような別ルーティンへの打ち消しではなく、あくまで
+// 同一ルーティンの重複表示を防ぐdedupeに留める。リマインダー予定自体を打ち消す機能は別スコープ）
+// リマインダー側だけジェネリクス（TReminder）にしているのは、reminder-form.tsxのformatKindSummary
+// に生のReminder行を渡す必要があり中身を保持したいため。手動予定側は呼び出し元がscheduledWorkoutId
+// 以外の生データを必要としない（drizzle-orm/hooksの型をlib層に持ち込まないためTManualは持たない）
+export function mergeScheduleCards<
+  TReminderCard extends UnifiedScheduleCardInput & { reminderId: number; reminder: unknown },
+  TManualCard extends UnifiedScheduleCardInput & { scheduledWorkoutId: number },
+>(
+  reminderCards: TReminderCard[],
+  manualCards: TManualCard[],
+): UnifiedScheduleCard<TReminderCard['reminder']>[] {
+  const manualRoutineIds = new Set(manualCards.map((c) => c.routineId));
+  const reminderEntries: UnifiedScheduleCard<TReminderCard['reminder']>[] = reminderCards
+    .filter((c) => !manualRoutineIds.has(c.routineId))
+    .map((c) => ({
+      key: `reminder-${c.reminderId}`,
+      routineId: c.routineId,
+      routineName: c.routineName,
+      categories: c.categories,
+      exerciseCount: c.exerciseCount,
+      hour: c.hour,
+      minute: c.minute,
+      source: 'reminder',
+      reminder: c.reminder,
+    }));
+  const manualEntries: UnifiedScheduleCard<TReminderCard['reminder']>[] = manualCards.map((c) => ({
+    key: `manual-${c.scheduledWorkoutId}`,
+    routineId: c.routineId,
+    routineName: c.routineName,
+    categories: c.categories,
+    exerciseCount: c.exerciseCount,
+    hour: c.hour,
+    minute: c.minute,
+    source: 'manual',
+    scheduledWorkoutId: c.scheduledWorkoutId,
+  }));
+  return [...reminderEntries, ...manualEntries].sort((a, b) => a.hour - b.hour || a.minute - b.minute);
+}

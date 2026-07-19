@@ -40,6 +40,13 @@ export function toDateKey(date: Date): string {
   return `${y}-${m}-${d}`;
 }
 
+// toDateKeyの逆変換。ローカルのカレンダー日付として組み立てる（new Date(dateKey)のようなISO
+// パース経由だとUTC解釈されタイムゾーンによって日付がずれるため使わない）
+export function parseDateKey(dateKey: string): Date {
+  const [y, m, d] = dateKey.split('-').map(Number);
+  return new Date(y, m - 1, d);
+}
+
 // ヘッダーの「YYYY年M月」表示・前月/翌月ナビゲーション用に、月単位でズラしたDateを返す
 export function addMonths(year: number, month: number, delta: number): { year: number; month: number } {
   // Dateコンストラクタはmonthが0-11の範囲外でも年をまたいで正規化してくれるため、

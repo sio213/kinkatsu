@@ -18,6 +18,10 @@ type Props = {
   onPress: () => void;
   // 今日自身の予定カードにのみ渡す（デザイン案「未来日は開始ボタンなし・＞のみ」）
   onPressStart?: () => void;
+  // 手動で追加した単発予定（PR10）を表す場合true。timeLabelがリマインダーの頻度表示
+  // （例:「毎週月曜 07:00」）ではなく素の時刻のみになり、見た目だけでは繰り返し予定と
+  // 区別しづらいため、視覚(バッジ)・読み上げ(accessibilityLabel)の両方で明示する（@designer指摘）
+  oneTime?: boolean;
 };
 
 // 選択日パネルの予定カード（デザイン案「未来01/未来03/今日01」）。ルーティン紐付き
@@ -34,11 +38,18 @@ export const RoutineScheduleCard = memo(function RoutineScheduleCard({
   timeLabel,
   onPress,
   onPressStart,
+  oneTime = false,
 }: Props) {
   // routine-card.tsxの一覧カードと同じ情報構成（名前・カテゴリ・種目数・スケジュール）で
   // 読み上げ単位をまとめる。カレンダー/一覧のどちらでルーティンを見てもVoiceOver体験が
   // 揃うようにする（@designer指摘）
-  const label = [routineName, categories.length > 0 ? categories.map(getCategoryLabel).join('・') : null, `${exerciseCount}種目`, timeLabel]
+  const label = [
+    routineName,
+    categories.length > 0 ? categories.map(getCategoryLabel).join('・') : null,
+    `${exerciseCount}種目`,
+    timeLabel,
+    oneTime ? '1回のみ' : null,
+  ]
     .filter(Boolean)
     .join('、');
   const { visible, overflowCount } = summarizeCategories(categories);
@@ -56,6 +67,7 @@ export const RoutineScheduleCard = memo(function RoutineScheduleCard({
         <View style={styles.timeBadge}>
           <DesignIcon name="calendar-today" size={15} color={Colors.accent} />
           <Text style={styles.timeText}>{timeLabel}</Text>
+          {oneTime && <Text style={styles.oneTimeText}>1回のみ</Text>}
         </View>
       </View>
       <IconSymbol name="chevron.right" size={22} color={Colors.textPlaceholder} />
@@ -135,4 +147,5 @@ const styles = StyleSheet.create({
     paddingVertical: 6,
   },
   timeText: { ...Typography.footnote, color: Colors.textBody, fontWeight: '600' },
+  oneTimeText: { ...Typography.badge, color: Colors.textMuted },
 });

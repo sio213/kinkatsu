@@ -1,4 +1,4 @@
-import { addMonths, buildMonthGridDates, CELLS_PER_WEEK, isSameDay, toDateKey, weeksInMonthGrid } from '@/lib/calendar/date-grid';
+import { addMonths, buildMonthGridDates, CELLS_PER_WEEK, isSameDay, parseDateKey, toDateKey, weeksInMonthGrid } from '@/lib/calendar/date-grid';
 
 describe('toDateKey', () => {
   it('YYYY-MM-DD形式（月/日は2桁ゼロパディング）を返す', () => {
@@ -31,6 +31,20 @@ describe('toDateKey', () => {
       // 23:30 PST → UTCでは翌日07:30。toISOString()経由だと'2026-01-02'になってしまう
       expect(toDateKey(new Date(2026, 0, 1, 23, 30))).toBe('2026-01-01');
     });
+  });
+});
+
+describe('parseDateKey', () => {
+  it('toDateKeyの逆変換になる（往復して同じ年月日に戻る）', () => {
+    const original = new Date(2026, 6, 25);
+    expect(toDateKey(parseDateKey(toDateKey(original)))).toBe(toDateKey(original));
+  });
+
+  it('ローカルの年月日として解釈する（月は2桁ゼロパディングされた文字列から1引いた0始まり）', () => {
+    const d = parseDateKey('2026-01-05');
+    expect(d.getFullYear()).toBe(2026);
+    expect(d.getMonth()).toBe(0);
+    expect(d.getDate()).toBe(5);
   });
 });
 
