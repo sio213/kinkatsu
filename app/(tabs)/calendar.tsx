@@ -5,8 +5,8 @@ import { RoutineScheduleCard } from '@/components/calendar/routine-schedule-card
 import { SessionTimeGroupHeader } from '@/components/calendar/session-time-group-header';
 import { SwipeableMonthView } from '@/components/calendar/swipeable-month-view';
 import { CategoryFilterChips } from '@/components/exercises/category-filter-chips';
-import { DesignIcon } from '@/components/ui/design-icon';
 import { IconSymbol } from '@/components/ui/icon-symbol';
+import { AddExerciseButton } from '@/components/workout/add-exercise-button';
 import { ResumeWorkoutBanner } from '@/components/workout/resume-workout-banner';
 import { Colors, Typography } from '@/constants/theme';
 import { useCalendarDayExercises, type CalendarDayCard } from '@/hooks/use-calendar-day-exercises';
@@ -63,23 +63,38 @@ function MonthNavButton({
   );
 }
 
-// 未来日パネルの予定リスト末尾に置く控えめな追加ボタン。DayEmptyStateの「予定を追加」は
-// 予定が0件の日にしか出ないため、既に1件以上ある日に2件目以降を追加する導線が無かった
-// （PRレビュー指摘対応）。見た目はcomponents/routines/routine-add-exercise-button.tsxの
-// ghostバリアント（一覧末尾の控えめな追加ボタン）に合わせるが、ラベルが「種目を追加」固定で
-// 汎用化されていないため、あちらを流用せずスタイルだけ揃えてこの画面内に定義する
-function AddScheduleGhostButton({ onPress }: { onPress: () => void }) {
+// UnifiedScheduleCard（lib/calendar/schedule.tsのmergeScheduleCards出力）を
+// RoutineScheduleCardのpropsへ変換する部分を今日パネル・未来日パネルで共有する
+// （oneTime/onDeleteの分岐がJSX2箇所に複製されていた、PRレビュー指摘対応）。
+// cardを通常の関数引数として受け取ることで、source==='manual'の絞り込みが
+// scheduledWorkoutId参照までそのまま効く（entry.card.xxxのような複合参照だとTSが
+// 絞り込みを保持できずIIFEが必要だった、PRレビュー指摘対応）
+type MergedScheduleCard = ReturnType<typeof mergeScheduleCards>[number];
+function ScheduleEntryCard({
+  card,
+  timeLabel,
+  onPress,
+  onPressStart,
+  onDelete,
+}: {
+  card: MergedScheduleCard;
+  timeLabel: string;
+  onPress: () => void;
+  onPressStart?: () => void;
+  onDelete: (scheduledWorkoutId: number, routineName: string) => void;
+}) {
   return (
-    <TouchableOpacity
-      style={styles.addScheduleGhost}
+    <RoutineScheduleCard
+      routineName={card.routineName}
+      categories={card.categories}
+      exerciseCount={card.exerciseCount}
+      timeLabel={timeLabel}
       onPress={onPress}
-      accessibilityRole="button"
-      accessibilityLabel="予定を追加"
-      hitSlop={{ top: 6, bottom: 6, left: 8, right: 8 }}
-    >
-      <DesignIcon name="add-circle" size={18} color={Colors.accent} />
-      <Text style={styles.addScheduleGhostText}>予定を追加</Text>
-    </TouchableOpacity>
+      onPressStart={onPressStart}
+      oneTime={card.source === 'manual'}
+      // リマインダー予定は削除不可のためonDeleteを渡さない（⋮メニュー自体が出ない）
+      onDelete={card.source === 'manual' ? () => onDelete(card.scheduledWorkoutId, card.routineName) : undefined}
+    />
   );
 }
 
@@ -173,24 +188,31 @@ export default function CalendarScreen() {
   // 過去日のときはここで結果を空配列に握りつぶす。EMPTY_SCHEDULEで参照を固定し、
   // 過去日を選んでいる間はdaySchedule/todayTimelineのuseMemoが毎回再計算されないようにする
   const isFutureDay = selectedDayStart > todayStart;
+  // 「予定を表示する日か」の判定は複数箇所（daySchedule/manualSchedule/mergedSchedule）で
+  // 同じ式を繰り返さないよう1つにまとめる（PRレビュー指摘対応）
+  const showsSchedule = isSelectedToday || isFutureDay;
   const rawDaySchedule = useCalendarDaySchedule(selectedDate);
-  const daySchedule: DayScheduleCard[] = isSelectedToday || isFutureDay ? rawDaySchedule : EMPTY_SCHEDULE;
-  // 手動予定（PR10）は今のところ未来日パネルのみ対象（今日タイムラインへの統合は後続PR）
+  const daySchedule: DayScheduleCard[] = showsSchedule ? rawDaySchedule : EMPTY_SCHEDULE;
+  // 手動予定（PR10）はPR10-4より今日も対象に含める（今日になった瞬間パネルから消えていた
+  // 既知バグの修正）。daySchedule同様、過去日だけ空に握りつぶす
   const rawManualSchedule = useCalendarDayManualSchedule(selectedDate);
-  const manualSchedule: ManualScheduleCard[] = isFutureDay ? rawManualSchedule : EMPTY_MANUAL_SCHEDULE;
+  const manualSchedule: ManualScheduleCard[] = showsSchedule ? rawManualSchedule : EMPTY_MANUAL_SCHEDULE;
   // 同じルーティンがリマインダー予定・手動予定の両方にあると同一予定が二重に見えるため、
   // routineId単位で手動予定を優先し重複を畳む（lib/calendar/schedule.tsのmergeScheduleCards、
-  // 2026-07-19確定。「リマインダー予定自体を打ち消す」機能は別スコープ）
-  const futureDaySchedule = useMemo(
-    () => (isFutureDay ? mergeScheduleCards(daySchedule, manualSchedule) : []),
-    [isFutureDay, daySchedule, manualSchedule],
+  // 2026-07-19確定。「リマインダー予定自体を打ち消す」機能は別スコープ）。今日・未来日どちらも
+  // 同じ統合結果を使う（PR10-4で今日パネルにも適用範囲を拡張）。daySchedule/manualScheduleが
+  // 既にEMPTY_*に握りつぶされているため、ここでshowsScheduleを再度見る必要は無い
+  // （過去日はmergeScheduleCards(EMPTY, EMPTY)が[]を返すので自然に空になる）
+  const mergedSchedule = useMemo(
+    () => mergeScheduleCards(daySchedule, manualSchedule),
+    [daySchedule, manualSchedule],
   );
   const todayTimeline = useMemo(
     () =>
       isSelectedToday
-        ? buildTodayTimeline(dayCardGroups, daySchedule, selectedDayStart)
+        ? buildTodayTimeline(dayCardGroups, mergedSchedule, selectedDayStart)
         : [],
-    [isSelectedToday, dayCardGroups, daySchedule, selectedDayStart],
+    [isSelectedToday, dayCardGroups, mergedSchedule, selectedDayStart],
   );
 
   const pushDebounced = useDebouncedPush();
@@ -319,30 +341,38 @@ export default function CalendarScreen() {
                   <DayEmptyState buttonIcon="play.fill" actionLabel="トレーニングを開始" onPressAction={handleStartToday} />
                 )
               ) : (
-                todayTimeline.map((entry) =>
-                  entry.kind === 'session' ? (
-                    <View key={entry.key} style={styles.dayGroup}>
-                      {todayTimeline.length > 1 && <SessionTimeGroupHeader sessionStartedAt={entry.group.sessionStartedAt} />}
-                      <DayCardList cards={entry.group.cards} onPressExercise={handlePressExercise} />
-                    </View>
-                  ) : (
-                    <View key={entry.key} style={styles.dayGroup}>
-                      {todayTimeline.length > 1 && <SessionTimeGroupHeader sessionStartedAt={entry.sortAt} isSchedule />}
-                      <RoutineScheduleCard
-                        routineName={entry.card.routineName}
-                        categories={entry.card.categories}
-                        exerciseCount={entry.card.exerciseCount}
-                        timeLabel={`今日 ${formatHourMinute(new Date(entry.sortAt))}`}
-                        onPress={() => handlePressRoutine(entry.card.routineId)}
-                        onPressStart={() => handleStartRoutine(entry.card.routineId, entry.card.routineName)}
-                      />
-                    </View>
-                  ),
-                )
+                <>
+                  {todayTimeline.map((entry) =>
+                    entry.kind === 'session' ? (
+                      <View key={entry.key} style={styles.dayGroup}>
+                        {todayTimeline.length > 1 && <SessionTimeGroupHeader sessionStartedAt={entry.group.sessionStartedAt} />}
+                        <DayCardList cards={entry.group.cards} onPressExercise={handlePressExercise} />
+                      </View>
+                    ) : (
+                      // 予定エントリは常にentry1件=カード1枚（グルーピングされない）で、
+                      // RoutineScheduleCard自身が時刻バッジを持つため、SessionTimeGroupHeaderを
+                      // 重ねると同じ時刻が2回表示されてしまっていた（@designer指摘、PR10-4で削除）
+                      <View key={entry.key} style={styles.dayGroup}>
+                        <ScheduleEntryCard
+                          card={entry.card}
+                          timeLabel={`今日 ${formatHourMinute(new Date(entry.sortAt))}`}
+                          onPress={() => handlePressRoutine(entry.card.routineId)}
+                          onPressStart={() => handleStartRoutine(entry.card.routineId, entry.card.routineName)}
+                          onDelete={handleDeleteSchedule}
+                        />
+                      </View>
+                    ),
+                  )}
+                  <AddExerciseButton
+                    onPress={handlePressAddSchedule}
+                    label="予定を追加"
+                    accessibilityLabel="予定を追加"
+                  />
+                </>
               )}
             </View>
           ) : isFutureDay ? (
-            futureDaySchedule.length === 0 ? (
+            mergedSchedule.length === 0 ? (
               <DayEmptyState
                 buttonIcon="plus"
                 actionLabel="予定を追加"
@@ -351,24 +381,20 @@ export default function CalendarScreen() {
               />
             ) : (
               <View style={styles.dayCardList}>
-                {futureDaySchedule.map((card) => (
-                  <RoutineScheduleCard
+                {mergedSchedule.map((card) => (
+                  <ScheduleEntryCard
                     key={card.key}
-                    routineName={card.routineName}
-                    categories={card.categories}
-                    exerciseCount={card.exerciseCount}
+                    card={card}
                     timeLabel={card.source === 'reminder' ? formatKindSummary(card.reminder) : formatHourMinuteParts(card.hour, card.minute)}
                     onPress={() => handlePressRoutine(card.routineId)}
-                    oneTime={card.source === 'manual'}
-                    // リマインダー予定は削除不可のためonDeleteを渡さない（⋮メニュー自体が出ない）
-                    onDelete={
-                      card.source === 'manual'
-                        ? () => handleDeleteSchedule(card.scheduledWorkoutId, card.routineName)
-                        : undefined
-                    }
+                    onDelete={handleDeleteSchedule}
                   />
                 ))}
-                <AddScheduleGhostButton onPress={handlePressAddSchedule} />
+                <AddExerciseButton
+                  onPress={handlePressAddSchedule}
+                  label="予定を追加"
+                  accessibilityLabel="予定を追加"
+                />
               </View>
             )
           ) : dayCards.length === 0 ? (
@@ -412,16 +438,4 @@ const styles = StyleSheet.create({
   // 時間帯グループ間の余白はデザイン案「複数18」のheight:12px相当
   dayGroupList: { gap: 12 },
   dayGroup: { gap: 8 },
-  // components/routines/routine-add-exercise-button.tsxのghostバリアントと同じ見た目
-  addScheduleGhost: {
-    flexDirection: 'row',
-    justifyContent: 'center',
-    alignItems: 'center',
-    gap: 6,
-    width: '100%',
-    backgroundColor: Colors.accentSurface,
-    borderRadius: 8,
-    paddingVertical: 11,
-  },
-  addScheduleGhostText: { ...Typography.footnote, fontWeight: '600', color: Colors.accent },
 });
