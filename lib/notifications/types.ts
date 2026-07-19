@@ -40,3 +40,13 @@ export type ReminderNotificationData = {
   type: typeof REMINDER_NOTIFICATION_TYPE;
   reminderId: number;
 };
+
+// カレンダーの手動予定（scheduledWorkouts、PR10-5）の通知。繰り返しリマインダーと違い1レコード=
+// 1回のみの通知のため、タップ時にDBを引き直さずに済むようroutineIdをdataへ直接埋め込む
+export const SCHEDULED_WORKOUT_NOTIFICATION_TYPE = 'scheduled_workout' as const;
+
+export type ScheduledWorkoutNotificationData = {
+  type: typeof SCHEDULED_WORKOUT_NOTIFICATION_TYPE;
+  scheduledWorkoutId: number;
+  routineId: number;
+};
