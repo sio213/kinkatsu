@@ -256,3 +256,27 @@ export const scheduledWorkouts = sqliteTable(
 
 export type ScheduledWorkout = typeof scheduledWorkouts.$inferSelect;
 export type NewScheduledWorkout = typeof scheduledWorkouts.$inferInsert;
+
+// リマインダー由来の予定を「特定の1日だけ」打ち消す記録（PR10-6）。リマインダーの繰り返し設定
+// 自体（reminders行）は変更せず、「このreminderIdはこの日だけ発火させない」という除外を
+// 別テーブルで持つ。scheduledDateはscheduledWorkouts.scheduledDateと同じ'YYYY-MM-DD'形式。
+// 同じ日を二重に打ち消せても意味が無いためunique制約を付ける。リマインダー削除時は
+// このスキップ記録も無意味になるためcascadeで一緒に消す
+export const reminderScheduleSkips = sqliteTable(
+  'reminder_schedule_skips',
+  {
+    id: integer('id').primaryKey({ autoIncrement: true }),
+    reminderId: integer('reminder_id')
+      .notNull()
+      .references(() => reminders.id, { onDelete: 'cascade' }),
+    skippedDate: text('skipped_date').notNull(),
+    createdAt: integer('created_at').notNull(),
+  },
+  (t) => ({
+    byReminder: index('idx_rss_reminder').on(t.reminderId),
+    uniqueSkip: uniqueIndex('idx_rss_unique').on(t.reminderId, t.skippedDate),
+  }),
+);
+
+export type ReminderScheduleSkip = typeof reminderScheduleSkips.$inferSelect;
+export type NewReminderScheduleSkip = typeof reminderScheduleSkips.$inferInsert;

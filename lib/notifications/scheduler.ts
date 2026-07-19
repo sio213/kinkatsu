@@ -1,10 +1,12 @@
 import { db } from '@/db/client';
 import {
   reminderNotifications,
+  reminderScheduleSkips,
   reminders,
   type NewReminder,
   type Reminder,
 } from '@/db/schema';
+import { toDateKey } from '@/lib/calendar/date-grid';
 import { and, eq, gt, lte } from 'drizzle-orm';
 import * as Notifications from 'expo-notifications';
 import { REMINDER_CHANNEL_ID } from './channels';
@@ -93,23 +95,44 @@ async function cancelReminderOsNotifications(reminderId: number): Promise<void> 
     .where(eq(reminderNotifications.reminderId, reminderId));
 }
 
-// ── ネイティブトリガー登録 ───────────────────────────
-
-async function scheduleNative(r: ParsedReminder): Promise<void> {
-  const now = Date.now();
-  const ids: string[] = [];
-
+// 通知content(title/body/sound/data/channelId)の組み立て。scheduleNative・scheduleQueue・
+// reminder-skip-scheduler.tsのunskip時の単発復元(PR10-6a)で同じ形が必要になるため共通化する
+// (@reviewer指摘: 3箇所に複製されていた)
+function buildReminderNotificationContent(r: { id: number; title: string; body: string }) {
   const data: ReminderNotificationData = {
     type: REMINDER_NOTIFICATION_TYPE,
     reminderId: r.id,
   };
-  const content = {
+  return {
     title: r.title,
     body: r.body,
     sound: true as const,
     data,
     ...(REMINDER_CHANNEL_ID ? { channelId: REMINDER_CHANNEL_ID } : {}),
   };
+}
+
+// キュー方式の単発DATEトリガー通知を1件登録する。scheduleQueueのループと、reminder-skip-scheduler.ts
+// のunskipReminderOccurrence（スキップ解除時に該当1件だけを復元する、@reviewer指摘対応）の両方から
+// 使う。DB挿入(reminderNotifications)は呼び出し側でバッチ方式が異なる(scheduleQueueは複数件まとめて
+// insert、unskip側は1件のみ即insert)ためここでは行わず、osNotificationIdの取得までに留める
+export async function scheduleQueueNotification(
+  reminder: { id: number; title: string; body: string },
+  date: Date,
+): Promise<string> {
+  return Notifications.scheduleNotificationAsync({
+    content: buildReminderNotificationContent(reminder),
+    trigger: { type: Notifications.SchedulableTriggerInputTypes.DATE, date },
+  });
+}
+
+// ── ネイティブトリガー登録 ───────────────────────────
+
+async function scheduleNative(r: ParsedReminder): Promise<void> {
+  const now = Date.now();
+  const ids: string[] = [];
+
+  const content = buildReminderNotificationContent(r);
 
   if (r.kind === 'interval') {
     const id = await Notifications.scheduleNotificationAsync({
@@ -224,26 +247,25 @@ async function scheduleQueue(r: ParsedReminder, depth: number): Promise<void> {
     dates = computeYearlyFireDates(from, a.getMonth(), r.monthdays, r.hour, r.minute, need);
   }
 
+  // 特定日だけの打ち消し(PR10-6a)を、新規に生成する未来分にも反映する。ここで除外しないと、
+  // 補充(refillReminder等)のたびにスキップした日が復活して通知が鳴ってしまう。除外した分
+  // depthに届かなくても実害は無く、次回の補充サイクルで末尾に継ぎ足される(既存のthreshold
+  // ベースの補充ロジックが前提にしている許容範囲と同じ)
+  if (dates.length > 0) {
+    const skipRows = await db
+      .select({ skippedDate: reminderScheduleSkips.skippedDate })
+      .from(reminderScheduleSkips)
+      .where(eq(reminderScheduleSkips.reminderId, r.id));
+    if (skipRows.length > 0) {
+      const skipSet = new Set(skipRows.map((s) => s.skippedDate));
+      dates = dates.filter((d) => !skipSet.has(toDateKey(d)));
+    }
+  }
+
   const nowMs = Date.now();
   const scheduled: { osId: string; date: Date }[] = [];
   for (const date of dates) {
-    const queueData: ReminderNotificationData = {
-      type: REMINDER_NOTIFICATION_TYPE,
-      reminderId: r.id,
-    };
-    const osId = await Notifications.scheduleNotificationAsync({
-      content: {
-        title: r.title,
-        body: r.body,
-        sound: true,
-        data: queueData,
-        ...(REMINDER_CHANNEL_ID ? { channelId: REMINDER_CHANNEL_ID } : {}),
-      },
-      trigger: {
-        type: Notifications.SchedulableTriggerInputTypes.DATE,
-        date,
-      },
-    });
+    const osId = await scheduleQueueNotification(r, date);
     scheduled.push({ osId, date });
   }
   if (scheduled.length > 0) {

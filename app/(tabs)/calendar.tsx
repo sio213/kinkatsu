@@ -3,15 +3,17 @@ import { CategoryColorLegend } from '@/components/calendar/category-color-legend
 import { DayEmptyState } from '@/components/calendar/day-empty-state';
 import { RoutineScheduleCard } from '@/components/calendar/routine-schedule-card';
 import { SessionTimeGroupHeader } from '@/components/calendar/session-time-group-header';
+import { SkippedReminderCard } from '@/components/calendar/skipped-reminder-card';
 import { SwipeableMonthView } from '@/components/calendar/swipeable-month-view';
 import { CategoryFilterChips } from '@/components/exercises/category-filter-chips';
 import { IconSymbol } from '@/components/ui/icon-symbol';
 import { AddExerciseButton } from '@/components/workout/add-exercise-button';
 import { ResumeWorkoutBanner } from '@/components/workout/resume-workout-banner';
 import { Colors, Typography } from '@/constants/theme';
+import type { Reminder } from '@/db/schema';
 import { useCalendarDayExercises, type CalendarDayCard } from '@/hooks/use-calendar-day-exercises';
 import { useCalendarDayManualSchedule, type ManualScheduleCard } from '@/hooks/use-calendar-day-manual-schedule';
-import { useCalendarDaySchedule, type DayScheduleCard } from '@/hooks/use-calendar-day-schedule';
+import { useCalendarDaySchedule, type DaySchedule } from '@/hooks/use-calendar-day-schedule';
 import { useCalendarMonthRecords } from '@/hooks/use-calendar-month-records';
 import { useCalendarMonthSchedule } from '@/hooks/use-calendar-month-schedule';
 import { useDebouncedPush } from '@/hooks/use-debounced-push';
@@ -20,9 +22,10 @@ import { useWorkoutSessions } from '@/hooks/use-workout-session';
 import { addMonths, isSameDay, toDateKey } from '@/lib/calendar/date-grid';
 import { CATEGORY_ALL, EXERCISE_CATEGORIES } from '@/lib/exercises/constants';
 import { buildTodayTimeline, groupCardsBySession } from '@/lib/calendar/session-groups';
-import { mergeScheduleCards } from '@/lib/calendar/schedule';
+import { mergeScheduleCards, type UnifiedScheduleCard } from '@/lib/calendar/schedule';
 import { formatHourMinute, formatHourMinuteParts } from '@/lib/calendar/time-of-day';
 import { formatKindSummary } from '@/lib/notifications/format';
+import { skipReminderOccurrence, unskipReminderOccurrence } from '@/lib/notifications/reminder-skip-scheduler';
 import { removeScheduledWorkout } from '@/lib/notifications/scheduled-workout-scheduler';
 import { formatMonthGroup, formatSessionDateGroup } from '@/lib/workout/summary';
 import { Stack } from 'expo-router';
@@ -36,7 +39,7 @@ const CALENDAR_FILTER_CATEGORIES = [CATEGORY_ALL, ...EXERCISE_CATEGORIES] as con
 
 // 過去日選択時に予定を握りつぶす際の固定参照（毎レンダー新しい配列を作らないことで
 // 依存するuseMemoの不要な再計算を避ける）
-const EMPTY_SCHEDULE: DayScheduleCard[] = [];
+const EMPTY_SCHEDULE: DaySchedule = { cards: [], skipped: [] };
 const EMPTY_MANUAL_SCHEDULE: ManualScheduleCard[] = [];
 
 function MonthNavButton({
@@ -69,19 +72,27 @@ function MonthNavButton({
 // cardを通常の関数引数として受け取ることで、source==='manual'の絞り込みが
 // scheduledWorkoutId参照までそのまま効く（entry.card.xxxのような複合参照だとTSが
 // 絞り込みを保持できずIIFEが必要だった、PRレビュー指摘対応）
-type MergedScheduleCard = ReturnType<typeof mergeScheduleCards>[number];
+// ReturnType<typeof mergeScheduleCards>はmergeScheduleCardsの型パラメータ制約
+// （reminder: unknown）で解決されてしまい、card.reminderへのプロパティアクセスが
+// 効かなくなる（実際の呼び出し箇所のcardは型推論で正しくReminderになるため問題なかったが、
+// このコンポーネント内でcard.reminder.idにアクセスする際に顕在化した）。呼び出し元
+// （lib/calendar/schedule.tsのUnifiedScheduleCard）をReminderで具体化して参照する
+type MergedScheduleCard = UnifiedScheduleCard<Reminder>;
 function ScheduleEntryCard({
   card,
   timeLabel,
   onPress,
   onPressStart,
   onDelete,
+  onSkip,
 }: {
   card: MergedScheduleCard;
   timeLabel: string;
   onPress: () => void;
   onPressStart?: () => void;
   onDelete: (scheduledWorkoutId: number, routineName: string) => void;
+  // リマインダー予定の⋮メニュー「今回だけスキップ」用（PR10-6a）
+  onSkip: (reminderId: number) => void;
 }) {
   return (
     <RoutineScheduleCard
@@ -92,8 +103,10 @@ function ScheduleEntryCard({
       onPress={onPress}
       onPressStart={onPressStart}
       oneTime={card.source === 'manual'}
-      // リマインダー予定は削除不可のためonDeleteを渡さない（⋮メニュー自体が出ない）
+      // 手動予定は削除、リマインダー予定はスキップ——出所ごとに⋮メニューの中身が異なる
+      // （RoutineScheduleCard側もonDelete/onSkipを排他的な入力として扱う）
       onDelete={card.source === 'manual' ? () => onDelete(card.scheduledWorkoutId, card.routineName) : undefined}
+      onSkip={card.source === 'reminder' ? () => onSkip(card.reminder.id) : undefined}
     />
   );
 }
@@ -192,19 +205,20 @@ export default function CalendarScreen() {
   // 同じ式を繰り返さないよう1つにまとめる（PRレビュー指摘対応）
   const showsSchedule = isSelectedToday || isFutureDay;
   const rawDaySchedule = useCalendarDaySchedule(selectedDate);
-  const daySchedule: DayScheduleCard[] = showsSchedule ? rawDaySchedule : EMPTY_SCHEDULE;
+  const daySchedule: DaySchedule = showsSchedule ? rawDaySchedule : EMPTY_SCHEDULE;
   // 手動予定（PR10）はPR10-4より今日も対象に含める（今日になった瞬間パネルから消えていた
   // 既知バグの修正）。daySchedule同様、過去日だけ空に握りつぶす
   const rawManualSchedule = useCalendarDayManualSchedule(selectedDate);
   const manualSchedule: ManualScheduleCard[] = showsSchedule ? rawManualSchedule : EMPTY_MANUAL_SCHEDULE;
   // 同じルーティンがリマインダー予定・手動予定の両方にあると同一予定が二重に見えるため、
   // routineId単位で手動予定を優先し重複を畳む（lib/calendar/schedule.tsのmergeScheduleCards、
-  // 2026-07-19確定。「リマインダー予定自体を打ち消す」機能は別スコープ）。今日・未来日どちらも
+  // 2026-07-19確定。「胸→背中に差し替え」のような別ルーティンへの打ち消しはdedupeの対象外、
+  // PR10-6の「今回だけスキップ」は別レイヤー(daySchedule.skipped)で扱う）。今日・未来日どちらも
   // 同じ統合結果を使う（PR10-4で今日パネルにも適用範囲を拡張）。daySchedule/manualScheduleが
   // 既にEMPTY_*に握りつぶされているため、ここでshowsScheduleを再度見る必要は無い
   // （過去日はmergeScheduleCards(EMPTY, EMPTY)が[]を返すので自然に空になる）
   const mergedSchedule = useMemo(
-    () => mergeScheduleCards(daySchedule, manualSchedule),
+    () => mergeScheduleCards(daySchedule.cards, manualSchedule),
     [daySchedule, manualSchedule],
   );
   const todayTimeline = useMemo(
@@ -257,6 +271,33 @@ export default function CalendarScreen() {
       ],
     );
   }, []);
+
+  // リマインダー予定の⋮メニュー「今回だけスキップ」用（PR10-6a）。取り消せる操作
+  // （ゴーストカードの「元に戻す」で戻せる）なので、手動予定の削除と違い確認Alertを挟まない
+  // （@designer方針: 気軽に試して気軽に戻せることを優先）。日付は選択日で確定済み
+  const handleSkipReminder = useCallback(
+    async (reminderId: number) => {
+      try {
+        await skipReminderOccurrence(reminderId, toDateKey(selectedDate));
+      } catch (e) {
+        console.error('[skip reminder occurrence]', e);
+        Alert.alert('エラー', '予定をスキップできませんでした。');
+      }
+    },
+    [selectedDate],
+  );
+  // スキップ済みゴーストカードの「元に戻す」用
+  const handleUndoSkipReminder = useCallback(
+    async (reminderId: number) => {
+      try {
+        await unskipReminderOccurrence(reminderId, toDateKey(selectedDate));
+      } catch (e) {
+        console.error('[unskip reminder occurrence]', e);
+        Alert.alert('エラー', 'スキップを元に戻せませんでした。');
+      }
+    },
+    [selectedDate],
+  );
 
   const { activeSession } = useWorkoutSessions();
   // 今日の空状態は進行中セッション(endedAtがnull)のendedAtがnullなためuseCalendarDayExercises
@@ -341,7 +382,7 @@ export default function CalendarScreen() {
                   （PR6で発見したバグ「無言で古いセッションに合流」の再発防止を、実績+予定が
                   混在するようになった今回のPR9-2でも一貫させる） */}
               {activeSession && <ResumeWorkoutBanner onPress={handleResumeToday} />}
-              {todayTimeline.length === 0 ? (
+              {todayTimeline.length === 0 && daySchedule.skipped.length === 0 ? (
                 !activeSession && (
                   <DayEmptyState buttonIcon="play.fill" actionLabel="トレーニングを開始" onPressAction={handleStartToday} />
                 )
@@ -364,10 +405,19 @@ export default function CalendarScreen() {
                           onPress={() => handlePressRoutine(entry.card.routineId)}
                           onPressStart={() => handleStartRoutine(entry.card.routineId, entry.card.routineName)}
                           onDelete={handleDeleteSchedule}
+                          onSkip={handleSkipReminder}
                         />
                       </View>
                     ),
                   )}
+                  {daySchedule.skipped.map((s) => (
+                    <SkippedReminderCard
+                      key={`skip-${s.reminderId}`}
+                      routineName={s.routineName}
+                      timeLabel={`今日 ${formatHourMinuteParts(s.hour, s.minute)}`}
+                      onUndo={() => handleUndoSkipReminder(s.reminderId)}
+                    />
+                  ))}
                   <AddExerciseButton
                     onPress={handlePressAddSchedule}
                     label="予定を追加"
@@ -377,7 +427,7 @@ export default function CalendarScreen() {
               )}
             </View>
           ) : isFutureDay ? (
-            mergedSchedule.length === 0 ? (
+            mergedSchedule.length === 0 && daySchedule.skipped.length === 0 ? (
               <DayEmptyState
                 buttonIcon="plus"
                 actionLabel="予定を追加"
@@ -393,6 +443,15 @@ export default function CalendarScreen() {
                     timeLabel={card.source === 'reminder' ? formatKindSummary(card.reminder) : formatHourMinuteParts(card.hour, card.minute)}
                     onPress={() => handlePressRoutine(card.routineId)}
                     onDelete={handleDeleteSchedule}
+                    onSkip={handleSkipReminder}
+                  />
+                ))}
+                {daySchedule.skipped.map((s) => (
+                  <SkippedReminderCard
+                    key={`skip-${s.reminderId}`}
+                    routineName={s.routineName}
+                    timeLabel={formatHourMinuteParts(s.hour, s.minute)}
+                    onUndo={() => handleUndoSkipReminder(s.reminderId)}
                   />
                 ))}
                 <AddExerciseButton

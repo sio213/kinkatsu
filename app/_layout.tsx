@@ -3,6 +3,7 @@ import { db, expoDb } from '@/db/client';
 import { seed } from '@/db/seed';
 import migrations from '@/drizzle/migrations';
 import { useColorScheme } from '@/hooks/use-color-scheme';
+import { pruneExpiredReminderScheduleSkips } from '@/lib/calendar/reminder-skips';
 import { ensureAndroidChannel } from '@/lib/notifications/channels';
 import { getPermissionState } from '@/lib/notifications/permissions';
 import { syncScheduledWorkoutNotifications } from '@/lib/notifications/scheduled-workout-scheduler';
@@ -51,7 +52,8 @@ async function onAppStart() {
   appStarting = true;
   try {
     await ensureAndroidChannel();
-    await pruneExpiredNotifications();
+    // reminderNotifications/reminderScheduleSkipsは別テーブル・独立処理のため並列実行できる
+    await Promise.all([pruneExpiredNotifications(), pruneExpiredReminderScheduleSkips()]);
     const state = await getPermissionState();
     if (state === 'granted') {
       // reminders/scheduledWorkoutsは別テーブル・独立処理のため並列実行できる（自動レビュー指摘）。

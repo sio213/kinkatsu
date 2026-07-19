@@ -12,6 +12,16 @@ export type ScheduleFireRow = {
   category: string;
 };
 
+// リマインダー由来の予定を特定の1日だけ打ち消す記録(PR10-6)。reminderId+日付の組み合わせを
+// 1つのキーにまとめ、Set.hasでの判定を各hookから共通して使えるようにする
+export function buildReminderSkipKey(reminderId: number, dateKey: string): string {
+  return `${reminderId}:${dateKey}`;
+}
+
+export function buildReminderSkipSet(rows: { reminderId: number; skippedDate: string }[]): Set<string> {
+  return new Set(rows.map((r) => buildReminderSkipKey(r.reminderId, r.skippedDate)));
+}
+
 // 日付ごとの代表カテゴリ（月グリッドのセルの予定リング/ドット色に使う）。同日に複数の
 // 予定がある場合は最も早い時刻のものを優先する（day-category.tsの「セット数最多」とは
 // 判定軸が異なるためあえて別実装にする）
