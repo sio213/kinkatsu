@@ -1,8 +1,8 @@
 import { db } from '@/db/client';
 import { routines, scheduledWorkouts } from '@/db/schema';
-import { parseDateKey } from '@/lib/calendar/date-grid';
+import { parseDateKey, toDateKey } from '@/lib/calendar/date-grid';
 import { addScheduledWorkout, deleteScheduledWorkout } from '@/lib/calendar/scheduled-workouts';
-import { eq } from 'drizzle-orm';
+import { eq, gte } from 'drizzle-orm';
 import * as Notifications from 'expo-notifications';
 import { REMINDER_CHANNEL_ID } from './channels';
 import { DEFAULT_REMINDER_BODY } from './messages';
@@ -115,7 +115,14 @@ export async function cancelScheduledWorkoutNotificationsForRoutine(routineId: n
 // 再スケジュールして追従する。scheduleNotificationAsyncは同一identifierを渡すと置換されるため
 // 冪等に呼んで問題ない
 export async function syncScheduledWorkoutNotifications(): Promise<void> {
-  const rows = await db.select().from(scheduledWorkouts);
+  // 手動予定は削除されない限り蓄積されるため、全件取得だと長期利用でクエリ・ループコストが
+  // 増加し続ける(自動レビュー指摘)。scheduledDateはtoDateKeyと同じ'YYYY-MM-DD'形式で
+  // 文字列比較が日付順と一致するため、SQL側で当日以降だけに絞り込む(時刻(hour/minute)まではSQLで
+  // 絞れないため、当日中の過ぎた時刻は従来通りJS側のfireDate判定で除外する)
+  const rows = await db
+    .select()
+    .from(scheduledWorkouts)
+    .where(gte(scheduledWorkouts.scheduledDate, toDateKey(new Date())));
   if (rows.length === 0) return;
   // 権限チェックはネイティブ呼び出しのため、行ごとではなくここで1回だけ行う
   if ((await getPermissionState()) !== 'granted') return;

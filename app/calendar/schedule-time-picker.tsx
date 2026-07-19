@@ -54,14 +54,19 @@ export default function ScheduleTimePickerScreen() {
 
   // 通知が届くよう先に権限をリクエストしておくが、拒否/未許可でも予定自体の保存は続ける
   // (リマインダーは権限が無いと保存自体を止めるが、手動予定はカレンダー表示自体に価値があるため
-  // 通知はスキップするだけにする、PR10-5計画フェーズの@designer/@planner方針)
+  // 通知はスキップするだけにする、PR10-5計画フェーズの@designer/@planner方針)。
+  // ensurePermission()自体が(拒否ではなく)例外を投げた場合でもこの「保存は必ず続ける」方針を
+  // 守るため、権限リクエストの失敗はここで握りつぶしcreateScheduledWorkoutへ進む(自動レビュー指摘対応)
   const handleConfirm = useCallback(async () => {
     if (isSubmittingRef.current) return;
     isSubmittingRef.current = true;
     setIsSubmitting(true);
     try {
-      const perm = await ensurePermission();
-      setPermState(perm);
+      try {
+        setPermState(await ensurePermission());
+      } catch (e) {
+        console.error('[ensure permission]', e);
+      }
       await createScheduledWorkout(routineId, routineName, dateKey, hour, minute);
       // 選択した時刻が既に過去(今日の過ぎた時刻を選んだ場合)は、
       // scheduled-workout-scheduler.tsのscheduleNotificationが通知登録を無言でスキップするため、
@@ -72,9 +77,15 @@ export default function ScheduleTimePickerScreen() {
       // 画面2→画面1→カレンダー画面の2階層を一度に閉じる
       // (app/workout/routine-load.tsxのrouter.dismiss(2)と同じ考え方)
       if (fireDate.getTime() <= Date.now()) {
-        Alert.alert('この時刻は過ぎています', '通知は届きませんが、予定はカレンダーに追加されました。', [
-          { text: 'OK', onPress: () => router.dismiss(2) },
-        ]);
+        // cancelable:falseが無いと、Android物理戻るボタンでこのAlertを無視できてしまう。isSubmitting系は
+        // Alert表示前(finally節)で既に解除済みのため、その場合ボタンが再度押せる状態のまま画面に残り、
+        // 同じ予定を重複作成できてしまう(自動レビュー指摘: Major)
+        Alert.alert(
+          'この時刻は過ぎています',
+          '通知は届きませんが、予定はカレンダーに追加されました。',
+          [{ text: 'OK', onPress: () => router.dismiss(2) }],
+          { cancelable: false },
+        );
       } else {
         router.dismiss(2);
       }

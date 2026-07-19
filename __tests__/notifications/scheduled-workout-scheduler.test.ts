@@ -45,12 +45,17 @@ jest.mock('@/db/client', () => {
 // scheduledWorkoutsは列名を判別できるオブジェクト形にしておく(単なる文字列だと
 // scheduledWorkouts.routineIdが常にundefinedになり、.where()に渡る列が正しいかを検証できない)
 jest.mock('@/db/schema', () => ({
-  scheduledWorkouts: { id: 'scheduledWorkouts.id', routineId: 'scheduledWorkouts.routineId' },
+  scheduledWorkouts: {
+    id: 'scheduledWorkouts.id',
+    routineId: 'scheduledWorkouts.routineId',
+    scheduledDate: 'scheduledWorkouts.scheduledDate',
+  },
   routines: { id: 'routines.id', name: 'routines.name' },
 }));
 
 jest.mock('drizzle-orm', () => ({
-  eq: jest.fn((col, val) => ({ col, val })),
+  eq: jest.fn((col, val) => ({ op: 'eq', col, val })),
+  gte: jest.fn((col, val) => ({ op: 'gte', col, val })),
 }));
 
 jest.mock('@/lib/calendar/scheduled-workouts', () => ({
@@ -191,6 +196,12 @@ describe('removeScheduledWorkout', () => {
 });
 
 describe('syncScheduledWorkoutNotifications', () => {
+  it('scheduledDateが当日以降のものだけをSQL側で絞り込む(自動レビュー指摘: 全件取得だと蓄積で肥大化するため)', async () => {
+    mockScheduledWorkoutRows = [];
+    await syncScheduledWorkoutNotifications();
+    expect(mockWhere).toHaveBeenCalledWith({ op: 'gte', col: 'scheduledWorkouts.scheduledDate', val: toDateKey(new Date()) });
+  });
+
   it('手動予定が0件ならroutinesを引かず、通知登録も行わない', async () => {
     mockScheduledWorkoutRows = [];
     await syncScheduledWorkoutNotifications();
@@ -291,7 +302,7 @@ describe('cancelScheduledWorkoutNotificationsForRoutine', () => {
     expect(mockDeleteScheduledWorkout).not.toHaveBeenCalled();
     // routineIdではなくidを条件に絞り込むような列違いの回帰を検知できるよう、.where()に渡った
     // 実引数(eq(scheduledWorkouts.routineId, routineId)の戻り値)を検証する(自動レビュー指摘対応)
-    expect(mockWhere).toHaveBeenCalledWith({ col: 'scheduledWorkouts.routineId', val: 10 });
+    expect(mockWhere).toHaveBeenCalledWith({ op: 'eq', col: 'scheduledWorkouts.routineId', val: 10 });
   });
 
   it('紐づく手動予定が無ければ何もキャンセルしない', async () => {
