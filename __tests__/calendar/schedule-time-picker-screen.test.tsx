@@ -3,6 +3,8 @@ const mockDismiss = jest.fn();
 const mockUseLocalSearchParams = jest.fn();
 const mockCreateScheduledWorkout = jest.fn();
 const mockEnsurePermission = jest.fn();
+const mockSkipReminderOccurrence = jest.fn();
+const mockUnskipReminderOccurrence = jest.fn();
 
 jest.mock('expo-router', () => ({
   useRouter: () => ({ back: mockBack, dismiss: mockDismiss }),
@@ -23,6 +25,11 @@ jest.mock('@/lib/notifications/scheduled-workout-scheduler', () => ({
     date.setHours(hour, minute, 0, 0);
     return date;
   },
+}));
+
+jest.mock('@/lib/notifications/reminder-skip-scheduler', () => ({
+  skipReminderOccurrence: (...args: unknown[]) => mockSkipReminderOccurrence(...args),
+  unskipReminderOccurrence: (...args: unknown[]) => mockUnskipReminderOccurrence(...args),
 }));
 
 // usePermissionState(hooks/use-permission-state.ts)はgetPermissionStateだけを使うが、
@@ -64,6 +71,8 @@ beforeEach(() => {
   mockUseLocalSearchParams.mockReturnValue({ dateKey: '2026-07-25', routineId: '10', routineName: '胸の日' });
   mockCreateScheduledWorkout.mockResolvedValue(1);
   mockEnsurePermission.mockResolvedValue('granted');
+  mockSkipReminderOccurrence.mockResolvedValue({ notificationSuppressed: true });
+  mockUnskipReminderOccurrence.mockResolvedValue(undefined);
   jest.spyOn(Alert, 'alert').mockImplementation(() => {});
   jest.spyOn(console, 'error').mockImplementation(() => {});
 });
@@ -340,6 +349,194 @@ describe('通知の権限バナー（PR10-5）', () => {
     mockEnsurePermission.mockResolvedValue('denied');
     const root = await renderAndSettle();
     expect(findByLabel(root, '設定を開く')).toBeDefined();
+  });
+});
+
+describe('差し替えモード（PR10-6b、replaceReminderId等がparamsに渡る場合）', () => {
+  beforeEach(() => {
+    mockUseLocalSearchParams.mockReturnValue({
+      dateKey: '2026-07-25',
+      routineId: '10',
+      routineName: '背中の日',
+      replaceReminderId: '1',
+      replaceHour: '7',
+      replaceMinute: '30',
+    });
+  });
+
+  test('デフォルト時刻は18:00ではなく元のリマインダーの時刻(replaceHour/replaceMinute)になる', () => {
+    const root = render();
+    const picker = root.findByType(DateTimePicker);
+    const value: Date = picker.props.value;
+    expect(value.getHours()).toBe(7);
+    expect(value.getMinutes()).toBe(30);
+  });
+
+  test('確定ボタンのラベルは「この時刻で差し替え」になる', () => {
+    const root = render();
+    expect(findByLabel(root, 'この時刻で差し替え')).toBeDefined();
+    expect(findByLabel(root, 'この時刻で追加')).toBeUndefined();
+  });
+
+  test('確定を押すと、skipReminderOccurrence(元のreminderId, 選択日)→createScheduledWorkoutの順で呼ばれる', async () => {
+    const root = render();
+    const callOrder: string[] = [];
+    mockSkipReminderOccurrence.mockImplementation(async () => {
+      callOrder.push('skip');
+      return { notificationSuppressed: true };
+    });
+    mockCreateScheduledWorkout.mockImplementation(async () => {
+      callOrder.push('create');
+      return 1;
+    });
+    const submitBtn = findByLabel(root, 'この時刻で差し替え')!;
+    await act(async () => {
+      submitBtn.props.onPress();
+      await Promise.resolve();
+      await Promise.resolve();
+    });
+
+    expect(mockSkipReminderOccurrence).toHaveBeenCalledWith(1, '2026-07-25');
+    expect(mockCreateScheduledWorkout).toHaveBeenCalledWith(10, '背中の日', '2026-07-25', 7, 30);
+    expect(callOrder).toEqual(['skip', 'create']);
+    expect(mockDismiss).toHaveBeenCalledWith(2);
+  });
+
+  test('スキップに失敗した場合は「差し替えできませんでした。」エラーを表示し、createScheduledWorkoutは呼ばれない', async () => {
+    mockSkipReminderOccurrence.mockRejectedValueOnce(new Error('fail'));
+    const root = render();
+    const submitBtn = findByLabel(root, 'この時刻で差し替え')!;
+    await act(async () => {
+      submitBtn.props.onPress();
+      await Promise.resolve();
+      await Promise.resolve();
+    });
+
+    expect(Alert.alert).toHaveBeenCalledWith('エラー', '差し替えできませんでした。');
+    expect(mockCreateScheduledWorkout).not.toHaveBeenCalled();
+    expect(mockDismiss).not.toHaveBeenCalled();
+  });
+
+  test('skipReminderOccurrenceが成功しcreateScheduledWorkoutが失敗した場合、unskipReminderOccurrenceで元のスキップを巻き戻してからエラーAlertを表示する(@reviewer Major指摘: 半端な状態の防止)', async () => {
+    mockCreateScheduledWorkout.mockRejectedValueOnce(new Error('fail'));
+    const root = render();
+    const submitBtn = findByLabel(root, 'この時刻で差し替え')!;
+    await act(async () => {
+      submitBtn.props.onPress();
+      await Promise.resolve();
+      await Promise.resolve();
+    });
+
+    expect(mockSkipReminderOccurrence).toHaveBeenCalledWith(1, '2026-07-25');
+    expect(mockUnskipReminderOccurrence).toHaveBeenCalledWith(1, '2026-07-25');
+    expect(Alert.alert).toHaveBeenCalledWith('エラー', '差し替えできませんでした。');
+    expect(mockDismiss).not.toHaveBeenCalled();
+  });
+
+  test('巻き戻し(unskipReminderOccurrence)自体が失敗しても、握りつぶしてエラーAlertは通常通り表示する', async () => {
+    mockCreateScheduledWorkout.mockRejectedValueOnce(new Error('fail'));
+    mockUnskipReminderOccurrence.mockRejectedValueOnce(new Error('rollback failed'));
+    const root = render();
+    const submitBtn = findByLabel(root, 'この時刻で差し替え')!;
+    await act(async () => {
+      submitBtn.props.onPress();
+      await Promise.resolve();
+      await Promise.resolve();
+      await Promise.resolve();
+    });
+
+    expect(Alert.alert).toHaveBeenCalledWith('エラー', '差し替えできませんでした。');
+  });
+
+  test('スキップが失敗した場合はunskipReminderOccurrence(巻き戻し)は呼ばれない(そもそもスキップが成立していないため)', async () => {
+    mockSkipReminderOccurrence.mockRejectedValueOnce(new Error('fail'));
+    const root = render();
+    const submitBtn = findByLabel(root, 'この時刻で差し替え')!;
+    await act(async () => {
+      submitBtn.props.onPress();
+      await Promise.resolve();
+      await Promise.resolve();
+    });
+
+    expect(mockUnskipReminderOccurrence).not.toHaveBeenCalled();
+  });
+
+  test('ネイティブ方式リマインダーで通知を止められなかった場合(notificationSuppressed: false)、差し替え完了時にその旨のAlertを表示する(@reviewer Major指摘: 通常スキップと同じ警告をこの経路だけ握り潰していた)', async () => {
+    mockSkipReminderOccurrence.mockResolvedValueOnce({ notificationSuppressed: false });
+    const root = render();
+    const submitBtn = findByLabel(root, 'この時刻で差し替え')!;
+    await act(async () => {
+      submitBtn.props.onPress();
+      await Promise.resolve();
+      await Promise.resolve();
+    });
+
+    expect(Alert.alert).toHaveBeenCalledWith(
+      '差し替えました',
+      '差し替えが完了しました。\nこの予定は「毎日」「毎週」などの繰り返し方式のため、元の通知は差し替え後も届く場合があります。',
+      expect.any(Array),
+      { cancelable: false },
+    );
+    expect(mockDismiss).not.toHaveBeenCalled();
+
+    const alertCall = (Alert.alert as jest.Mock).mock.calls[0];
+    const okAction = alertCall[2].find((b: { text?: string }) => b.text === 'OK');
+    act(() => {
+      okAction.onPress();
+    });
+    expect(mockDismiss).toHaveBeenCalledWith(2);
+  });
+
+  test('notificationSuppressed: trueの通常ケースでは、差し替え完了時にAlertを出さずそのままdismissする', async () => {
+    mockSkipReminderOccurrence.mockResolvedValueOnce({ notificationSuppressed: true });
+    const root = render();
+    const submitBtn = findByLabel(root, 'この時刻で差し替え')!;
+    await act(async () => {
+      submitBtn.props.onPress();
+      await Promise.resolve();
+      await Promise.resolve();
+    });
+
+    expect(Alert.alert).not.toHaveBeenCalled();
+    expect(mockDismiss).toHaveBeenCalledWith(2);
+  });
+
+  test('過去時刻の場合の警告Alertの文言も差し替え用になる', async () => {
+    mockUseLocalSearchParams.mockReturnValue({
+      dateKey: '2020-01-01',
+      routineId: '10',
+      routineName: '背中の日',
+      replaceReminderId: '1',
+      replaceHour: '7',
+      replaceMinute: '30',
+    });
+    const root = render();
+    const submitBtn = findByLabel(root, 'この時刻で差し替え')!;
+    await act(async () => {
+      submitBtn.props.onPress();
+      await Promise.resolve();
+      await Promise.resolve();
+    });
+
+    expect(Alert.alert).toHaveBeenCalledWith(
+      'この時刻は過ぎています',
+      '通知は届きませんが、差し替えは完了しました。',
+      expect.any(Array),
+      { cancelable: false },
+    );
+  });
+});
+
+describe('通常モード（差し替えパラメータが無い場合）はskipReminderOccurrenceを一切呼ばない', () => {
+  test('確定してもskipReminderOccurrenceは呼ばれない', async () => {
+    const root = render();
+    const submitBtn = findByLabel(root, 'この時刻で追加')!;
+    await act(async () => {
+      submitBtn.props.onPress();
+      await Promise.resolve();
+      await Promise.resolve();
+    });
+    expect(mockSkipReminderOccurrence).not.toHaveBeenCalled();
   });
 });
 

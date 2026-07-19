@@ -8,6 +8,7 @@ import { usePermissionState } from '@/hooks/use-permission-state';
 import { isValidDateKey, parseDateKey } from '@/lib/calendar/date-grid';
 import { formatHourMinuteParts } from '@/lib/calendar/time-of-day';
 import { ensurePermission } from '@/lib/notifications/permissions';
+import { skipReminderOccurrence, unskipReminderOccurrence } from '@/lib/notifications/reminder-skip-scheduler';
 import { buildScheduledWorkoutFireDate, createScheduledWorkout } from '@/lib/notifications/scheduled-workout-scheduler';
 import { formatSessionDateGroup } from '@/lib/workout/summary';
 import DateTimePicker from '@react-native-community/datetimepicker';
@@ -22,19 +23,34 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 // reminder-form.tsxの新規リマインダーのデフォルトと揃え、アプリ内での「トレーニングの標準時刻」感を
 // 一貫させる
 export default function ScheduleTimePickerScreen() {
-  const { dateKey, routineId: routineIdParam, routineName } = useLocalSearchParams<{
+  const {
+    dateKey,
+    routineId: routineIdParam,
+    routineName,
+    replaceReminderId,
+    replaceHour,
+    replaceMinute,
+  } = useLocalSearchParams<{
     dateKey: string;
     routineId: string;
     routineName: string;
+    // 「今回だけ差し替え」（PR10-6b、schedule-routine-picker.tsx経由）のときだけ渡る。この3項目は
+    // セットで存在する
+    replaceReminderId?: string;
+    replaceHour?: string;
+    replaceMinute?: string;
   }>();
   const routineId = Number(routineIdParam);
+  const isReplaceMode = replaceReminderId !== undefined;
   const router = useRouter();
   const isSubmittingRef = useRef(false);
 
   const [permState, setPermState] = usePermissionState();
   const [showAndroidTimePicker, setShowAndroidTimePicker] = useState(false);
-  const [hour, setHour] = useState(18);
-  const [minute, setMinute] = useState(0);
+  // 差し替え時は元のリマインダーの時刻をデフォルトにする(差し替えたいのは基本的に「中身」であって
+  // 「時間帯」ではないため、毎回18:00から手動で直す手間を無くす、@designer方針)
+  const [hour, setHour] = useState(() => (isReplaceMode && replaceHour ? Number(replaceHour) : 18));
+  const [minute, setMinute] = useState(() => (isReplaceMode && replaceMinute ? Number(replaceMinute) : 0));
   // isSubmittingRefは連打防止用の同期ガード、こちらはボタンの見た目のフィードバック用
   // (ensurePermission()がOSネイティブの許可ダイアログ応答待ちで数秒ブロックしうるため、
   // 押した直後に何も反応が無く見えるのを防ぐ、@designerレビュー指摘)
@@ -61,11 +77,27 @@ export default function ScheduleTimePickerScreen() {
     if (isSubmittingRef.current) return;
     isSubmittingRef.current = true;
     setIsSubmitting(true);
+    // 差し替え合成(スキップ→手動予定追加)の前半が成立したかどうか。後半が失敗した場合の
+    // 巻き戻し判定に使う(@reviewer Major指摘: 後半だけ失敗すると元の予定が無言で消えたまま残る)
+    let skippedForReplace = false;
     try {
       try {
         setPermState(await ensurePermission());
       } catch (e) {
         console.error('[ensure permission]', e);
+      }
+      // 「今回だけ差し替え」（PR10-6b）: 元のリマインダー予定をこの日だけスキップしてから、
+      // 選んだ新しいルーティンを手動予定として追加する。「差し替え = スキップ + 手動予定追加」という
+      // 計画フェーズの合成方針の通り、既存のskipReminderOccurrence/createScheduledWorkoutを
+      // そのまま2回呼ぶだけで実現する（専用の差し替えテーブルは持たない）。ネイティブ方式リマインダー
+      // (毎日/毎週/単純な毎月)は個別キャンセルできない制約(PR10-6c対応予定)があるため、
+      // notificationSuppressedを保持しておき、通常のスキップ(handleSkipReminder)と同じく
+      // 抑止できなかった場合は後で警告する(@reviewer Major指摘: この経路だけ戻り値を握り潰していた)
+      let notificationSuppressed = true;
+      if (isReplaceMode && replaceReminderId) {
+        const result = await skipReminderOccurrence(Number(replaceReminderId), dateKey);
+        skippedForReplace = true;
+        notificationSuppressed = result.notificationSuppressed;
       }
       await createScheduledWorkout(routineId, routineName, dateKey, hour, minute);
       // 選択した時刻が既に過去(今日の過ぎた時刻を選んだ場合)は、
@@ -74,15 +106,28 @@ export default function ScheduleTimePickerScreen() {
       // 判定式自体はscheduleNotification内部と同じものを使う必要があるため、
       // scheduled-workout-scheduler.tsから公開されたbuildScheduledWorkoutFireDateを再利用する
       const fireDate = buildScheduledWorkoutFireDate(dateKey, hour, minute);
+      const isPastTime = fireDate.getTime() <= Date.now();
+      const nativeNoticeWarning =
+        isReplaceMode && !notificationSuppressed
+          ? 'この予定は「毎日」「毎週」などの繰り返し方式のため、元の通知は差し替え後も届く場合があります。'
+          : null;
       // 画面2→画面1→カレンダー画面の2階層を一度に閉じる
       // (app/workout/routine-load.tsxのrouter.dismiss(2)と同じ考え方)
-      if (fireDate.getTime() <= Date.now()) {
+      if (isPastTime || nativeNoticeWarning) {
+        const lines = [
+          isReplaceMode
+            ? isPastTime
+              ? '通知は届きませんが、差し替えは完了しました。'
+              : '差し替えが完了しました。'
+            : '通知は届きませんが、予定はカレンダーに追加されました。',
+        ];
+        if (nativeNoticeWarning) lines.push(nativeNoticeWarning);
         // cancelable:falseが無いと、Android物理戻るボタンでこのAlertを無視できてしまう。isSubmitting系は
         // Alert表示前(finally節)で既に解除済みのため、その場合ボタンが再度押せる状態のまま画面に残り、
         // 同じ予定を重複作成できてしまう(自動レビュー指摘: Major)
         Alert.alert(
-          'この時刻は過ぎています',
-          '通知は届きませんが、予定はカレンダーに追加されました。',
+          isPastTime ? 'この時刻は過ぎています' : '差し替えました',
+          lines.join('\n'),
           [{ text: 'OK', onPress: () => router.dismiss(2) }],
           { cancelable: false },
         );
@@ -91,12 +136,23 @@ export default function ScheduleTimePickerScreen() {
       }
     } catch (e) {
       console.error('[add scheduled workout]', e);
-      Alert.alert('エラー', '予定を追加できませんでした。');
+      if (skippedForReplace && replaceReminderId) {
+        // 前半(スキップ)は成立済みなので、後半(手動予定の追加)の失敗を「差し替えできませんでした」
+        // で伝えるだけだと、実際には元の予定が消えたままの中途半端な状態が残ってしまう。
+        // 巻き戻し自体が失敗しても(この場合ゴーストカードの「元に戻す」で手動復旧できるため)、
+        // ユーザーに見せるエラー自体は変えずログにのみ残す
+        try {
+          await unskipReminderOccurrence(Number(replaceReminderId), dateKey);
+        } catch (rollbackError) {
+          console.error('[rollback skip after replace failure]', rollbackError);
+        }
+      }
+      Alert.alert('エラー', isReplaceMode ? '差し替えできませんでした。' : '予定を追加できませんでした。');
     } finally {
       isSubmittingRef.current = false;
       setIsSubmitting(false);
     }
-  }, [routineId, routineName, dateKey, hour, minute, router, setPermState]);
+  }, [routineId, routineName, dateKey, hour, minute, router, setPermState, isReplaceMode, replaceReminderId]);
 
   const handleRequestPermission = useCallback(async () => {
     setPermState(await ensurePermission());
@@ -159,7 +215,11 @@ export default function ScheduleTimePickerScreen() {
         </FormField>
       </View>
       <View style={styles.footer}>
-        <PrimaryButton label="この時刻で追加" onPress={handleConfirm} disabled={isSubmitting} />
+        <PrimaryButton
+          label={isReplaceMode ? 'この時刻で差し替え' : 'この時刻で追加'}
+          onPress={handleConfirm}
+          disabled={isSubmitting}
+        />
       </View>
     </SafeAreaView>
   );

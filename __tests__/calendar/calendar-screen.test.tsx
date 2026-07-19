@@ -1216,6 +1216,182 @@ describe('CalendarScreen 予定（PR9-2: リマインダー由来の未来予定
     });
   });
 
+  describe('リマインダー予定の「今回だけ差し替え」(PR10-6b)', () => {
+    function replaceCard(overrides: Record<string, unknown> = {}) {
+      const reminderId = (overrides.reminderId as number | undefined) ?? 1;
+      const routineId = (overrides.routineId as number | undefined) ?? 10;
+      const routineName = (overrides.routineName as string | undefined) ?? '胸の日';
+      const hour = (overrides.hour as number | undefined) ?? 7;
+      const minute = (overrides.minute as number | undefined) ?? 30;
+      return {
+        reminderId,
+        routineId,
+        routineName,
+        categories: ['chest'],
+        exerciseCount: 3,
+        hour,
+        minute,
+        reminder: {
+          id: reminderId,
+          routineId,
+          title: routineName,
+          body: '',
+          kind: 'weekly',
+          hour,
+          minute,
+          weekdays: '[0]',
+          monthdays: null,
+          anchorDate: null,
+          intervalDays: null,
+          intervalMonths: null,
+          nthWeek: null,
+          nthWeekdays: null,
+          enabled: true,
+          createdAt: 0,
+          updatedAt: 0,
+        },
+        ...overrides,
+      };
+    }
+    function daySchedule(cards: ReturnType<typeof replaceCard>[], skipped: unknown[] = []) {
+      return { cards, skipped };
+    }
+    function manualCard(overrides: Record<string, unknown> = {}) {
+      return {
+        scheduledWorkoutId: 99,
+        routineId: 30,
+        routineName: '背中の日',
+        categories: ['back'],
+        exerciseCount: 4,
+        hour: 7,
+        minute: 30,
+        ...overrides,
+      };
+    }
+    function findMenuTrigger(root: ReactTestInstance, routineName: string) {
+      return root
+        .findAllByType(TouchableOpacity)
+        .find((t) => typeof t.props.accessibilityLabel === 'string' && t.props.accessibilityLabel.startsWith(`「${routineName}」`) && t.props.accessibilityLabel.endsWith('のメニューを開く'));
+    }
+
+    test('未来日: ⋮→「今回だけ差し替え」を押すと確認Alertを出さず、schedule-routine-pickerへreminderId/routineName/hour/minuteをString化して渡す', async () => {
+      const root = render();
+      const future = new Date();
+      future.setDate(future.getDate() + 5);
+      mockUseCalendarDaySchedule.mockReturnValue(daySchedule([replaceCard()]));
+      selectDate(future);
+
+      act(() => {
+        findMenuTrigger(root, '胸の日')!.props.onPress();
+      });
+      const replaceItem = root.findAllByType(TouchableOpacity).find((t) => t.props.accessibilityLabel === '今回だけ差し替え')!;
+      act(() => {
+        replaceItem.props.onPress();
+      });
+
+      expect(Alert.alert).not.toHaveBeenCalled();
+      expect(mockPush).toHaveBeenCalledWith({
+        pathname: '/calendar/schedule-routine-picker',
+        params: {
+          dateKey: toDateKey(future),
+          replaceReminderId: '1',
+          replaceRoutineName: '胸の日',
+          replaceHour: '7',
+          replaceMinute: '30',
+        },
+      });
+    });
+
+    test('今日: ⋮→「今回だけ差し替え」を押すと今日のdateKeyで遷移する', () => {
+      mockUseCalendarDaySchedule.mockReturnValue(daySchedule([replaceCard()]));
+      const root = render();
+
+      act(() => {
+        findMenuTrigger(root, '胸の日')!.props.onPress();
+      });
+      const replaceItem = root.findAllByType(TouchableOpacity).find((t) => t.props.accessibilityLabel === '今回だけ差し替え')!;
+      act(() => {
+        replaceItem.props.onPress();
+      });
+
+      expect(mockPush).toHaveBeenCalledWith(
+        expect.objectContaining({ params: expect.objectContaining({ dateKey: toDateKey(new Date()) }) }),
+      );
+    });
+
+    test('複数のリマインダー予定が並んでいても、押したカードに対応するreminderId/routineNameが渡る(先頭固定になっていないことの確認)', () => {
+      mockUseCalendarDaySchedule.mockReturnValue(
+        daySchedule([
+          replaceCard({ reminderId: 1, routineId: 10, routineName: '胸の日', hour: 7, minute: 30 }),
+          replaceCard({ reminderId: 2, routineId: 11, routineName: '脚の日', hour: 20, minute: 0 }),
+        ]),
+      );
+      const root = render();
+
+      act(() => {
+        findMenuTrigger(root, '脚の日')!.props.onPress();
+      });
+      const replaceItem = root.findAllByType(TouchableOpacity).find((t) => t.props.accessibilityLabel === '今回だけ差し替え')!;
+      act(() => {
+        replaceItem.props.onPress();
+      });
+
+      expect(mockPush).toHaveBeenCalledWith(
+        expect.objectContaining({
+          params: expect.objectContaining({ replaceReminderId: '2', replaceRoutineName: '脚の日', replaceHour: '20', replaceMinute: '0' }),
+        }),
+      );
+    });
+
+    test('手動予定カードには「今回だけ差し替え」は表示されない(onDeleteが排他的に渡るため)', () => {
+      mockUseCalendarDaySchedule.mockReturnValue(daySchedule([]));
+      const future = new Date();
+      future.setDate(future.getDate() + 5);
+      mockUseCalendarDayManualSchedule.mockReturnValue([manualCard()]);
+      const root = render();
+      selectDate(future);
+
+      act(() => {
+        findMenuTrigger(root, '背中の日')!.props.onPress();
+      });
+      expect(root.findAllByType(TouchableOpacity).some((t) => t.props.accessibilityLabel === '今回だけ差し替え')).toBe(
+        false,
+      );
+    });
+
+    test('差し替え後: リマインダーのゴーストカード(スキップ済み)と、差し替え先の新しい手動予定カードが同日に両方表示される', () => {
+      const future = new Date();
+      future.setDate(future.getDate() + 5);
+      mockUseCalendarDaySchedule.mockReturnValue({
+        cards: [],
+        skipped: [{ reminderId: 1, routineId: 10, routineName: '胸の日', hour: 7, minute: 30 }],
+      });
+      mockUseCalendarDayManualSchedule.mockReturnValue([manualCard()]);
+      const root = render();
+      selectDate(future);
+
+      expect(root.findByProps({ children: '07:30・スキップ済み' })).toBeDefined();
+      expect(root.findByProps({ children: '背中の日' })).toBeDefined();
+    });
+
+    test('同じルーティンへの差し替え(時刻だけ変える場合)でも、ゴーストカードと新しい手動予定カードは重複排除されず両方表示される(mergeScheduleCardsのroutineId単位の畳み込みと衝突しない経路)', () => {
+      const future = new Date();
+      future.setDate(future.getDate() + 5);
+      mockUseCalendarDaySchedule.mockReturnValue({
+        cards: [],
+        skipped: [{ reminderId: 1, routineId: 10, routineName: '胸の日', hour: 7, minute: 30 }],
+      });
+      mockUseCalendarDayManualSchedule.mockReturnValue([
+        manualCard({ scheduledWorkoutId: 99, routineId: 10, routineName: '胸の日', hour: 21, minute: 0 }),
+      ]);
+      const root = render();
+      selectDate(future);
+
+      expect(root.findByProps({ children: '07:30・スキップ済み' })).toBeDefined();
+      expect(root.findAllByProps({ children: '胸の日' }).length).toBeGreaterThanOrEqual(2);
+    });
+  });
+
   describe('今日の予定カードの「開始」ボタン(handleStartRoutine)', () => {
     function findStartButton(root: ReactTestInstance) {
       return root

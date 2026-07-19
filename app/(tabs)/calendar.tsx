@@ -85,6 +85,7 @@ function ScheduleEntryCard({
   onPressStart,
   onDelete,
   onSkip,
+  onReplace,
 }: {
   card: MergedScheduleCard;
   timeLabel: string;
@@ -93,6 +94,8 @@ function ScheduleEntryCard({
   onDelete: (scheduledWorkoutId: number, routineName: string) => void;
   // リマインダー予定の⋮メニュー「今回だけスキップ」用（PR10-6a）
   onSkip: (reminderId: number) => void;
+  // リマインダー予定の⋮メニュー「今回だけ差し替え」用（PR10-6b）
+  onReplace: (reminderId: number, routineName: string, hour: number, minute: number) => void;
 }) {
   return (
     <RoutineScheduleCard
@@ -103,10 +106,15 @@ function ScheduleEntryCard({
       onPress={onPress}
       onPressStart={onPressStart}
       oneTime={card.source === 'manual'}
-      // 手動予定は削除、リマインダー予定はスキップ——出所ごとに⋮メニューの中身が異なる
-      // （RoutineScheduleCard側もonDelete/onSkipを排他的な入力として扱う）
+      // 手動予定は削除、リマインダー予定はスキップ・差し替え——出所ごとに⋮メニューの中身が異なる
+      // （RoutineScheduleCard側もonDelete/onSkip・onReplaceを排他的な入力として扱う）
       onDelete={card.source === 'manual' ? () => onDelete(card.scheduledWorkoutId, card.routineName) : undefined}
       onSkip={card.source === 'reminder' ? () => onSkip(card.reminder.id) : undefined}
+      onReplace={
+        card.source === 'reminder'
+          ? () => onReplace(card.reminder.id, card.routineName, card.hour, card.minute)
+          : undefined
+      }
     />
   );
 }
@@ -357,6 +365,25 @@ export default function CalendarScreen() {
     },
     [selectedDate],
   );
+  // リマインダー予定の⋮メニュー「今回だけ差し替え」用（PR10-6b）。ここではまだ何もDBを
+  // 変更せず、既存の「予定を追加」フロー（schedule-routine-picker→schedule-time-picker）を
+  // 差し替えパラメータ付きで再利用するだけ。実際のスキップ+手動予定追加はschedule-time-picker.tsxの
+  // 確定操作まで遅延させる（途中で戻る操作をした場合に元のリマインダー予定が無言で消えたままに
+  // ならないようにするため）
+  const handlePressReplace = useCallback(
+    (reminderId: number, routineName: string, hour: number, minute: number) =>
+      pushDebounced({
+        pathname: '/calendar/schedule-routine-picker',
+        params: {
+          dateKey: toDateKey(selectedDate),
+          replaceReminderId: String(reminderId),
+          replaceRoutineName: routineName,
+          replaceHour: String(hour),
+          replaceMinute: String(minute),
+        },
+      }),
+    [pushDebounced, selectedDate],
+  );
 
   const { activeSession } = useWorkoutSessions();
   // 今日の空状態は進行中セッション(endedAtがnull)のendedAtがnullなためuseCalendarDayExercises
@@ -479,6 +506,7 @@ export default function CalendarScreen() {
                           onPressStart={() => handleStartRoutine(entry.card.routineId, entry.card.routineName)}
                           onDelete={handleDeleteSchedule}
                           onSkip={handleSkipReminder}
+                          onReplace={handlePressReplace}
                         />
                       </View>
                     );
@@ -521,6 +549,7 @@ export default function CalendarScreen() {
                       onPress={() => handlePressRoutine(item.card.routineId)}
                       onDelete={handleDeleteSchedule}
                       onSkip={handleSkipReminder}
+                      onReplace={handlePressReplace}
                     />
                   ),
                 )}
