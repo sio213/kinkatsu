@@ -41,7 +41,12 @@ export default function ScheduleTimePickerScreen() {
     replaceMinute?: string;
   }>();
   const routineId = Number(routineIdParam);
-  const isReplaceMode = replaceReminderId !== undefined;
+  // routineIdと同じ理由(不正な直リンク対策)で、replaceReminderIdもNumber.isInteger等で
+  // 検証してから使う。素通しだとNaNのreminderIdでskipReminderOccurrence/DB書き込みを
+  // 試みることになる(@reviewer指摘)
+  const replaceReminderIdNum = replaceReminderId !== undefined ? Number(replaceReminderId) : undefined;
+  const isReplaceMode =
+    replaceReminderIdNum !== undefined && Number.isInteger(replaceReminderIdNum) && replaceReminderIdNum > 0;
   const router = useRouter();
   const isSubmittingRef = useRef(false);
 
@@ -94,8 +99,8 @@ export default function ScheduleTimePickerScreen() {
       // notificationSuppressedを保持しておき、通常のスキップ(handleSkipReminder)と同じく
       // 抑止できなかった場合は後で警告する(@reviewer Major指摘: この経路だけ戻り値を握り潰していた)
       let notificationSuppressed = true;
-      if (isReplaceMode && replaceReminderId) {
-        const result = await skipReminderOccurrence(Number(replaceReminderId), dateKey);
+      if (isReplaceMode && replaceReminderIdNum !== undefined) {
+        const result = await skipReminderOccurrence(replaceReminderIdNum, dateKey);
         skippedForReplace = true;
         notificationSuppressed = result.notificationSuppressed;
       }
@@ -136,13 +141,13 @@ export default function ScheduleTimePickerScreen() {
       }
     } catch (e) {
       console.error('[add scheduled workout]', e);
-      if (skippedForReplace && replaceReminderId) {
+      if (skippedForReplace && replaceReminderIdNum !== undefined) {
         // 前半(スキップ)は成立済みなので、後半(手動予定の追加)の失敗を「差し替えできませんでした」
         // で伝えるだけだと、実際には元の予定が消えたままの中途半端な状態が残ってしまう。
         // 巻き戻し自体が失敗しても(この場合ゴーストカードの「元に戻す」で手動復旧できるため)、
         // ユーザーに見せるエラー自体は変えずログにのみ残す
         try {
-          await unskipReminderOccurrence(Number(replaceReminderId), dateKey);
+          await unskipReminderOccurrence(replaceReminderIdNum, dateKey);
         } catch (rollbackError) {
           console.error('[rollback skip after replace failure]', rollbackError);
         }
@@ -152,7 +157,7 @@ export default function ScheduleTimePickerScreen() {
       isSubmittingRef.current = false;
       setIsSubmitting(false);
     }
-  }, [routineId, routineName, dateKey, hour, minute, router, setPermState, isReplaceMode, replaceReminderId]);
+  }, [routineId, routineName, dateKey, hour, minute, router, setPermState, isReplaceMode, replaceReminderIdNum]);
 
   const handleRequestPermission = useCallback(async () => {
     setPermState(await ensurePermission());
