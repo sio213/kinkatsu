@@ -8,7 +8,7 @@ import { usePermissionState } from '@/hooks/use-permission-state';
 import { isValidDateKey, parseDateKey } from '@/lib/calendar/date-grid';
 import { formatHourMinuteParts } from '@/lib/calendar/time-of-day';
 import { ensurePermission } from '@/lib/notifications/permissions';
-import { createScheduledWorkout } from '@/lib/notifications/scheduled-workout-scheduler';
+import { buildScheduledWorkoutFireDate, createScheduledWorkout } from '@/lib/notifications/scheduled-workout-scheduler';
 import { formatSessionDateGroup } from '@/lib/workout/summary';
 import DateTimePicker from '@react-native-community/datetimepicker';
 import { Stack, useLocalSearchParams, useRouter } from 'expo-router';
@@ -65,9 +65,10 @@ export default function ScheduleTimePickerScreen() {
       await createScheduledWorkout(routineId, routineName, dateKey, hour, minute);
       // 選択した時刻が既に過去(今日の過ぎた時刻を選んだ場合)は、
       // scheduled-workout-scheduler.tsのscheduleNotificationが通知登録を無言でスキップするため、
-      // ここで一言伝えてからカレンダーへ戻る(@designerレビュー指摘: サイレントな機能欠落の防止)
-      const fireDate = parseDateKey(dateKey);
-      fireDate.setHours(hour, minute, 0, 0);
+      // ここで一言伝えてからカレンダーへ戻る(@designerレビュー指摘: サイレントな機能欠落の防止)。
+      // 判定式自体はscheduleNotification内部と同じものを使う必要があるため、
+      // scheduled-workout-scheduler.tsから公開されたbuildScheduledWorkoutFireDateを再利用する
+      const fireDate = buildScheduledWorkoutFireDate(dateKey, hour, minute);
       // 画面2→画面1→カレンダー画面の2階層を一度に閉じる
       // (app/workout/routine-load.tsxのrouter.dismiss(2)と同じ考え方)
       if (fireDate.getTime() <= Date.now()) {

@@ -17,7 +17,9 @@ function notificationIdFor(scheduledWorkoutId: number): string {
   return `scheduled-workout-${scheduledWorkoutId}`;
 }
 
-function buildFireDate(scheduledDate: string, hour: number, minute: number): Date {
+// app/calendar/schedule-time-picker.tsxの「今日の過ぎた時刻」判定でも同じ計算が必要なため、
+// UI層とのロジック重複を避けてここから公開する
+export function buildScheduledWorkoutFireDate(scheduledDate: string, hour: number, minute: number): Date {
   const date = parseDateKey(scheduledDate);
   date.setHours(hour, minute, 0, 0);
   return date;
@@ -56,7 +58,7 @@ async function scheduleNotificationCore(sw: ScheduledWorkoutLike, routineName: s
 // PermissionBannerにより案内済みのため、ここで重ねてAlertは出さない設計、PR10-5計画フェーズの
 // @designer方針)
 async function scheduleNotification(sw: ScheduledWorkoutLike, routineName: string): Promise<void> {
-  const fireDate = buildFireDate(sw.scheduledDate, sw.hour, sw.minute);
+  const fireDate = buildScheduledWorkoutFireDate(sw.scheduledDate, sw.hour, sw.minute);
   if (fireDate.getTime() <= Date.now()) return;
   if ((await getPermissionState()) !== 'granted') return;
   await scheduleNotificationCore(sw, routineName, fireDate);
@@ -87,7 +89,8 @@ export async function createScheduledWorkout(
 }
 
 // 選択日パネル手動予定カードの⋮メニュー「削除」(app/(tabs)/calendar.tsxのhandleDeleteSchedule)用。
-// 通知キャンセルを先に行ってからDB削除する(逆順だと削除後に通知IDを引く手段が無くなるため)
+// 通知キャンセルを先に行ってからDB削除する。cancelNotificationは内部でエラーを握りつぶし常に
+// 成功するため、この順序なら万一DB削除が失敗しても通知だけは確実に止められる
 export async function removeScheduledWorkout(scheduledWorkoutId: number): Promise<void> {
   await cancelNotification(scheduledWorkoutId);
   await deleteScheduledWorkout(scheduledWorkoutId);
@@ -121,15 +124,17 @@ export async function syncScheduledWorkoutNotifications(): Promise<void> {
   const routineNameById = new Map(routineRows.map((r) => [r.id, r.name] as const));
 
   const now = Date.now();
-  for (const sw of rows) {
-    const routineName = routineNameById.get(sw.routineId);
-    if (routineName === undefined) continue;
-    const fireDate = buildFireDate(sw.scheduledDate, sw.hour, sw.minute);
-    if (fireDate.getTime() <= now) continue;
-    try {
-      await scheduleNotificationCore(sw, routineName, fireDate);
-    } catch (e) {
-      console.error('[sync scheduled-workout notification]', e);
-    }
-  }
+  await Promise.all(
+    rows.map(async (sw) => {
+      const routineName = routineNameById.get(sw.routineId);
+      if (routineName === undefined) return;
+      const fireDate = buildScheduledWorkoutFireDate(sw.scheduledDate, sw.hour, sw.minute);
+      if (fireDate.getTime() <= now) return;
+      try {
+        await scheduleNotificationCore(sw, routineName, fireDate);
+      } catch (e) {
+        console.error('[sync scheduled-workout notification]', e);
+      }
+    }),
+  );
 }

@@ -15,6 +15,14 @@ jest.mock('expo-router', () => ({
 
 jest.mock('@/lib/notifications/scheduled-workout-scheduler', () => ({
   createScheduledWorkout: (...args: unknown[]) => mockCreateScheduledWorkout(...args),
+  // lib/calendar/date-grid.tsのparseDateKeyと同じ計算をここでも行う(要mock化のため実体をimportできず、
+  // 依存を持たない純粋なロジックなのでインライン複製する)。過去時刻確定時のAlert分岐のテストで使う
+  buildScheduledWorkoutFireDate: (dateKey: string, hour: number, minute: number) => {
+    const [y, m, d] = dateKey.split('-').map(Number);
+    const date = new Date(y, m - 1, d);
+    date.setHours(hour, minute, 0, 0);
+    return date;
+  },
 }));
 
 // usePermissionState(hooks/use-permission-state.ts)はgetPermissionStateだけを使うが、

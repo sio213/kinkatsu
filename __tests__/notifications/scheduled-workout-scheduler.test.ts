@@ -8,6 +8,10 @@ const mockDeleteScheduledWorkout = jest.fn();
 const mockGetPermissionState = jest.fn();
 const mockScheduleNotificationAsync = jest.fn();
 const mockCancelScheduledNotificationAsync = jest.fn();
+// .where()に渡された実引数(eq()の呼び出し結果)を検証できるよう、単なる無視スタブではなく
+// 呼び出しを記録するjest.fnにする(自動レビューの指摘: 誤った列を渡す回帰があっても
+// このテストが通ってしまう問題への対応)
+const mockWhere = jest.fn((..._args: unknown[]) => Promise.resolve(mockScheduledWorkoutRows));
 
 // scheduledWorkouts側は.from(table)を直接await(syncScheduledWorkoutNotifications)する場合と
 // .from(table).where(...)をawait(cancelScheduledWorkoutNotificationsForRoutine)する場合の
@@ -15,25 +19,34 @@ const mockCancelScheduledNotificationAsync = jest.fn();
 function mockChainable(value: unknown) {
   return {
     then: (resolve: (v: unknown) => void) => Promise.resolve(value).then(resolve),
-    where: (..._args: unknown[]) => Promise.resolve(value),
+    where: (...args: unknown[]) => mockWhere(...args),
   };
 }
 
-jest.mock('@/db/client', () => ({
-  db: {
-    select: jest.fn((cols?: unknown) => ({
-      from: (table: unknown) => {
-        if (table === 'scheduledWorkouts') return mockChainable(mockScheduledWorkoutRows);
-        if (table === 'routines') return Promise.resolve(mockRoutineRows);
-        throw new Error(`unexpected table: ${table} (cols=${JSON.stringify(cols)})`);
-      },
-    })),
-  },
-}));
+// @/db/schemaのモックをここでトップレベルconstとして持つと、babelがconstをvarへ変換する
+// 都合でimport起因のrequireがconst代入より先に走り、参照時にundefinedになる(実際に再現確認済み)。
+// db.test.tsと同じく、@/db/client側のfactory内でrequire('@/db/schema')して同一インスタンスを
+// 遅延取得することで回避する
+jest.mock('@/db/client', () => {
+  const schema = require('@/db/schema');
+  return {
+    db: {
+      select: jest.fn((cols?: unknown) => ({
+        from: (table: unknown) => {
+          if (table === schema.scheduledWorkouts) return mockChainable(mockScheduledWorkoutRows);
+          if (table === schema.routines) return Promise.resolve(mockRoutineRows);
+          throw new Error(`unexpected table: ${JSON.stringify(table)} (cols=${JSON.stringify(cols)})`);
+        },
+      })),
+    },
+  };
+});
 
+// scheduledWorkoutsは列名を判別できるオブジェクト形にしておく(単なる文字列だと
+// scheduledWorkouts.routineIdが常にundefinedになり、.where()に渡る列が正しいかを検証できない)
 jest.mock('@/db/schema', () => ({
-  scheduledWorkouts: 'scheduledWorkouts',
-  routines: 'routines',
+  scheduledWorkouts: { id: 'scheduledWorkouts.id', routineId: 'scheduledWorkouts.routineId' },
+  routines: { id: 'routines.id', name: 'routines.name' },
 }));
 
 jest.mock('drizzle-orm', () => ({
@@ -276,6 +289,9 @@ describe('cancelScheduledWorkoutNotificationsForRoutine', () => {
     expect(mockCancelScheduledNotificationAsync).toHaveBeenCalledWith('scheduled-workout-1');
     expect(mockCancelScheduledNotificationAsync).toHaveBeenCalledWith('scheduled-workout-2');
     expect(mockDeleteScheduledWorkout).not.toHaveBeenCalled();
+    // routineIdではなくidを条件に絞り込むような列違いの回帰を検知できるよう、.where()に渡った
+    // 実引数(eq(scheduledWorkouts.routineId, routineId)の戻り値)を検証する(自動レビュー指摘対応)
+    expect(mockWhere).toHaveBeenCalledWith({ col: 'scheduledWorkouts.routineId', val: 10 });
   });
 
   it('紐づく手動予定が無ければ何もキャンセルしない', async () => {
