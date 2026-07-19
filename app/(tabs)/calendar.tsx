@@ -5,20 +5,23 @@ import { RoutineScheduleCard } from '@/components/calendar/routine-schedule-card
 import { SessionTimeGroupHeader } from '@/components/calendar/session-time-group-header';
 import { SwipeableMonthView } from '@/components/calendar/swipeable-month-view';
 import { CategoryFilterChips } from '@/components/exercises/category-filter-chips';
+import { DesignIcon } from '@/components/ui/design-icon';
 import { IconSymbol } from '@/components/ui/icon-symbol';
 import { ResumeWorkoutBanner } from '@/components/workout/resume-workout-banner';
 import { Colors, Typography } from '@/constants/theme';
 import { useCalendarDayExercises, type CalendarDayCard } from '@/hooks/use-calendar-day-exercises';
+import { useCalendarDayManualSchedule, type ManualScheduleCard } from '@/hooks/use-calendar-day-manual-schedule';
 import { useCalendarDaySchedule, type DayScheduleCard } from '@/hooks/use-calendar-day-schedule';
 import { useCalendarMonthRecords } from '@/hooks/use-calendar-month-records';
 import { useCalendarMonthSchedule } from '@/hooks/use-calendar-month-schedule';
 import { useDebouncedPush } from '@/hooks/use-debounced-push';
 import { useStartRoutineWithConfirm } from '@/hooks/use-start-routine-with-confirm';
 import { useWorkoutSessions } from '@/hooks/use-workout-session';
-import { addMonths, isSameDay } from '@/lib/calendar/date-grid';
+import { addMonths, isSameDay, toDateKey } from '@/lib/calendar/date-grid';
 import { CATEGORY_ALL, EXERCISE_CATEGORIES } from '@/lib/exercises/constants';
 import { buildTodayTimeline, groupCardsBySession } from '@/lib/calendar/session-groups';
-import { formatHourMinute } from '@/lib/calendar/time-of-day';
+import { mergeScheduleCards } from '@/lib/calendar/schedule';
+import { formatHourMinute, formatHourMinuteParts } from '@/lib/calendar/time-of-day';
 import { formatKindSummary } from '@/lib/notifications/format';
 import { formatMonthGroup, formatSessionDateGroup } from '@/lib/workout/summary';
 import { Stack } from 'expo-router';
@@ -33,6 +36,7 @@ const CALENDAR_FILTER_CATEGORIES = [CATEGORY_ALL, ...EXERCISE_CATEGORIES] as con
 // 過去日選択時に予定を握りつぶす際の固定参照（毎レンダー新しい配列を作らないことで
 // 依存するuseMemoの不要な再計算を避ける）
 const EMPTY_SCHEDULE: DayScheduleCard[] = [];
+const EMPTY_MANUAL_SCHEDULE: ManualScheduleCard[] = [];
 
 function MonthNavButton({
   direction,
@@ -54,6 +58,26 @@ function MonthNavButton({
         size={20}
         color={Colors.textPlaceholder}
       />
+    </TouchableOpacity>
+  );
+}
+
+// 未来日パネルの予定リスト末尾に置く控えめな追加ボタン。DayEmptyStateの「予定を追加」は
+// 予定が0件の日にしか出ないため、既に1件以上ある日に2件目以降を追加する導線が無かった
+// （PRレビュー指摘対応）。見た目はcomponents/routines/routine-add-exercise-button.tsxの
+// ghostバリアント（一覧末尾の控えめな追加ボタン）に合わせるが、ラベルが「種目を追加」固定で
+// 汎用化されていないため、あちらを流用せずスタイルだけ揃えてこの画面内に定義する
+function AddScheduleGhostButton({ onPress }: { onPress: () => void }) {
+  return (
+    <TouchableOpacity
+      style={styles.addScheduleGhost}
+      onPress={onPress}
+      accessibilityRole="button"
+      accessibilityLabel="予定を追加"
+      hitSlop={{ top: 6, bottom: 6, left: 8, right: 8 }}
+    >
+      <DesignIcon name="add-circle" size={18} color={Colors.accent} />
+      <Text style={styles.addScheduleGhostText}>予定を追加</Text>
     </TouchableOpacity>
   );
 }
@@ -150,6 +174,16 @@ export default function CalendarScreen() {
   const isFutureDay = selectedDayStart > todayStart;
   const rawDaySchedule = useCalendarDaySchedule(selectedDate);
   const daySchedule: DayScheduleCard[] = isSelectedToday || isFutureDay ? rawDaySchedule : EMPTY_SCHEDULE;
+  // 手動予定（PR10）は今のところ未来日パネルのみ対象（今日タイムラインへの統合は後続PR）
+  const rawManualSchedule = useCalendarDayManualSchedule(selectedDate);
+  const manualSchedule: ManualScheduleCard[] = isFutureDay ? rawManualSchedule : EMPTY_MANUAL_SCHEDULE;
+  // 同じルーティンがリマインダー予定・手動予定の両方にあると同一予定が二重に見えるため、
+  // routineId単位で手動予定を優先し重複を畳む（lib/calendar/schedule.tsのmergeScheduleCards、
+  // 2026-07-19確定。「リマインダー予定自体を打ち消す」機能は別スコープ）
+  const futureDaySchedule = useMemo(
+    () => (isFutureDay ? mergeScheduleCards(daySchedule, manualSchedule) : []),
+    [isFutureDay, daySchedule, manualSchedule],
+  );
   const todayTimeline = useMemo(
     () =>
       isSelectedToday
@@ -166,6 +200,12 @@ export default function CalendarScreen() {
   const handlePressRoutine = useCallback(
     (routineId: number) => pushDebounced(`/routine/edit/${routineId}`),
     [pushDebounced],
+  );
+  // 未来日パネルの「予定を追加」ボタン用（PR10）。日付は選択日で確定済みのため
+  // ルーティン選択画面（app/calendar/schedule-routine-picker.tsx）へdateKeyだけ渡す
+  const handlePressAddSchedule = useCallback(
+    () => pushDebounced({ pathname: '/calendar/schedule-routine-picker', params: { dateKey: toDateKey(selectedDate) } }),
+    [pushDebounced, selectedDate],
   );
 
   const { activeSession } = useWorkoutSessions();
@@ -220,11 +260,12 @@ export default function CalendarScreen() {
           <CategoryColorLegend />
         </View>
         {/* 予定（リング/ドット表現）が実際に画面上にある場合だけ表示する。予定を使っていない
-            （＝ルーティン紐付きリマインダーを設定していない）ユーザーには不要な説明のため
+            （＝ルーティン紐付きリマインダーも手動予定も無い）ユーザーには不要な説明のため
             常時表示にはしない（@designer指摘: 塗り=実施/リング・ドット=予定の凡例が無いと
-            初見で誤読されるおそれがあるとの指摘への対応） */}
+            初見で誤読されるおそれがあるとの指摘への対応）。手動予定(PR10)もリング/ドットに
+            反映されるようになったため「リマインダー由来」の限定は外す */}
         {primaryCategoryByScheduleDay.size > 0 && (
-          <Text style={styles.scheduleLegendHint}>塗りつぶし＝実施済み、輪郭・点＝予定（リマインダー由来）</Text>
+          <Text style={styles.scheduleLegendHint}>塗りつぶし＝実施済み、輪郭・点＝予定</Text>
         )}
 
         <View style={styles.dayPanel}>
@@ -278,26 +319,27 @@ export default function CalendarScreen() {
               )}
             </View>
           ) : isFutureDay ? (
-            daySchedule.length === 0 ? (
+            futureDaySchedule.length === 0 ? (
               <DayEmptyState
                 buttonIcon="plus"
                 actionLabel="予定を追加"
                 text="予定がありません"
-                disabled
-                onPressAction={() => {}}
+                onPressAction={handlePressAddSchedule}
               />
             ) : (
               <View style={styles.dayCardList}>
-                {daySchedule.map((card) => (
+                {futureDaySchedule.map((card) => (
                   <RoutineScheduleCard
-                    key={card.reminderId}
+                    key={card.key}
                     routineName={card.routineName}
                     categories={card.categories}
                     exerciseCount={card.exerciseCount}
-                    timeLabel={formatKindSummary(card.reminder)}
+                    timeLabel={card.source === 'reminder' ? formatKindSummary(card.reminder) : formatHourMinuteParts(card.hour, card.minute)}
                     onPress={() => handlePressRoutine(card.routineId)}
+                    oneTime={card.source === 'manual'}
                   />
                 ))}
+                <AddScheduleGhostButton onPress={handlePressAddSchedule} />
               </View>
             )
           ) : dayCards.length === 0 ? (
@@ -341,4 +383,16 @@ const styles = StyleSheet.create({
   // 時間帯グループ間の余白はデザイン案「複数18」のheight:12px相当
   dayGroupList: { gap: 12 },
   dayGroup: { gap: 8 },
+  // components/routines/routine-add-exercise-button.tsxのghostバリアントと同じ見た目
+  addScheduleGhost: {
+    flexDirection: 'row',
+    justifyContent: 'center',
+    alignItems: 'center',
+    gap: 6,
+    width: '100%',
+    backgroundColor: Colors.accentSurface,
+    borderRadius: 8,
+    paddingVertical: 11,
+  },
+  addScheduleGhostText: { ...Typography.footnote, fontWeight: '600', color: Colors.accent },
 });

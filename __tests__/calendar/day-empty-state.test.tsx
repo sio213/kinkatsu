@@ -43,9 +43,4 @@ describe('DayEmptyState', () => {
     expect(root.root.findByProps({ children: '予定がありません' })).toBeDefined();
     expect(() => root.root.findByProps({ children: '記録がありません' })).toThrow();
   });
-
-  it('disabled=trueならボタンのTouchableOpacityにdisabledが渡る（PR10未実装の「予定を追加」用）', () => {
-    const root = render({ disabled: true, actionLabel: '予定を追加' });
-    expect(root.root.findByType(TouchableOpacity).props.disabled).toBe(true);
-  });
 });

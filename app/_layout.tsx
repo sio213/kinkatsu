@@ -182,6 +182,10 @@ export default function RootLayout() {
               上書きする（workout/session-history-loadと同じ方針） */}
           <Stack.Screen name="workout/routine-load" options={{ title: '' }} />
           <Stack.Screen name="workout/start-chooser" options={{ title: 'どう始める？' }} />
+          {/* どちらも選択中の日付をヘッダーに動的表示するため、画面側でStack.Screen optionsを
+              上書きする（workout/routine-loadと同じ方針） */}
+          <Stack.Screen name="calendar/schedule-routine-picker" options={{ title: '' }} />
+          <Stack.Screen name="calendar/schedule-time-picker" options={{ title: '' }} />
           <Stack.Screen
             name="modal"
             options={{ presentation: 'modal', title: 'Modal' }}

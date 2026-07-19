@@ -84,4 +84,18 @@ describe('RoutineScheduleCard', () => {
     const texts = root.root.findAllByType(Text).map((t) => t.props.children);
     expect(texts).toContain('+1');
   });
+
+  it('oneTime=trueの場合、「1回のみ」バッジを表示し、accessibilityLabelにも含める（手動予定とリマインダー予定の区別、PR10）', () => {
+    const root = render({ oneTime: true, timeLabel: '19:30' });
+    const texts = root.root.findAllByType(Text).map((t) => t.props.children);
+    expect(texts).toContain('1回のみ');
+    const label = root.root.findByType(TouchableOpacity).props.accessibilityLabel as string;
+    expect(label).toBe('胸の日、胸・肩、4種目、19:30、1回のみ');
+  });
+
+  it('oneTimeを省略した場合（リマインダー予定）、「1回のみ」バッジは表示されない', () => {
+    const root = render();
+    const texts = root.root.findAllByType(Text).map((t) => t.props.children);
+    expect(texts).not.toContain('1回のみ');
+  });
 });

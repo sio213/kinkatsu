@@ -1,21 +1,26 @@
 // jest.mock はホイストされるため、変数は var で定義してスコープを合わせる
 /* eslint-disable no-var */
 var mockRows: unknown[] | undefined;
+var mockManualRows: unknown[] | undefined;
 var mockSummaries: Map<number, { exerciseCount: number; categories: string[] }>;
 
 jest.mock('@/db/client', () => {
-  const chain = {
-    where: jest.fn().mockReturnThis(),
-  };
   return {
     db: {
-      select: jest.fn().mockReturnValue({ from: jest.fn().mockReturnValue(chain) }),
+      select: jest.fn(() => ({
+        from: jest.fn((table: string) => ({
+          __table: table,
+          where: jest.fn().mockReturnThis(),
+        })),
+      })),
     },
   };
 });
 
+// 文字列マーカーにしておき、useLiveQueryのモック側でどちらのテーブルへのクエリかを判別する
 jest.mock('@/db/schema', () => ({
-  reminders: { id: 'id', routineId: 'routineId', enabled: 'enabled' },
+  reminders: 'reminders',
+  scheduledWorkouts: 'scheduledWorkouts',
 }));
 
 jest.mock('drizzle-orm', () => ({
@@ -25,7 +30,9 @@ jest.mock('drizzle-orm', () => ({
 }));
 
 jest.mock('drizzle-orm/expo-sqlite', () => ({
-  useLiveQuery: jest.fn(() => ({ data: mockRows })),
+  useLiveQuery: jest.fn((query: { __table: string }) => ({
+    data: query.__table === 'scheduledWorkouts' ? mockManualRows : mockRows,
+  })),
 }));
 
 jest.mock('@/hooks/use-routines', () => ({
@@ -72,6 +79,7 @@ const BASE_REMINDER = {
 
 beforeEach(() => {
   mockRows = undefined;
+  mockManualRows = undefined;
   mockSummaries = new Map();
 });
 
@@ -140,5 +148,56 @@ describe('useCalendarMonthSchedule', () => {
     const result = getResult();
     expect(result.primaryCategoryByScheduleDay.get('2026-07-20')).toBe('chest');
     expect(result.categorySetByScheduleDay.get('2026-07-20')).toEqual(new Set(['leg', 'chest']));
+  });
+
+  it('手動予定(scheduledWorkouts、PR10)だけがある場合も、日付ごとの代表カテゴリに反映される', () => {
+    mockManualRows = [{ id: 1, routineId: 10, scheduledDate: '2026-07-20', hour: 19, minute: 30 }];
+    mockSummaries = new Map([[10, { exerciseCount: 2, categories: ['leg'] }]]);
+    const todayStart = new Date(2026, 6, 20).getTime();
+    const rangeEnd = new Date(2026, 6, 23).getTime();
+    const getResult = renderHook(todayStart, rangeEnd, todayStart);
+    const result = getResult();
+    expect(result.primaryCategoryByScheduleDay.get('2026-07-20')).toBe('leg');
+    expect(result.categorySetByScheduleDay.get('2026-07-20')).toEqual(new Set(['leg']));
+  });
+
+  it('同日にリマインダー予定と手動予定の両方がある場合、時刻が早い方のカテゴリが代表になる', () => {
+    mockRows = [{ ...BASE_REMINDER, id: 1, routineId: 10, kind: 'interval', intervalDays: 1, hour: 19, minute: 0 }];
+    mockManualRows = [{ id: 1, routineId: 20, scheduledDate: '2026-07-20', hour: 7, minute: 0 }];
+    mockSummaries = new Map([
+      [10, { exerciseCount: 1, categories: ['leg'] }],
+      [20, { exerciseCount: 1, categories: ['chest'] }],
+    ]);
+    const todayStart = new Date(2026, 6, 20).getTime();
+    const rangeEnd = new Date(2026, 6, 21).getTime();
+    const getResult = renderHook(todayStart, rangeEnd, todayStart);
+    const result = getResult();
+    expect(result.primaryCategoryByScheduleDay.get('2026-07-20')).toBe('chest');
+    expect(result.categorySetByScheduleDay.get('2026-07-20')).toEqual(new Set(['leg', 'chest']));
+  });
+
+  it('手動予定もsummariesに代表カテゴリが無いルーティン(種目0件)は対象外', () => {
+    mockManualRows = [{ id: 1, routineId: 10, scheduledDate: '2026-07-20', hour: 19, minute: 30 }];
+    mockSummaries = new Map(); // routineId=10のエントリなし
+    const todayStart = new Date(2026, 6, 20).getTime();
+    const rangeEnd = new Date(2026, 6, 21).getTime();
+    const getResult = renderHook(todayStart, rangeEnd, todayStart);
+    expect(getResult().primaryCategoryByScheduleDay.size).toBe(0);
+  });
+
+  it('手動予定も範囲外([effectiveStart, rangeEnd)外)の日付は対象外', () => {
+    mockManualRows = [
+      { id: 1, routineId: 10, scheduledDate: '2026-06-30', hour: 19, minute: 30 }, // todayStartより前
+      { id: 2, routineId: 10, scheduledDate: '2026-07-23', hour: 19, minute: 30 }, // rangeEnd以降
+      { id: 3, routineId: 10, scheduledDate: '2026-07-20', hour: 19, minute: 30 }, // 範囲内
+    ];
+    mockSummaries = new Map([[10, { exerciseCount: 1, categories: ['leg'] }]]);
+    const todayStart = new Date(2026, 6, 20).getTime();
+    const rangeEnd = new Date(2026, 6, 23).getTime();
+    const getResult = renderHook(todayStart, rangeEnd, todayStart);
+    const result = getResult();
+    expect(result.primaryCategoryByScheduleDay.has('2026-06-30')).toBe(false);
+    expect(result.primaryCategoryByScheduleDay.has('2026-07-23')).toBe(false);
+    expect(result.primaryCategoryByScheduleDay.get('2026-07-20')).toBe('leg');
   });
 });

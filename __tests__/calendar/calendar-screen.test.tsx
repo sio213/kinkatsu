@@ -2,6 +2,7 @@ const mockPush = jest.fn();
 const mockUseWorkoutSessions = jest.fn();
 const mockUseCalendarDayExercises = jest.fn();
 const mockUseCalendarDaySchedule = jest.fn();
+const mockUseCalendarDayManualSchedule = jest.fn();
 const mockSwipeableMonthView = jest.fn();
 
 jest.mock('@/hooks/use-debounced-push', () => ({
@@ -30,6 +31,10 @@ jest.mock('@/hooks/use-calendar-month-schedule', () => ({
 
 jest.mock('@/hooks/use-calendar-day-schedule', () => ({
   useCalendarDaySchedule: () => mockUseCalendarDaySchedule(),
+}));
+
+jest.mock('@/hooks/use-calendar-day-manual-schedule', () => ({
+  useCalendarDayManualSchedule: () => mockUseCalendarDayManualSchedule(),
 }));
 
 const mockEndWorkoutSession = jest.fn();
@@ -79,6 +84,7 @@ beforeEach(() => {
   jest.clearAllMocks();
   mockUseCalendarDayExercises.mockReturnValue({ cards: [], retry: jest.fn() });
   mockUseCalendarDaySchedule.mockReturnValue([]);
+  mockUseCalendarDayManualSchedule.mockReturnValue([]);
   mockUseWorkoutSessions.mockReturnValue({ sessions: [], activeSession: null });
   jest.spyOn(Alert, 'alert').mockImplementation(() => {});
   mockStartWorkoutFromRoutine.mockResolvedValue({ sessionId: 77, cards: [] });
@@ -429,7 +435,7 @@ describe('CalendarScreen 予定（PR9-2: リマインダー由来の未来予定
     expect(findTextByJoinedChildren(root, '今日 20:00')).toBeUndefined();
   });
 
-  test('未来日を選択して予定が無い場合、「予定がありません」と無効化された「予定を追加」ボタンを表示する', () => {
+  test('未来日を選択して予定が無い場合、「予定がありません」+有効な「予定を追加」ボタンを表示し、押すとルーティン選択画面へ遷移する（PR10）', () => {
     const root = render();
     const future = new Date();
     future.setDate(future.getDate() + 5);
@@ -438,7 +444,16 @@ describe('CalendarScreen 予定（PR9-2: リマインダー由来の未来予定
     expect(root.findByProps({ children: '予定がありません' })).toBeDefined();
     const addBtn = root.findAllByType(TouchableOpacity).find((t) => t.props.accessibilityLabel === '予定を追加');
     expect(addBtn).toBeDefined();
-    expect(addBtn!.props.disabled).toBe(true);
+    expect(addBtn!.props.disabled).toBeFalsy();
+
+    act(() => {
+      addBtn!.props.onPress();
+    });
+    const expectedDateKey = `${future.getFullYear()}-${String(future.getMonth() + 1).padStart(2, '0')}-${String(future.getDate()).padStart(2, '0')}`;
+    expect(mockPush).toHaveBeenCalledWith({
+      pathname: '/calendar/schedule-routine-picker',
+      params: { dateKey: expectedDateKey },
+    });
   });
 
   test('過去日を選択すると、useCalendarDayScheduleが予定を返していても表示されない（過去日は実績のみ）', () => {
@@ -451,6 +466,84 @@ describe('CalendarScreen 予定（PR9-2: リマインダー由来の未来予定
 
     expect(root.findAllByProps({ children: '胸の日' }).length).toBe(0);
     expect(root.findByProps({ children: '記録がありません' })).toBeDefined();
+  });
+
+  describe('手動で追加した予定(PR10)', () => {
+    function manualCard(overrides: Record<string, unknown> = {}) {
+      return {
+        scheduledWorkoutId: 1,
+        routineId: 20,
+        routineName: '脚の日',
+        categories: ['leg'],
+        exerciseCount: 3,
+        hour: 19,
+        minute: 30,
+        ...overrides,
+      };
+    }
+
+    test('未来日に手動予定があれば表示され、時刻ラベルは「HH:MM」の素の表記になる（頻度表示は付かない）', () => {
+      const root = render();
+      const future = new Date();
+      future.setDate(future.getDate() + 5);
+      mockUseCalendarDayManualSchedule.mockReturnValue([manualCard()]);
+      selectDate(future);
+
+      expect(root.findByProps({ children: '脚の日' })).toBeDefined();
+      expect(findTextByJoinedChildren(root, '19:30')).toBeDefined();
+    });
+
+    test('同じルーティンがリマインダー予定・手動予定の両方にある場合、手動予定だけが表示される（重複排除）', () => {
+      const root = render();
+      const future = new Date();
+      future.setDate(future.getDate() + 5);
+      mockUseCalendarDaySchedule.mockReturnValue([scheduleCard({ routineId: 20, routineName: '脚の日' })]);
+      mockUseCalendarDayManualSchedule.mockReturnValue([manualCard({ routineId: 20, routineName: '脚の日' })]);
+      selectDate(future);
+
+      // 「脚の日」の予定カードは1枚だけ（重複表示されない）。findAllByType(TouchableOpacity)の
+      // accessibilityLabelで数える（findAllByProps({children:'脚の日'})はTextの内部ホスト要素まで
+      // 二重にマッチするため、カード単位の存在確認には使えない）
+      const cards = root
+        .findAllByType(TouchableOpacity)
+        .filter((t) => typeof t.props.accessibilityLabel === 'string' && t.props.accessibilityLabel.startsWith('脚の日、'));
+      expect(cards.length).toBe(1);
+      // 手動予定側の素の時刻表記が使われている（リマインダー側のformatKindSummaryではない）
+      expect(findTextByJoinedChildren(root, '19:30')).toBeDefined();
+    });
+
+    test('過去日を選択すると、手動予定を返していても表示されない（過去日は実績のみ）', () => {
+      const root = render();
+      const past = new Date();
+      past.setDate(past.getDate() - 5);
+      mockUseCalendarDayManualSchedule.mockReturnValue([manualCard()]);
+      mockUseCalendarDayExercises.mockReturnValue({ cards: [], retry: jest.fn() });
+      selectDate(past);
+
+      expect(root.findAllByProps({ children: '脚の日' }).length).toBe(0);
+      expect(root.findByProps({ children: '記録がありません' })).toBeDefined();
+    });
+
+    test('既に予定が1件ある日でも一覧末尾に「予定を追加」ボタンが表示され、押すとその日のdateKeyでルーティン選択画面へ遷移する（2件目以降を追加する導線、PRレビュー指摘対応）', () => {
+      const root = render();
+      const future = new Date();
+      future.setDate(future.getDate() + 5);
+      mockUseCalendarDayManualSchedule.mockReturnValue([manualCard()]);
+      selectDate(future);
+
+      expect(root.findByProps({ children: '脚の日' })).toBeDefined();
+      const addBtn = root.findAllByType(TouchableOpacity).find((t) => t.props.accessibilityLabel === '予定を追加')!;
+      expect(addBtn).toBeDefined();
+
+      act(() => {
+        addBtn.props.onPress();
+      });
+      const expectedDateKey = `${future.getFullYear()}-${String(future.getMonth() + 1).padStart(2, '0')}-${String(future.getDate()).padStart(2, '0')}`;
+      expect(mockPush).toHaveBeenCalledWith({
+        pathname: '/calendar/schedule-routine-picker',
+        params: { dateKey: expectedDateKey },
+      });
+    });
   });
 
   describe('今日の予定カードの「開始」ボタン(handleStartRoutine)', () => {

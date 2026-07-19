@@ -14,8 +14,8 @@ const TIME_OF_DAY_LABELS: Record<TimeOfDay, string> = {
 export function getTimeOfDay(date: Date): TimeOfDay {
   const hour = date.getHours();
   if (hour >= 4 && hour < 11) return 'morning';
-  if (hour >= 11 && hour < 17) return 'midday';
-  if (hour >= 17 && hour < 19) return 'evening';
+  if (hour >= 11 && hour < 16) return 'midday';
+  if (hour >= 16 && hour < 19) return 'evening';
   return 'night'; // 19:00〜翌3:59
 }
 
@@ -24,5 +24,12 @@ export function getTimeOfDayLabel(period: TimeOfDay): string {
 }
 
 export function formatHourMinute(date: Date): string {
-  return `${String(date.getHours()).padStart(2, '0')}:${String(date.getMinutes()).padStart(2, '0')}`;
+  return formatHourMinuteParts(date.getHours(), date.getMinutes());
+}
+
+// DBのhour/minute(0-23, 0-59の数値列)をそのまま整形したいだけの箇所（Dateオブジェクトを
+// 経由する意味が無い）向け。「HH:MM」フォーマットの実体はここに1本化し、呼び出し側で
+// ダミーのDateを組み立てさせない
+export function formatHourMinuteParts(hour: number, minute: number): string {
+  return `${String(hour).padStart(2, '0')}:${String(minute).padStart(2, '0')}`;
 }

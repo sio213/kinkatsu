@@ -7,14 +7,14 @@ describe('getTimeOfDay', () => {
     expect(getTimeOfDay(new Date(2026, 6, 16, 10, 59))).toBe('morning');
   });
 
-  it('11:00〜16:59は昼(midday)', () => {
+  it('11:00〜15:59は昼(midday)', () => {
     expect(getTimeOfDay(new Date(2026, 6, 16, 11, 0))).toBe('midday');
     expect(getTimeOfDay(new Date(2026, 6, 16, 12, 30))).toBe('midday');
-    expect(getTimeOfDay(new Date(2026, 6, 16, 16, 59))).toBe('midday');
+    expect(getTimeOfDay(new Date(2026, 6, 16, 15, 59))).toBe('midday');
   });
 
-  it('17:00〜18:59は夕方(evening)', () => {
-    expect(getTimeOfDay(new Date(2026, 6, 16, 17, 0))).toBe('evening');
+  it('16:00〜18:59は夕方(evening)', () => {
+    expect(getTimeOfDay(new Date(2026, 6, 16, 16, 0))).toBe('evening');
     expect(getTimeOfDay(new Date(2026, 6, 16, 17, 40))).toBe('evening');
     expect(getTimeOfDay(new Date(2026, 6, 16, 18, 59))).toBe('evening');
   });

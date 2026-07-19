@@ -1,4 +1,4 @@
-import { addMonths, buildMonthGridDates, CELLS_PER_WEEK, isSameDay, toDateKey, weeksInMonthGrid } from '@/lib/calendar/date-grid';
+import { addMonths, buildMonthGridDates, CELLS_PER_WEEK, isSameDay, isValidDateKey, parseDateKey, toDateKey, weeksInMonthGrid } from '@/lib/calendar/date-grid';
 
 describe('toDateKey', () => {
   it('YYYY-MM-DD形式（月/日は2桁ゼロパディング）を返す', () => {
@@ -31,6 +31,41 @@ describe('toDateKey', () => {
       // 23:30 PST → UTCでは翌日07:30。toISOString()経由だと'2026-01-02'になってしまう
       expect(toDateKey(new Date(2026, 0, 1, 23, 30))).toBe('2026-01-01');
     });
+  });
+});
+
+describe('parseDateKey', () => {
+  it('toDateKeyの逆変換になる（往復して同じ年月日に戻る）', () => {
+    const original = new Date(2026, 6, 25);
+    expect(toDateKey(parseDateKey(toDateKey(original)))).toBe(toDateKey(original));
+  });
+
+  it('ローカルの年月日として解釈する（月は2桁ゼロパディングされた文字列から1引いた0始まり）', () => {
+    const d = parseDateKey('2026-01-05');
+    expect(d.getFullYear()).toBe(2026);
+    expect(d.getMonth()).toBe(0);
+    expect(d.getDate()).toBe(5);
+  });
+});
+
+describe('isValidDateKey', () => {
+  it('正しい"YYYY-MM-DD"形式ならtrue', () => {
+    expect(isValidDateKey('2026-07-25')).toBe(true);
+    expect(isValidDateKey('2026-01-01')).toBe(true);
+  });
+
+  it('undefined/null/空文字/形式が違う文字列はfalse', () => {
+    expect(isValidDateKey(undefined)).toBe(false);
+    expect(isValidDateKey(null)).toBe(false);
+    expect(isValidDateKey('')).toBe(false);
+    expect(isValidDateKey('2026/07/25')).toBe(false);
+    expect(isValidDateKey('not-a-date')).toBe(false);
+    expect(isValidDateKey('2026-7-25')).toBe(false); // ゼロパディング必須
+  });
+
+  it('存在しない日付（Dateコンストラクタが繰り上げてしまう値）はfalse', () => {
+    expect(isValidDateKey('2026-02-30')).toBe(false); // 2月30日は存在しない→3月2日に繰り上がる
+    expect(isValidDateKey('2026-13-01')).toBe(false); // 13月は存在しない
   });
 });
 

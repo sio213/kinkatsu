@@ -40,6 +40,24 @@ export function toDateKey(date: Date): string {
   return `${y}-${m}-${d}`;
 }
 
+// toDateKeyの逆変換。ローカルのカレンダー日付として組み立てる（new Date(dateKey)のようなISO
+// パース経由だとUTC解釈されタイムゾーンによって日付がずれるため使わない）
+export function parseDateKey(dateKey: string): Date {
+  const [y, m, d] = dateKey.split('-').map(Number);
+  return new Date(y, m - 1, d);
+}
+
+const DATE_KEY_PATTERN = /^\d{4}-\d{2}-\d{2}$/;
+
+// dateKeyがparseDateKeyに安全に渡せる'YYYY-MM-DD'形式か検証する。paramsとして受け取った
+// dateKey(不正な直リンク・型の付かないuseLocalSearchParamsの戻り値)をDateに変換する前の
+// ガードに使う想定（app/calendar/schedule-*-picker.tsx）。存在しない日付(例: 2026-02-30)は
+// Dateコンストラクタが自動繰り上げてしまうため、toDateKeyで往復させて一致するかも確認する
+export function isValidDateKey(dateKey: string | undefined | null): dateKey is string {
+  if (!dateKey || !DATE_KEY_PATTERN.test(dateKey)) return false;
+  return toDateKey(parseDateKey(dateKey)) === dateKey;
+}
+
 // ヘッダーの「YYYY年M月」表示・前月/翌月ナビゲーション用に、月単位でズラしたDateを返す
 export function addMonths(year: number, month: number, delta: number): { year: number; month: number } {
   // Dateコンストラクタはmonthが0-11の範囲外でも年をまたいで正規化してくれるため、

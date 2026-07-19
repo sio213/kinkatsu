@@ -227,3 +227,32 @@ export const reminderNotifications = sqliteTable(
 );
 
 export type ReminderNotification = typeof reminderNotifications.$inferSelect;
+
+// カレンダーで手動追加した予定（リマインダーとは無関係に「特定の日にこのルーティンをやる」を
+// 1件だけ置くもの、PR10確定仕様）。リマインダーは繰り返し設定+通知が本体なのに対し、こちらは
+// 単発の日付+時刻のみを持つ薄いレコード。ルーティン削除時は「そのルーティンをやる予定」自体が
+// 意味を失うためcascadeで一緒に消す（remindersのset nullとは異なり、孤児化を許容する理由が無い）
+export const scheduledWorkouts = sqliteTable(
+  'scheduled_workouts',
+  {
+    id: integer('id').primaryKey({ autoIncrement: true }),
+    routineId: integer('routine_id')
+      .notNull()
+      .references(() => routines.id, { onDelete: 'cascade' }),
+    // カレンダーのtoDateKey(lib/calendar/date-grid.ts)と同じ'YYYY-MM-DD'形式。月表示グリッドとの
+    // 突合・範囲検索が文字列比較のみで完結し、epoch msで持つ場合に発生しうるタイムゾーンずれの
+    // 心配が要らないため（この行が表すのは「特定の瞬間」ではなく「カレンダー上の1日」）
+    scheduledDate: text('scheduled_date').notNull(),
+    hour: integer('hour').notNull(),
+    minute: integer('minute').notNull(),
+    createdAt: integer('created_at').notNull(),
+    updatedAt: integer('updated_at').notNull(),
+  },
+  (t) => ({
+    byDate: index('idx_sw_date').on(t.scheduledDate),
+    byRoutine: index('idx_sw_routine').on(t.routineId),
+  }),
+);
+
+export type ScheduledWorkout = typeof scheduledWorkouts.$inferSelect;
+export type NewScheduledWorkout = typeof scheduledWorkouts.$inferInsert;
