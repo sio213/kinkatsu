@@ -22,6 +22,10 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 // spinner、Androidはボタン+モーダル、スタイルも同一に揃える）をそのまま踏襲する。デフォルト18:00も
 // reminder-form.tsxの新規リマインダーのデフォルトと揃え、アプリ内での「トレーニングの標準時刻」感を
 // 一貫させる
+function isPositiveInteger(n: number): boolean {
+  return Number.isInteger(n) && n > 0;
+}
+
 export default function ScheduleTimePickerScreen() {
   const {
     dateKey,
@@ -41,7 +45,11 @@ export default function ScheduleTimePickerScreen() {
     replaceMinute?: string;
   }>();
   const routineId = Number(routineIdParam);
-  const isReplaceMode = replaceReminderId !== undefined;
+  // routineIdと同じ理由(不正な直リンク対策)で、replaceReminderIdもNumber.isInteger等で
+  // 検証してから使う。素通しだとNaNのreminderIdでskipReminderOccurrence/DB書き込みを
+  // 試みることになる(@reviewer指摘)。isPositiveIntegerは下のroutineIdガードとも共有する
+  const replaceReminderIdNum = replaceReminderId !== undefined ? Number(replaceReminderId) : undefined;
+  const isReplaceMode = replaceReminderIdNum !== undefined && isPositiveInteger(replaceReminderIdNum);
   const router = useRouter();
   const isSubmittingRef = useRef(false);
 
@@ -49,8 +57,17 @@ export default function ScheduleTimePickerScreen() {
   const [showAndroidTimePicker, setShowAndroidTimePicker] = useState(false);
   // 差し替え時は元のリマインダーの時刻をデフォルトにする(差し替えたいのは基本的に「中身」であって
   // 「時間帯」ではないため、毎回18:00から手動で直す手間を無くす、@designer方針)
-  const [hour, setHour] = useState(() => (isReplaceMode && replaceHour ? Number(replaceHour) : 18));
-  const [minute, setMinute] = useState(() => (isReplaceMode && replaceMinute ? Number(replaceMinute) : 0));
+  // replaceHour/replaceMinuteもreplaceReminderIdと同じ直リンク対策が必要(@reviewer追加指摘)。
+  // 不正値(例:"abc")のまま素通しするとhour/minute stateがNaNになり、DateTimePickerに
+  // Invalid Dateが渡ってしまうため、範囲外ならデフォルトの18:00にフォールバックする
+  const [hour, setHour] = useState(() => {
+    const h = replaceHour !== undefined ? Number(replaceHour) : NaN;
+    return isReplaceMode && Number.isInteger(h) && h >= 0 && h <= 23 ? h : 18;
+  });
+  const [minute, setMinute] = useState(() => {
+    const m = replaceMinute !== undefined ? Number(replaceMinute) : NaN;
+    return isReplaceMode && Number.isInteger(m) && m >= 0 && m <= 59 ? m : 0;
+  });
   // isSubmittingRefは連打防止用の同期ガード、こちらはボタンの見た目のフィードバック用
   // (ensurePermission()がOSネイティブの許可ダイアログ応答待ちで数秒ブロックしうるため、
   // 押した直後に何も反応が無く見えるのを防ぐ、@designerレビュー指摘)
@@ -95,8 +112,8 @@ export default function ScheduleTimePickerScreen() {
       // 通常のスキップ(handleSkipReminder)と同じく、抑止できなかった場合は後で警告する
       // (@reviewer Major指摘: この経路だけ戻り値を握り潰していた)
       let notificationSuppressed = true;
-      if (isReplaceMode && replaceReminderId) {
-        const result = await skipReminderOccurrence(Number(replaceReminderId), dateKey);
+      if (isReplaceMode && replaceReminderIdNum !== undefined) {
+        const result = await skipReminderOccurrence(replaceReminderIdNum, dateKey);
         skippedForReplace = true;
         notificationSuppressed = result.notificationSuppressed;
       }
@@ -140,13 +157,13 @@ export default function ScheduleTimePickerScreen() {
       }
     } catch (e) {
       console.error('[add scheduled workout]', e);
-      if (skippedForReplace && replaceReminderId) {
+      if (skippedForReplace && replaceReminderIdNum !== undefined) {
         // 前半(スキップ)は成立済みなので、後半(手動予定の追加)の失敗を「差し替えできませんでした」
         // で伝えるだけだと、実際には元の予定が消えたままの中途半端な状態が残ってしまう。
         // 巻き戻し自体が失敗しても(この場合ゴーストカードの「元に戻す」で手動復旧できるため)、
         // ユーザーに見せるエラー自体は変えずログにのみ残す
         try {
-          await unskipReminderOccurrence(Number(replaceReminderId), dateKey);
+          await unskipReminderOccurrence(replaceReminderIdNum, dateKey);
         } catch (rollbackError) {
           console.error('[rollback skip after replace failure]', rollbackError);
         }
@@ -156,7 +173,7 @@ export default function ScheduleTimePickerScreen() {
       isSubmittingRef.current = false;
       setIsSubmitting(false);
     }
-  }, [routineId, routineName, dateKey, hour, minute, router, setPermState, isReplaceMode, replaceReminderId]);
+  }, [routineId, routineName, dateKey, hour, minute, router, setPermState, isReplaceMode, replaceReminderIdNum]);
 
   const handleRequestPermission = useCallback(async () => {
     setPermState(await ensurePermission());
@@ -166,8 +183,8 @@ export default function ScheduleTimePickerScreen() {
   // paramsで渡すが、不正な直リンク等への防御として明示的にガードする（dateKeyが不正なまま
   // parseDateKeyに渡るとクラッシュするため）。routineIdはDBの自動採番id(1始まりの整数)なので、
   // Number.isFiniteだけでは通ってしまう""(0扱い)・"0"・負数・小数の文字列まで弾くため
-  // Number.isInteger + 正の数であることまで確認する
-  if (!Number.isInteger(routineId) || routineId <= 0 || !isValidDateKey(dateKey)) {
+  // Number.isInteger + 正の数であることまで確認する(isPositiveInteger、replaceReminderIdNumと共有)
+  if (!isPositiveInteger(routineId) || !isValidDateKey(dateKey)) {
     return (
       <SafeAreaView style={styles.safeArea} edges={['bottom']}>
         <Stack.Screen options={{ title: '時刻を選択' }} />
