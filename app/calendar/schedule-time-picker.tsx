@@ -108,9 +108,12 @@ export default function ScheduleTimePickerScreen() {
       // scheduled-workout-scheduler.tsから公開されたbuildScheduledWorkoutFireDateを再利用する
       const fireDate = buildScheduledWorkoutFireDate(dateKey, hour, minute);
       const isPastTime = fireDate.getTime() <= Date.now();
+      // 「通知停止処理」という表現は不正確——ネイティブ方式の実体はcancelReminderOsNotifications
+      // (個別に.catch(()=>{})で握りつぶすため実質失敗しない)ではなく、その後の一時キュー化で
+      // 新しい通知を登録するscheduleQueueNotification側が失敗している可能性が高い(@reviewer指摘)
       const notificationSuppressionWarning =
         isReplaceMode && !notificationSuppressed
-          ? '元の予定の通知停止処理に失敗した可能性があります。念のため指定時刻に通知が届いていないかご確認ください。'
+          ? '元の予定の新しい通知の登録処理に失敗した可能性があります。念のため指定時刻に通知が届いていないかご確認ください。'
           : null;
       // 画面2→画面1→カレンダー画面の2階層を一度に閉じる
       // (app/workout/routine-load.tsxのrouter.dismiss(2)と同じ考え方)

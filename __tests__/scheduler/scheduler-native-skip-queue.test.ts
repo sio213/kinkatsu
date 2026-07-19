@@ -405,6 +405,36 @@ describe('reconcileNativeReminderSchedules (起動時の整合)', () => {
     expect(mockNotificationsTable.filter((r) => r.reminderId === 1).every((r) => r.triggerType === 'queue')).toBe(true);
     expect(mockNotificationsTable.filter((r) => r.reminderId === 3).every((r) => r.triggerType === 'native')).toBe(true);
   });
+
+  it('1件の再スケジュールが失敗(OS通知APIエラー等)しても、例外を外に伝播させず他のリマインダーの整合は続行される(@reviewer Major指摘: 1件の失敗が起動サイクル全体を巻き込んで中断させていた)', async () => {
+    mockRemindersTable = [nativeWeeklyRow({ id: 1 }), nativeWeeklyRow({ id: 3, title: '背中の日' })];
+    mockNotificationsTable = [
+      nativeNotificationRow(1, 'os-1-native'), // id1: スキップ有りなのでqueue化を試みるが失敗する
+      queueNotificationRow(3, 'os-3-queue', new Date(2026, 6, 26, 7, 0).getTime()), // id3: スキップ無しなのでnative復帰(成功)
+    ];
+    mockSkipsTable = [{ reminderId: 1, skippedDate: '2026-07-26' }];
+    const consoleErrorSpy = jest.spyOn(console, 'error').mockImplementation(() => {});
+
+    mockScheduleNotificationAsync.mockImplementation((req: { content: { data: { reminderId: number } } }) => {
+      if (req.content.data.reminderId === 1) return Promise.reject(new Error('OS notification API failed'));
+      return Promise.resolve(`os-${mockNextNotificationId++}`);
+    });
+
+    await expect(reconcileNativeReminderSchedules()).resolves.toBeUndefined();
+
+    // id1は失敗がログに残るが、reconcileNativeReminderSchedules自体は例外を投げない
+    expect(consoleErrorSpy).toHaveBeenCalledWith(
+      '[reconcile native reminder schedule]',
+      1,
+      expect.any(Error),
+    );
+    // id3は無関係な失敗に巻き込まれず正常にnativeへ復帰する
+    const id3Rows = mockNotificationsTable.filter((r) => r.reminderId === 3);
+    expect(id3Rows.length).toBeGreaterThan(0);
+    expect(id3Rows.every((r) => r.triggerType === 'native')).toBe(true);
+
+    consoleErrorSpy.mockRestore();
+  });
 });
 
 describe('updateReminder/setReminderEnabled/deleteReminder × 一時キュー中native(往復堅牢性、@tester指摘)', () => {

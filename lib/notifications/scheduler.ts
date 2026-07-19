@@ -327,9 +327,14 @@ async function countEffectiveQueueReminders(): Promise<number> {
   return allEnabled.filter((rem) => isEffectiveQueueReminder(rem, skipReminderIds)).length;
 }
 
-// queue方式で予約する際のdepthを、OS通知上限(MAX_OS_NOTIFICATIONS)を考慮して決定する。
 // 種別ごとの基本depth(queueDepthFor)と、実効的にqueue方式の全リマインダー数で按分した予算
-// (computeQuotaPerReminder、refillReminder/refillAllRemindersと同じ計算式)の小さい方を採用する。
+// (computeQuotaPerReminder)の小さい方を採用する。resolveQueueDepth/refillAllRemindersの
+// 2箇所に同じ式が別々に存在していた重複を解消する(@reviewer指摘)
+function capQueueDepth(kind: ReminderKind, quota: number): number {
+  return Math.min(queueDepthFor(kind), quota);
+}
+
+// queue方式で予約する際のdepthを、OS通知上限(MAX_OS_NOTIFICATIONS)を考慮して決定する。
 // 以前は一時キュー化(スキップ)時のみ固定depthを無条件で積んでおり、他にqueue方式リマインダーが
 // 多い状態でスキップを連打すると、OS側の保留通知上限(iOS ~64件)を超えて無関係な他のリマインダーの
 // 通知が静かに欠落しうる問題があった(@reviewer Major指摘)。DBクエリ1回分のコストは、iOS通知
@@ -337,7 +342,7 @@ async function countEffectiveQueueReminders(): Promise<number> {
 // (createReminder/updateReminder経由)にもこの予算計算を一貫して適用する
 async function resolveQueueDepth(r: ParsedReminder): Promise<number> {
   const queueCount = await countEffectiveQueueReminders();
-  return Math.min(queueDepthFor(r.kind as ReminderKind), computeQuotaPerReminder(Math.max(1, queueCount)));
+  return capQueueDepth(r.kind as ReminderKind, computeQuotaPerReminder(Math.max(1, queueCount)));
 }
 
 async function scheduleReminder(r: ParsedReminder): Promise<void> {
@@ -373,7 +378,16 @@ export async function reconcileNativeReminderSchedules(): Promise<void> {
     const isQueued = queuedReminderIds.has(r.id);
 
     if (hasSkip !== isQueued) {
-      await rescheduleReminderFromDb(r.id);
+      // 1件の再スケジュール失敗(OS通知APIエラー等)で例外がonAppStartまで伝播すると、
+      // 起動サイクル全体(refillAllReminders/syncScheduledWorkoutNotifications含む)が
+      // 中断され、無関係な他のリマインダー・手動予定の通知更新まで巻き添えになってしまう
+      // (@reviewer Major指摘)。1件ずつ独立して握りつぶし、次回起動時のreconcileで再試行される
+      // 前提とする(既存のcancelReminderOsNotifications内の個別catchと同じ「握りつぶして継続」方針)
+      try {
+        await rescheduleReminderFromDb(r.id);
+      } catch (e) {
+        console.error('[reconcile native reminder schedule]', r.id, e);
+      }
     }
   }
 }
@@ -549,8 +563,7 @@ export async function refillAllReminders(now = new Date()): Promise<void> {
 
     if (futureCount.length <= REFILL_THRESHOLD) {
       const parsed = parseReminder(r);
-      const depth = Math.min(queueDepthFor(parsed.kind as ReminderKind), quota);
-      await scheduleQueue(parsed, depth);
+      await scheduleQueue(parsed, capQueueDepth(parsed.kind as ReminderKind, quota));
     }
   }
 }
