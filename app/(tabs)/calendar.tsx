@@ -1,6 +1,7 @@
 import { CalendarExerciseCard } from '@/components/calendar/calendar-exercise-card';
 import { CategoryColorLegend } from '@/components/calendar/category-color-legend';
 import { DayEmptyState } from '@/components/calendar/day-empty-state';
+import { RoutineScheduleCard } from '@/components/calendar/routine-schedule-card';
 import { SessionTimeGroupHeader } from '@/components/calendar/session-time-group-header';
 import { SwipeableMonthView } from '@/components/calendar/swipeable-month-view';
 import { CategoryFilterChips } from '@/components/exercises/category-filter-chips';
@@ -8,13 +9,17 @@ import { IconSymbol } from '@/components/ui/icon-symbol';
 import { ResumeWorkoutBanner } from '@/components/workout/resume-workout-banner';
 import { Colors, Typography } from '@/constants/theme';
 import { useCalendarDayExercises, type CalendarDayCard } from '@/hooks/use-calendar-day-exercises';
+import { useCalendarDaySchedule, type DayScheduleCard } from '@/hooks/use-calendar-day-schedule';
 import { useCalendarMonthRecords } from '@/hooks/use-calendar-month-records';
 import { useCalendarMonthSchedule } from '@/hooks/use-calendar-month-schedule';
 import { useDebouncedPush } from '@/hooks/use-debounced-push';
+import { useStartRoutineWithConfirm } from '@/hooks/use-start-routine-with-confirm';
 import { useWorkoutSessions } from '@/hooks/use-workout-session';
 import { addMonths, isSameDay } from '@/lib/calendar/date-grid';
 import { CATEGORY_ALL, EXERCISE_CATEGORIES } from '@/lib/exercises/constants';
-import { groupCardsBySession } from '@/lib/calendar/session-groups';
+import { buildTodayTimeline, groupCardsBySession } from '@/lib/calendar/session-groups';
+import { formatHourMinute } from '@/lib/calendar/time-of-day';
+import { formatKindSummary } from '@/lib/notifications/format';
 import { formatMonthGroup, formatSessionDateGroup } from '@/lib/workout/summary';
 import { Stack } from 'expo-router';
 import { useCallback, useMemo, useState } from 'react';
@@ -24,6 +29,10 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 // カレンダーのカテゴリフィルターは「全て」+全カテゴリのみ（★お気に入りは種目単位の概念で
 // 日別の実施記録には意味を持たないため、種目一覧等と共通のCATEGORY_FILTER_LISTは使わない）
 const CALENDAR_FILTER_CATEGORIES = [CATEGORY_ALL, ...EXERCISE_CATEGORIES] as const;
+
+// 過去日選択時に予定を握りつぶす際の固定参照（毎レンダー新しい配列を作らないことで
+// 依存するuseMemoの不要な再計算を避ける）
+const EMPTY_SCHEDULE: DayScheduleCard[] = [];
 
 function MonthNavButton({
   direction,
@@ -129,13 +138,36 @@ export default function CalendarScreen() {
     [dayCards],
   );
 
+  const isSelectedToday = isSameDay(selectedDate, today);
+  const selectedDayStart = useMemo(
+    () => new Date(selectedDate.getFullYear(), selectedDate.getMonth(), selectedDate.getDate()).getTime(),
+    [selectedDate],
+  );
+  // 予定は「今日以降」だけが対象（過去日は実績のみを表示する既存仕様、2026-07-19確定）。
+  // useCalendarDaySchedule自体は日付の前後関係を知らず選択日の発火有無だけを返すため、
+  // 過去日のときはここで結果を空配列に握りつぶす。EMPTY_SCHEDULEで参照を固定し、
+  // 過去日を選んでいる間はdaySchedule/todayTimelineのuseMemoが毎回再計算されないようにする
+  const isFutureDay = selectedDayStart > todayStart;
+  const rawDaySchedule = useCalendarDaySchedule(selectedDate);
+  const daySchedule: DayScheduleCard[] = isSelectedToday || isFutureDay ? rawDaySchedule : EMPTY_SCHEDULE;
+  const todayTimeline = useMemo(
+    () =>
+      isSelectedToday
+        ? buildTodayTimeline(dayCardGroups, daySchedule, selectedDayStart)
+        : [],
+    [isSelectedToday, dayCardGroups, daySchedule, selectedDayStart],
+  );
+
   const pushDebounced = useDebouncedPush();
   const handlePressExercise = useCallback(
     (exerciseId: number) => pushDebounced(`/exercise/${exerciseId}`),
     [pushDebounced],
   );
+  const handlePressRoutine = useCallback(
+    (routineId: number) => pushDebounced(`/routine/edit/${routineId}`),
+    [pushDebounced],
+  );
 
-  const isSelectedToday = isSameDay(selectedDate, today);
   const { activeSession } = useWorkoutSessions();
   // 今日の空状態は進行中セッション(endedAtがnull)のendedAtがnullなためuseCalendarDayExercises
   // 側では「記録なし」に見えている状態でも起こりうる（今日開始したが1セットも確定していない等）。
@@ -148,6 +180,11 @@ export default function CalendarScreen() {
   const handleStartToday = useCallback(() => {
     pushDebounced('/workout/start-chooser');
   }, [pushDebounced]);
+
+  // 今日の予定カードの「開始」ボタン用。進行中セッションがある場合の確認ダイアログを含む
+  // ロジックはuseStartRoutineWithConfirmに共通化してある（ルーティン一覧のカード
+  // 「開始」ボタンと挙動が同一のため）
+  const handleStartRoutine = useStartRoutineWithConfirm(activeSession, (sessionId) => pushDebounced(`/workout/${sessionId}`));
 
   return (
     <SafeAreaView style={styles.safeArea} edges={[]}>
@@ -207,14 +244,64 @@ export default function CalendarScreen() {
                 <Text style={styles.dayRetryText}>再試行</Text>
               </TouchableOpacity>
             </View>
-          ) : dayCards.length === 0 ? (
-            isSelectedToday && activeSession ? (
-              <ResumeWorkoutBanner onPress={handleResumeToday} />
-            ) : isSelectedToday ? (
-              <DayEmptyState buttonIcon="play.fill" actionLabel="トレーニングを開始" onPressAction={handleStartToday} />
+          ) : isSelectedToday ? (
+            <View style={styles.dayGroupList}>
+              {/* 進行中セッションがある場合は、実績・予定の有無にかかわらず常にバナーを出す
+                  （PR6で発見したバグ「無言で古いセッションに合流」の再発防止を、実績+予定が
+                  混在するようになった今回のPR9-2でも一貫させる） */}
+              {activeSession && <ResumeWorkoutBanner onPress={handleResumeToday} />}
+              {todayTimeline.length === 0 ? (
+                !activeSession && (
+                  <DayEmptyState buttonIcon="play.fill" actionLabel="トレーニングを開始" onPressAction={handleStartToday} />
+                )
+              ) : (
+                todayTimeline.map((entry) =>
+                  entry.kind === 'session' ? (
+                    <View key={entry.key} style={styles.dayGroup}>
+                      {todayTimeline.length > 1 && <SessionTimeGroupHeader sessionStartedAt={entry.group.sessionStartedAt} />}
+                      <DayCardList cards={entry.group.cards} onPressExercise={handlePressExercise} />
+                    </View>
+                  ) : (
+                    <View key={entry.key} style={styles.dayGroup}>
+                      {todayTimeline.length > 1 && <SessionTimeGroupHeader sessionStartedAt={entry.sortAt} isSchedule />}
+                      <RoutineScheduleCard
+                        routineName={entry.card.routineName}
+                        categories={entry.card.categories}
+                        exerciseCount={entry.card.exerciseCount}
+                        timeLabel={`今日 ${formatHourMinute(new Date(entry.sortAt))}`}
+                        onPress={() => handlePressRoutine(entry.card.routineId)}
+                        onPressStart={() => handleStartRoutine(entry.card.routineId, entry.card.routineName)}
+                      />
+                    </View>
+                  ),
+                )
+              )}
+            </View>
+          ) : isFutureDay ? (
+            daySchedule.length === 0 ? (
+              <DayEmptyState
+                buttonIcon="plus"
+                actionLabel="予定を追加"
+                text="予定がありません"
+                disabled
+                onPressAction={() => {}}
+              />
             ) : (
-              <Text style={styles.dayEmptyText}>記録がありません</Text>
+              <View style={styles.dayCardList}>
+                {daySchedule.map((card) => (
+                  <RoutineScheduleCard
+                    key={card.reminderId}
+                    routineName={card.routineName}
+                    categories={card.categories}
+                    exerciseCount={card.exerciseCount}
+                    timeLabel={formatKindSummary(card.reminder)}
+                    onPress={() => handlePressRoutine(card.routineId)}
+                  />
+                ))}
+              </View>
             )
+          ) : dayCards.length === 0 ? (
+            <Text style={styles.dayEmptyText}>記録がありません</Text>
           ) : dayCardGroups.length > 1 ? (
             <View style={styles.dayGroupList}>
               {dayCardGroups.map((group) => (

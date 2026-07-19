@@ -39,4 +39,25 @@ describe('SessionTimeGroupHeader', () => {
     expect(icon).toBeDefined();
     expect(icon.props.color).toBe(Colors[colorKey as keyof typeof Colors]);
   });
+
+  describe('isSchedule（今日パネルで実績と予定を混在表示する場合）', () => {
+    it('isSchedule未指定(false)なら「予定」ラベルを表示しない', () => {
+      const root = render({ sessionStartedAt: new Date(2026, 6, 16, 20, 0).getTime() });
+      const texts = root.root.findAllByType(Text).map((t) => [t.props.children].flat().join(''));
+      expect(texts).not.toContain('予定');
+    });
+
+    it('isSchedule=trueなら時刻ラベルに加えて控えめな「予定」ラベルを表示する', () => {
+      const root = render({ sessionStartedAt: new Date(2026, 6, 16, 20, 0).getTime(), isSchedule: true });
+      const texts = root.root.findAllByType(Text).map((t) => [t.props.children].flat().join(''));
+      expect(texts).toContain('夜 20:00');
+      expect(texts).toContain('予定');
+    });
+
+    it('isSchedule=trueならaccessibilityLabelにも「予定」を含む', () => {
+      const root = render({ sessionStartedAt: new Date(2026, 6, 16, 20, 0).getTime(), isSchedule: true });
+      const header = root.root.findAllByType(View).find((v) => v.props.accessibilityRole === 'header')!;
+      expect(header.props.accessibilityLabel).toBe('夜 20:00、予定');
+    });
+  });
 });

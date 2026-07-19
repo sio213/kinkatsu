@@ -21,3 +21,31 @@ export function groupCardsBySession<T extends { sessionId: number; sessionStarte
   }
   return [...groups.values()].sort((a, b) => a.sessionStartedAt - b.sessionStartedAt);
 }
+
+// 今日パネル専用。実績セッション（groupCardsBySessionの出力）と予定（ルーティン紐付き
+// リマインダー由来、2026-07-19確定でPR8の時間帯グループ機構を延長する方針）を同じ
+// 時系列リストに混ぜて時刻順に並べる。予定側のsortAtは「その日のhour:minute」から
+// 組み立てるため、呼び出し側は年月日（selectedDateの0時起点）を渡す
+export type TodayTimelineEntry<TSession, TSchedule> =
+  | { kind: 'session'; key: string; sortAt: number; group: SessionGroup<TSession> }
+  | { kind: 'schedule'; key: string; sortAt: number; card: TSchedule };
+
+export function buildTodayTimeline<TSession, TSchedule extends { reminderId: number; hour: number; minute: number }>(
+  sessionGroups: SessionGroup<TSession>[],
+  scheduleCards: TSchedule[],
+  dayStart: number,
+): TodayTimelineEntry<TSession, TSchedule>[] {
+  const sessionEntries: TodayTimelineEntry<TSession, TSchedule>[] = sessionGroups.map((group) => ({
+    kind: 'session',
+    key: `session-${group.sessionId}`,
+    sortAt: group.sessionStartedAt,
+    group,
+  }));
+  const scheduleEntries: TodayTimelineEntry<TSession, TSchedule>[] = scheduleCards.map((card) => ({
+    kind: 'schedule',
+    key: `schedule-${card.reminderId}`,
+    sortAt: dayStart + card.hour * 3_600_000 + card.minute * 60_000,
+    card,
+  }));
+  return [...sessionEntries, ...scheduleEntries].sort((a, b) => a.sortAt - b.sortAt);
+}
