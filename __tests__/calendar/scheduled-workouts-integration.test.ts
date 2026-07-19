@@ -89,4 +89,11 @@ describe('scheduled_workoutsスキーマ - 実SQLite上でのFK挙動', () => {
       .all('2026-07-01', '2026-08-01') as { d: string }[];
     expect(rows.map((r) => r.d).sort()).toEqual(['2026-07-20', '2026-07-25']);
   });
+
+  it('存在しないroutine_idへのINSERTはFK制約違反で例外を投げる（addScheduledWorkoutが呼ばれる直前にルーティンが削除された場合等の安全網）', () => {
+    db = new Database(':memory:');
+    db.pragma('foreign_keys = ON');
+    applyAllMigrations(db);
+    expect(() => seedScheduledWorkout(db, 999999, '2026-07-25')).toThrow(/FOREIGN KEY constraint failed/);
+  });
 });

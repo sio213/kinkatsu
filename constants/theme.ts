@@ -170,6 +170,12 @@ export const Typography = {
   caption: { fontSize: 12, lineHeight: 16, fontWeight: '500' },
   /** NEW/BESTなどの小バッジ */
   badge: { fontSize: 11, fontWeight: '700' },
+  /**
+   * Android用の時刻選択ボタン（reminder-form.tsx・app/calendar/schedule-time-picker.tsxで
+   * 共通使用）。iOSのspinner表示の数字サイズ感に合わせた大きめの太字数値。letterSpacingは
+   * 「18 : 00」のように時刻がゆったり読めるようにするため
+   */
+  timeDisplay: { fontSize: 28, fontWeight: '700', letterSpacing: 2 },
 } as const;
 
 /**

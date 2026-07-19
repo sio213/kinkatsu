@@ -5,6 +5,7 @@ import { RoutineScheduleCard } from '@/components/calendar/routine-schedule-card
 import { SessionTimeGroupHeader } from '@/components/calendar/session-time-group-header';
 import { SwipeableMonthView } from '@/components/calendar/swipeable-month-view';
 import { CategoryFilterChips } from '@/components/exercises/category-filter-chips';
+import { DesignIcon } from '@/components/ui/design-icon';
 import { IconSymbol } from '@/components/ui/icon-symbol';
 import { ResumeWorkoutBanner } from '@/components/workout/resume-workout-banner';
 import { Colors, Typography } from '@/constants/theme';
@@ -57,6 +58,25 @@ function MonthNavButton({
         size={20}
         color={Colors.textPlaceholder}
       />
+    </TouchableOpacity>
+  );
+}
+
+// 未来日パネルの予定リスト末尾に置く控えめな追加ボタン。DayEmptyStateの「予定を追加」は
+// 予定が0件の日にしか出ないため、既に1件以上ある日に2件目以降を追加する導線が無かった
+// （PRレビュー指摘対応）。見た目はcomponents/routines/routine-add-exercise-button.tsxの
+// ghostバリアント（一覧末尾の控えめな追加ボタン）に合わせるが、ラベルが「種目を追加」固定で
+// 汎用化されていないため、あちらを流用せずスタイルだけ揃えてこの画面内に定義する
+function AddScheduleGhostButton({ onPress }: { onPress: () => void }) {
+  return (
+    <TouchableOpacity
+      style={styles.addScheduleGhost}
+      onPress={onPress}
+      accessibilityRole="button"
+      accessibilityLabel="予定を追加"
+    >
+      <DesignIcon name="add-circle" size={18} color={Colors.accent} />
+      <Text style={styles.addScheduleGhostText}>予定を追加</Text>
     </TouchableOpacity>
   );
 }
@@ -239,11 +259,12 @@ export default function CalendarScreen() {
           <CategoryColorLegend />
         </View>
         {/* 予定（リング/ドット表現）が実際に画面上にある場合だけ表示する。予定を使っていない
-            （＝ルーティン紐付きリマインダーを設定していない）ユーザーには不要な説明のため
+            （＝ルーティン紐付きリマインダーも手動予定も無い）ユーザーには不要な説明のため
             常時表示にはしない（@designer指摘: 塗り=実施/リング・ドット=予定の凡例が無いと
-            初見で誤読されるおそれがあるとの指摘への対応） */}
+            初見で誤読されるおそれがあるとの指摘への対応）。手動予定(PR10)もリング/ドットに
+            反映されるようになったため「リマインダー由来」の限定は外す */}
         {primaryCategoryByScheduleDay.size > 0 && (
-          <Text style={styles.scheduleLegendHint}>塗りつぶし＝実施済み、輪郭・点＝予定（リマインダー由来）</Text>
+          <Text style={styles.scheduleLegendHint}>塗りつぶし＝実施済み、輪郭・点＝予定</Text>
         )}
 
         <View style={styles.dayPanel}>
@@ -317,6 +338,7 @@ export default function CalendarScreen() {
                     oneTime={card.source === 'manual'}
                   />
                 ))}
+                <AddScheduleGhostButton onPress={handlePressAddSchedule} />
               </View>
             )
           ) : dayCards.length === 0 ? (
@@ -360,4 +382,16 @@ const styles = StyleSheet.create({
   // 時間帯グループ間の余白はデザイン案「複数18」のheight:12px相当
   dayGroupList: { gap: 12 },
   dayGroup: { gap: 8 },
+  // components/routines/routine-add-exercise-button.tsxのghostバリアントと同じ見た目
+  addScheduleGhost: {
+    flexDirection: 'row',
+    justifyContent: 'center',
+    alignItems: 'center',
+    gap: 6,
+    width: '100%',
+    backgroundColor: Colors.accentSurface,
+    borderRadius: 8,
+    paddingVertical: 11,
+  },
+  addScheduleGhostText: { ...Typography.footnote, fontWeight: '600', color: Colors.accent },
 });

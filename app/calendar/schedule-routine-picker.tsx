@@ -6,7 +6,7 @@ import { Colors } from '@/constants/theme';
 import type { Routine } from '@/db/schema';
 import { useDebouncedPush } from '@/hooks/use-debounced-push';
 import { useRoutineExerciseSummaries, useRoutines } from '@/hooks/use-routines';
-import { parseDateKey } from '@/lib/calendar/date-grid';
+import { isValidDateKey, parseDateKey } from '@/lib/calendar/date-grid';
 import { formatSessionDateGroup } from '@/lib/workout/summary';
 import { Stack, useLocalSearchParams, useRouter } from 'expo-router';
 import { useCallback } from 'react';
@@ -50,6 +50,17 @@ export default function ScheduleRoutinePickerScreen() {
     },
     [summaries, handleSelect],
   );
+
+  // カレンダー画面から遷移する限り不正なdateKeyは渡らないが、不正な直リンク等への防御として
+  // 明示的にガードする（dateKeyが不正なままparseDateKeyに渡るとクラッシュするため）
+  if (!isValidDateKey(dateKey)) {
+    return (
+      <SafeAreaView style={styles.safeArea} edges={['bottom']}>
+        <Stack.Screen options={{ title: 'ルーティンを選択' }} />
+        <NotFoundState message="日付が見つかりません" actionLabel="戻る" onPressAction={() => router.back()} />
+      </SafeAreaView>
+    );
+  }
 
   return (
     <SafeAreaView style={styles.safeArea} edges={['bottom']}>

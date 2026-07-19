@@ -14,8 +14,8 @@ const TIME_OF_DAY_LABELS: Record<TimeOfDay, string> = {
 export function getTimeOfDay(date: Date): TimeOfDay {
   const hour = date.getHours();
   if (hour >= 4 && hour < 11) return 'morning';
-  if (hour >= 11 && hour < 17) return 'midday';
-  if (hour >= 17 && hour < 19) return 'evening';
+  if (hour >= 11 && hour < 16) return 'midday';
+  if (hour >= 16 && hour < 19) return 'evening';
   return 'night'; // 19:00〜翌3:59
 }
 

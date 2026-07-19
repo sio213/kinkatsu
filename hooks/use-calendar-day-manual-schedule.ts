@@ -38,11 +38,14 @@ export function useCalendarDayManualSchedule(selectedDate: Date): ManualSchedule
     const cards: ManualScheduleCard[] = [];
     for (const r of rows) {
       if (r.scheduledDate !== dateKey) continue;
-      const summary = summaries.get(r.routineId);
       const routineName = routineNameById.get(r.routineId);
-      // 種目が1件も無いルーティンや、削除済みルーティンを指す予定（安全網、通常はcascadeで
-      // 一緒に消える）は代表カテゴリ/名前を決められず対象外
-      if (!summary || routineName === undefined) continue;
+      // 削除済みルーティンを指す予定（安全網、通常はcascadeで一緒に消える）は名前を
+      // 決められず対象外。種目0件のルーティンはschedule-routine-picker.tsx側で選択できて
+      // しまう（workout/routine-picker.tsxと同じ「0種目でも選べる」仕様）ため、ここで
+      // summary無しを除外すると「選べたのに選択日パネルへ永久に表示されない」予定が
+      // 生まれてしまう。summaryが無ければ0種目・カテゴリ無しにフォールバックして表示する
+      if (routineName === undefined) continue;
+      const summary = summaries.get(r.routineId) ?? { exerciseCount: 0, categories: [] };
 
       cards.push({
         scheduledWorkoutId: r.id,

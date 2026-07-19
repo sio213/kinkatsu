@@ -523,6 +523,27 @@ describe('CalendarScreen 予定（PR9-2: リマインダー由来の未来予定
       expect(root.findAllByProps({ children: '脚の日' }).length).toBe(0);
       expect(root.findByProps({ children: '記録がありません' })).toBeDefined();
     });
+
+    test('既に予定が1件ある日でも一覧末尾に「予定を追加」ボタンが表示され、押すとその日のdateKeyでルーティン選択画面へ遷移する（2件目以降を追加する導線、PRレビュー指摘対応）', () => {
+      const root = render();
+      const future = new Date();
+      future.setDate(future.getDate() + 5);
+      mockUseCalendarDayManualSchedule.mockReturnValue([manualCard()]);
+      selectDate(future);
+
+      expect(root.findByProps({ children: '脚の日' })).toBeDefined();
+      const addBtn = root.findAllByType(TouchableOpacity).find((t) => t.props.accessibilityLabel === '予定を追加')!;
+      expect(addBtn).toBeDefined();
+
+      act(() => {
+        addBtn.props.onPress();
+      });
+      const expectedDateKey = `${future.getFullYear()}-${String(future.getMonth() + 1).padStart(2, '0')}-${String(future.getDate()).padStart(2, '0')}`;
+      expect(mockPush).toHaveBeenCalledWith({
+        pathname: '/calendar/schedule-routine-picker',
+        params: { dateKey: expectedDateKey },
+      });
+    });
   });
 
   describe('今日の予定カードの「開始」ボタン(handleStartRoutine)', () => {

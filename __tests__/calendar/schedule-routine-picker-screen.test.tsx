@@ -117,3 +117,22 @@ test('カードを連打してもpushは1回しか呼ばれない（useDebounced
 
   expect(mockPush).toHaveBeenCalledTimes(1);
 });
+
+test('dateKeyが不正な形式の場合は「見つかりません」画面になる（parseDateKeyへ渡してクラッシュしないためのガード）', () => {
+  mockUseLocalSearchParams.mockReturnValue({ dateKey: 'not-a-date' });
+  mockUseRoutines.mockReturnValue({ routines: [baseRoutine({ id: 10, name: '胸の日' })] });
+  const root = render();
+  expect(root.findByProps({ children: '日付が見つかりません' })).toBeDefined();
+  expect(() => root.findByProps({ children: '胸の日' })).toThrow();
+});
+
+test('dateKeyが無い(undefined)場合も「見つかりません」画面になり、戻るボタンでrouter.backする', () => {
+  mockUseLocalSearchParams.mockReturnValue({ dateKey: undefined });
+  const root = render();
+  expect(root.findByProps({ children: '日付が見つかりません' })).toBeDefined();
+  const backBtn = root.findAllByType(TouchableOpacity).find((btn) => btn.props.accessibilityLabel === '戻る')!;
+  act(() => {
+    backBtn.props.onPress();
+  });
+  expect(mockBack).toHaveBeenCalled();
+});

@@ -2,8 +2,8 @@ import { FormField } from '@/components/ui/form-field';
 import { HeaderTitle } from '@/components/ui/header-title';
 import { NotFoundState } from '@/components/ui/not-found-state';
 import { PrimaryButton } from '@/components/ui/primary-button';
-import { Colors } from '@/constants/theme';
-import { parseDateKey } from '@/lib/calendar/date-grid';
+import { Colors, Typography } from '@/constants/theme';
+import { isValidDateKey, parseDateKey } from '@/lib/calendar/date-grid';
 import { addScheduledWorkout } from '@/lib/calendar/scheduled-workouts';
 import { formatHourMinuteParts } from '@/lib/calendar/time-of-day';
 import { formatSessionDateGroup } from '@/lib/workout/summary';
@@ -59,9 +59,10 @@ export default function ScheduleTimePickerScreen() {
     }
   }, [routineId, dateKey, hour, minute, router]);
 
-  // 前画面(schedule-routine-picker.tsx)は必ず数値のroutineIdをparamsで渡すが、
-  // app/workout/routine-load.tsxと同じく不正な直リンク等への防御として明示的にガードする
-  if (!Number.isFinite(routineId)) {
+  // 前画面(schedule-routine-picker.tsx)は必ず数値のroutineId・'YYYY-MM-DD'形式のdateKeyを
+  // paramsで渡すが、app/workout/routine-load.tsxと同じく不正な直リンク等への防御として
+  // 明示的にガードする（dateKeyが不正なままparseDateKeyに渡るとクラッシュするため）
+  if (!Number.isFinite(routineId) || !isValidDateKey(dateKey)) {
     return (
       <SafeAreaView style={styles.safeArea} edges={['bottom']}>
         <Stack.Screen options={{ title: '時刻を選択' }} />
@@ -82,7 +83,12 @@ export default function ScheduleTimePickerScreen() {
       <View style={styles.content}>
         <FormField label="時刻">
           {Platform.OS === 'android' && (
-            <TouchableOpacity style={styles.timeButton} onPress={() => setShowAndroidTimePicker(true)}>
+            <TouchableOpacity
+              style={styles.timeButton}
+              onPress={() => setShowAndroidTimePicker(true)}
+              accessibilityRole="button"
+              accessibilityLabel="時刻を変更"
+            >
               <Text style={styles.timeButtonText}>{timeLabel}</Text>
             </TouchableOpacity>
           )}
@@ -116,7 +122,7 @@ const styles = StyleSheet.create({
     paddingVertical: 12,
     alignSelf: 'flex-start',
   },
-  timeButtonText: { fontSize: 28, fontWeight: '700', color: Colors.textPrimary, letterSpacing: 2 },
+  timeButtonText: { ...Typography.timeDisplay, color: Colors.textPrimary },
   footer: {
     paddingHorizontal: 20,
     paddingTop: 8,

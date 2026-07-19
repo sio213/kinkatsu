@@ -608,7 +608,7 @@ const styles = StyleSheet.create({
     paddingVertical: 12,
     alignSelf: 'flex-start',
   },
-  timeButtonText: { fontSize: 28, fontWeight: '700', color: Colors.textPrimary, letterSpacing: 2 },
+  timeButtonText: { ...Typography.timeDisplay, color: Colors.textPrimary },
 
   kindRow: { flexDirection: 'row', flexWrap: 'wrap', gap: 8 },
   chip: {

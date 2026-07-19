@@ -75,11 +75,13 @@ describe('useCalendarDayManualSchedule', () => {
     });
   });
 
-  it('summariesに代表カテゴリが無いルーティン(種目0件)の予定は結果に含まれない', () => {
+  it('summariesに代表カテゴリが無いルーティン(種目0件)の予定は、0種目・カテゴリ無しとして結果に含まれる（schedule-routine-picker.tsxでは0種目のルーティンも選択できるため、除外すると選んだのに二度と表示されない予定が生まれてしまう。PRレビュー指摘対応）', () => {
     mockRows = [{ id: 1, routineId: 10, scheduledDate: '2026-07-25', hour: 19, minute: 30 }];
     mockSummaries = new Map();
     mockRoutines = [{ id: 10, name: '胸の日' }];
-    expect(renderHook(new Date(2026, 6, 25)).result()).toEqual([]);
+    const result = renderHook(new Date(2026, 6, 25)).result();
+    expect(result).toHaveLength(1);
+    expect(result[0]).toMatchObject({ routineName: '胸の日', categories: [], exerciseCount: 0 });
   });
 
   it('routinesにルーティン名が無い(削除済み等)場合、予定は結果に含まれない', () => {
