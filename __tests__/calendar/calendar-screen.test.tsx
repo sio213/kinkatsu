@@ -374,13 +374,13 @@ describe('CalendarScreen 予定（PR9-2: リマインダー由来の未来予定
     expect(root.findAllByProps({ children: '開始' }).length).toBeGreaterThan(0);
   });
 
-  test('今日、予定が1件だけ（実績0件）の場合は時間帯見出しを表示しない（既存の「1件だけの日は見出し無し」ルールを予定単独でも踏襲）', () => {
+  test('今日、予定カードには「予定」ラベルの見出しが付かない（カード自身の時刻バッジと二重表示になるため、PR10-4でSessionTimeGroupHeaderを予定エントリには出さないよう変更）', () => {
     mockUseCalendarDaySchedule.mockReturnValue([scheduleCard()]);
     const root = render();
     expect(findTextByJoinedChildren(root, '予定')).toBeUndefined();
   });
 
-  test('今日、実績と予定が両方ある場合、時刻順に混ざって表示され、予定側にだけ「予定」ラベルが付く', () => {
+  test('今日、実績と予定が両方ある場合、時刻順に混ざって表示される（予定側は自身の時刻バッジのみで、実績側とは別カード形状のため見出しの「予定」ラベルは付けない、PR10-4で時刻の二重表示を解消）', () => {
     mockUseCalendarDayExercises.mockReturnValue({
       cards: [
         {
@@ -406,12 +406,12 @@ describe('CalendarScreen 予定（PR9-2: リマインダー由来の未来予定
     expect(findTextByJoinedChildren(root, '朝 07:10')).toBeDefined();
     expect(root.findByProps({ children: '朝の種目' })).toBeDefined();
     expect(root.findByProps({ children: '胸の日' })).toBeDefined();
-    expect(findTextByJoinedChildren(root, '予定')).toBeDefined();
+    expect(findTextByJoinedChildren(root, '今日 20:00')).toBeDefined();
 
     const allTexts = root.findAllByType(Text).map((t) => [t.props.children].flat().join(''));
     const morningIndex = allTexts.indexOf('朝 07:10');
-    const scheduleTagIndex = allTexts.indexOf('予定');
-    expect(scheduleTagIndex).toBeGreaterThan(morningIndex);
+    const scheduleTimeIndex = allTexts.indexOf('今日 20:00');
+    expect(scheduleTimeIndex).toBeGreaterThan(morningIndex);
   });
 
   test('今日、進行中セッションがあり予定もある場合、再開バナーと予定カードの両方が表示される', () => {
@@ -736,13 +736,188 @@ describe('CalendarScreen 予定（PR9-2: リマインダー由来の未来予定
         });
       });
 
-      test('今日自身の手動予定には⋮メニューが出ない（今日タイムラインへの統合は後続PR、意図的なスコープ外の回帰ガード）', () => {
+      test('今日自身の手動予定も選択日パネルに表示され、「今日 HH:MM」表記＋⋮メニューが出る（PR10-4、選択日が今日になった瞬間消えていたバグの修正）', () => {
+        mockUseCalendarDayManualSchedule.mockReturnValue([manualCard({ routineName: '今日だけの脚の日', hour: 19, minute: 30 })]);
         const root = render();
-        mockUseCalendarDayManualSchedule.mockReturnValue([manualCard({ routineName: '今日だけの脚の日' })]);
         // selectDateしない=今日が選択されたまま
 
-        expect(root.findAllByProps({ children: '今日だけの脚の日' }).length).toBe(0);
-        expect(findAllMenuTriggers(root).length).toBe(0);
+        expect(root.findByProps({ children: '今日だけの脚の日' })).toBeDefined();
+        expect(findTextByJoinedChildren(root, '今日 19:30')).toBeDefined();
+        expect(findMenuTrigger(root, '今日だけの脚の日')).toBeDefined();
+      });
+
+      test('今日自身の手動予定の⋮→削除で確認Alert→confirmでdeleteScheduledWorkoutが呼ばれる', async () => {
+        mockUseCalendarDayManualSchedule.mockReturnValue([manualCard({ routineName: '今日だけの脚の日' })]);
+        const root = render();
+
+        act(() => {
+          findMenuTrigger(root, '今日だけの脚の日')!.props.onPress();
+        });
+        const deleteItem = root.findAllByType(TouchableOpacity).find((t) => t.props.accessibilityLabel === '削除')!;
+        act(() => {
+          deleteItem.props.onPress();
+        });
+        const alertCall = (Alert.alert as jest.Mock).mock.calls[0];
+        const confirmAction = alertCall[2].find((b: { text?: string }) => b.text === '削除');
+        await act(async () => {
+          await confirmAction.onPress();
+        });
+
+        expect(mockDeleteScheduledWorkout).toHaveBeenCalledWith(1);
+      });
+
+      test('今日自身の手動予定の削除に失敗した場合もエラーAlertを表示する（開始ボタン付きレイアウトでも共通ハンドラが機能すること、PR10-4）', async () => {
+        mockDeleteScheduledWorkout.mockRejectedValueOnce(new Error('fail'));
+        jest.spyOn(console, 'error').mockImplementation(() => {});
+        mockUseCalendarDayManualSchedule.mockReturnValue([manualCard({ routineName: '今日だけの脚の日' })]);
+        const root = render();
+
+        act(() => {
+          findMenuTrigger(root, '今日だけの脚の日')!.props.onPress();
+        });
+        const deleteItem = root.findAllByType(TouchableOpacity).find((t) => t.props.accessibilityLabel === '削除')!;
+        act(() => {
+          deleteItem.props.onPress();
+        });
+        const alertCall = (Alert.alert as jest.Mock).mock.calls[0];
+        const confirmAction = alertCall[2].find((b: { text?: string }) => b.text === '削除');
+        await act(async () => {
+          await confirmAction.onPress();
+        });
+
+        expect(Alert.alert).toHaveBeenCalledWith('エラー', '予定を削除できませんでした。');
+      });
+
+      test('今日自身の手動予定にも「開始」ボタンが表示され、押すとstartWorkoutFromRoutineが呼ばれる（リマインダー予定と同じ扱い、PR10-4）', async () => {
+        mockUseCalendarDayManualSchedule.mockReturnValue([manualCard({ routineId: 20, routineName: '今日だけの脚の日' })]);
+        const root = render();
+
+        const startBtn = root
+          .findAllByType(TouchableOpacity)
+          .find((t) => t.props.accessibilityLabel === '「今日だけの脚の日」のトレーニングを開始')!;
+        await act(async () => {
+          await startBtn.props.onPress();
+        });
+
+        expect(mockStartWorkoutFromRoutine).toHaveBeenCalledWith(20);
+        expect(mockPush).toHaveBeenCalledWith('/workout/77');
+      });
+
+      test('今日、同じルーティンがリマインダー予定・手動予定の両方にある場合、手動予定だけが表示される（未来日と同じdedupeを今日にも適用、PR10-4）', () => {
+        mockUseCalendarDaySchedule.mockReturnValue([scheduleCard({ routineId: 20, routineName: '脚の日' })]);
+        mockUseCalendarDayManualSchedule.mockReturnValue([manualCard({ routineId: 20, routineName: '脚の日' })]);
+        const root = render();
+
+        const cards = root
+          .findAllByType(TouchableOpacity)
+          .filter((t) => typeof t.props.accessibilityLabel === 'string' && t.props.accessibilityLabel.startsWith('脚の日、'));
+        expect(cards.length).toBe(1);
+        expect(findMenuTrigger(root, '脚の日')).toBeDefined();
+      });
+
+      test('今日、手動予定が1件以上ある場合、一覧末尾に「予定を追加」ボタンが表示される（PR10-4）', () => {
+        mockUseCalendarDayManualSchedule.mockReturnValue([manualCard()]);
+        const root = render();
+
+        expect(root.findAllByType(TouchableOpacity).find((t) => t.props.accessibilityLabel === '予定を追加')).toBeDefined();
+      });
+
+      test('今日、実績・予定とも0件の場合は「予定を追加」ボタンを表示しない（今日の第一級アクションは「トレーニングを開始」のみ、未来日の空状態とは非対称な現行仕様の固定）', () => {
+        const root = render();
+        expect(root.findAllByType(TouchableOpacity).find((t) => t.props.accessibilityLabel === '予定を追加')).toBeUndefined();
+      });
+
+      test('今日パネルの「予定を追加」ボタンを押すと、選択日(=今日)のdateKeyでルーティン選択画面へ遷移する（PR10-4）', () => {
+        mockUseCalendarDayManualSchedule.mockReturnValue([manualCard()]);
+        const root = render();
+
+        const addBtn = root.findAllByType(TouchableOpacity).find((t) => t.props.accessibilityLabel === '予定を追加')!;
+        act(() => {
+          addBtn.props.onPress();
+        });
+
+        const today = new Date();
+        const expectedDateKey = `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, '0')}-${String(today.getDate()).padStart(2, '0')}`;
+        expect(mockPush).toHaveBeenCalledWith({
+          pathname: '/calendar/schedule-routine-picker',
+          params: { dateKey: expectedDateKey },
+        });
+      });
+
+      test('今日、実績セッション・リマインダー予定・手動予定の3種が混在しても時刻順に統合表示される（PR10-4）', () => {
+        // セッションのsessionStartedAtも予定のhour/minute同様「実際の今日」基準で組み立てないと、
+        // 固定の過去日付にしてしまうとエポック値が小さくなり常に先頭に来てしまい、時刻順の
+        // 検証にならない（テスト実装時に一度踏んだ落とし穴）
+        const today = new Date();
+        mockUseCalendarDayExercises.mockReturnValue({
+          cards: [
+            {
+              workoutSessionExerciseId: 1,
+              exerciseId: 1,
+              name: '昼の実績種目',
+              category: 'chest',
+              measurementType: 'weight_reps',
+              source: 'preset',
+              slug: 'bench-press',
+              sessionId: 1,
+              sessionStartedAt: new Date(today.getFullYear(), today.getMonth(), today.getDate(), 12, 0).getTime(),
+              isBest: false,
+              comparison: null,
+              sets: [{ weight: 60, reps: 8, durationSeconds: null, distanceMeters: null, completedAt: 1 }],
+            },
+          ],
+          retry: jest.fn(),
+        });
+        mockUseCalendarDaySchedule.mockReturnValue([scheduleCard({ routineId: 10, routineName: '朝の予定', hour: 7, minute: 0 })]);
+        mockUseCalendarDayManualSchedule.mockReturnValue([manualCard({ routineId: 21, routineName: '夜の手動予定', hour: 19, minute: 30 })]);
+        const root = render();
+
+        const allTexts = root.findAllByType(Text).map((t) => [t.props.children].flat().join(''));
+        const idx = (s: string) => allTexts.indexOf(s);
+        expect(idx('朝の予定')).toBeGreaterThanOrEqual(0);
+        expect(idx('昼の実績種目')).toBeGreaterThan(idx('朝の予定'));
+        expect(idx('夜の手動予定')).toBeGreaterThan(idx('昼の実績種目'));
+      });
+
+      test('今日、進行中セッションがあり手動予定のみある場合（リマインダー予定なし）、再開バナーと手動予定カードの両方が表示される（PR10-4）', () => {
+        mockUseWorkoutSessions.mockReturnValue({
+          sessions: [{ id: 9, startedAt: 0, endedAt: null }],
+          activeSession: { id: 9, startedAt: 0, endedAt: null },
+        });
+        mockUseCalendarDayManualSchedule.mockReturnValue([manualCard({ routineName: '進行中と併存する脚の日' })]);
+        const root = render();
+
+        expect(
+          root.findAllByType(TouchableOpacity).find((t) => t.props.accessibilityLabel === '進行中のトレーニングを再開する'),
+        ).toBeDefined();
+        expect(root.findByProps({ children: '進行中と併存する脚の日' })).toBeDefined();
+      });
+
+      test('未来日で手動予定を表示した状態から選択日を今日に戻しても、手動予定が消えない（選択日が今日になった瞬間に消えていたバグの回帰、PR10-4の本来の目的）', () => {
+        const root = render();
+        const future = new Date();
+        future.setDate(future.getDate() + 3);
+        mockUseCalendarDayManualSchedule.mockReturnValue([manualCard({ routineName: '往復テストの脚の日' })]);
+
+        selectDate(future);
+        expect(root.findByProps({ children: '往復テストの脚の日' })).toBeDefined();
+
+        selectDate(new Date());
+        expect(root.findByProps({ children: '往復テストの脚の日' })).toBeDefined();
+      });
+
+      test('過去日を選択した後に選択日を今日に戻すと、手動予定が再表示される', () => {
+        const root = render();
+        const past = new Date();
+        past.setDate(past.getDate() - 3);
+        mockUseCalendarDayManualSchedule.mockReturnValue([manualCard({ routineName: '往復テストの脚の日2' })]);
+        mockUseCalendarDayExercises.mockReturnValue({ cards: [], retry: jest.fn() });
+
+        selectDate(past);
+        expect(root.findAllByProps({ children: '往復テストの脚の日2' }).length).toBe(0);
+
+        selectDate(new Date());
+        expect(root.findByProps({ children: '往復テストの脚の日2' })).toBeDefined();
       });
     });
   });

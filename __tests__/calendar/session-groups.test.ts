@@ -62,17 +62,19 @@ describe('groupCardsBySession', () => {
 describe('buildTodayTimeline', () => {
   const dayStart = new Date(2026, 6, 20).getTime();
 
+  // keyはmergeScheduleCards(lib/calendar/schedule.ts)が発行する'reminder-*'/'manual-*'を模す
+  // （PR10-4でreminderId専用からkeyベースへ汎化したため、テスト側もkeyを直接渡す形にする）
   it('実績セッションと予定を時刻順に混ぜる', () => {
     const sessionGroups = groupCardsBySession([
       card({ sessionId: 1, sessionStartedAt: dayStart + 19 * 3_600_000, name: '夜の実績' }), // 19:00
     ]);
-    const scheduleCards = [{ reminderId: 100, hour: 7, minute: 0, routineName: '朝の予定' }];
+    const scheduleCards = [{ key: 'reminder-100', hour: 7, minute: 0, routineName: '朝の予定' }];
     const timeline = buildTodayTimeline(sessionGroups, scheduleCards, dayStart);
     expect(timeline.map((e) => e.kind)).toEqual(['schedule', 'session']);
   });
 
   it('予定側のsortAtはdayStart+hour:minuteから組み立てられる', () => {
-    const scheduleCards = [{ reminderId: 1, hour: 20, minute: 30, routineName: 'x' }];
+    const scheduleCards = [{ key: 'reminder-1', hour: 20, minute: 30, routineName: 'x' }];
     const timeline = buildTodayTimeline([], scheduleCards, dayStart);
     expect(timeline[0].sortAt).toBe(dayStart + 20 * 3_600_000 + 30 * 60_000);
   });
@@ -86,29 +88,50 @@ describe('buildTodayTimeline', () => {
       card({ sessionId: 1, sessionStartedAt: dayStart + 12 * 3_600_000, name: '昼の実績' }),
     ]);
     const scheduleCards = [
-      { reminderId: 1, hour: 19, minute: 0, routineName: '夜の予定' },
-      { reminderId: 2, hour: 7, minute: 0, routineName: '朝の予定' },
+      { key: 'reminder-1', hour: 19, minute: 0, routineName: '夜の予定' },
+      { key: 'reminder-2', hour: 7, minute: 0, routineName: '朝の予定' },
     ];
     const timeline = buildTodayTimeline(sessionGroups, scheduleCards, dayStart);
-    expect(timeline.map((e) => e.key)).toEqual(['schedule-2', 'session-1', 'schedule-1']);
+    expect(timeline.map((e) => e.key)).toEqual(['reminder-2', 'session-1', 'reminder-1']);
   });
 
-  it('各エントリのkeyはkind+idで一意になる（sessionIdとreminderIdの値域が重複しても衝突しない）', () => {
+  it('各エントリのkeyはカード自身のkeyがそのまま使われ、sessionIdの値域と重複しても衝突しない', () => {
     const sessionGroups = groupCardsBySession([
       card({ sessionId: 1, sessionStartedAt: dayStart + 7 * 3_600_000, name: 'A' }),
     ]);
-    const scheduleCards = [{ reminderId: 1, hour: 19, minute: 0, routineName: 'x' }];
+    const scheduleCards = [{ key: 'reminder-1', hour: 19, minute: 0, routineName: 'x' }];
     const timeline = buildTodayTimeline(sessionGroups, scheduleCards, dayStart);
     const keys = timeline.map((e) => e.key);
     expect(new Set(keys).size).toBe(keys.length);
+  });
+
+  it('手動予定（manual-*キー）もリマインダー予定と同じく統合できる（PR10-4）', () => {
+    const sessionGroups = groupCardsBySession([
+      card({ sessionId: 1, sessionStartedAt: dayStart + 12 * 3_600_000, name: '昼の実績' }),
+    ]);
+    const scheduleCards = [
+      { key: 'reminder-1', hour: 7, minute: 0, routineName: '朝の予定' },
+      { key: 'manual-9', hour: 19, minute: 0, routineName: '夜の手動予定' },
+    ];
+    const timeline = buildTodayTimeline(sessionGroups, scheduleCards, dayStart);
+    expect(timeline.map((e) => e.key)).toEqual(['reminder-1', 'session-1', 'manual-9']);
+  });
+
+  it('予定同士のsortAtが完全一致する場合も、渡した配列の順序を維持する（Array.sortの安定性への依存を明示するテスト、PR10-4）', () => {
+    const scheduleCards = [
+      { key: 'reminder-1', hour: 7, minute: 0, routineName: 'A' },
+      { key: 'manual-9', hour: 7, minute: 0, routineName: 'B' },
+    ];
+    const timeline = buildTodayTimeline([], scheduleCards, dayStart);
+    expect(timeline.map((e) => e.key)).toEqual(['reminder-1', 'manual-9']);
   });
 
   it('セッションと予定のsortAtが完全一致する場合、セッションが先に来る（Array.sortの安定性への暗黙依存を固定する回帰テスト）', () => {
     const sessionGroups = groupCardsBySession([
       card({ sessionId: 1, sessionStartedAt: dayStart + 7 * 3_600_000, name: 'A' }),
     ]);
-    const scheduleCards = [{ reminderId: 1, hour: 7, minute: 0, routineName: 'x' }];
+    const scheduleCards = [{ key: 'reminder-1', hour: 7, minute: 0, routineName: 'x' }];
     const timeline = buildTodayTimeline(sessionGroups, scheduleCards, dayStart);
-    expect(timeline.map((e) => e.key)).toEqual(['session-1', 'schedule-1']);
+    expect(timeline.map((e) => e.key)).toEqual(['session-1', 'reminder-1']);
   });
 });

@@ -23,14 +23,15 @@ export function groupCardsBySession<T extends { sessionId: number; sessionStarte
 }
 
 // 今日パネル専用。実績セッション（groupCardsBySessionの出力）と予定（ルーティン紐付き
-// リマインダー由来、2026-07-19確定でPR8の時間帯グループ機構を延長する方針）を同じ
-// 時系列リストに混ぜて時刻順に並べる。予定側のsortAtは「その日のhour:minute」から
+// リマインダー由来、2026-07-19確定でPR8の時間帯グループ機構を延長する方針。PR10-4で
+// 手動追加した予定（lib/calendar/schedule.tsのmergeScheduleCards出力）も対象に加えた）を
+// 同じ時系列リストに混ぜて時刻順に並べる。予定側のsortAtは「その日のhour:minute」から
 // 組み立てるため、呼び出し側は年月日（selectedDateの0時起点）を渡す
 export type TodayTimelineEntry<TSession, TSchedule> =
   | { kind: 'session'; key: string; sortAt: number; group: SessionGroup<TSession> }
   | { kind: 'schedule'; key: string; sortAt: number; card: TSchedule };
 
-export function buildTodayTimeline<TSession, TSchedule extends { reminderId: number; hour: number; minute: number }>(
+export function buildTodayTimeline<TSession, TSchedule extends { key: string; hour: number; minute: number }>(
   sessionGroups: SessionGroup<TSession>[],
   scheduleCards: TSchedule[],
   dayStart: number,
@@ -41,9 +42,12 @@ export function buildTodayTimeline<TSession, TSchedule extends { reminderId: num
     sortAt: group.sessionStartedAt,
     group,
   }));
+  // 予定側のkeyはmergeScheduleCards(lib/calendar/schedule.ts)が発行する`reminder-*`/`manual-*`を
+  // そのまま使う（リマインダー由来・手動どちらも区別せず一意になり、session-*とも衝突しない、
+  // PR10-4でリマインダー予定専用のreminderIdベースから汎化）
   const scheduleEntries: TodayTimelineEntry<TSession, TSchedule>[] = scheduleCards.map((card) => ({
     kind: 'schedule',
-    key: `schedule-${card.reminderId}`,
+    key: card.key,
     sortAt: dayStart + card.hour * 3_600_000 + card.minute * 60_000,
     card,
   }));
