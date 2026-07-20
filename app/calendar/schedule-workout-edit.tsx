@@ -7,6 +7,7 @@ import { PrimaryButton } from '@/components/ui/primary-button';
 import { Colors } from '@/constants/theme';
 import { useDebouncedPush } from '@/hooks/use-debounced-push';
 import { useKeyboardInset } from '@/hooks/use-keyboard-inset';
+import { useRoutines } from '@/hooks/use-routines';
 import { useScheduledWorkoutTime } from '@/hooks/use-scheduled-workout';
 import { useScheduledWorkoutExercises } from '@/hooks/use-scheduled-workout-exercises';
 import { parseDateKey } from '@/lib/calendar/date-grid';
@@ -35,6 +36,7 @@ export default function ScheduleWorkoutEditScreen() {
   const keyboardInset = useKeyboardInset();
   const exercises = useScheduledWorkoutExercises(scheduledWorkoutId);
   const { time: scheduledTime, loaded: scheduledTimeLoaded } = useScheduledWorkoutTime(scheduledWorkoutId);
+  const { routines } = useRoutines();
 
   // 選択日パネルでは見えていた対象日・時刻を、この画面のヘッダーにも表示する。同日に複数の
   // 直接予定があるとき、どの予定を編集しているか見失わないようにする（@designer指摘）
@@ -45,6 +47,13 @@ export default function ScheduleWorkoutEditScreen() {
   const handleAddExercise = useCallback(() => {
     pushDebounced({
       pathname: '/calendar/schedule-workout-add-exercise',
+      params: { scheduledWorkoutId: String(scheduledWorkoutId) },
+    });
+  }, [pushDebounced, scheduledWorkoutId]);
+
+  const handleLoadFromRoutine = useCallback(() => {
+    pushDebounced({
+      pathname: '/calendar/schedule-workout-routine-picker',
       params: { scheduledWorkoutId: String(scheduledWorkoutId) },
     });
   }, [pushDebounced, scheduledWorkoutId]);
@@ -130,6 +139,17 @@ export default function ScheduleWorkoutEditScreen() {
 
   const menuItems: DropdownMenuItem[] = [
     { key: 'add', label: '種目を追加', icon: 'add', onPress: handleAddExercise },
+    {
+      key: 'routine',
+      label: 'ルーティンから読み込み',
+      icon: 'fitness-center',
+      disabled: routines.length === 0,
+      hint:
+        routines.length === 0
+          ? '保存済みのルーティンがありません'
+          : '保存済みのルーティンを選んで種目と目標セット値をまとめて追加します',
+      onPress: handleLoadFromRoutine,
+    },
     {
       key: 'reorder',
       label: '種目を並び替え',

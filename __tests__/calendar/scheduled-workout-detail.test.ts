@@ -71,13 +71,16 @@ jest.mock('drizzle-orm', () => ({
 }));
 
 const mockBuildInitialRoutineSets = jest.fn();
+const mockGetRoutineDetail = jest.fn();
 jest.mock('@/lib/routines/db', () => ({
   buildInitialRoutineSets: (...args: unknown[]) => mockBuildInitialRoutineSets(...args),
+  getRoutineDetail: (...args: unknown[]) => mockGetRoutineDetail(...args),
 }));
 
 import { db } from '@/db/client';
 import {
   addExercisesToScheduledWorkout,
+  addRoutineExercisesToScheduledWorkout,
   addScheduledWorkoutSet,
   deleteLastScheduledWorkoutSet,
   deleteScheduledWorkoutSet,
@@ -131,6 +134,77 @@ describe('addExercisesToScheduledWorkout', () => {
     await addExercisesToScheduledWorkout(1, [30]);
     const [, exerciseValues] = mockInsertValues.mock.calls[0];
     expect(exerciseValues).toEqual([expect.objectContaining({ orderIndex: 0 })]);
+  });
+});
+
+describe('addRoutineExercisesToScheduledWorkout', () => {
+  it('selectionsが空なら何もしない', async () => {
+    await addRoutineExercisesToScheduledWorkout(1, 10, []);
+    expect(mockGetRoutineDetail).not.toHaveBeenCalled();
+    expect(mockInsertValues).not.toHaveBeenCalled();
+  });
+
+  it('ルーティンが見つからない場合は何もしない', async () => {
+    mockGetRoutineDetail.mockResolvedValueOnce(null);
+    await addRoutineExercisesToScheduledWorkout(1, 10, [{ routineExerciseId: 501 }]);
+    expect(mockInsertValues).not.toHaveBeenCalled();
+  });
+
+  it('選んだ種目だけを、ルーティン内の表示順(orderIndex順)で追加し、ルーティンの目標セットの値をそのままコピーする', async () => {
+    mockGetRoutineDetail.mockResolvedValueOnce({
+      routine: { id: 10, name: '胸トレ' },
+      reminder: null,
+      exercises: [
+        {
+          id: 501,
+          exerciseId: 20,
+          sets: [{ id: 1, setNumber: 1, weight: 60, reps: 8, durationSeconds: null, distanceMeters: null }],
+        },
+        {
+          id: 502,
+          exerciseId: 21,
+          sets: [{ id: 2, setNumber: 1, weight: 40, reps: 12, durationSeconds: null, distanceMeters: null }],
+        },
+      ],
+    });
+    mockSelectWhere.mockResolvedValueOnce([{ orderIndex: 0 }]); // getMaxOrderIndex
+
+    // 選択順は502→501（クリック順とは逆）でも、送信されるのはルーティン内の表示順(501→502)
+    await addRoutineExercisesToScheduledWorkout(1, 10, [{ routineExerciseId: 502 }, { routineExerciseId: 501 }]);
+
+    const [, exerciseValues] = mockInsertValues.mock.calls[0];
+    expect(exerciseValues).toEqual([
+      expect.objectContaining({ scheduledWorkoutId: 1, exerciseId: 20, orderIndex: 1 }),
+      expect.objectContaining({ scheduledWorkoutId: 1, exerciseId: 21, orderIndex: 2 }),
+    ]);
+    const [, firstSetsValues] = mockInsertValues.mock.calls[1];
+    expect(firstSetsValues).toEqual([expect.objectContaining({ weight: 60, reps: 8, setNumber: 1 })]);
+    const [, secondSetsValues] = mockInsertValues.mock.calls[2];
+    expect(secondSetsValues).toEqual([expect.objectContaining({ weight: 40, reps: 12, setNumber: 1 })]);
+  });
+
+  it('ルーティンの種目に0セットのものが含まれる場合は空欄1セットにフォールバックする', async () => {
+    mockGetRoutineDetail.mockResolvedValueOnce({
+      routine: { id: 10, name: '胸トレ' },
+      reminder: null,
+      exercises: [{ id: 501, exerciseId: 20, sets: [] }],
+    });
+    mockSelectWhere.mockResolvedValueOnce([]); // getMaxOrderIndex
+
+    await addRoutineExercisesToScheduledWorkout(1, 10, [{ routineExerciseId: 501 }]);
+
+    const [, setsValues] = mockInsertValues.mock.calls[1];
+    expect(setsValues).toEqual([expect.objectContaining({ weight: null, reps: null, setNumber: 1 })]);
+  });
+
+  it('選択したidがルーティン内に1件も見つからない場合は何もしない', async () => {
+    mockGetRoutineDetail.mockResolvedValueOnce({
+      routine: { id: 10, name: '胸トレ' },
+      reminder: null,
+      exercises: [{ id: 501, exerciseId: 20, sets: [] }],
+    });
+    await addRoutineExercisesToScheduledWorkout(1, 10, [{ routineExerciseId: 999 }]);
+    expect(mockInsertValues).not.toHaveBeenCalled();
   });
 });
 

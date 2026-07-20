@@ -10,6 +10,7 @@ const mockDeleteLastScheduledWorkoutSet = jest.fn();
 const mockDeleteScheduledWorkoutSet = jest.fn();
 const mockUpdateScheduledWorkoutSetValues = jest.fn();
 const mockRemoveScheduledWorkout = jest.fn();
+const mockUseRoutines = jest.fn();
 
 jest.mock('expo-router', () => ({
   useRouter: () => ({ back: mockBack, push: mockPush }),
@@ -43,6 +44,10 @@ jest.mock('@/lib/calendar/scheduled-workout-detail', () => ({
 
 jest.mock('@/lib/notifications/scheduled-workout-scheduler', () => ({
   removeScheduledWorkout: (...args: unknown[]) => mockRemoveScheduledWorkout(...args),
+}));
+
+jest.mock('@/hooks/use-routines', () => ({
+  useRoutines: () => mockUseRoutines(),
 }));
 
 import ScheduleWorkoutEditScreen from '@/app/calendar/schedule-workout-edit';
@@ -106,6 +111,7 @@ beforeEach(() => {
     time: { scheduledDate: '2026-07-21', hour: 19, minute: 30 },
     loaded: true,
   });
+  mockUseRoutines.mockReturnValue({ routines: [{ id: 1, name: '胸トレ' }] });
   jest.spyOn(Alert, 'alert').mockImplementation(() => {});
 });
 
@@ -146,6 +152,38 @@ describe('ScheduleWorkoutEditScreen', () => {
       pathname: '/calendar/schedule-workout-add-exercise',
       params: { scheduledWorkoutId: '5' },
     });
+  });
+
+  it('保存済みルーティンがあるとき、ヘッダー⋮「ルーティンから読み込み」を押すとscheduledWorkoutId付きでschedule-workout-routine-pickerへ遷移する', () => {
+    const root = render();
+    const headerMenuTrigger = root
+      .findAllByType(TouchableOpacity)
+      .find((t) => t.props.accessibilityLabel === '種目編集のメニューを開く')!;
+    act(() => {
+      headerMenuTrigger.props.onPress();
+    });
+    const routineItem = findMenuItem(root, 'ルーティンから読み込み')!;
+    expect(routineItem.props.disabled).toBe(false);
+    act(() => {
+      routineItem.props.onPress();
+    });
+    expect(mockPush).toHaveBeenCalledWith({
+      pathname: '/calendar/schedule-workout-routine-picker',
+      params: { scheduledWorkoutId: '5' },
+    });
+  });
+
+  it('保存済みルーティンが無いとき、ヘッダー⋮「ルーティンから読み込み」は無効になる', () => {
+    mockUseRoutines.mockReturnValue({ routines: [] });
+    const root = render();
+    const headerMenuTrigger = root
+      .findAllByType(TouchableOpacity)
+      .find((t) => t.props.accessibilityLabel === '種目編集のメニューを開く')!;
+    act(() => {
+      headerMenuTrigger.props.onPress();
+    });
+    const routineItem = findMenuItem(root, 'ルーティンから読み込み')!;
+    expect(routineItem.props.disabled).toBe(true);
   });
 
   it('種目が2件以上のとき、ヘッダー⋮「種目を並び替え」を押すとscheduledWorkoutId付きでschedule-workout-exercise-reorderへ遷移する', () => {

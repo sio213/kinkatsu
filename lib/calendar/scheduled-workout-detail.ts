@@ -1,6 +1,6 @@
 import { db, type DbOrTx, type Tx } from '@/db/client';
 import { scheduledWorkoutExercises, scheduledWorkoutSets, scheduledWorkouts } from '@/db/schema';
-import { buildInitialRoutineSets } from '@/lib/routines/db';
+import { buildInitialRoutineSets, getRoutineDetail, type RoutineDetailExercise } from '@/lib/routines/db';
 import { hasAnyValue, type PreviousSetValues } from '@/lib/workout/set-values';
 import { and, desc, eq } from 'drizzle-orm';
 
@@ -71,6 +71,80 @@ export async function addExercisesToScheduledWorkout(scheduledWorkoutId: number,
     await insertInitialScheduledWorkoutSets(tx, inserted, now);
     await touchScheduledWorkout(tx, scheduledWorkoutId, now);
   });
+}
+
+export type RoutineExerciseSelection = { routineExerciseId: number };
+
+// ヘッダー⋮「ルーティンから読み込み」(app/calendar/schedule-workout-routine-load.tsx)用。
+// lib/workout/session.tsのinsertRoutineCardsIntoSession/addRoutineExercisesToSessionと同じ方針で、
+// 選んだルーティンの種目を新規追加し、目標セットは「そのルーティンの実際の値」をそのままコピーする
+// （addExercisesToScheduledWorkoutが種目追加ピッカー用に「直近の実績」をプリフィルするのとは
+// 異なり、こちらは画面上で確認した値と入る値を一致させるため、ユーザーが見たルーティンの値を
+// そのまま使う）。ルーティンに0セットの種目が含まれる場合は空欄1セットにフォールバックする
+// （lib/workout/session.tsのbuildInitialSetsと同じ挙動）
+export async function addRoutineExercisesToScheduledWorkout(
+  scheduledWorkoutId: number,
+  routineId: number,
+  selections: RoutineExerciseSelection[],
+): Promise<void> {
+  if (selections.length === 0) return;
+  const detail = await getRoutineDetail(routineId);
+  if (!detail) return;
+  // detail.exercises(orderIndex順)をfilterすることで、一部だけ選択してもselectionsの並びが
+  // クリック順ではなくルーティン内の表示順のまま保たれる（addRoutineExercisesToSessionと同じ考え方）
+  const selectedIds = new Set(selections.map((s) => s.routineExerciseId));
+  const selectedExercises = detail.exercises.filter((e) => selectedIds.has(e.id));
+  if (selectedExercises.length === 0) return;
+
+  const now = Date.now();
+  const startIndex = (await getMaxOrderIndex(scheduledWorkoutId)) + 1;
+
+  await db.transaction(async (tx) => {
+    const inserted = await tx
+      .insert(scheduledWorkoutExercises)
+      .values(
+        selectedExercises.map((e, i) => ({
+          scheduledWorkoutId,
+          exerciseId: e.exerciseId,
+          orderIndex: startIndex + i,
+          createdAt: now,
+        })),
+      )
+      .returning();
+
+    // 単一のINSERT...RETURNINGは挿入した値の順序で行を返す（lib/workout/session.tsの
+    // insertSessionExerciseCardsと同じSQLite/expo-sqliteの実際の挙動への依存）ため、
+    // inserted[i]とselectedExercises[i]は対応する
+    await insertRoutineSetsForScheduledWorkout(
+      tx,
+      inserted.map((row, i) => ({ scheduledWorkoutExerciseId: row.id, routineSets: selectedExercises[i].sets })),
+      now,
+    );
+    await touchScheduledWorkout(tx, scheduledWorkoutId, now);
+  });
+}
+
+async function insertRoutineSetsForScheduledWorkout(
+  tx: Tx,
+  rows: { scheduledWorkoutExerciseId: number; routineSets: RoutineDetailExercise['sets'] }[],
+  now: number,
+): Promise<void> {
+  for (const row of rows) {
+    const sets = row.routineSets.length > 0
+      ? row.routineSets
+      : [{ weight: null, reps: null, durationSeconds: null, distanceMeters: null }];
+    await tx.insert(scheduledWorkoutSets).values(
+      sets.map((s, i) => ({
+        scheduledWorkoutExerciseId: row.scheduledWorkoutExerciseId,
+        setNumber: i + 1,
+        weight: s.weight,
+        reps: s.reps,
+        durationSeconds: s.durationSeconds,
+        distanceMeters: s.distanceMeters,
+        createdAt: now,
+      })),
+    );
+  }
 }
 
 // 種目カード⋮メニュー「削除」。この予定に最低1種目は残す必要があるため（addDirectScheduledWorkout
