@@ -74,7 +74,8 @@ export function useCalendarMonthSchedule(rangeStart: number, rangeEnd: number, t
       }
       for (const fireDate of fireDates) {
         const dateKey = toDateKey(fireDate);
-        // 「今回だけスキップ」(PR10-6a)された日は月グリッドのリング/ドットにも反映させない
+        // 削除済み(reminderScheduleSkips、2026-07-19に「今回だけスキップ」から変更)の日は
+        // 月グリッドのリング/ドットにも反映させない
         if (skipSet.has(buildReminderSkipKey(r.id, dateKey))) continue;
         fireRows.push({ dateKey, hour: fireDate.getHours(), minute: fireDate.getMinutes(), category });
       }

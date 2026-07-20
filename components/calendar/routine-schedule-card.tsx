@@ -23,17 +23,15 @@ type Props = {
   // （例:「毎週月曜 07:00」）ではなく素の時刻のみになり、見た目だけでは繰り返し予定と
   // 区別しづらいため、視覚(バッジ)・読み上げ(accessibilityLabel)の両方で明示する（@designer指摘）
   oneTime?: boolean;
-  // 手動予定（PR10-3、削除可）のときだけ呼び出し側が渡す。渡された場合のみ⋮メニュー
-  // （「削除」1項目、components/routines/routine-card-menu.tsxと同じDropdownMenuの使い方）を表示する。
-  // リマインダー予定（削除不可）には渡さないため⋮自体が出ない
+  // 手動予定（PR10-3）・リマインダー予定（PR10-6a、2026-07-19に「今回だけスキップ」から
+  // 「削除」へ変更）どちらの削除にも共通で使う。渡された場合のみ⋮メニュー（「削除」1項目、
+  // components/routines/routine-card-menu.tsxと同じDropdownMenuの使い方）を表示する。
+  // 呼び出し側(app/(tabs)/calendar.tsx)は削除前に確認ダイアログを出す責務を持つ（このカードは
+  // 確認済みの削除実行のみを担当する）
   onDelete?: () => void;
-  // リマインダー予定（削除不可、PR10-6a）のときだけ呼び出し側が渡す。渡された場合のみ⋮メニュー
-  // （「今回だけスキップ」1項目）を表示する。取り消せる操作（選択日パネルの「元に戻す」で戻せる）
-  // のためdanger扱いにはしない（@designer方針、「削除」との危険度の違いを色で表す）
-  onSkip?: () => void;
-  // リマインダー予定（PR10-6b）のときだけ呼び出し側が渡す。onSkipと同じメニュー内に
-  // 「今回だけ差し替え」項目を追加で表示する（スキップ・差し替えは別項目として並列提示する、
-  // @designer方針）。onSkipと同時に渡ってonSkip単独で表示されるケースと両立する
+  // リマインダー予定（PR10-6b）のときだけ呼び出し側が渡す。onDeleteと同じメニュー内に
+  // 「今回だけ差し替え」項目を追加で表示する（削除・差し替えは性質が異なる別項目として
+  // 区切り線で分けて並列提示する、@designer方針）
   onReplace?: () => void;
 };
 
@@ -42,16 +40,10 @@ function deleteMenuItems(onDelete: () => void): DropdownMenuItem[] {
   return [{ key: 'delete', label: '削除', icon: 'delete-outline', danger: true, onPress: onDelete }];
 }
 
-// スキップ（その場で完結する取り消し可能な操作）と差し替え（2画面遷移を伴いデータを追加する
-// 操作）は性質が異なるため、同じ1グループにまとめず別グループにしてDropdownMenu標準の
-// 区切り線で分ける（@designer指摘: ラベルが「今回だけ」まで一致し末尾でしか区別できないため）
-function reminderMenuGroups(onSkip?: () => void, onReplace?: () => void): DropdownMenuItem[][] {
-  return [
-    ...(onSkip ? [[{ key: 'skip', label: '今回だけスキップ', icon: 'event-busy' as const, onPress: onSkip }]] : []),
-    ...(onReplace
-      ? [[{ key: 'replace', label: '今回だけ差し替え', icon: 'swap-horiz' as const, onPress: onReplace }]]
-      : []),
-  ];
+// 削除（取り消し不可）と差し替え（2画面遷移を伴いデータを追加する操作）は性質が異なるため、
+// 同じ1グループにまとめず別グループにしてDropdownMenu標準の区切り線で分ける
+function replaceMenuItems(onReplace: () => void): DropdownMenuItem[] {
+  return [{ key: 'replace', label: '今回だけ差し替え', icon: 'swap-horiz', onPress: onReplace }];
 }
 
 // 選択日パネルの予定カード（デザイン案「未来01/未来03/今日01」）。ルーティン紐付き
@@ -73,17 +65,16 @@ export const RoutineScheduleCard = memo(function RoutineScheduleCard({
   onPressStart,
   oneTime = false,
   onDelete,
-  onSkip,
   onReplace,
 }: Props) {
-  // onDelete(手動予定)・onSkip/onReplace(リマインダー予定)は出所で分岐する呼び出し側の責務により
-  // 排他的に渡される想定(手動予定にはonSkip/onReplaceは渡らない)。onSkip/onReplaceは同じ
-  // メニュー内に区切り線で分けた別グループとして並べて出す(@designer方針)
+  // onDelete(手動予定・リマインダー予定共通)・onReplace(リマインダー予定のみ)は同じメニュー内に
+  // 区切り線で分けた別グループとして並べて出す(@designer方針)。onReplaceは手動予定には渡らない。
+  // 破壊的操作の「削除」はroutine-card-menu.tsx/exercise-card-menu.tsxと同じく必ず最後尾に置く
+  // （@designer指摘: 削除が最上段だと、メニューを開いた直後に指が最も近い位置に取り消し不可の
+  // 操作が来てしまい誤タップのリスクが上がる）
   const menuGroups = onDelete
-    ? [deleteMenuItems(onDelete)]
-    : onSkip || onReplace
-      ? reminderMenuGroups(onSkip, onReplace)
-      : null;
+    ? [...(onReplace ? [replaceMenuItems(onReplace)] : []), deleteMenuItems(onDelete)]
+    : null;
   // routine-card.tsxの一覧カードと同じ情報構成（名前・カテゴリ・種目数・スケジュール）で
   // 読み上げ単位をまとめる。カレンダー/一覧のどちらでルーティンを見てもVoiceOver体験が
   // 揃うようにする（@designer指摘）
@@ -108,7 +99,7 @@ export const RoutineScheduleCard = memo(function RoutineScheduleCard({
             <DropdownMenu
               groups={menuGroups}
               // routine-card-menu.tsx/exercise-card-menu.tsxは項目5つのため160、
-              // こちらは「削除」単独、または「今回だけスキップ」/「今回だけ差し替え」の最大2項目
+              // こちらは「削除」単独、または「削除」/「今回だけ差し替え」の最大2項目
               // までのため少し狭い140で十分（各ラベルの文字数は既存の5項目パターンと大差ない）
               minWidth={140}
               renderTrigger={({ open, onPress: onOpenMenu }) => (

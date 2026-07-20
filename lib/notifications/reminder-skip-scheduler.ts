@@ -112,9 +112,13 @@ export type SkipReminderOccurrenceResult = {
   notificationSuppressed: boolean;
 };
 
-// 選択日パネルの予定カード⋮メニュー「今回だけスキップ」用。スキップ記録の保存と、該当日の
-// 通知キャンセルをセットで行う。通知キャンセルが失敗してもスキップ自体は成立させたい
-// (表示が消えることの方が優先)ため、通知側のエラーはcatchして握りつぶす。
+// 選択日パネルの予定カード⋮メニュー「削除」（2026-07-19に「今回だけスキップ」から変更）、
+// および「今回だけ差し替え」(schedule-time-picker.tsx)の両方から呼ばれる。関数名・テーブル名が
+// 「スキップ」のままなのは、内部的には「その日のこの発火は無かったことにする」マーカーとしての
+// 役割が変わっていないため（詳細はapp/(tabs)/calendar.tsxのhandleDeleteReminderOccurrence
+// 直上のコメント参照）。スキップ記録の保存と、該当日の通知キャンセルをセットで行う。
+// 通知キャンセルが失敗してもスキップ自体は成立させたい(表示が消えることの方が優先)ため、
+// 通知側のエラーはcatchして握りつぶす。
 // 既にスキップ済みの日への二重呼び出し(⋮メニュー連打・useLiveQuery再購読前の再タップ等)は
 // unique制約違反による分かりにくいエラーAlertを避けるため、先に存在チェックして冪等にする
 // (@reviewer/@tester指摘対応)。存在チェックとinsertの間はTOCTOUで理論上すり抜けうるため、
@@ -141,8 +145,10 @@ export async function skipReminderOccurrence(
   }
 }
 
-// スキップ済みカードの「元に戻す」用。スキップ記録の削除と、未来日に限り該当日の通知再登録を
-// セットで行う
+// 2026-07-19にユーザー向けの「元に戻す」UI（ゴーストカード）は廃止された。現在は
+// app/calendar/schedule-time-picker.tsxの「今回だけ差し替え」フローが、手動予定の追加に
+// 失敗した際の内部ロールバック専用として呼ぶのみ（ユーザーが直接起動する導線は無い）。
+// スキップ記録の削除と、未来日に限り該当日の通知再登録をセットで行う
 export async function unskipReminderOccurrence(reminderId: number, skippedDate: string): Promise<void> {
   await removeReminderScheduleSkip(reminderId, skippedDate);
   try {
