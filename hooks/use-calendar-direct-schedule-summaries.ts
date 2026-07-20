@@ -5,7 +5,14 @@ import { eq } from 'drizzle-orm';
 import { useLiveQuery } from 'drizzle-orm/expo-sqlite';
 import { useMemo } from 'react';
 
-export type DirectScheduleSummary = { exerciseCount: number; categories: string[]; exerciseNames: string[] };
+export type DirectScheduleSummary = {
+  exerciseCount: number;
+  categories: string[];
+  exerciseNames: string[];
+  // 種目一覧カード表示（DirectScheduleExerciseGroup、2026-07-20）・編集画面への遷移時の
+  // 事前選択に使う。exerciseNamesと同じ並び順（orderIndex順）
+  exerciseIds: number[];
+};
 
 // カレンダーの「直接追加」予定（ルーティンを介さず個別に選んだ種目、2026-07-20）用。
 // hooks/use-routines.tsのuseRoutineExerciseSummariesと対になるフックで、集計方針
@@ -16,6 +23,7 @@ export function useCalendarDirectScheduleSummaries(): Map<number, DirectSchedule
     db
       .select({
         scheduledWorkoutId: scheduledWorkoutExercises.scheduledWorkoutId,
+        exerciseId: scheduledWorkoutExercises.exerciseId,
         category: exercises.category,
         name: exercises.name,
       })
@@ -40,6 +48,15 @@ export function useCalendarDirectScheduleSummaries(): Map<number, DirectSchedule
       counts.set(row.category, (counts.get(row.category) ?? 0) + 1);
     }
     const namesById = groupExerciseNamesByScheduleId(rows);
+    const idsById = new Map<number, number[]>();
+    for (const row of rows) {
+      const ids = idsById.get(row.scheduledWorkoutId);
+      if (ids) {
+        ids.push(row.exerciseId);
+      } else {
+        idsById.set(row.scheduledWorkoutId, [row.exerciseId]);
+      }
+    }
 
     const map = new Map<number, DirectScheduleSummary>();
     for (const [scheduledWorkoutId, counts] of categoryCounts) {
@@ -48,6 +65,7 @@ export function useCalendarDirectScheduleSummaries(): Map<number, DirectSchedule
         exerciseCount: exerciseCounts.get(scheduledWorkoutId) ?? 0,
         categories,
         exerciseNames: namesById.get(scheduledWorkoutId) ?? [],
+        exerciseIds: idsById.get(scheduledWorkoutId) ?? [],
       });
     }
     return map;

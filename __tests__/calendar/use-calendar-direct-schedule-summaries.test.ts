@@ -68,9 +68,9 @@ describe('useCalendarDirectScheduleSummaries', () => {
     mockLiveQueryQueue = [
       {
         data: [
-          { scheduledWorkoutId: 1, category: 'chest', name: 'ベンチプレス' },
-          { scheduledWorkoutId: 1, category: 'shoulder', name: 'ショルダープレス' },
-          { scheduledWorkoutId: 1, category: 'chest', name: 'インクラインベンチプレス' },
+          { scheduledWorkoutId: 1, exerciseId: 10, category: 'chest', name: 'ベンチプレス' },
+          { scheduledWorkoutId: 1, exerciseId: 11, category: 'shoulder', name: 'ショルダープレス' },
+          { scheduledWorkoutId: 1, exerciseId: 12, category: 'chest', name: 'インクラインベンチプレス' },
         ],
       },
     ];
@@ -79,6 +79,7 @@ describe('useCalendarDirectScheduleSummaries', () => {
       exerciseCount: 3,
       categories: ['chest', 'shoulder'],
       exerciseNames: ['ベンチプレス', 'ショルダープレス', 'インクラインベンチプレス'],
+      exerciseIds: [10, 11, 12],
     });
   });
 
@@ -86,9 +87,9 @@ describe('useCalendarDirectScheduleSummaries', () => {
     mockLiveQueryQueue = [
       {
         data: [
-          { scheduledWorkoutId: 1, category: 'chest', name: 'ベンチプレス' },
-          { scheduledWorkoutId: 2, category: 'leg', name: 'スクワット' },
-          { scheduledWorkoutId: 1, category: 'arm', name: 'アームカール' },
+          { scheduledWorkoutId: 1, exerciseId: 10, category: 'chest', name: 'ベンチプレス' },
+          { scheduledWorkoutId: 2, exerciseId: 20, category: 'leg', name: 'スクワット' },
+          { scheduledWorkoutId: 1, exerciseId: 13, category: 'arm', name: 'アームカール' },
         ],
       },
     ];
@@ -97,21 +98,28 @@ describe('useCalendarDirectScheduleSummaries', () => {
       exerciseCount: 2,
       categories: ['chest', 'arm'],
       exerciseNames: ['ベンチプレス', 'アームカール'],
+      exerciseIds: [10, 13],
     });
-    expect(result.get(2)).toEqual({ exerciseCount: 1, categories: ['leg'], exerciseNames: ['スクワット'] });
+    expect(result.get(2)).toEqual({
+      exerciseCount: 1,
+      categories: ['leg'],
+      exerciseNames: ['スクワット'],
+      exerciseIds: [20],
+    });
   });
 
-  it('exerciseNamesはorderIndex順（クエリのorderBy結果の並び）をそのまま保つ', () => {
+  it('exerciseNames/exerciseIdsはorderIndex順（クエリのorderBy結果の並び）をそのまま保つ', () => {
     mockLiveQueryQueue = [
       {
         data: [
-          { scheduledWorkoutId: 1, category: 'chest', name: 'ベンチプレス' },
-          { scheduledWorkoutId: 1, category: 'back', name: 'デッドリフト' },
-          { scheduledWorkoutId: 1, category: 'leg', name: 'スクワット' },
+          { scheduledWorkoutId: 1, exerciseId: 10, category: 'chest', name: 'ベンチプレス' },
+          { scheduledWorkoutId: 1, exerciseId: 30, category: 'back', name: 'デッドリフト' },
+          { scheduledWorkoutId: 1, exerciseId: 20, category: 'leg', name: 'スクワット' },
         ],
       },
     ];
     const result = mount();
     expect(result.get(1)?.exerciseNames).toEqual(['ベンチプレス', 'デッドリフト', 'スクワット']);
+    expect(result.get(1)?.exerciseIds).toEqual([10, 30, 20]);
   });
 });

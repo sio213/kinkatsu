@@ -14,7 +14,11 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 // app/routine/exercise-picker.tsxと同じく、DB非依存の汎用ExercisePickerView（onConfirmで
 // 選択順を保持した種目id配列を受け取る）をそのまま使う。ここではまだDBに書き込まず、
 // 選んだ種目idをschedule-time-picker（画面2、時刻確定）へ引き継ぐだけ
-// （ルーティン版のschedule-routine-picker→schedule-time-pickerと同じ2段階構成）
+// （ルーティン版のschedule-routine-picker→schedule-time-pickerと同じ2段階構成）。
+// 既存予定に種目を追加する場合はapp/calendar/schedule-workout-add-exercise.tsx、
+// 既存予定の種目・目標セットをまとめて編集する場合はapp/calendar/schedule-workout-edit.tsxを使う
+// （どちらも既存予定の種目一覧カード(DirectScheduleExerciseGroup)タップ後の導線で、この画面は
+// 新規作成専用、2026-07-20に編集モードを分離）
 export default function ScheduleExercisePickerScreen() {
   const { dateKey } = useLocalSearchParams<{ dateKey: string }>();
   const router = useRouter();

@@ -9,10 +9,17 @@ type Props = {
   onSwap: () => void;
   onMoveUp: () => void;
   onMoveDown: () => void;
-  onLoadFromHistory: () => void;
-  // この種目に読み込める過去記録が1件も無ければ「上へ移動」等と同じくグレーアウトする
-  hasHistory: boolean;
+  // 「過去の記録から読み込み」項目。セッションの概念が無い文脈（直接予定の目標セット編集画面、
+  // 2026-07-20）では読み込み元が無いため省略でき、その場合この項目自体を出さない
+  onLoadFromHistory?: () => void;
+  // この種目に読み込める過去記録が1件も無ければ「上へ移動」等と同じくグレーアウトする。
+  // onLoadFromHistory省略時は無視される
+  hasHistory?: boolean;
   onDelete: () => void;
+  // カードがこの1件しか無い等、削除を実行すると不正な状態になる場合に無効化する
+  // （直接予定の種目編集画面、2026-07-20。「上へ移動」等と同じく実行前に先回りして伝える方針）
+  isDeleteDisabled?: boolean;
+  deleteDisabledHint?: string;
 };
 
 // 種目カードの「⋮」メニュー
@@ -25,20 +32,34 @@ export function ExerciseCardMenu({
   onLoadFromHistory,
   hasHistory,
   onDelete,
+  isDeleteDisabled,
+  deleteDisabledHint,
 }: Props) {
   const items: DropdownMenuItem[] = [
     { key: 'swap', label: '種目を入れ替え', icon: 'swap-horiz', onPress: onSwap },
     { key: 'up', label: '上へ移動', icon: 'arrow-upward', disabled: isFirst, onPress: onMoveUp },
     { key: 'down', label: '下へ移動', icon: 'arrow-downward', disabled: isLast, onPress: onMoveDown },
+    ...(onLoadFromHistory
+      ? [
+          {
+            key: 'history',
+            label: '過去の記録から読み込み',
+            icon: 'history' as const,
+            disabled: !hasHistory,
+            hint: !hasHistory ? 'この種目の過去の記録がありません' : undefined,
+            onPress: onLoadFromHistory,
+          },
+        ]
+      : []),
     {
-      key: 'history',
-      label: '過去の記録から読み込み',
-      icon: 'history',
-      disabled: !hasHistory,
-      hint: !hasHistory ? 'この種目の過去の記録がありません' : undefined,
-      onPress: onLoadFromHistory,
+      key: 'delete',
+      label: '削除',
+      icon: 'delete-outline',
+      danger: true,
+      disabled: isDeleteDisabled,
+      hint: isDeleteDisabled ? deleteDisabledHint : undefined,
+      onPress: onDelete,
     },
-    { key: 'delete', label: '削除', icon: 'delete-outline', danger: true, onPress: onDelete },
   ];
 
   return (

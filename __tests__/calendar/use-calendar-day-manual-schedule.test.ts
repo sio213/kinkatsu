@@ -3,7 +3,10 @@
 var mockRows: unknown[] | undefined;
 var mockSummaries: Map<number, { exerciseCount: number; categories: string[] }>;
 var mockRoutines: { id: number; name: string }[];
-var mockDirectSummaries: Map<number, { exerciseCount: number; categories: string[]; exerciseNames: string[] }>;
+var mockDirectSummaries: Map<
+  number,
+  { exerciseCount: number; categories: string[]; exerciseNames: string[]; exerciseIds: number[] }
+>;
 
 jest.mock('@/db/client', () => ({
   db: {
@@ -145,7 +148,7 @@ describe('useCalendarDayManualSchedule', () => {
     it('種目名から合成したタイトル・カテゴリ・種目数を返す', () => {
       mockRows = [{ id: 1, routineId: null, scheduledDate: '2026-07-25', hour: 19, minute: 30 }];
       mockDirectSummaries = new Map([
-        [1, { exerciseCount: 2, categories: ['chest', 'shoulder'], exerciseNames: ['ベンチプレス', 'ショルダープレス'] }],
+        [1, { exerciseCount: 2, categories: ['chest', 'shoulder'], exerciseNames: ['ベンチプレス', 'ショルダープレス'], exerciseIds: [10, 11] }],
       ]);
       const result = renderHook(new Date(2026, 6, 25)).result();
       expect(result).toHaveLength(1);
@@ -157,7 +160,7 @@ describe('useCalendarDayManualSchedule', () => {
         exerciseCount: 2,
         hour: 19,
         minute: 30,
-        exerciseNames: ['ベンチプレス', 'ショルダープレス'],
+        exerciseIds: [10, 11],
       });
     });
 
@@ -174,7 +177,9 @@ describe('useCalendarDayManualSchedule', () => {
       ];
       mockSummaries = new Map([[10, { exerciseCount: 1, categories: ['leg'] }]]);
       mockRoutines = [{ id: 10, name: '夜の予定' }];
-      mockDirectSummaries = new Map([[2, { exerciseCount: 1, categories: ['chest'], exerciseNames: ['ベンチプレス'] }]]);
+      mockDirectSummaries = new Map([
+        [2, { exerciseCount: 1, categories: ['chest'], exerciseNames: ['ベンチプレス'], exerciseIds: [10] }],
+      ]);
       const result = renderHook(new Date(2026, 6, 25)).result();
       expect(result.map((c) => c.title)).toEqual(['ベンチプレス', '夜の予定']);
     });

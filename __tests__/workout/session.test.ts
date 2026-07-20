@@ -111,6 +111,14 @@ jest.mock('@/lib/routines/db', () => ({
   getRoutineDetail: (...args: unknown[]) => mockGetRoutineDetail(...args),
 }));
 
+// startWorkoutFromScheduledWorkoutが読む「予定の目標セット」はgetScheduledWorkoutSetsForExercise経由。
+// このクエリ自体の組み立てはscheduled-workout-detail.test.tsが担当するため、ここでは
+// startWorkoutFromScheduledWorkoutがその結果を優先するか前回記録にフォールバックするかだけを見る
+const mockGetScheduledWorkoutSetsForExercise = jest.fn();
+jest.mock('@/lib/calendar/scheduled-workout-detail', () => ({
+  getScheduledWorkoutSetsForExercise: (...args: unknown[]) => mockGetScheduledWorkoutSetsForExercise(...args),
+}));
+
 import {
   addExercisesToSession,
   addRoutineExercisesToSession,
@@ -121,7 +129,6 @@ import {
   reorderSessionExercises,
   startPastWorkoutFromRoutine,
   startWorkoutFromRoutine,
-  startWorkoutFromScheduledExercises,
   startWorkoutFromScheduledWorkout,
   startWorkoutSession,
 } from '@/lib/workout/session';
@@ -137,6 +144,9 @@ beforeEach(() => {
   // 既定は「前回の記録なし」。プリフィルを検証するテストだけ個別にmockResolvedValueOnceで上書きする
   mockGetPreviousSets.mockResolvedValue([]);
   mockGetRoutineDetail.mockResolvedValue(null);
+  // 既定は「目標セット未設定」。startWorkoutFromScheduledWorkoutはこの場合getPreviousSetsに
+  // フォールバックする
+  mockGetScheduledWorkoutSetsForExercise.mockResolvedValue([]);
 });
 
 describe('startWorkoutSession', () => {
@@ -901,73 +911,25 @@ describe('startPastWorkoutFromRoutine', () => {
   });
 });
 
-// カレンダーの「直接追加」予定（scheduledWorkoutExercises、ルーティンを介さず個別に選んだ種目、
-// 2026-07-20）を実施する用。ルーティンの目標セットが無いため、addExercisesToSessionと同じ
-// getPreviousSets経由の自動プリフィルになる（insertRoutineCardsIntoSessionは経由しない）
-describe('startWorkoutFromScheduledExercises', () => {
-  it('exerciseIdsが空ならnullを返し、セッションも作らない', async () => {
-    const result = await startWorkoutFromScheduledExercises([], Date.now(), null);
+// カレンダーの「直接追加」予定を今日パネルの開始ボタン・通知タップから実施する用。
+// 種目編集画面(app/calendar/schedule-workout-edit.tsx)で設定した目標セットがあればそれを
+// コピーし、無ければaddExercisesToSessionと同じgetPreviousSets経由の自動プリフィルにフォールバックする
+// （2026-07-20、目標セット機能追加に伴いstartWorkoutFromScheduledExercisesを統合）
+describe('startWorkoutFromScheduledWorkout', () => {
+  it('対象の種目が1件も見つからない場合はnullを返し、セッションも作らない', async () => {
+    mockSelectWhere.mockResolvedValueOnce([]);
+    const result = await startWorkoutFromScheduledWorkout(999);
     expect(result).toBeNull();
     expect(mockInsertValues).not.toHaveBeenCalled();
   });
 
-  it('新規セッションを作り、渡した種目をorderIndex0から連番でカードに追加する（routineIdは書き込まない）', async () => {
-    mockSelectWhere.mockResolvedValueOnce([]); // このセッションにまだカードが無い
-    mockGetPreviousSets.mockResolvedValue([]);
-    mockReturning
-      .mockResolvedValueOnce([{ id: 60, startedAt: 100, endedAt: null }]) // workoutSessions insert
-      .mockResolvedValueOnce([
-        { id: 200, exerciseId: 10 },
-        { id: 201, exerciseId: 11 },
-      ]); // workoutSessionExercises insert
-
-    const result = await startWorkoutFromScheduledExercises([10, 11], 100, null);
-
-    expect(result?.sessionId).toBe(60);
-    const sessionPayload = mockInsertValues.mock.calls[0][0];
-    expect(sessionPayload).toEqual({
-      startedAt: 100,
-      endedAt: null,
-      createdAt: expect.any(Number),
-      updatedAt: expect.any(Number),
-    });
-    // 手動開始と同じくroutineIdキー自体を含まない（未指定=schema既定のnull）
-    expect(sessionPayload.routineId).toBeUndefined();
-
-    const cardsPayload = mockInsertValues.mock.calls[1][0];
-    expect(cardsPayload).toEqual([
-      { sessionId: 60, exerciseId: 10, orderIndex: 0, createdAt: expect.any(Number) },
-      { sessionId: 60, exerciseId: 11, orderIndex: 1, createdAt: expect.any(Number) },
-    ]);
-  });
-
-  it('種目ごとに前回記録があれば自動プリフィルする（ルーティンの目標セットではなくgetPreviousSets経由）', async () => {
-    mockSelectWhere.mockResolvedValueOnce([]);
-    mockGetPreviousSets.mockResolvedValueOnce([
-      { setNumber: 1, weight: 60, reps: 8, durationSeconds: null, distanceMeters: null },
-    ]);
-    mockReturning
-      .mockResolvedValueOnce([{ id: 61, startedAt: 0, endedAt: null }])
-      .mockResolvedValueOnce([{ id: 300, exerciseId: 10 }]);
-    mockSetsReturning.mockResolvedValueOnce([{ id: 900 }]);
-
-    await startWorkoutFromScheduledExercises([10], 0, null);
-
-    expect(mockGetPreviousSets).toHaveBeenCalledWith(expect.anything(), 10, 61);
-    const setsPayload = mockSetsInsertValues.mock.calls[0][0];
-    expect(setsPayload).toEqual([
-      expect.objectContaining({ sessionId: 61, exerciseId: 10, weight: 60, reps: 8, completedAt: null }),
-    ]);
-  });
-});
-
-// カレンダーの「直接追加」予定を今日パネルの開始ボタン・通知タップから実施する用。
-// scheduledWorkoutExercisesから種目idを解決してstartWorkoutFromScheduledExercisesへ委譲する
-describe('startWorkoutFromScheduledWorkout', () => {
-  it('scheduledWorkoutIdに紐づく種目をorderIndex順に取得し、startWorkoutFromScheduledExercisesへ渡す', async () => {
+  it('scheduledWorkoutIdに紐づく種目をorderIndex順に取得し、新規セッションへカードとして追加する（routineIdは書き込まない）', async () => {
     mockSelectWhere
-      .mockResolvedValueOnce([{ exerciseId: 20 }, { exerciseId: 21 }]) // scheduledWorkoutExercises検索
-      .mockResolvedValueOnce([]); // 既存カードが無いセッション
+      .mockResolvedValueOnce([
+        { exerciseId: 20, scheduledWorkoutExerciseId: 900 },
+        { exerciseId: 21, scheduledWorkoutExerciseId: 901 },
+      ]) // scheduledWorkoutExercises検索
+      .mockResolvedValueOnce([]); // このセッションにまだカードが無い
     mockGetPreviousSets.mockResolvedValue([]);
     mockReturning
       .mockResolvedValueOnce([{ id: 70, startedAt: 0, endedAt: null }])
@@ -979,15 +941,83 @@ describe('startWorkoutFromScheduledWorkout', () => {
     const result = await startWorkoutFromScheduledWorkout(5);
 
     expect(result?.sessionId).toBe(70);
+    const sessionPayload = mockInsertValues.mock.calls[0][0];
+    expect(sessionPayload.routineId).toBeUndefined();
     const cardsPayload = mockInsertValues.mock.calls[1][0];
     expect(cardsPayload.map((c: { exerciseId: number }) => c.exerciseId)).toEqual([20, 21]);
   });
 
-  it('対象の種目が1件も見つからない場合はnullを返し、セッションも作らない', async () => {
-    mockSelectWhere.mockResolvedValueOnce([]);
-    const result = await startWorkoutFromScheduledWorkout(999);
-    expect(result).toBeNull();
-    expect(mockInsertValues).not.toHaveBeenCalled();
+  it('目標セットが未設定の種目は、従来通り種目ごとの前回記録から自動プリフィルする', async () => {
+    mockSelectWhere.mockResolvedValueOnce([{ exerciseId: 10, scheduledWorkoutExerciseId: 900 }]).mockResolvedValueOnce([]);
+    mockGetScheduledWorkoutSetsForExercise.mockResolvedValueOnce([]); // 目標セット未設定
+    mockGetPreviousSets.mockResolvedValueOnce([
+      { setNumber: 1, weight: 60, reps: 8, durationSeconds: null, distanceMeters: null },
+    ]);
+    mockReturning
+      .mockResolvedValueOnce([{ id: 61, startedAt: 0, endedAt: null }])
+      .mockResolvedValueOnce([{ id: 300, exerciseId: 10 }]);
+    mockSetsReturning.mockResolvedValueOnce([{ id: 900 }]);
+
+    await startWorkoutFromScheduledWorkout(5);
+
+    expect(mockGetScheduledWorkoutSetsForExercise).toHaveBeenCalledWith(expect.anything(), 900);
+    expect(mockGetPreviousSets).toHaveBeenCalledWith(expect.anything(), 10, 61);
+    const setsPayload = mockSetsInsertValues.mock.calls[0][0];
+    expect(setsPayload).toEqual([
+      expect.objectContaining({ sessionId: 61, exerciseId: 10, weight: 60, reps: 8, completedAt: null }),
+    ]);
+  });
+
+  it('目標セットが設定されている種目は、前回記録ではなく目標セットをそのままコピーする（ルーティン開始時と同じ挙動、2026-07-20確定）', async () => {
+    mockSelectWhere.mockResolvedValueOnce([{ exerciseId: 10, scheduledWorkoutExerciseId: 900 }]).mockResolvedValueOnce([]);
+    mockGetScheduledWorkoutSetsForExercise.mockResolvedValueOnce([
+      { setNumber: 1, weight: 70, reps: 5, durationSeconds: null, distanceMeters: null },
+    ]);
+    mockReturning
+      .mockResolvedValueOnce([{ id: 62, startedAt: 0, endedAt: null }])
+      .mockResolvedValueOnce([{ id: 301, exerciseId: 10 }]);
+    mockSetsReturning.mockResolvedValueOnce([{ id: 901 }]);
+
+    await startWorkoutFromScheduledWorkout(5);
+
+    expect(mockGetPreviousSets).not.toHaveBeenCalled();
+    const setsPayload = mockSetsInsertValues.mock.calls[0][0];
+    expect(setsPayload).toEqual([
+      expect.objectContaining({ sessionId: 62, exerciseId: 10, weight: 70, reps: 5, completedAt: null }),
+    ]);
+  });
+
+  it('複数種目が混在する場合、種目ごとに個別判定する（一部だけ目標セット設定済み、他は前回記録にフォールバック。@tester指摘: カード対応のズレ回帰防止）', async () => {
+    mockSelectWhere
+      .mockResolvedValueOnce([
+        { exerciseId: 10, scheduledWorkoutExerciseId: 900 }, // 目標セット未設定
+        { exerciseId: 20, scheduledWorkoutExerciseId: 901 }, // 目標セット設定済み
+      ])
+      .mockResolvedValueOnce([]);
+    mockGetScheduledWorkoutSetsForExercise
+      .mockResolvedValueOnce([]) // exercise 10
+      .mockResolvedValueOnce([{ setNumber: 1, weight: 70, reps: 5, durationSeconds: null, distanceMeters: null }]); // exercise 20
+    mockGetPreviousSets.mockResolvedValueOnce([
+      { setNumber: 1, weight: 40, reps: 12, durationSeconds: null, distanceMeters: null },
+    ]);
+    mockReturning
+      .mockResolvedValueOnce([{ id: 63, startedAt: 0, endedAt: null }])
+      .mockResolvedValueOnce([
+        { id: 302, exerciseId: 10 },
+        { id: 303, exerciseId: 20 },
+      ]);
+    mockSetsReturning.mockResolvedValueOnce([{ id: 902 }, { id: 903 }]);
+
+    await startWorkoutFromScheduledWorkout(5);
+
+    // exercise 10だけ前回記録を参照し、exercise 20は参照しない（取り違え防止）
+    expect(mockGetPreviousSets).toHaveBeenCalledWith(expect.anything(), 10, 63);
+    expect(mockGetPreviousSets).not.toHaveBeenCalledWith(expect.anything(), 20, 63);
+    const setsPayload = mockSetsInsertValues.mock.calls[0][0];
+    expect(setsPayload).toEqual([
+      expect.objectContaining({ exerciseId: 10, weight: 40, reps: 12 }),
+      expect.objectContaining({ exerciseId: 20, weight: 70, reps: 5 }),
+    ]);
   });
 });
 

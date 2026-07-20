@@ -78,10 +78,9 @@ export type UnifiedScheduleCardInput = {
   exerciseCount: number;
   hour: number;
   minute: number;
-  // 直接予定（routineId===null）が2種目以上のとき、titleが「先頭の種目名 他N種目」に
-  // 圧縮されてしまい選んだ種目の全容が分からなくなる（@designer指摘、2026-07-20）ため、
-  // カード側で全種目名を表示するために保持する。ルーティン予定・リマインダー予定は常にundefined
-  exerciseNames?: string[];
+  // 直接予定（routineId===null）のときだけ設定する。種目一覧カード表示
+  // （DirectScheduleExerciseGroup）・編集画面への遷移時の事前選択に使う（2026-07-20）
+  exerciseIds?: number[];
 };
 
 export type UnifiedScheduleCard<TReminder> =
@@ -118,7 +117,7 @@ export function mergeScheduleCards<
       exerciseCount: c.exerciseCount,
       hour: c.hour,
       minute: c.minute,
-      exerciseNames: c.exerciseNames,
+      exerciseIds: c.exerciseIds,
       source: 'reminder',
       reminder: c.reminder,
     }));
@@ -130,7 +129,7 @@ export function mergeScheduleCards<
     exerciseCount: c.exerciseCount,
     hour: c.hour,
     minute: c.minute,
-    exerciseNames: c.exerciseNames,
+    exerciseIds: c.exerciseIds,
     source: 'manual',
     scheduledWorkoutId: c.scheduledWorkoutId,
   }));
