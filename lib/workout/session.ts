@@ -284,7 +284,7 @@ async function createRoutineSession(
   return db.transaction(async (tx) => {
     const [session] = await tx
       .insert(workoutSessions)
-      .values({ startedAt, endedAt, createdAt: now, updatedAt: now })
+      .values({ routineId, startedAt, endedAt, createdAt: now, updatedAt: now })
       .returning();
 
     const cards = await insertRoutineCardsIntoSession(tx, session.id, detail.exercises, now);

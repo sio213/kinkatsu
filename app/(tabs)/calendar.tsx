@@ -17,7 +17,8 @@ import { useCalendarMonthRecords } from '@/hooks/use-calendar-month-records';
 import { useCalendarMonthSchedule } from '@/hooks/use-calendar-month-schedule';
 import { useDebouncedPush } from '@/hooks/use-debounced-push';
 import { useStartRoutineWithConfirm } from '@/hooks/use-start-routine-with-confirm';
-import { useWorkoutSessions } from '@/hooks/use-workout-session';
+import { useTickingNow } from '@/hooks/use-ticking-now';
+import { useResumeWorkoutSummary, useWorkoutSessions } from '@/hooks/use-workout-session';
 import { addMonths, isSameDay, toDateKey } from '@/lib/calendar/date-grid';
 import { CATEGORY_ALL, EXERCISE_CATEGORIES } from '@/lib/exercises/constants';
 import { buildTodayTimeline, groupCardsBySession } from '@/lib/calendar/session-groups';
@@ -26,7 +27,7 @@ import { formatHourMinute, formatHourMinuteParts } from '@/lib/calendar/time-of-
 import { formatKindSummary } from '@/lib/notifications/format';
 import { skipReminderOccurrence } from '@/lib/notifications/reminder-skip-scheduler';
 import { removeScheduledWorkout } from '@/lib/notifications/scheduled-workout-scheduler';
-import { formatMonthGroup, formatSessionDateGroup } from '@/lib/workout/summary';
+import { formatElapsedClock, formatMonthGroup, formatSessionDateGroup } from '@/lib/workout/summary';
 import { Stack } from 'expo-router';
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { ActivityIndicator, Alert, ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
@@ -388,6 +389,8 @@ export default function CalendarScreen() {
   );
 
   const { activeSession } = useWorkoutSessions();
+  const resumeSummary = useResumeWorkoutSummary(activeSession);
+  const resumeNow = useTickingNow(activeSession != null);
   // 今日の空状態は進行中セッション(endedAtがnull)のendedAtがnullなためuseCalendarDayExercises
   // 側では「記録なし」に見えている状態でも起こりうる（今日開始したが1セットも確定していない等）。
   // その場合「トレーニングを開始」ボタンのまま無言でそのセッションに合流すると、新規に始めたい
@@ -466,7 +469,16 @@ export default function CalendarScreen() {
               {/* 進行中セッションがある場合は、実績・予定の有無にかかわらず常にバナーを出す
                   （PR6で発見したバグ「無言で古いセッションに合流」の再発防止を、実績+予定が
                   混在するようになった今回のPR9-2でも一貫させる） */}
-              {activeSession && <ResumeWorkoutBanner onPress={handleResumeToday} />}
+              {activeSession && (
+                <ResumeWorkoutBanner
+                  routineName={resumeSummary.routineName}
+                  elapsedLabel={formatElapsedClock(resumeNow - activeSession.startedAt)}
+                  completedExerciseCount={resumeSummary.completedExerciseCount}
+                  totalExerciseCount={resumeSummary.totalExerciseCount}
+                  completedSetCount={resumeSummary.completedSetCount}
+                  onPress={handleResumeToday}
+                />
+              )}
               {todayTimeline.length === 0 ? (
                 !activeSession && (
                   <DayEmptyState buttonIcon="play.fill" actionLabel="トレーニングを開始" onPressAction={handleStartToday} />

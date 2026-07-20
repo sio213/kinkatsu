@@ -16,6 +16,27 @@ export function formatSessionDuration(
   return `${minutes}分`;
 }
 
+// 経過時間を「M:SS」形式にする（分は60を超えても位取りせずそのまま伸びる）。
+// トレーニング中画面のタイマーチップ・再開バナーの60分未満表記で共通利用（@reviewer指摘: 重複実装の解消）
+export function formatMinutesSeconds(ms: number): string {
+  const totalSeconds = Math.max(0, Math.floor(ms / 1000));
+  const minutes = Math.floor(totalSeconds / 60);
+  const seconds = totalSeconds % 60;
+  return `${minutes}:${String(seconds).padStart(2, '0')}`;
+}
+
+// 再開バナーの経過時間表示用。60分未満は秒まで見える「M:SS」、60分以上になったら秒を落として
+// 「H時間M分」に切り替える（デザイン案の要件: 60分を超えたら時間・分が分かりやすい表記にする）
+export function formatElapsedClock(ms: number): string {
+  const totalSeconds = Math.max(0, Math.floor(ms / 1000));
+  const hours = Math.floor(totalSeconds / 3600);
+  if (hours > 0) {
+    const minutes = Math.floor((totalSeconds % 3600) / 60);
+    return `${hours}時間${minutes}分`;
+  }
+  return formatMinutesSeconds(ms);
+}
+
 // 記録タブの日付グループ見出し用（例: 「7月3日（木）」）
 export function formatSessionDateGroup(startedAt: number): string {
   const d = new Date(startedAt);

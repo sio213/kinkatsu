@@ -36,15 +36,27 @@ export const exercises = sqliteTable(
 export type Exercise = typeof exercises.$inferSelect;
 
 // トレーニングセッション（記録の1回分）
-export const workoutSessions = sqliteTable('workout_sessions', {
-  id: integer('id').primaryKey({ autoIncrement: true }),
-  startedAt: integer('started_at').notNull(),
-  // nullなら進行中（中断・再開の判定に使う）
-  endedAt: integer('ended_at'),
-  note: text('note'),
-  createdAt: integer('created_at').notNull(),
-  updatedAt: integer('updated_at').notNull(),
-});
+export const workoutSessions = sqliteTable(
+  'workout_sessions',
+  {
+    id: integer('id').primaryKey({ autoIncrement: true }),
+    startedAt: integer('started_at').notNull(),
+    // nullなら進行中（中断・再開の判定に使う）
+    endedAt: integer('ended_at'),
+    // ルーティンから開始した場合のみ設定（startWorkoutFromRoutine/startPastWorkoutFromRoutine）。
+    // 「自分で選ぶ」等の手動開始はnullのまま（再開バナーの表示分岐: ルーティン名 or「トレーニング中」、
+    // 2026-07-20）。ルーティン削除後もセッション自体の記録（過去の実施履歴）は残す必要があるため、
+    // restrictではなくset nullにする（references()はroutinesがこのファイルの後方で定義されているが、
+    // コールバック経由の遅延評価のため forward reference として問題なく解決される）
+    routineId: integer('routine_id').references(() => routines.id, { onDelete: 'set null' }),
+    note: text('note'),
+    createdAt: integer('created_at').notNull(),
+    updatedAt: integer('updated_at').notNull(),
+  },
+  (t) => ({
+    byRoutine: index('idx_ws_routine').on(t.routineId),
+  }),
+);
 
 export type WorkoutSession = typeof workoutSessions.$inferSelect;
 export type NewWorkoutSession = typeof workoutSessions.$inferInsert;

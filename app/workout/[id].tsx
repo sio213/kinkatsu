@@ -12,6 +12,7 @@ import { useAutoCollapseCompletedExercises } from '@/hooks/use-auto-collapse-com
 import { useDebouncedPush } from '@/hooks/use-debounced-push';
 import { useKeyboardInset } from '@/hooks/use-keyboard-inset';
 import { useRoutines } from '@/hooks/use-routines';
+import { useTickingNow } from '@/hooks/use-ticking-now';
 import {
   EMPTY_PREFILLED_SET_IDS,
   EMPTY_SETS,
@@ -23,20 +24,13 @@ import {
 } from '@/hooks/use-workout-session';
 import { subscribePrefilled } from '@/lib/workout/prefill-feedback';
 import { deleteSession, endWorkoutSession, type PrefilledCard } from '@/lib/workout/session';
-import { formatSessionDateGroup, formatSessionDuration } from '@/lib/workout/summary';
+import { formatMinutesSeconds, formatSessionDateGroup, formatSessionDuration } from '@/lib/workout/summary';
 import type { ParamListBase } from '@react-navigation/native';
 import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { Stack, useLocalSearchParams, useNavigation, useRouter } from 'expo-router';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { Alert, FlatList, StyleSheet, Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-
-function formatElapsed(ms: number): string {
-  const totalSeconds = Math.max(0, Math.floor(ms / 1000));
-  const minutes = Math.floor(totalSeconds / 60);
-  const seconds = totalSeconds % 60;
-  return `${minutes}:${String(seconds).padStart(2, '0')}`;
-}
 
 export default function WorkoutScreen() {
   const { id } = useLocalSearchParams<{ id: string }>();
@@ -50,7 +44,6 @@ export default function WorkoutScreen() {
   const sessionSets = useSessionSets(sessionId ?? -1);
   const exercisesWithHistory = useExercisesWithHistory(sessionId ?? -1);
   const { routines } = useRoutines();
-  const [now, setNow] = useState(() => Date.now());
   const isFinishingRef = useRef(false);
   const keyboardInset = useKeyboardInset();
   // 種目追加/入れ替え/記録から読み込む画面はDB操作直後にrouter.back()で閉じるため、プリフィルが
@@ -94,17 +87,12 @@ export default function WorkoutScreen() {
   // 出し分ける）。hooksはこの後の早期returnより前で無条件に呼ぶ必要があるため、sessionが
   // まだnullの間もここで安全に評価できる形にしている
   const isActive = session != null && session.endedAt == null;
+  const now = useTickingNow(isActive);
   const {
     collapsedIds,
     toggleCollapsed: handleToggleCollapsed,
     handleInteract,
   } = useAutoCollapseCompletedExercises(isActive, sessionExercises, sessionSets);
-
-  useEffect(() => {
-    if (!session || session.endedAt != null) return;
-    const interval = setInterval(() => setNow(Date.now()), 1000);
-    return () => clearInterval(interval);
-  }, [session]);
 
   // 種目追加/入れ替え画面はDB操作直後にrouter.back()で閉じるため、プリフィルが起きたことは
   // pub/sub経由でここに届く（lib/workout/prefill-feedback.ts）。他のセッション画面からの
@@ -286,7 +274,7 @@ export default function WorkoutScreen() {
             <IconSymbol name="timer" size={16} color={Colors.accent} />
             <Text style={styles.timerText}>
               {isActive
-                ? formatElapsed(now - session.startedAt)
+                ? formatMinutesSeconds(now - session.startedAt)
                 : formatSessionDuration(session.startedAt, session.endedAt)}
             </Text>
           </View>

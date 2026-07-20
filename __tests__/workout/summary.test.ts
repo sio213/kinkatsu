@@ -1,4 +1,6 @@
 import {
+  formatElapsedClock,
+  formatMinutesSeconds,
   formatMonthGroup,
   formatRelativeDaysAgo,
   formatSessionDateGroup,
@@ -6,6 +8,43 @@ import {
   groupByMonth,
   groupSessionsByDate,
 } from '@/lib/workout/summary';
+
+describe('formatMinutesSeconds', () => {
+  it('"M:SS"形式にする（秒は2桁0埋め、分は60を超えてもそのまま伸びる）', () => {
+    expect(formatMinutesSeconds(0)).toBe('0:00');
+    expect(formatMinutesSeconds(5_000)).toBe('0:05');
+    expect(formatMinutesSeconds(65 * 60_000)).toBe('65:00');
+  });
+
+  it('負の経過時間にはならない（クロック補正等の異常値をガード）', () => {
+    expect(formatMinutesSeconds(-1_000)).toBe('0:00');
+  });
+});
+
+describe('formatElapsedClock', () => {
+  it('60分未満は"M:SS"形式（秒は2桁0埋め）', () => {
+    expect(formatElapsedClock(0)).toBe('0:00');
+    expect(formatElapsedClock(5_000)).toBe('0:05');
+    expect(formatElapsedClock(65_000)).toBe('1:05');
+  });
+
+  it('59分59秒は60分未満表記の上限', () => {
+    expect(formatElapsedClock(59 * 60_000 + 59_000)).toBe('59:59');
+  });
+
+  it('60分ちょうどで"H時間M分"表記に切り替わる', () => {
+    expect(formatElapsedClock(60 * 60_000)).toBe('1時間0分');
+  });
+
+  it('60分以上は秒を切り捨てて時・分だけ表示する', () => {
+    expect(formatElapsedClock(60 * 60_000 + 59_000)).toBe('1時間0分');
+    expect(formatElapsedClock(90 * 60_000)).toBe('1時間30分');
+  });
+
+  it('負の経過時間にはならない（クロック補正等の異常値をガード）', () => {
+    expect(formatElapsedClock(-1_000)).toBe('0:00');
+  });
+});
 
 describe('formatSessionDuration', () => {
   it('endedAtがある場合はstartedAtとの差を分単位で返す', () => {

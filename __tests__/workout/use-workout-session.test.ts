@@ -2,6 +2,11 @@
 /* eslint-disable no-var */
 // useLiveQuery はhook呼び出し順に消費するキュー
 var mockLiveQueryQueue: { data: unknown }[];
+// 各useLiveQuery呼び出しに渡されたdeps引数を呼び出し順に記録する。drizzle-orm/expo-sqliteの
+// useLiveQueryはdepsが変化したときだけクエリを張り直す仕様（デフォルト[]＝マウント時の1回きり）のため、
+// sessionId/routineIdの変化を追従させるにはdepsへ明示的に渡す必要がある（実機で再現・特定した不具合）。
+// useResumeWorkoutSummaryがこれを正しく渡しているかの回帰テストに使う
+var mockLiveQueryDepsCalls: unknown[][];
 
 jest.mock('@/db/client', () => {
   const chain = {
@@ -10,6 +15,7 @@ jest.mock('@/db/client', () => {
     groupBy: jest.fn().mockReturnThis(),
     limit: jest.fn().mockReturnThis(),
     innerJoin: jest.fn().mockReturnThis(),
+    leftJoin: jest.fn().mockReturnThis(),
   };
   return {
     db: {
@@ -20,13 +26,15 @@ jest.mock('@/db/client', () => {
 });
 
 jest.mock('@/db/schema', () => ({
-  workoutSessions: { id: 'id', startedAt: 'startedAt', endedAt: 'endedAt' },
+  workoutSessions: { id: 'id', startedAt: 'startedAt', endedAt: 'endedAt', routineId: 'routineId' },
   sets: {
+    id: 'id',
     sessionId: 'sessionId',
     weight: 'weight',
     reps: 'reps',
     workoutSessionExerciseId: 'workoutSessionExerciseId',
     setNumber: 'setNumber',
+    completedAt: 'completedAt',
   },
   exercises: { id: 'id' },
   workoutSessionExercises: {
@@ -35,6 +43,7 @@ jest.mock('@/db/schema', () => ({
     exerciseId: 'exerciseId',
     orderIndex: 'orderIndex',
   },
+  routines: { id: 'id', name: 'name' },
 }));
 
 jest.mock('drizzle-orm', () => ({
@@ -51,13 +60,17 @@ jest.mock('drizzle-orm', () => ({
 }));
 
 jest.mock('drizzle-orm/expo-sqlite', () => ({
-  useLiveQuery: jest.fn(() => mockLiveQueryQueue.shift() ?? { data: undefined }),
+  useLiveQuery: jest.fn((_query: unknown, deps: unknown[] = []) => {
+    mockLiveQueryDepsCalls.push(deps);
+    return mockLiveQueryQueue.shift() ?? { data: undefined };
+  }),
 }));
 
 import React from 'react';
 import { act, create } from 'react-test-renderer';
 import {
   useExercisesWithHistory,
+  useResumeWorkoutSummary,
   useSessionExercises,
   useSessionSetCount,
   useSessionSets,
@@ -82,6 +95,7 @@ function makeHarness<T>(hook: () => T) {
 
 beforeEach(() => {
   mockLiveQueryQueue = [];
+  mockLiveQueryDepsCalls = [];
   jest.clearAllMocks();
 });
 
@@ -264,5 +278,98 @@ describe('useSessionSets', () => {
 
     expect(captured).toHaveLength(2);
     expect(captured[0]).toBe(captured[1]);
+  });
+});
+
+describe('useResumeWorkoutSummary', () => {
+  const manualSession = { id: 1, routineId: null, startedAt: 0, endedAt: null } as Parameters<
+    typeof useResumeWorkoutSummary
+  >[0];
+  const routineSession = { id: 2, routineId: 10, startedAt: 0, endedAt: null } as Parameters<
+    typeof useResumeWorkoutSummary
+  >[0];
+
+  function mountSummary(session: Parameters<typeof useResumeWorkoutSummary>[0]) {
+    return makeHarness(() => useResumeWorkoutSummary(session))();
+  }
+
+  it('session=nullのときすべて0・routineNameはnull', () => {
+    mockLiveQueryQueue = [{ data: undefined }, { data: undefined }, { data: undefined }];
+    expect(mountSummary(null)).toEqual({
+      completedExerciseCount: 0,
+      totalExerciseCount: 0,
+      completedSetCount: 0,
+      routineName: null,
+    });
+  });
+
+  // sessionId/routineIdはactiveSession（呼び出し元のuseWorkoutSessions自身のuseLiveQueryが
+  // 非同期に解決する）由来のため、マウント直後は-1のプレースホルダーで後続のレンダーから実際の値になる。
+  // useLiveQueryの第2引数(deps)にこれらを渡さないと、-1で張ったクエリのまま実際の値が来ても
+  // クエリが張り直されず空データに固定されてしまう不具合が実機で見つかったため、
+  // ここで確実にdepsへ渡っていることを回帰テストとして固定する
+  it('sessionId/routineIdをuseLiveQueryのdepsに渡す（渡さないとactiveSession確定後もクエリが空のまま固定される不具合の回帰防止）', () => {
+    mockLiveQueryQueue = [{ data: [] }, { data: [] }, { data: [] }];
+    mountSummary(routineSession);
+    expect(mockLiveQueryDepsCalls).toEqual([[2], [2], [10]]);
+  });
+
+  it('種目0件（exerciseIdRowsが空配列）', () => {
+    mockLiveQueryQueue = [{ data: [] }, { data: undefined }, { data: undefined }];
+    const result = mountSummary(manualSession);
+    expect(result.totalExerciseCount).toBe(0);
+    expect(result.completedExerciseCount).toBe(0);
+    expect(result.completedSetCount).toBe(0);
+  });
+
+  // setsの集計をworkoutSessionExercisesにleftJoinする実装だと、useLiveQueryの書き込み監視が
+  // クエリのfrom()テーブル(workoutSessionExercises)しか見ないため、セット✓確定(setsへの書き込み)
+  // では再フェッチされず画面に戻っても反映されない不具合があった（実機で再現・特定）。
+  // setsテーブル単体のクエリに分けてJS側で突き合わせているため、ここではその2クエリの結果を
+  // 個別に渡してテストする
+  it('totalSets>0かつcompletedSets===totalSetsの種目のみ完了扱いにする（useAutoCollapseCompletedExercisesと同じ基準）', () => {
+    mockLiveQueryQueue = [
+      {
+        data: [{ sessionExerciseId: 1 }, { sessionExerciseId: 2 }, { sessionExerciseId: 3 }],
+      },
+      {
+        data: [
+          { sessionExerciseId: 1, totalSets: 3, completedSets: 3 }, // 完了
+          { sessionExerciseId: 2, totalSets: 3, completedSets: 2 }, // 一部完了
+          // sessionExerciseId:3はsetsに1件も無いためsetAggRowsに現れない
+          // （セット未追加の種目。totalSets=0扱いになり完了カウントに含めない）
+        ],
+      },
+      { data: undefined },
+    ];
+    const result = mountSummary(manualSession);
+    expect(result.completedExerciseCount).toBe(1);
+    expect(result.totalExerciseCount).toBe(3);
+    expect(result.completedSetCount).toBe(5);
+  });
+
+  it('routineId有り・ルーティン名が解決できる場合はroutineNameを返す', () => {
+    mockLiveQueryQueue = [
+      { data: [{ sessionExerciseId: 1 }] },
+      { data: [{ sessionExerciseId: 1, totalSets: 1, completedSets: 1 }] },
+      { data: [{ name: '胸の日' }] },
+    ];
+    expect(mountSummary(routineSession).routineName).toBe('胸の日');
+  });
+
+  it('routineId有りだがルーティンが見つからない（削除済み等）場合はnullにフォールバックする', () => {
+    mockLiveQueryQueue = [
+      { data: [{ sessionExerciseId: 1 }] },
+      { data: [{ sessionExerciseId: 1, totalSets: 1, completedSets: 1 }] },
+      { data: [] },
+    ];
+    expect(mountSummary(routineSession).routineName).toBeNull();
+  });
+
+  it('routineId=null（手動開始）の場合、routineRows側に何か返っていてもroutineNameは必ずnull', () => {
+    // sessionId/routineIdのフォールバック値(-1)が誤って別セッションの行にヒットするような実装ミスを
+    // 検知するため、あえてroutineRowsに値を入れた状態でテストする
+    mockLiveQueryQueue = [{ data: [] }, { data: [] }, { data: [{ name: '無関係なルーティン' }] }];
+    expect(mountSummary(manualSession).routineName).toBeNull();
   });
 });
