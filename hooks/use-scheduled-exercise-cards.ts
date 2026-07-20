@@ -68,11 +68,16 @@ export function useScheduledExerciseCards(scheduledWorkoutId: number): UseSchedu
       // 種目ごとに個別にtry/catchする。目標セット設定済みの種目は履歴取得を必要としないため、
       // 一部の種目の履歴取得だけが失敗しても、その種目だけ空セット（履歴フォールバック無し）に
       // 留め、既に表示できる他の種目（目標セット・履歴取得成功分）まで巻き込んでcards全体を
-      // 'error'にはしない（@tester指摘: Promise.allの全滅仕様だと無関係な種目まで消えてしまう）
+      // 'error'にはしない（@tester指摘: Promise.allの全滅仕様だと無関係な種目まで消えてしまう）。
+      // ただし対象の種目が全滅した場合（DB接続不良等）は、再試行UIを意味のあるものにするため
+      // 従来通りcards全体を'error'にする（@reviewer指摘: 部分失敗だけを考慮した結果、'error'/retry
+      // 経路が到達不能なdead codeになっていた）
+      let anySucceeded = false;
       const entries = await Promise.all(
         idsNeedingHistory.map(async (exerciseId) => {
           try {
             const history = await getExerciseHistoryEntries(exerciseId, NO_SESSION_TO_EXCLUDE);
+            anySucceeded = true;
             // entriesはgetExerciseHistoryEntriesの時点でdesc(startedAt)済み＝先頭が直近の実施
             return [exerciseId, history[0]?.sets ?? []] as [number, HistorySetValues[]];
           } catch (e) {
@@ -81,7 +86,12 @@ export function useScheduledExerciseCards(scheduledWorkoutId: number): UseSchedu
           }
         }),
       );
-      if (!cancelled) setHistoryByExerciseId(new Map(entries));
+      if (cancelled) return;
+      if (!anySucceeded) {
+        setHistoryByExerciseId('error');
+        return;
+      }
+      setHistoryByExerciseId(new Map(entries));
     })();
 
     return () => {

@@ -214,6 +214,7 @@ export default function RootLayout() {
           <Stack.Screen name="calendar/schedule-workout-edit" options={{ title: '' }} />
           <Stack.Screen name="calendar/schedule-workout-add-exercise" options={{ title: '種目を追加' }} />
           <Stack.Screen name="calendar/schedule-workout-exercise-swap" options={{ title: '種目を入れ替え' }} />
+          <Stack.Screen name="calendar/schedule-workout-exercise-reorder" options={{ title: '種目を並び替え' }} />
           <Stack.Screen
             name="modal"
             options={{ presentation: 'modal', title: 'Modal' }}
