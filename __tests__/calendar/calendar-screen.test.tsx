@@ -734,6 +734,7 @@ describe('CalendarScreen 予定（PR9-2: リマインダー由来の未来予定
       mockUseScheduledExerciseCards.mockReturnValue({
         cards: [
           {
+            scheduledWorkoutExerciseId: 100,
             exerciseId: 10,
             name: 'ベンチプレス',
             category: 'chest',
@@ -1068,6 +1069,7 @@ describe('CalendarScreen 予定（PR9-2: リマインダー由来の未来予定
         mockUseScheduledExerciseCards.mockReturnValue({
           cards: [
             {
+              scheduledWorkoutExerciseId: 100,
               exerciseId: 10,
               name: 'ベンチプレス',
               category: 'chest',

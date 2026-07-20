@@ -33,6 +33,7 @@ function findByAccessibilityLabel(root: ReactTestInstance, label: string) {
 }
 
 const benchPressCard = {
+  scheduledWorkoutExerciseId: 200,
   exerciseId: 10,
   name: 'ベンチプレス',
   category: 'chest',
@@ -77,7 +78,7 @@ describe('DirectScheduleExerciseGroup', () => {
     mockUseScheduledExerciseCards.mockReturnValue({
       cards: [
         benchPressCard,
-        { ...benchPressCard, exerciseId: 11, name: 'スクワット', category: 'leg' },
+        { ...benchPressCard, scheduledWorkoutExerciseId: 201, exerciseId: 11, name: 'スクワット', category: 'leg' },
       ],
       retry: jest.fn(),
     });

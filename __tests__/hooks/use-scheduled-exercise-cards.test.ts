@@ -41,6 +41,16 @@ async function flush(root: ReturnType<typeof create>) {
   return root;
 }
 
+// completedAtはCalendarExerciseCard内部の「確定セットのみ表示」ガード(!= null)を通すためだけの
+// センチネル値で、値自体に意味は無い契約のため、具体的な数値ではなく非nullであることだけを見る
+function expectTargetSets(sets: ScheduledExerciseCard['sets'], expected: Omit<ScheduledExerciseCard['sets'][number], 'completedAt'>[]) {
+  expect(sets).toHaveLength(expected.length);
+  sets.forEach((s, i) => {
+    expect(s).toMatchObject(expected[i]);
+    expect(s.completedAt).not.toBeNull();
+  });
+}
+
 const benchExercise = {
   scheduledWorkoutExerciseId: 100,
   exerciseId: 10,
@@ -70,17 +80,18 @@ describe('useScheduledExerciseCards', () => {
     const { getCards, root } = renderHook(5);
     await flush(root);
     expect(mockGetExerciseHistoryEntries).not.toHaveBeenCalled();
-    expect(getCards()).toEqual([
-      {
-        exerciseId: 10,
-        name: 'ベンチプレス',
-        category: 'chest',
-        source: 'preset',
-        slug: 'bench_press',
-        measurementType: 'weight_reps',
-        sets: [{ weight: 70, reps: 6, durationSeconds: null, distanceMeters: null, completedAt: 0 }],
-      },
-    ]);
+    const cards = getCards();
+    expect(cards).toHaveLength(1);
+    expect(cards[0]).toMatchObject({
+      scheduledWorkoutExerciseId: 100,
+      exerciseId: 10,
+      name: 'ベンチプレス',
+      category: 'chest',
+      source: 'preset',
+      slug: 'bench_press',
+      measurementType: 'weight_reps',
+    });
+    expectTargetSets(cards[0].sets, [{ weight: 70, reps: 6, durationSeconds: null, distanceMeters: null }]);
   });
 
   it('目標セットが空(全カラムnull)の種目は、直近の実施記録を参考値として取得する', async () => {
@@ -117,6 +128,19 @@ describe('useScheduledExerciseCards', () => {
     expect(mockGetExerciseHistoryEntries).not.toHaveBeenCalled();
   });
 
+  it('同じ種目が複数回この予定に含まれていても、履歴取得はexerciseId単位で1回にまとめる（@reviewer指摘: 重複時の冗長なDBアクセス防止）', async () => {
+    mockUseScheduledWorkoutExercises.mockReturnValue([
+      { ...benchExercise, scheduledWorkoutExerciseId: 100, sets: [] },
+      { ...benchExercise, scheduledWorkoutExerciseId: 101, sets: [] },
+    ]);
+    mockGetExerciseHistoryEntries.mockResolvedValue([]);
+    const { getCards, root } = renderHook(5);
+    await flush(root);
+    expect(mockGetExerciseHistoryEntries).toHaveBeenCalledTimes(1);
+    const cards = getCards();
+    expect(cards.map((c) => c.scheduledWorkoutExerciseId)).toEqual([100, 101]);
+  });
+
   it('複数種目が混在する場合、種目ごとに個別判定する（一部だけ目標セット設定済み、他は履歴フォールバック）', async () => {
     const squatExercise = {
       scheduledWorkoutExerciseId: 101,
@@ -136,21 +160,52 @@ describe('useScheduledExerciseCards', () => {
     await flush(root);
     expect(mockGetExerciseHistoryEntries).toHaveBeenCalledTimes(1);
     expect(mockGetExerciseHistoryEntries).toHaveBeenCalledWith(11, -1);
-    expect(getCards().find((c) => c.exerciseId === 10)?.sets).toEqual([
-      { weight: 70, reps: 6, durationSeconds: null, distanceMeters: null, completedAt: 0 },
+    expectTargetSets(getCards().find((c) => c.exerciseId === 10)!.sets, [
+      { weight: 70, reps: 6, durationSeconds: null, distanceMeters: null },
     ]);
     expect(getCards().find((c) => c.exerciseId === 11)?.sets).toEqual([]);
   });
 
-  it('履歴取得が失敗した場合は\'error\'を返す', async () => {
+  it('一部の種目だけ履歴取得が失敗しても、その種目だけ空セットになり他の種目（目標セット・履歴取得成功分）は表示され続ける（cards全体をerrorにしない）', async () => {
     jest.spyOn(console, 'error').mockImplementation(() => {});
+    const squatExercise = {
+      scheduledWorkoutExerciseId: 101,
+      exerciseId: 11,
+      name: 'スクワット',
+      category: 'leg',
+      measurementType: 'weight_reps',
+      source: 'preset',
+      slug: 'squat',
+    };
+    const deadliftExercise = {
+      scheduledWorkoutExerciseId: 102,
+      exerciseId: 12,
+      name: 'デッドリフト',
+      category: 'back',
+      measurementType: 'weight_reps',
+      source: 'preset',
+      slug: 'deadlift',
+    };
     mockUseScheduledWorkoutExercises.mockReturnValue([
-      { ...benchExercise, sets: [{ id: 1, weight: null, reps: null, durationSeconds: null, distanceMeters: null }] },
+      // 目標セット設定済み（履歴取得不要）
+      { ...benchExercise, sets: [{ id: 1, weight: 70, reps: 6, durationSeconds: null, distanceMeters: null }] },
+      // 履歴取得が失敗する
+      { ...squatExercise, sets: [{ id: 2, weight: null, reps: null, durationSeconds: null, distanceMeters: null }] },
+      // 履歴取得が成功する
+      { ...deadliftExercise, sets: [{ id: 3, weight: null, reps: null, durationSeconds: null, distanceMeters: null }] },
     ]);
-    mockGetExerciseHistoryEntries.mockRejectedValue(new Error('fail'));
-    const { getResult, root } = renderHook(5);
+    mockGetExerciseHistoryEntries.mockImplementation((exerciseId: number) =>
+      exerciseId === 11 ? Promise.reject(new Error('fail')) : Promise.resolve([]),
+    );
+    const { getCards, getResult, root } = renderHook(5);
     await flush(root);
-    expect(getResult()).toBe('error');
+
+    expect(getResult()).not.toBe('error');
+    expectTargetSets(getCards().find((c) => c.exerciseId === 10)!.sets, [
+      { weight: 70, reps: 6, durationSeconds: null, distanceMeters: null },
+    ]);
+    expect(getCards().find((c) => c.exerciseId === 11)?.sets).toEqual([]);
+    expect(getCards().find((c) => c.exerciseId === 12)?.sets).toEqual([]);
   });
 
   it('retryを呼ぶと履歴を再取得する', async () => {

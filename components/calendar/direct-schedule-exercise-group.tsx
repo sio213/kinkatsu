@@ -77,7 +77,7 @@ export const DirectScheduleExerciseGroup = memo(function DirectScheduleExerciseG
         <View style={styles.cardList}>
           {cards.map((card) => (
             <CalendarExerciseCard
-              key={card.exerciseId}
+              key={card.scheduledWorkoutExerciseId}
               exerciseId={card.exerciseId}
               name={card.name}
               category={card.category}

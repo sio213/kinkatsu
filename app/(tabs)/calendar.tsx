@@ -131,8 +131,8 @@ function ScheduleEntryCard({
 
 // 時間帯グループ表示・フラット表示のどちらでもカード列の描画は同一のため共有する
 // （CalendarExerciseCardへ渡すpropsを2箇所に重複させない）。onPressExerciseはカード全体を
-// 受け取る形にしている（今日パネル=種目詳細へ、過去日パネル=記録編集画面へ、と呼び出し元
-// によって遷移先の判断材料（exerciseId/sessionId）が異なるため、@ユーザー指摘2026-07-20）
+// 受け取る形にしている（呼び出し元によって遷移先の判断材料(sessionId)が異なるため）。
+// 今日・過去日パネルとも記録編集画面へ遷移する（2026-07-21、@ユーザー指摘で統一）
 function DayCardList({
   cards,
   onPressExercise,
