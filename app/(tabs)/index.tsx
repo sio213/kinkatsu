@@ -5,9 +5,8 @@ import { ResumeWorkoutBanner } from '@/components/workout/resume-workout-banner'
 import { SessionCard } from '@/components/workout/session-card';
 import { Colors, Typography } from '@/constants/theme';
 import type { WorkoutSession } from '@/db/schema';
+import { useDebouncedPush } from '@/hooks/use-debounced-push';
 import { useSessionStats, useWorkoutSessions } from '@/hooks/use-workout-session';
-import { useWorkoutStarter } from '@/hooks/use-workout-starter';
-import { startWorkoutSession } from '@/lib/workout/session';
 import { groupSessionsByDate } from '@/lib/workout/summary';
 import { Stack, useRouter } from 'expo-router';
 import { useCallback } from 'react';
@@ -16,9 +15,9 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 
 export default function RecordScreen() {
   const router = useRouter();
+  const pushDebounced = useDebouncedPush();
   const { sessions, activeSession } = useWorkoutSessions();
   const summaryBySession = useSessionStats();
-  const startWorkout = useWorkoutStarter((sessionId) => router.push(`/workout/${sessionId}`));
 
   // 進行中セッションは履歴に出さず、開始/再開ボタンから直接遷移する対象にする
   const endedSessions = sessions.filter((s) => s.endedAt != null);
@@ -30,14 +29,19 @@ export default function RecordScreen() {
 
   // このボタン自体が「開始/再開」を兼ねるため、進行中セッションがあれば無条件でそちらへ合流する
   // (ルーティン一覧のカードタップと違い、ここでは「進行中のトレーニングへ戻る」ことが期待される
-  // 挙動そのものなので確認は挟まない)
+  // 挙動そのものなので確認は挟まない)。進行中セッションが無い場合は、カレンダーの「今日・記録なし」
+  // パネルと同じ開始方法選択画面(start-chooser)を経由させる（2026-07-20、要件確認済み。
+  // 以前はここで直接startWorkoutSessionを呼び空セッションへ即遷移していたが、
+  // 「自分で選ぶ/ルーティン/おすすめメニュー/履歴から」の選択機会が無いまま開始されてしまっていた）。
+  // カレンダーの同じ遷移先を持つhandleStartToday(app/(tabs)/calendar.tsx)と揃え、
+  // pushDebouncedで連打によるstart-chooserの二重pushを防ぐ（@tester指摘）
   const handleStart = useCallback(() => {
     if (activeSession) {
-      router.push(`/workout/${activeSession.id}`);
+      pushDebounced(`/workout/${activeSession.id}`);
       return;
     }
-    startWorkout(async () => (await startWorkoutSession()).id);
-  }, [activeSession, startWorkout, router]);
+    pushDebounced('/workout/start-chooser');
+  }, [activeSession, pushDebounced]);
 
   return (
     <SafeAreaView style={styles.safeArea} edges={[]}>

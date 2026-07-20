@@ -12,10 +12,9 @@ type Props = {
   text?: string;
 };
 
-// カレンダー選択日パネルの「記録/予定がありません」状態のうち、アクションボタンを持つもの
-// （今日・未来日）専用。デザイン案指定の破線ボックス+全幅Primaryボタン。ボタンを持たない
-// 状態（過去日）はapp/(tabs)/calendar.tsxの既存の単純なテキスト表示のままにしており、
-// このコンポーネントは使わない
+// カレンダー選択日パネルの「記録/予定がありません」状態（今日・未来日・過去日いずれも）専用。
+// デザイン案指定の破線ボックス+全幅Primaryボタン。過去日は2026-07-20より「記録を追加」
+// （buttonIcon="plus"、事後記録フローへ遷移）でこのコンポーネントを使うようになった
 export function DayEmptyState({ buttonIcon, actionLabel, onPressAction, text = '記録がありません' }: Props) {
   return (
     <View style={styles.box}>

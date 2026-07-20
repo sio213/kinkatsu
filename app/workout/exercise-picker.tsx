@@ -10,7 +10,15 @@ import { Alert, StyleSheet } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 export default function ExercisePickerScreen() {
-  const { sessionId: sessionIdParam } = useLocalSearchParams<{ sessionId: string }>();
+  // newSessionは、start-chooser「自分で選ぶ」から作成直後のセッションで直接この画面へ
+  // 遷移してきた場合にのみ付く（2026-07-20）。この経路では/workout/{id}を一度もpushして
+  // いないため、確定後はrouter.back()ではなくreplaceで/workout/{id}へ差し込む必要がある
+  // （通常経路＝[id].tsxのAddExerciseButton/⋮メニュー経由では既に/workout/{id}がスタックに
+  // 積まれているため、従来通りbackで戻る）
+  const { sessionId: sessionIdParam, newSession } = useLocalSearchParams<{
+    sessionId: string;
+    newSession?: string;
+  }>();
   const sessionId = Number(sessionIdParam);
   const router = useRouter();
   const pushDebounced = useDebouncedPush();
@@ -31,8 +39,15 @@ export default function ExercisePickerScreen() {
       isAddingRef.current = true;
       try {
         const prefilled = await addExercisesToSession(sessionId, selectedIds);
+        // newSession経路は/workout/{id}が未マウントのため、ここでのnotifyPrefilledは
+        // 購読者不在で無視される（ゴースト表示・新規カードへの自動フォーカスは効かないが、
+        // 種目・セット自体はDBに保存済みで、/workout/{id}側のlive queryには通常通り反映される）
         notifyPrefilled(prefilled);
-        router.back();
+        if (newSession === '1') {
+          router.replace(`/workout/${sessionId}`);
+        } else {
+          router.back();
+        }
       } catch (e) {
         console.error('[add exercises to session]', e);
         Alert.alert('エラー', '種目を追加できませんでした。');
@@ -40,7 +55,7 @@ export default function ExercisePickerScreen() {
         isAddingRef.current = false;
       }
     },
-    [sessionId, router],
+    [sessionId, router, newSession],
   );
 
   if (!Number.isFinite(sessionId)) {

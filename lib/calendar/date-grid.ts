@@ -58,6 +58,16 @@ export function isValidDateKey(dateKey: string | undefined | null): dateKey is s
   return toDateKey(parseDateKey(dateKey)) === dateKey;
 }
 
+// 過去日の事後記録（app/workout/start-chooser.tsx・app/workout/past-routine-picker.tsx）用。
+// dateKeyが指す「その日」を一意に表す時刻としてローカル正午を使う。0時（日付境界）付近だと
+// 将来的なタイムゾーン・DST絡みの計算で意図せず前後の日にずれるリスクがあるため、常に安全な
+// 正午に固定する（事後記録に時刻入力UIは無く、時刻自体に意味は無いため固定値で十分）
+export function dateKeyToNoonMs(dateKey: string): number {
+  const date = parseDateKey(dateKey);
+  date.setHours(12, 0, 0, 0);
+  return date.getTime();
+}
+
 // ヘッダーの「YYYY年M月」表示・前月/翌月ナビゲーション用に、月単位でズラしたDateを返す
 export function addMonths(year: number, month: number, delta: number): { year: number; month: number } {
   // Dateコンストラクタはmonthが0-11の範囲外でも年をまたいで正規化してくれるため、

@@ -220,6 +220,12 @@ export default function WorkoutScreen() {
 
   if (!session) return null;
 
+  // カレンダー過去日パネル「記録を追加」経由で作られたセッション（startedAt=endedAt、
+  // 2026-07-20）は所要時間の概念自体が無いため、タイマーチップを出さない。出すと常に「0分」
+  // になり、実際に0分で終えた通常セッションと見分けが付かない「バグに見える表示」になる
+  // ため（@designer指摘）
+  const isPastRecordSession = session.endedAt === session.startedAt;
+
   const menuItems: DropdownMenuItem[] = [
     {
       key: 'add',
@@ -274,16 +280,18 @@ export default function WorkoutScreen() {
         }}
       />
 
-      <ContextBar justify="flex-end">
-        <View style={styles.timerChip}>
-          <IconSymbol name="timer" size={16} color={Colors.accent} />
-          <Text style={styles.timerText}>
-            {isActive
-              ? formatElapsed(now - session.startedAt)
-              : formatSessionDuration(session.startedAt, session.endedAt)}
-          </Text>
-        </View>
-      </ContextBar>
+      {!isPastRecordSession && (
+        <ContextBar justify="flex-end">
+          <View style={styles.timerChip}>
+            <IconSymbol name="timer" size={16} color={Colors.accent} />
+            <Text style={styles.timerText}>
+              {isActive
+                ? formatElapsed(now - session.startedAt)
+                : formatSessionDuration(session.startedAt, session.endedAt)}
+            </Text>
+          </View>
+        </ContextBar>
+      )}
 
       {sessionExercises.length === 0 ? (
         <View style={styles.body}>

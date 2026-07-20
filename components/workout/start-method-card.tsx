@@ -9,9 +9,14 @@ type Props = {
   // タップしても何も起きないようにする（デザイン未確定のプレースホルダー画面のため）
   disabled?: boolean;
   onPress?: () => void;
+  // 過去日の事後記録モード(app/workout/start-chooser.tsx)専用。カード自体のラベル・アイコンは
+  // 今日のライブ開始フローと同じ（「自分で選ぶ」「ルーティン」に「開始」のニュアンスは元々無い）
+  // ため変えないが、視覚的な日付サブタイトルだけでは伝わりにくいVoiceOverユーザー向けに
+  // 対象日を読み上げで補う（@designer指摘）
+  hint?: string;
 };
 
-export function StartMethodCard({ icon, label, disabled = false, onPress }: Props) {
+export function StartMethodCard({ icon, label, disabled = false, onPress, hint }: Props) {
   return (
     <TouchableOpacity
       style={styles.card}
@@ -20,7 +25,7 @@ export function StartMethodCard({ icon, label, disabled = false, onPress }: Prop
       accessibilityRole="button"
       accessibilityLabel={label}
       accessibilityState={{ disabled }}
-      accessibilityHint={disabled ? '準備中の機能です' : undefined}
+      accessibilityHint={disabled ? '準備中の機能です' : hint}
     >
       {disabled && (
         <View style={styles.badge}>

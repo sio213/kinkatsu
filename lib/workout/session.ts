@@ -74,13 +74,25 @@ function buildInitialSets(
   }));
 }
 
-export async function startWorkoutSession() {
+async function insertWorkoutSessionRow(startedAt: number, endedAt: number | null): Promise<WorkoutSession> {
   const now = Date.now();
   const [inserted] = await db
     .insert(workoutSessions)
-    .values({ startedAt: now, createdAt: now, updatedAt: now })
+    .values({ startedAt, endedAt, createdAt: now, updatedAt: now })
     .returning();
   return inserted;
+}
+
+export async function startWorkoutSession() {
+  return insertWorkoutSessionRow(Date.now(), null);
+}
+
+// カレンダーの過去日パネル「記録を追加」用（2026-07-20）。作成直後からendedAtが入っているため、
+// app/workout/[id].tsxは自動的に「記録の編集」モード（タイマー非表示、リアルタイム記録画面と
+// 同じUIで種目追加・セット入力が可能）で開く。startedAt=endedAtにする副作用で所要時間表示は
+// 「0分」になるが、事後記録に所要時間の概念自体が無いため許容する（設計フェーズで確認済み）
+export async function createPastWorkoutSession(pastDate: number): Promise<WorkoutSession> {
+  return insertWorkoutSessionRow(pastDate, pastDate);
 }
 
 export async function endWorkoutSession(id: number) {
@@ -256,14 +268,15 @@ function insertRoutineCardsIntoSession(
   );
 }
 
-// ルーティン一覧のカードタップ・ルーティン由来リマインダーの通知タップ用。新規セッションを作り、
-// そのルーティンに登録済みの種目・目標セット(routineSets)を最初から入れた状態で返す
-export async function startWorkoutFromRoutine(
+// startWorkoutFromRoutine/startPastWorkoutFromRoutine共通のセッション作成本体。
+// ルーティンは種目1件以上が保存時の必須条件(zodバリデーション)のため通常は起こらないが、
+// 万一0件のまま保存されていた場合に、種目の無い空のセッションだけを作ってしまわないための防御
+async function createRoutineSession(
   routineId: number,
+  startedAt: number,
+  endedAt: number | null,
 ): Promise<{ sessionId: number; cards: PrefilledCard[] } | null> {
   const detail = await getRoutineDetail(routineId);
-  // ルーティンは種目1件以上が保存時の必須条件(zodバリデーション)のため通常は起こらないが、
-  // 万一0件のまま保存されていた場合に、種目の無い空のセッションだけを作ってしまわないための防御
   if (!detail || detail.exercises.length === 0) return null;
 
   const now = Date.now();
@@ -271,13 +284,26 @@ export async function startWorkoutFromRoutine(
   return db.transaction(async (tx) => {
     const [session] = await tx
       .insert(workoutSessions)
-      .values({ startedAt: now, createdAt: now, updatedAt: now })
+      .values({ startedAt, endedAt, createdAt: now, updatedAt: now })
       .returning();
 
     const cards = await insertRoutineCardsIntoSession(tx, session.id, detail.exercises, now);
 
     return { sessionId: session.id, cards };
   });
+}
+
+// ルーティン一覧のカードタップ・ルーティン由来リマインダーの通知タップ用。新規セッションを作り、
+// そのルーティンに登録済みの種目・目標セット(routineSets)を最初から入れた状態で返す
+export async function startWorkoutFromRoutine(routineId: number) {
+  return createRoutineSession(routineId, Date.now(), null);
+}
+
+// カレンダー過去日パネル「記録を追加」→「ルーティン」経由用（2026-07-20）。
+// createPastWorkoutSessionと同じくstartedAt=endedAt=pastDateで作成し、ルーティンの種目・
+// 目標セットは通常のstartWorkoutFromRoutineと同じくその場で流し込む
+export async function startPastWorkoutFromRoutine(routineId: number, pastDate: number) {
+  return createRoutineSession(routineId, pastDate, pastDate);
 }
 
 export type RoutineExerciseSelection = { routineExerciseId: number };

@@ -108,10 +108,12 @@ jest.mock('@/lib/routines/db', () => ({
 import {
   addExercisesToSession,
   addRoutineExercisesToSession,
+  createPastWorkoutSession,
   endWorkoutSession,
   getActiveSession,
   replaceSessionExercise,
   reorderSessionExercises,
+  startPastWorkoutFromRoutine,
   startWorkoutFromRoutine,
   startWorkoutSession,
 } from '@/lib/workout/session';
@@ -146,6 +148,28 @@ describe('startWorkoutSession', () => {
   it('insertが失敗した場合はエラーを握りつぶさずthrowする（呼び出し側でAlertを出すため）', async () => {
     mockReturning.mockRejectedValueOnce(new Error('db error'));
     await expect(startWorkoutSession()).rejects.toThrow('db error');
+  });
+});
+
+// カレンダー過去日パネル「記録を追加」用（2026-07-20）。startWorkoutSessionと違い、
+// startedAt/endedAtの両方に呼び出し側から渡した過去日時をそのまま書き込む
+describe('createPastWorkoutSession', () => {
+  it('startedAtとendedAtの両方に渡した日時を同じ値で書き込む', async () => {
+    const pastDate = new Date(2026, 6, 25, 12, 0, 0).getTime();
+    await createPastWorkoutSession(pastDate);
+
+    const payload = mockInsertValues.mock.calls[0][0];
+    expect(payload.startedAt).toBe(pastDate);
+    expect(payload.endedAt).toBe(pastDate);
+    // createdAt/updatedAtは(startedAtとは別に)呼び出し時点の現在時刻を使う
+    expect(payload.createdAt).toBe(payload.updatedAt);
+    expect(payload.createdAt).not.toBe(pastDate);
+  });
+
+  it('insertされた行を返す', async () => {
+    mockReturning.mockResolvedValueOnce([{ id: 7, startedAt: 100, endedAt: 100 }]);
+    const result = await createPastWorkoutSession(100);
+    expect(result).toEqual({ id: 7, startedAt: 100, endedAt: 100 });
   });
 });
 
@@ -677,6 +701,7 @@ describe('startWorkoutFromRoutine', () => {
     const sessionPayload = mockInsertValues.mock.calls[0][0];
     expect(sessionPayload).toEqual({
       startedAt: expect.any(Number),
+      endedAt: null,
       createdAt: expect.any(Number),
       updatedAt: expect.any(Number),
     });
@@ -821,6 +846,43 @@ describe('startWorkoutFromRoutine', () => {
     });
     mockReturning.mockRejectedValueOnce(new Error('db error'));
     await expect(startWorkoutFromRoutine(1)).rejects.toThrow('db error');
+  });
+});
+
+// カレンダー過去日パネル「記録を追加」→「ルーティン」経由用（2026-07-20）。
+// createRoutineSession共通化により種目投入ロジック自体はstartWorkoutFromRoutineと同じため、
+// ここではstartedAt/endedAtの書き込み内容と、種目0件時の防御が引き継がれていることだけを見る
+describe('startPastWorkoutFromRoutine', () => {
+  it('startedAtとendedAtの両方に渡した過去日時を同じ値で書き込む', async () => {
+    mockGetRoutineDetail.mockResolvedValueOnce({
+      routine: { id: 1, name: '胸トレ' },
+      reminder: null,
+      exercises: [{ id: 501, exerciseId: 10, sets: [] }],
+    });
+    mockSelectWhere.mockResolvedValueOnce([]);
+    mockReturning.mockResolvedValueOnce([{ id: 55, startedAt: 0, endedAt: 0 }]).mockResolvedValueOnce([{ id: 100, exerciseId: 10 }]);
+    const pastDate = new Date(2026, 6, 25, 12, 0, 0).getTime();
+
+    const result = await startPastWorkoutFromRoutine(1, pastDate);
+
+    expect(result?.sessionId).toBe(55);
+    const sessionPayload = mockInsertValues.mock.calls[0][0];
+    expect(sessionPayload.startedAt).toBe(pastDate);
+    expect(sessionPayload.endedAt).toBe(pastDate);
+  });
+
+  it('該当ルーティンが見つからない場合はnullを返し、セッションも作らない', async () => {
+    mockGetRoutineDetail.mockResolvedValueOnce(null);
+    const result = await startPastWorkoutFromRoutine(999, Date.now());
+    expect(result).toBeNull();
+    expect(mockInsertValues).not.toHaveBeenCalled();
+  });
+
+  it('種目が0件のルーティンはnullを返し、空のセッションを作らない', async () => {
+    mockGetRoutineDetail.mockResolvedValueOnce({ routine: { id: 1, name: 'A' }, reminder: null, exercises: [] });
+    const result = await startPastWorkoutFromRoutine(1, Date.now());
+    expect(result).toBeNull();
+    expect(mockInsertValues).not.toHaveBeenCalled();
   });
 });
 
