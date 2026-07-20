@@ -20,6 +20,7 @@ import m0015 from './0015_scheduled_workouts.sql';
 import m0016 from './0016_reminder_schedule_skips.sql';
 import m0017 from './0017_workout_sessions_routine_id.sql';
 import m0018 from './0018_scheduled_workout_exercises.sql';
+import m0019 from './0019_scheduled_workout_sets.sql';
 
   export default {
     journal,
@@ -42,6 +43,7 @@ m0014,
 m0015,
 m0016,
 m0017,
-m0018
+m0018,
+m0019
     }
   }

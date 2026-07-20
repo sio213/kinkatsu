@@ -747,7 +747,6 @@ describe('CalendarScreen 予定（PR9-2: リマインダー由来の未来予定
       });
       selectDate(future);
 
-      const expectedDateKey = `${future.getFullYear()}-${String(future.getMonth() + 1).padStart(2, '0')}-${String(future.getDate()).padStart(2, '0')}`;
       const exerciseCard = root
         .findAllByType(TouchableOpacity)
         .find((t) => typeof t.props.accessibilityLabel === 'string' && t.props.accessibilityLabel.startsWith('ベンチプレス、'))!;
@@ -755,8 +754,8 @@ describe('CalendarScreen 予定（PR9-2: リマインダー由来の未来予定
         exerciseCard.props.onPress();
       });
       expect(mockPush).toHaveBeenCalledWith({
-        pathname: '/calendar/schedule-exercise-picker',
-        params: { dateKey: expectedDateKey, scheduledWorkoutId: '5', exerciseIds: '10,11' },
+        pathname: '/calendar/schedule-workout-edit',
+        params: { scheduledWorkoutId: '5' },
       });
 
       const menuTrigger = root
@@ -1090,13 +1089,9 @@ describe('CalendarScreen 予定（PR9-2: リマインダー由来の未来予定
           exerciseCard.props.onPress();
         });
 
-        const todayDateKey = (() => {
-          const d = new Date();
-          return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
-        })();
         expect(mockPush).toHaveBeenCalledWith({
-          pathname: '/calendar/schedule-exercise-picker',
-          params: { dateKey: todayDateKey, scheduledWorkoutId: '5', exerciseIds: '10,11' },
+          pathname: '/calendar/schedule-workout-edit',
+          params: { scheduledWorkoutId: '5' },
         });
       });
 

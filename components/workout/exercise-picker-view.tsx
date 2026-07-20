@@ -25,25 +25,13 @@ type Props = {
   // このコンポーネントはawaitせずに呼ぶだけで、非同期処理のライフサイクル（連打防止・
   // エラー表示・完了後の遷移等）は全て呼び出し側の責務とする
   onConfirm: (selectedIds: number[]) => void | Promise<void>;
-  // 既存の選択済み種目を編集する画面（schedule-exercise-picker.tsxの編集モード、2026-07-20）用。
-  // 渡すと初期状態からその種目が選択済みとして表示される（新規追加時は省略、常に空から開始）
-  initialSelectedIds?: number[];
-  // 確定ボタンのラベルを呼び出し側で差し替える（新規追加は「N件を追加」、編集は「保存」等）。
-  // 省略時は従来通り「N件を追加」/「追加」
-  confirmLabel?: (count: number) => string;
 };
 
 // 種目追加ピッカーの検索/カテゴリ絞り込み/並び替え/複数選択/確定ボタンの本体。
 // app/workout/exercise-picker.tsx（トレーニング中セッションへの追加）とルーティンの
 // 種目追加（下書きへの追加）の両方から使う共通ビュー。sessionId依存の確定処理
 // （addExercisesToSession呼び出し等）は持たず、呼び出し側にonConfirmで委譲する
-export function ExercisePickerView({
-  excludeSessionId,
-  onPressInfo,
-  onConfirm,
-  initialSelectedIds,
-  confirmLabel = (count) => (count > 0 ? `${count}件を追加` : '追加'),
-}: Props) {
+export function ExercisePickerView({ excludeSessionId, onPressInfo, onConfirm }: Props) {
   const { exercises } = useExercises();
   const usageStats = useExerciseUsageStats(excludeSessionId);
   const sortBy = useExerciseSortStore((state) => state.pickerSortBy);
@@ -51,11 +39,8 @@ export function ExercisePickerView({
 
   const [search, setSearch] = useState('');
   const [activeCategory, setActiveCategory] = useState<string>(CATEGORY_ALL);
-  // 選択順を保持するため配列で管理する（Setだと挿入順の保証が実装依存になるため避ける）。
-  // initialSelectedIdsは編集モード(schedule-exercise-picker.tsx)用の初期値で、以後は
-  // このコンポーネント内のローカル状態としてのみ扱う（親から更新されても追従しない、
-  // 他のuseState初期値と同じ「マウント時の1回だけ」の一般的な扱い）
-  const [selectedIds, setSelectedIds] = useState<number[]>(() => initialSelectedIds ?? []);
+  // 選択順を保持するため配列で管理する（Setだと挿入順の保証が実装依存になるため避ける）
+  const [selectedIds, setSelectedIds] = useState<number[]>([]);
   const keyboardInset = useKeyboardInset();
 
   // 種目詳細等へ遷移してこの画面がフォーカスを失うタイミングでキーボードを閉じる。
@@ -139,7 +124,7 @@ export function ExercisePickerView({
       />
       <View style={styles.footer}>
         <PrimaryButton
-          label={confirmLabel(selectedIds.length)}
+          label={selectedIds.length > 0 ? `${selectedIds.length}件を追加` : '追加'}
           onPress={handleConfirm}
           disabled={selectedIds.length === 0}
         />

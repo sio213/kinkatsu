@@ -273,8 +273,8 @@ export type NewScheduledWorkout = typeof scheduledWorkouts.$inferInsert;
 
 // 「直接追加」（ルーティンを介さず個別に選んだ種目で予定を作る、2026-07-20）の中身。
 // routineExercises/workoutSessionExercisesと同じ形（セットとは独立、並び順を保持）。
-// 目標セット値は持たない（ルーティンの目標セットに相当する概念が無いため、実施時は
-// 種目ごとの前回記録から自動プリフィルする、startWorkoutFromScheduledExercises参照）
+// 目標セット値は下のscheduledWorkoutSetsに持たせる（実施時はそちらを優先し、未設定の種目だけ
+// 前回記録にフォールバックする、lib/workout/session.tsのstartWorkoutFromScheduledWorkout参照）
 export const scheduledWorkoutExercises = sqliteTable(
   'scheduled_workout_exercises',
   {
@@ -295,6 +295,32 @@ export const scheduledWorkoutExercises = sqliteTable(
 
 export type ScheduledWorkoutExercise = typeof scheduledWorkoutExercises.$inferSelect;
 export type NewScheduledWorkoutExercise = typeof scheduledWorkoutExercises.$inferInsert;
+
+// 直接追加予定の種目に持たせる「目標セット」（2026-07-20）。routineSetsと全く同じ形。
+// 実施記録ではなく計画値のため、setsと違いcompletedAtを持たない（routineSetsと同じ理由）。
+// 実施時（startWorkoutFromScheduledWorkout）はこの目標セットがあればそれをコピーし、
+// 無ければ従来通り種目ごとの前回記録にフォールバックする
+export const scheduledWorkoutSets = sqliteTable(
+  'scheduled_workout_sets',
+  {
+    id: integer('id').primaryKey({ autoIncrement: true }),
+    scheduledWorkoutExerciseId: integer('scheduled_workout_exercise_id')
+      .notNull()
+      .references(() => scheduledWorkoutExercises.id, { onDelete: 'cascade' }),
+    setNumber: integer('set_number').notNull(),
+    weight: real('weight'),
+    reps: integer('reps'),
+    durationSeconds: integer('duration_seconds'),
+    distanceMeters: real('distance_meters'),
+    createdAt: integer('created_at').notNull(),
+  },
+  (t) => ({
+    byExercise: index('idx_sws_exercise').on(t.scheduledWorkoutExerciseId),
+  }),
+);
+
+export type ScheduledWorkoutSet = typeof scheduledWorkoutSets.$inferSelect;
+export type NewScheduledWorkoutSet = typeof scheduledWorkoutSets.$inferInsert;
 
 // リマインダー由来の予定を「特定の1日だけ」打ち消す記録（PR10-6）。リマインダーの繰り返し設定
 // 自体（reminders行）は変更せず、「このreminderIdはこの日だけ発火させない」という除外を

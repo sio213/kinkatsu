@@ -305,22 +305,16 @@ export default function CalendarScreen() {
     [pushDebounced, selectedDate],
   );
   // 直接予定（routineId===null、2026-07-20）の種目一覧カードタップ用。過去の記録の種目カードが
-  // 記録編集画面(/workout/[sessionId])へ飛ぶのと同じ考え方で、この予定の種目一覧をまとめて
-  // 編集する画面（schedule-exercise-picker.tsxの編集モード）へ遷移する（@ユーザー指摘）。
-  // 既存の選択済みexerciseIdsはこの時点で手元にある値をそのままパラメータで渡す（遷移先で
-  // 改めてDBを引き直さない。@tester指摘: 引き直す設計だと読み込み中/該当予定が見つからない
-  // 場合の区別ができず永続的な空白画面になりかねない）
+  // 記録編集画面(/workout/[sessionId])へ飛ぶのと同じ考え方で、この予定の種目一覧・目標セットを
+  // まとめて編集する画面（schedule-workout-edit.tsx）へ遷移する（@ユーザー指摘）。この画面は
+  // scheduledWorkoutIdのlive queryで自前にDBを引くため、種目idの受け渡しは不要
   const handleEditDirectScheduleExercises = useCallback(
-    (scheduledWorkoutId: number, exerciseIds: number[]) =>
+    (scheduledWorkoutId: number) =>
       pushDebounced({
-        pathname: '/calendar/schedule-exercise-picker',
-        params: {
-          dateKey: toDateKey(selectedDate),
-          scheduledWorkoutId: String(scheduledWorkoutId),
-          exerciseIds: exerciseIds.join(','),
-        },
+        pathname: '/calendar/schedule-workout-edit',
+        params: { scheduledWorkoutId: String(scheduledWorkoutId) },
       }),
-    [pushDebounced, selectedDate],
+    [pushDebounced],
   );
   // 手動予定カードの⋮メニュー「削除」用（PR10-3、PR10-5で通知キャンセルも合わせて行うよう変更）。
   // app/routine/index.tsxのhandleDeleteやsession-exercise-card.tsxのhandleDeleteExerciseと同じ
@@ -550,7 +544,7 @@ export default function CalendarScreen() {
                             title={card.title}
                             onPressStart={() => handleStartDirectSchedule(card.scheduledWorkoutId, card.title)}
                             onDelete={() => handleDeleteSchedule(card.scheduledWorkoutId, card.title)}
-                            onPress={() => handleEditDirectScheduleExercises(card.scheduledWorkoutId, exerciseIds)}
+                            onPress={() => handleEditDirectScheduleExercises(card.scheduledWorkoutId)}
                           />
                         </View>
                       );
@@ -609,7 +603,7 @@ export default function CalendarScreen() {
                         sessionStartedAt={sessionStartedAt}
                         title={card.title}
                         onDelete={() => handleDeleteSchedule(card.scheduledWorkoutId, card.title)}
-                        onPress={() => handleEditDirectScheduleExercises(card.scheduledWorkoutId, exerciseIds)}
+                        onPress={() => handleEditDirectScheduleExercises(card.scheduledWorkoutId)}
                       />
                     );
                   }

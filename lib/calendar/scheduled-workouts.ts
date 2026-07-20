@@ -1,5 +1,6 @@
 import { db } from '@/db/client';
 import { scheduledWorkoutExercises, scheduledWorkouts } from '@/db/schema';
+import { insertInitialScheduledWorkoutSets } from '@/lib/calendar/scheduled-workout-detail';
 import { eq } from 'drizzle-orm';
 
 function assertValidTime(hour: number, minute: number): void {
@@ -8,16 +9,6 @@ function assertValidTime(hour: number, minute: number): void {
   // 安全網としてここで範囲チェックする（PRレビュー指摘対応）
   if (!Number.isInteger(hour) || hour < 0 || hour > 23) throw new Error(`invalid hour: ${hour}`);
   if (!Number.isInteger(minute) || minute < 0 || minute > 59) throw new Error(`invalid minute: ${minute}`);
-}
-
-// addDirectScheduledWorkout/updateScheduledWorkoutExercises共通のinsert values生成（@reviewer指摘）
-function toScheduledExerciseRows(scheduledWorkoutId: number, exerciseIds: number[], now: number) {
-  return exerciseIds.map((exerciseId, orderIndex) => ({
-    scheduledWorkoutId,
-    exerciseId,
-    orderIndex,
-    createdAt: now,
-  }));
 }
 
 // カレンダーで手動追加する予定（リマインダーとは無関係、PR10確定仕様）。呼び出し側
@@ -40,7 +31,10 @@ export async function addScheduledWorkout(
 }
 
 // 「直接追加」（ルーティンを介さず個別に選んだ種目で予定を作る、2026-07-20）用。routineIdは
-// nullのまま、選んだ種目をscheduledWorkoutExercisesへ選択順(orderIndex)付きで挿入する
+// nullのまま、選んだ種目をscheduledWorkoutExercisesへ選択順(orderIndex)付きで挿入する。
+// 各種目には目標セット（scheduledWorkoutSets、2026-07-20追加）も、その種目の直近の実績があれば
+// プリフィルして作成する（種目追加ピッカーからの追加(addExercisesToScheduledWorkout)と同じ方針。
+// 実施時(startWorkoutFromScheduledWorkout)はこの目標セットを優先してコピーする）
 export async function addDirectScheduledWorkout(
   exerciseIds: number[],
   scheduledDate: string,
@@ -56,23 +50,12 @@ export async function addDirectScheduledWorkout(
       .insert(scheduledWorkouts)
       .values({ routineId: null, scheduledDate, hour, minute, createdAt: now, updatedAt: now })
       .returning();
-    await tx.insert(scheduledWorkoutExercises).values(toScheduledExerciseRows(inserted.id, exerciseIds, now));
+    const exerciseRows = await tx
+      .insert(scheduledWorkoutExercises)
+      .values(exerciseIds.map((exerciseId, orderIndex) => ({ scheduledWorkoutId: inserted.id, exerciseId, orderIndex, createdAt: now })))
+      .returning();
+    await insertInitialScheduledWorkoutSets(tx, exerciseRows, now);
     return inserted.id;
-  });
-}
-
-// 「直接追加」予定の種目一覧をまとめて編集する画面（schedule-exercise-picker.tsxの編集モード、
-// 2026-07-20）用。既存のscheduledWorkoutExercisesを一旦全て削除し、新しい選択順で入れ直す
-// （個々の行をdiffして増減させるより、選択内容全体を置き換える方が実装・検証ともに単純なため。
-// 過去の実績には触れない別テーブルのため、入れ替えても記録に影響しない）
-export async function updateScheduledWorkoutExercises(scheduledWorkoutId: number, exerciseIds: number[]): Promise<void> {
-  if (exerciseIds.length === 0) throw new Error('exerciseIds must not be empty');
-
-  const now = Date.now();
-  await db.transaction(async (tx) => {
-    await tx.delete(scheduledWorkoutExercises).where(eq(scheduledWorkoutExercises.scheduledWorkoutId, scheduledWorkoutId));
-    await tx.insert(scheduledWorkoutExercises).values(toScheduledExerciseRows(scheduledWorkoutId, exerciseIds, now));
-    await tx.update(scheduledWorkouts).set({ updatedAt: now }).where(eq(scheduledWorkouts.id, scheduledWorkoutId));
   });
 }
 

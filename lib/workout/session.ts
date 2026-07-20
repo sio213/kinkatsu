@@ -1,5 +1,6 @@
 import { db, type Tx } from '@/db/client';
 import { scheduledWorkoutExercises, sets, workoutSessionExercises, workoutSessions, type WorkoutSession } from '@/db/schema';
+import { getScheduledWorkoutSetsForExercise } from '@/lib/calendar/scheduled-workout-detail';
 import { getRoutineDetail, type RoutineDetailExercise } from '@/lib/routines/db';
 import { getPreviousSets, hasAnyValue, type PreviousSetValues } from '@/lib/workout/history';
 import { and, desc, eq, isNull } from 'drizzle-orm';
@@ -306,55 +307,40 @@ export async function startPastWorkoutFromRoutine(routineId: number, pastDate: n
   return createRoutineSession(routineId, pastDate, pastDate);
 }
 
-// カレンダーの「直接追加」予定（scheduledWorkoutExercises、ルーティンを介さず個別に選んだ種目、
-// 2026-07-20）を実施する用。今日パネルの予定カード「開始」ボタン・その予定の通知タップから呼ばれる。
-// ルーティンの目標セットに相当する値を持たないため、addExercisesToSessionと同じく種目ごとの
-// 前回記録から自動プリフィルする（createRoutineSessionのルーティン目標セットとは異なる経路）。
-// routineIdは渡さず(schema既定のnullのまま)、手動開始と同じ「トレーニング中」表示になる
-export async function startWorkoutFromScheduledExercises(
-  exerciseIds: number[],
-  startedAt: number,
-  endedAt: number | null,
-): Promise<{ sessionId: number; cards: PrefilledCard[] } | null> {
-  if (exerciseIds.length === 0) return null;
-  const now = Date.now();
-
-  return db.transaction(async (tx) => {
-    const [session] = await tx
-      .insert(workoutSessions)
-      .values({ startedAt, endedAt, createdAt: now, updatedAt: now })
-      .returning();
-
-    const cards = await insertSessionExerciseCards(
-      tx,
-      session.id,
-      exerciseIds.map((exerciseId) => ({ exerciseId })),
-      now,
-      'new',
-      (t, spec) => getPreviousSets(t, spec.exerciseId, session.id),
-    );
-
-    return { sessionId: session.id, cards };
-  });
-}
-
 // カレンダーの「直接追加」予定（scheduledWorkoutExercises、2026-07-20）をscheduledWorkoutId
 // から実施する用。今日パネルの予定カード「開始」ボタン(app/(tabs)/calendar.tsx)・その予定の
-// 通知タップ(lib/notifications/tap-handler.ts)の両方から呼ばれる。種目idの解決を1箇所に
-// まとめることで、両呼び出し元でクエリを重複させない
+// 通知タップ(lib/notifications/tap-handler.ts)の両方から呼ばれる。routineIdは渡さず
+// (schema既定のnullのまま)、手動開始と同じ「トレーニング中」表示になる。
+// 種目ごとに、種目編集画面(app/calendar/schedule-workout-edit.tsx)で設定した目標セット
+// (scheduledWorkoutSets)があればそれをそのままコピーし（ルーティン開始時と同じ挙動、
+// 2026-07-20確定）、未設定なら従来通り種目ごとの前回記録にフォールバックする
 export async function startWorkoutFromScheduledWorkout(
   scheduledWorkoutId: number,
 ): Promise<{ sessionId: number; cards: PrefilledCard[] } | null> {
   const rows = await db
-    .select({ exerciseId: scheduledWorkoutExercises.exerciseId })
+    .select({
+      exerciseId: scheduledWorkoutExercises.exerciseId,
+      scheduledWorkoutExerciseId: scheduledWorkoutExercises.id,
+    })
     .from(scheduledWorkoutExercises)
     .where(eq(scheduledWorkoutExercises.scheduledWorkoutId, scheduledWorkoutId))
     .orderBy(scheduledWorkoutExercises.orderIndex);
-  return startWorkoutFromScheduledExercises(
-    rows.map((r) => r.exerciseId),
-    Date.now(),
-    null,
-  );
+  if (rows.length === 0) return null;
+
+  const now = Date.now();
+  return db.transaction(async (tx) => {
+    const [session] = await tx
+      .insert(workoutSessions)
+      .values({ startedAt: now, endedAt: null, createdAt: now, updatedAt: now })
+      .returning();
+
+    const cards = await insertSessionExerciseCards(tx, session.id, rows, now, 'new', async (t, spec) => {
+      const targetSets = await getScheduledWorkoutSetsForExercise(t, spec.scheduledWorkoutExerciseId);
+      return targetSets.length > 0 ? targetSets : getPreviousSets(t, spec.exerciseId, session.id);
+    });
+
+    return { sessionId: session.id, cards };
+  });
 }
 
 export type RoutineExerciseSelection = { routineExerciseId: number };
