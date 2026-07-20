@@ -484,6 +484,29 @@ describe('CalendarScreen 予定（PR9-2: リマインダー由来の未来予定
     expect(root.findByProps({ children: '記録がありません' })).toBeDefined();
   });
 
+  // 過去日・記録なしパネルの「記録を追加」（2026-07-20、デザイン検討/スケジュール（カレンダー）
+  // 機能 デザイン案.htmlの「② 過去」を実装）
+  test('過去日・記録なしの場合、「記録を追加」ボタンが表示され、押すと選択日のdateKeyでstart-chooserへ遷移する', () => {
+    const root = render();
+    const past = new Date();
+    past.setDate(past.getDate() - 5);
+    mockUseCalendarDayExercises.mockReturnValue({ cards: [], retry: jest.fn() });
+    selectDate(past);
+
+    const addBtn = root.findAllByType(TouchableOpacity).find((t) => t.props.accessibilityLabel === '記録を追加')!;
+    expect(addBtn).toBeDefined();
+
+    act(() => {
+      addBtn.props.onPress();
+    });
+
+    const expectedDateKey = `${past.getFullYear()}-${String(past.getMonth() + 1).padStart(2, '0')}-${String(past.getDate()).padStart(2, '0')}`;
+    expect(mockPush).toHaveBeenCalledWith({
+      pathname: '/workout/start-chooser',
+      params: { pastDateKey: expectedDateKey },
+    });
+  });
+
   describe('手動で追加した予定(PR10)', () => {
     function manualCard(overrides: Record<string, unknown> = {}) {
       return {

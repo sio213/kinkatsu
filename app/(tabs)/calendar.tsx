@@ -384,6 +384,12 @@ export default function CalendarScreen() {
   const handleStartToday = useCallback(() => {
     pushDebounced('/workout/start-chooser');
   }, [pushDebounced]);
+  // 過去日パネルの「記録を追加」用（2026-07-20）。今日と同じ開始方法選択画面
+  // (start-chooser)を経由させ、選んだ方法で作るセッションだけをpastDateKey付きで
+  // 過去日の完了済みセッション（記録の編集モード）に切り替える（要件確認済み）
+  const handleAddPastRecord = useCallback(() => {
+    pushDebounced({ pathname: '/workout/start-chooser', params: { pastDateKey: toDateKey(selectedDate) } });
+  }, [pushDebounced, selectedDate]);
 
   // 今日の予定カードの「開始」ボタン用。進行中セッションがある場合の確認ダイアログを含む
   // ロジックはuseStartRoutineWithConfirmに共通化してある（ルーティン一覧のカード
@@ -519,7 +525,7 @@ export default function CalendarScreen() {
               </View>
             )
           ) : dayCards.length === 0 ? (
-            <Text style={styles.dayEmptyText}>記録がありません</Text>
+            <DayEmptyState buttonIcon="plus" actionLabel="記録を追加" onPressAction={handleAddPastRecord} />
           ) : dayCardGroups.length > 1 ? (
             <View style={styles.dayGroupList}>
               {dayCardGroups.map((group) => (
@@ -550,7 +556,6 @@ const styles = StyleSheet.create({
   // 使う日付見出し）のため、同じトークン（caption/textMuted/700）に揃える
   dayHeading: { ...Typography.caption, fontWeight: '700', color: Colors.textMuted, marginBottom: 10 },
   dayLoading: { marginTop: 12 },
-  dayEmptyText: { ...Typography.body, color: Colors.textMuted },
   dayErrorWrapper: { flexDirection: 'row', alignItems: 'center', gap: 8, flexWrap: 'wrap' },
   dayErrorText: { ...Typography.body, color: Colors.danger },
   dayRetryText: { ...Typography.bodyStrong, color: Colors.accent },

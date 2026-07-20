@@ -1,12 +1,13 @@
 const mockBack = jest.fn();
 const mockPush = jest.fn();
+const mockReplace = jest.fn();
 const mockUseLocalSearchParams = jest.fn();
 const mockUseExercises = jest.fn();
 const mockAddExercisesToSession = jest.fn();
 const mockUseExerciseUsageStats = jest.fn();
 
 jest.mock('expo-router', () => ({
-  useRouter: () => ({ back: mockBack, push: mockPush }),
+  useRouter: () => ({ back: mockBack, push: mockPush, replace: mockReplace }),
   useLocalSearchParams: () => mockUseLocalSearchParams(),
   // 実際のuseFocusEffectはナビゲーションのフォーカス/ブラーイベントに紐づくが、
   // テストではeffectを即実行するだけで十分（クリーンアップの検証はここでは不要）
@@ -117,6 +118,50 @@ test('複数選択して追加を押すとaddExercisesToSessionが呼ばれ、ro
 
   expect(mockAddExercisesToSession).toHaveBeenCalledWith(5, [10, 11]);
   expect(mockBack).toHaveBeenCalled();
+  expect(mockReplace).not.toHaveBeenCalled();
+});
+
+// start-chooser「自分で選ぶ」から作成直後のセッションで直接この画面へ遷移してきた場合
+// （2026-07-20）。/workout/{id}を一度もpushしていないため、router.back()ではなく
+// replaceで/workout/{id}へ差し込む（そうしないと戻る操作でstart-chooserに戻ってしまう）
+describe('newSession=1（start-chooserの「自分で選ぶ」から直接遷移してきた場合）', () => {
+  beforeEach(() => {
+    mockUseLocalSearchParams.mockReturnValue({ sessionId: '5', newSession: '1' });
+  });
+
+  test('追加を押すとaddExercisesToSessionが呼ばれ、router.backではなくreplaceで/workout/{id}へ遷移する', async () => {
+    const root = render();
+    act(() => {
+      root.findByProps({ accessibilityLabel: benchPressLabel }).props.onPress();
+    });
+
+    const addBtn = findButtonByLabel(root, '1件を追加')!;
+    await act(async () => {
+      addBtn.props.onPress();
+    });
+
+    expect(mockAddExercisesToSession).toHaveBeenCalledWith(5, [10]);
+    expect(mockReplace).toHaveBeenCalledWith('/workout/5');
+    expect(mockBack).not.toHaveBeenCalled();
+  });
+
+  test('追加が失敗した場合はエラーAlertを表示し、replaceもbackも呼ばれない', async () => {
+    mockAddExercisesToSession.mockRejectedValueOnce(new Error('fail'));
+    jest.spyOn(console, 'error').mockImplementation(() => {});
+    const root = render();
+    act(() => {
+      root.findByProps({ accessibilityLabel: benchPressLabel }).props.onPress();
+    });
+
+    const addBtn = findButtonByLabel(root, '1件を追加')!;
+    await act(async () => {
+      addBtn.props.onPress();
+    });
+
+    expect(Alert.alert).toHaveBeenCalledWith('エラー', '種目を追加できませんでした。');
+    expect(mockReplace).not.toHaveBeenCalled();
+    expect(mockBack).not.toHaveBeenCalled();
+  });
 });
 
 test('追加が失敗した場合はエラーAlertを表示し、router.backは呼ばれない', async () => {
