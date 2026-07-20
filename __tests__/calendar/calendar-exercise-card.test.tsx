@@ -50,12 +50,14 @@ describe('CalendarExerciseCard', () => {
     expect(texts).not.toContain('ベスト');
   });
 
-  it('カード（全体）をタップするとexerciseIdを渡してonPressが呼ばれる', () => {
-    const root = render({ exerciseId: 42 });
+  // 遷移先の判断（種目詳細か記録編集画面か）は呼び出し元(app/(tabs)/calendar.tsxのDayCardList)の
+  // 責務のため、このカード自身は引数無しでonPressを呼ぶだけでよい（2026-07-20）
+  it('カード（全体）をタップするとonPressが呼ばれる', () => {
+    const root = render();
     act(() => {
       (root.root.findByType(TouchableOpacity).props.onPress as () => void)();
     });
-    expect(onPress).toHaveBeenCalledWith(42);
+    expect(onPress).toHaveBeenCalledTimes(1);
   });
 
   it('accessibilityLabelに種目名・カテゴリ名・概要・自己ベストの有無を含む', () => {
@@ -64,6 +66,13 @@ describe('CalendarExerciseCard', () => {
     expect(label).toContain('ベンチプレス');
     expect(label).toContain('胸');
     expect(label).toContain('自己ベスト');
+  });
+
+  // 遷移先が文脈（今日パネル/過去日パネル）で変わるため、accessibilityLabelとは別に
+  // 呼び出し元から渡されたhintをそのまま反映する（@designer指摘）
+  it('accessibilityHintを渡すとそのまま反映される', () => {
+    const root = render({ accessibilityHint: 'タップして記録を編集します' });
+    expect(root.root.findByType(TouchableOpacity).props.accessibilityHint).toBe('タップして記録を編集します');
   });
 
   it('✓未確定(completedAt: null)のセットはセット数・概要の集計から除外される（自己ベスト判定と基準を揃える）', () => {

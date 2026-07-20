@@ -20,7 +20,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 // reminderId等（replaceXxx、下記4項目はセットで渡る）が付いている場合だけ見出し・サブタイトルを
 // 差し替え用に出し分け、次画面へもそのまま引き継ぐ。描画部分（一覧・空状態）は
 // components/routines/routine-picker-list.tsxへ集約している（2026-07-20、@reviewer指摘:
-// app/workout/routine-picker.tsx・app/workout/past-routine-picker.tsxと合わせて3本目の
+// app/workout/routine-picker.tsx・app/workout/start-routine-picker.tsxと合わせて3本目の
 // 同型ピッカーに到達したため）
 export default function ScheduleRoutinePickerScreen() {
   const { dateKey, replaceReminderId, replaceRoutineName, replaceHour, replaceMinute } = useLocalSearchParams<{
@@ -83,6 +83,7 @@ export default function ScheduleRoutinePickerScreen() {
         summaries={summaries}
         onSelect={handleSelect}
         onPressBack={() => router.back()}
+        hint="タップして時刻を選ぶ画面に進みます"
       />
     </SafeAreaView>
   );

@@ -95,14 +95,14 @@ test('「自分で選ぶ」が失敗したらAlertを表示し遷移しない', 
   expect(mockPush).not.toHaveBeenCalled();
 });
 
-test('「ルーティン」をタップするとルーティン一覧へ遷移する（セッション作成はしない）', () => {
+test('「ルーティン」をタップすると専用ピッカー画面(start-routine-picker)へ遷移する（pastDateKeyは付けない、セッション作成はしない、2026-07-20: フルCRUD一覧app/routine/index.tsxから統一）', () => {
   const root = render();
 
   act(() => {
     findCardByLabel(root, 'ルーティン')!.props.onPress();
   });
 
-  expect(mockPush).toHaveBeenCalledWith('/routine');
+  expect(mockPush).toHaveBeenCalledWith({ pathname: '/workout/start-routine-picker', params: {} });
   expect(mockStartWorkoutSession).not.toHaveBeenCalled();
 });
 
@@ -172,7 +172,7 @@ describe('pastDateKeyモード（過去日の事後記録）', () => {
     });
   });
 
-  test('「ルーティン」をタップすると、pastDateKey付きで過去日専用のルーティンピッカーへ遷移する（フルCRUD一覧app/routine/index.tsxではなく、@designer指摘で専用ピッカーに変更、セッション作成はしない）', () => {
+  test('「ルーティン」をタップすると、pastDateKey付きで専用ピッカー画面(start-routine-picker)へ遷移する（セッション作成はしない）', () => {
     const root = render();
 
     act(() => {
@@ -180,7 +180,7 @@ describe('pastDateKeyモード（過去日の事後記録）', () => {
     });
 
     expect(mockPush).toHaveBeenCalledWith({
-      pathname: '/workout/past-routine-picker',
+      pathname: '/workout/start-routine-picker',
       params: { pastDateKey: '2026-07-25' },
     });
     expect(mockCreatePastWorkoutSession).not.toHaveBeenCalled();

@@ -28,12 +28,20 @@ type Props = {
   // 直前の同種目セッションとの比較（hooks/use-calendar-day-exercises.tsで算出）。
   // 比較対象が無い/変化なしならnull
   comparison: SetComparison | null;
-  onPress: (exerciseId: number) => void;
+  // 遷移先はこのカード自身では決めず、呼び出し元(app/(tabs)/calendar.tsxのDayCardList)に
+  // 委ねる。今日パネルは種目詳細、過去日パネルは記録編集画面と、同じカードでも文脈によって
+  // 遷移先が異なるため（2026-07-20）
+  onPress: () => void;
+  // 遷移先の説明（例:「タップして種目の詳細を見ます」）。exercise-card.tsx/session-card.tsxは
+  // accessibilityLabel自体に行き先を含めているが、このカードは種目名・カテゴリ・セット概要の
+  // 読み上げが既に長いため、行き先の説明はhintに分離する（@designer指摘: 遷移先が文脈で
+  // 変わるようになった以上、読み上げだけでは行き先を予見できない）
+  accessibilityHint?: string;
 };
 
 // カレンダーの選択日パネル用の読み取り専用種目カード。session-exercise-card.tsx・
 // routine-template-exercise-card.tsxと違い展開/折りたたみや⋮メニューを持たず、カード全体が
-// 1つのタップ領域（種目詳細へ遷移）。chevronは装飾のみで独立したタップ対象にはしない
+// 1つのタップ領域。chevronは装飾のみで独立したタップ対象にはしない
 export const CalendarExerciseCard = memo(function CalendarExerciseCard({
   exerciseId,
   name,
@@ -45,6 +53,7 @@ export const CalendarExerciseCard = memo(function CalendarExerciseCard({
   isBest,
   comparison,
   onPress,
+  accessibilityHint,
 }: Props) {
   const images: ExerciseImages = getExerciseImages({ source, slug });
   const resolvedMeasurementType = resolveMeasurementType(measurementType);
@@ -56,9 +65,10 @@ export const CalendarExerciseCard = memo(function CalendarExerciseCard({
   return (
     <TouchableOpacity
       style={styles.card}
-      onPress={() => onPress(exerciseId)}
+      onPress={onPress}
       accessibilityRole="button"
       accessibilityLabel={`${name}、${categoryLabel}、${summary}${isBest ? '、自己ベスト' : ''}${comparison ? `、前回比${comparison.label}` : ''}`}
+      accessibilityHint={accessibilityHint}
     >
       <ExerciseIdentity
         images={images}
