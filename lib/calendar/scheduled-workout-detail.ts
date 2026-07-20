@@ -152,17 +152,24 @@ export async function addHistoryCardsToScheduledWorkout(
       .returning();
 
     // カードごとに直列でawaitする（lib/workout/session.tsのinsertSessionExerciseCardsと同じ理由。
-    // 同一トランザクション内での並列クエリ発行を避け、insertedとselectionsの対応順を保つ）
+    // 同一トランザクション内での並列クエリ発行を避け、insertedとselectionsの対応順を保つ）。
+    // 取得した各カードのセット値は貯めておき、ルーティン読み込み経路(addRoutineExercisesToScheduledWorkout)
+    // と同じくinsertScheduledWorkoutSetsFromValuesへ最後に1回だけまとめて渡す（@reviewer指摘: 経路間で
+    // 抽象の使い方を揃える）
+    const rows: { scheduledWorkoutExerciseId: number; values: PreviousSetValues[] }[] = [];
     for (const [i, row] of inserted.entries()) {
       const historySets = (await getPreviousSetsForCard(tx, selections[i].sourceWorkoutSessionExerciseId)).filter(
         hasAnyValue,
       );
-      await insertScheduledWorkoutSetsFromValues(tx, [{ scheduledWorkoutExerciseId: row.id, values: historySets }], now);
+      rows.push({ scheduledWorkoutExerciseId: row.id, values: historySets });
     }
+    await insertScheduledWorkoutSetsFromValues(tx, rows, now);
     await touchScheduledWorkout(tx, scheduledWorkoutId, now);
   });
 }
 
+// valuesのsetNumberは読まず、渡された配列順で1から振り直す（コピー元のsetNumberが
+// 欠番/重複していても新しい行は必ず連番になる。lib/workout/session.tsのbuildInitialSetsと同じ方針）
 async function insertScheduledWorkoutSetsFromValues(
   tx: Tx,
   rows: { scheduledWorkoutExerciseId: number; values: PreviousSetValues[] }[],

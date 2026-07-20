@@ -316,6 +316,19 @@ describe('addHistoryCardsToScheduledWorkout', () => {
     expect(setsValues).toEqual([expect.objectContaining({ weight: null, reps: null, setNumber: 1 })]);
   });
 
+  it('値あり行と全カラムnullの行が混在する過去カードは、null行だけ除外して値あり行のみコピーする', async () => {
+    mockSelectWhere.mockResolvedValueOnce([]); // getMaxOrderIndex
+    mockGetPreviousSetsForCard.mockResolvedValueOnce([
+      { setNumber: 1, weight: 60, reps: 8, durationSeconds: null, distanceMeters: null },
+      { setNumber: 2, weight: null, reps: null, durationSeconds: null, distanceMeters: null },
+    ]);
+
+    await addHistoryCardsToScheduledWorkout(1, [{ exerciseId: 20, sourceWorkoutSessionExerciseId: 900 }]);
+
+    const [, setsValues] = mockInsertValues.mock.calls[1];
+    expect(setsValues).toEqual([expect.objectContaining({ weight: 60, reps: 8, setNumber: 1 })]);
+  });
+
   it('種目の追加とあわせて予定のupdatedAtも更新する', async () => {
     mockSelectWhere.mockResolvedValueOnce([]); // getMaxOrderIndex
     mockGetPreviousSetsForCard.mockResolvedValueOnce([]);
