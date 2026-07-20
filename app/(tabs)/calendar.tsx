@@ -669,9 +669,13 @@ const styles = StyleSheet.create({
   legend: { marginTop: 10 },
 
   dayPanel: { marginTop: 16, paddingTop: 12, borderTopWidth: 1, borderTopColor: Colors.border },
-  // 記録タブ(app/(tabs)/index.tsx)の日付グループ見出しと同じ役割（formatSessionDateGroupを
-  // 使う日付見出し）のため、同じトークン（caption/textMuted/700）に揃える
-  dayHeading: { ...Typography.caption, fontWeight: '700', color: Colors.textMuted, marginBottom: 10 },
+  // 記録タブ(app/(tabs)/index.tsx)の日付グループ見出しはformatSessionDateGroupを使う点は
+  // 同じだが、そちらは長いリストの中で繰り返される控えめなeyebrowラベル(12px/muted/700)。
+  // 一方こちらは選択日パネルに1つだけ出る、その画面が「何の日を見ているか」を示す見出しのため、
+  // デザイン案（スケジュール（カレンダー）機能 デザイン案.html、font-size:14px/font-weight:800/
+  // color:var(--ink)）の指定通りもう一段強く表示する。役割が異なるためあえて別トークン扱いにし、
+  // fontSizeを直書きしている（14px/weight800に一致する既存Typographyトークンが無いため）
+  dayHeading: { fontSize: 14, lineHeight: 20, fontWeight: '800', color: Colors.textPrimary, marginBottom: 10 },
   dayLoading: { marginTop: 12 },
   dayErrorWrapper: { flexDirection: 'row', alignItems: 'center', gap: 8, flexWrap: 'wrap' },
   dayErrorText: { ...Typography.body, color: Colors.danger },
