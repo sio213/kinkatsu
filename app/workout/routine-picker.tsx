@@ -16,7 +16,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 // 編集・複製・削除は行わないため、RoutinePickerCard(読み取り専用の簡易カード)を使う。
 // 描画部分（一覧・空状態）はcomponents/routines/routine-picker-list.tsxへ集約している
 // （2026-07-20、@reviewer指摘: app/calendar/schedule-routine-picker.tsx・
-// app/workout/past-routine-picker.tsxと合わせて3本目の同型ピッカーに到達したため）
+// app/workout/start-routine-picker.tsxと合わせて3本目の同型ピッカーに到達したため）
 export default function RoutinePickerScreen() {
   const { sessionId: sessionIdParam } = useLocalSearchParams<{ sessionId: string }>();
   const sessionId = Number(sessionIdParam);
@@ -59,6 +59,7 @@ export default function RoutinePickerScreen() {
         summaries={summaries}
         onSelect={handleSelect}
         onPressBack={() => router.back()}
+        hint="タップして種目を選ぶ画面に進みます"
       />
     </SafeAreaView>
   );

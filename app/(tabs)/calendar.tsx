@@ -123,13 +123,19 @@ function ScheduleEntryCard({
 }
 
 // 時間帯グループ表示・フラット表示のどちらでもカード列の描画は同一のため共有する
-// （CalendarExerciseCardへ渡すpropsを2箇所に重複させない）
+// （CalendarExerciseCardへ渡すpropsを2箇所に重複させない）。onPressExerciseはカード全体を
+// 受け取る形にしている（今日パネル=種目詳細へ、過去日パネル=記録編集画面へ、と呼び出し元
+// によって遷移先の判断材料（exerciseId/sessionId）が異なるため、@ユーザー指摘2026-07-20）
 function DayCardList({
   cards,
   onPressExercise,
+  accessibilityHint,
 }: {
   cards: CalendarDayCard[];
-  onPressExercise: (exerciseId: number) => void;
+  onPressExercise: (card: CalendarDayCard) => void;
+  // 遷移先の説明（今日パネル/過去日パネルで文言が変わる、@designer指摘）。カード自体は
+  // 見た目が同じままなのでVoiceOverだけでも文脈の違いが伝わるようにする
+  accessibilityHint: string;
 }) {
   return (
     <View style={styles.dayCardList}>
@@ -145,7 +151,8 @@ function DayCardList({
           sets={card.sets}
           isBest={card.isBest}
           comparison={card.comparison}
-          onPress={onPressExercise}
+          onPress={() => onPressExercise(card)}
+          accessibilityHint={accessibilityHint}
         />
       ))}
     </View>
@@ -268,8 +275,16 @@ export default function CalendarScreen() {
   );
 
   const pushDebounced = useDebouncedPush();
+  // 今日パネルの種目カードは種目詳細（フォーム・注意点等の閲覧用ページ）へ遷移する
   const handlePressExercise = useCallback(
-    (exerciseId: number) => pushDebounced(`/exercise/${exerciseId}`),
+    (card: CalendarDayCard) => pushDebounced(`/exercise/${card.exerciseId}`),
+    [pushDebounced],
+  );
+  // 過去日パネルの種目カードは、その日の記録そのものを見返す/直す用途のため、種目詳細では
+  // なくそのセッションの記録編集画面へ遷移する（2026-07-20、要件確認済み）。今日パネルの
+  // 種目カード（handlePressExercise）は変更対象外のため種目詳細のまま維持している
+  const handlePressPastRecord = useCallback(
+    (card: CalendarDayCard) => pushDebounced(`/workout/${card.sessionId}`),
     [pushDebounced],
   );
   const handlePressRoutine = useCallback(
@@ -463,7 +478,11 @@ export default function CalendarScreen() {
                       return (
                         <View key={entry.key} style={styles.dayGroup}>
                           {todayTimeline.length > 1 && <SessionTimeGroupHeader sessionStartedAt={entry.group.sessionStartedAt} />}
-                          <DayCardList cards={entry.group.cards} onPressExercise={handlePressExercise} />
+                          <DayCardList
+                            cards={entry.group.cards}
+                            onPressExercise={handlePressExercise}
+                            accessibilityHint="タップして種目の詳細を見ます"
+                          />
                         </View>
                       );
                     }
@@ -531,12 +550,20 @@ export default function CalendarScreen() {
               {dayCardGroups.map((group) => (
                 <View key={group.sessionId} style={styles.dayGroup}>
                   <SessionTimeGroupHeader sessionStartedAt={group.sessionStartedAt} />
-                  <DayCardList cards={group.cards} onPressExercise={handlePressExercise} />
+                  <DayCardList
+                    cards={group.cards}
+                    onPressExercise={handlePressPastRecord}
+                    accessibilityHint="タップして記録を編集します"
+                  />
                 </View>
               ))}
             </View>
           ) : (
-            <DayCardList cards={dayCards} onPressExercise={handlePressExercise} />
+            <DayCardList
+              cards={dayCards}
+              onPressExercise={handlePressPastRecord}
+              accessibilityHint="タップして記録を編集します"
+            />
           )}
         </View>
       </ScrollView>

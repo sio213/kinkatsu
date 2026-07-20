@@ -33,7 +33,7 @@ function findCardByLabel(root: ReactTestInstance, label: string) {
 }
 
 // app/workout/routine-picker.tsx・app/calendar/schedule-routine-picker.tsx・
-// app/workout/past-routine-picker.tsxの3画面が共有する描画部分（2026-07-20、@reviewer指摘:
+// app/workout/start-routine-picker.tsxの3画面が共有する描画部分（2026-07-20、@reviewer指摘:
 // 3本目のピッカー画面到達でrule of threeの閾値に達したため描画のみ共通化した）
 test('ルーティン一覧を表示する', () => {
   const { root } = render();

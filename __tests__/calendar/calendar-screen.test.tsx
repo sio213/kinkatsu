@@ -241,6 +241,24 @@ describe('CalendarScreen 時間帯グループ', () => {
     expect(root.findByProps({ children: 'ベンチプレス' })).toBeDefined();
   });
 
+  // 過去日パネルの種目カードとは異なり、今日パネルの種目カードは今回の変更対象外
+  // （2026-07-20、要件確認済み）で従来通り種目詳細へ遷移する（回帰防止）
+  test('今日パネルの種目カードをタップすると、記録編集画面ではなく種目詳細(/exercise/{id})へ遷移する', () => {
+    mockUseCalendarDayExercises.mockReturnValue({
+      cards: [card({ workoutSessionExerciseId: 1, exerciseId: 10, sessionId: 77 })],
+      retry: jest.fn(),
+    });
+    const root = render();
+
+    const cardBtn = root.findAllByType(TouchableOpacity).find((t) => t.props.accessibilityLabel?.startsWith('ベンチプレス'))!;
+    act(() => {
+      cardBtn.props.onPress();
+    });
+
+    expect(mockPush).toHaveBeenCalledWith('/exercise/10');
+    expect(mockPush).not.toHaveBeenCalledWith('/workout/77');
+  });
+
   test('同日に複数セッションがあれば時間帯見出し(朝/夜)が時刻順に表示される', () => {
     mockUseCalendarDayExercises.mockReturnValue({
       cards: [
@@ -505,6 +523,98 @@ describe('CalendarScreen 予定（PR9-2: リマインダー由来の未来予定
       pathname: '/workout/start-chooser',
       params: { pastDateKey: expectedDateKey },
     });
+  });
+
+  // 過去日パネルの種目カードは種目詳細ではなく記録編集画面へ遷移する（2026-07-20、要件確認済み。
+  // 今日パネルの種目カードは対象外で従来通り種目詳細（/exercise/{id}）のまま）
+  test('過去日の種目カードをタップすると、種目詳細ではなくそのセッションの記録編集画面(/workout/{sessionId})へ遷移する', () => {
+    const root = render();
+    const past = new Date();
+    past.setDate(past.getDate() - 5);
+    mockUseCalendarDayExercises.mockReturnValue({
+      cards: [
+        {
+          workoutSessionExerciseId: 1,
+          exerciseId: 10,
+          name: 'ベンチプレス',
+          category: 'chest',
+          measurementType: 'weight_reps',
+          source: 'preset',
+          slug: 'bench-press',
+          sessionId: 77,
+          sessionStartedAt: past.getTime(),
+          isBest: false,
+          comparison: null,
+          sets: [{ weight: 60, reps: 8, durationSeconds: null, distanceMeters: null, completedAt: 1 }],
+        },
+      ],
+      retry: jest.fn(),
+    });
+    selectDate(past);
+
+    const card = root.findAllByType(TouchableOpacity).find((t) => t.props.accessibilityLabel?.startsWith('ベンチプレス'))!;
+    expect(card).toBeDefined();
+    act(() => {
+      card.props.onPress();
+    });
+
+    expect(mockPush).toHaveBeenCalledWith('/workout/77');
+    expect(mockPush).not.toHaveBeenCalledWith('/exercise/10');
+  });
+
+  // @tester指摘: 過去日に複数セッションがある場合、別グループのsessionIdへ誤爆しないことの確認
+  test('過去日に複数セッションがある場合、各グループの種目カードは自分のセッションIDへ遷移する', () => {
+    const root = render();
+    const past = new Date();
+    past.setDate(past.getDate() - 5);
+    mockUseCalendarDayExercises.mockReturnValue({
+      cards: [
+        {
+          workoutSessionExerciseId: 1,
+          exerciseId: 10,
+          name: '朝の種目',
+          category: 'chest',
+          measurementType: 'weight_reps',
+          source: 'preset',
+          slug: 'bench-press',
+          sessionId: 77,
+          sessionStartedAt: new Date(past.getFullYear(), past.getMonth(), past.getDate(), 7, 0).getTime(),
+          isBest: false,
+          comparison: null,
+          sets: [{ weight: 60, reps: 8, durationSeconds: null, distanceMeters: null, completedAt: 1 }],
+        },
+        {
+          workoutSessionExerciseId: 2,
+          exerciseId: 20,
+          name: '夜の種目',
+          category: 'leg',
+          measurementType: 'weight_reps',
+          source: 'preset',
+          slug: 'squat',
+          sessionId: 88,
+          sessionStartedAt: new Date(past.getFullYear(), past.getMonth(), past.getDate(), 20, 0).getTime(),
+          isBest: false,
+          comparison: null,
+          sets: [{ weight: 80, reps: 5, durationSeconds: null, distanceMeters: null, completedAt: 1 }],
+        },
+      ],
+      retry: jest.fn(),
+    });
+    selectDate(past);
+
+    const morningCard = root.findAllByType(TouchableOpacity).find((t) => t.props.accessibilityLabel?.startsWith('朝の種目'))!;
+    act(() => {
+      morningCard.props.onPress();
+    });
+    expect(mockPush).toHaveBeenCalledWith('/workout/77');
+
+    mockPush.mockClear();
+
+    const nightCard = root.findAllByType(TouchableOpacity).find((t) => t.props.accessibilityLabel?.startsWith('夜の種目'))!;
+    act(() => {
+      nightCard.props.onPress();
+    });
+    expect(mockPush).toHaveBeenCalledWith('/workout/88');
   });
 
   describe('手動で追加した予定(PR10)', () => {

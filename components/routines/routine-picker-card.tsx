@@ -10,6 +10,12 @@ type Props = {
   exerciseCount: number;
   categories: string[];
   onPress: () => void;
+  // タップすると何が起きるかの読み上げ（routine-card.tsx/routine-schedule-card.tsxの
+  // accessibilityHintと同じ役割）。呼び出し元ごとにタップの結果（時刻選択へ進む/
+  // 種目を選ぶ画面へ進む/即座にライブセッションを開始する等）が異なるため、値そのものは
+  // 呼び出し元に決めさせる（2026-07-20、@designer指摘: このカードだけhintが無く、
+  // 特に即座にセッションを開始するstart-routine-picker.tsxでの読み上げ不足が目立っていた）
+  hint?: string;
 };
 
 // トレーニング中画面ヘッダー⋮「ルーティンから読み込む」の画面2で使う、読み取り専用の
@@ -23,6 +29,7 @@ export const RoutinePickerCard = memo(function RoutinePickerCard({
   exerciseCount,
   categories,
   onPress,
+  hint,
 }: Props) {
   const { visible, overflowCount } = summarizeCategories(categories);
 
@@ -44,6 +51,7 @@ export const RoutinePickerCard = memo(function RoutinePickerCard({
       onPress={handlePress}
       accessibilityRole="button"
       accessibilityLabel={accessibilityLabel}
+      accessibilityHint={hint}
     >
       <View style={styles.content}>
         <Text style={styles.name} numberOfLines={1}>{name}</Text>

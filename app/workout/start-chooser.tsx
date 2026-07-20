@@ -53,15 +53,16 @@ export default function StartChooserScreen() {
     startWorkout(async () => (await startWorkoutSession()).id);
   }, [isPastMode, pastDateKey, startWorkout]);
 
+  // app/routine/index.tsx（フルCRUD一覧）ではなく、「選ぶだけ」の専用ピッカー画面
+  // (app/workout/start-routine-picker.tsx)を使う（2026-07-20、要件確認済み: 編集・複製・
+  // 削除・並び替えが同居する一覧を選択操作に使うと誤操作リスクがあるため、当初は過去日限定で
+  // 置き換えたが、今日のライブ開始でも同じ理由で統一した）。過去日モードのときだけ
+  // pastDateKeyを引き継ぐ
   const handlePickRoutine = useCallback(() => {
-    if (isPastMode) {
-      // app/routine/index.tsx（フルCRUD一覧）ではなく、未来日の「予定を追加」フローと同じ
-      // 「選ぶだけ」の専用ピッカー画面を使う（2026-07-20、@designer指摘: 編集・複製・削除・
-      // 並び替えが同居する一覧を「選ぶだけ」の操作に使うと誤操作リスクがあるため置き換えた）
-      pushDebounced({ pathname: '/workout/past-routine-picker', params: { pastDateKey: pastDateKey! } });
-      return;
-    }
-    pushDebounced('/routine');
+    pushDebounced({
+      pathname: '/workout/start-routine-picker',
+      params: isPastMode ? { pastDateKey: pastDateKey! } : {},
+    });
   }, [isPastMode, pastDateKey, pushDebounced]);
 
   // カレンダー画面から遷移する限り不正なpastDateKeyは渡らないが、不正な直リンク等への防御として

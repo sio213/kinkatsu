@@ -52,3 +52,16 @@ test('カテゴリが多い場合は省略件数を「+N」で表示する（sum
     true,
   );
 });
+
+// タップの結果（即座にセッション開始/次の選択画面へ進む等）は呼び出し元ごとに異なるため、
+// hintの値そのものはpropsで受け取るだけ（@designer指摘: 即座にセッションを開始する
+// start-routine-picker.tsxでhintが無いのはVoiceOverユーザーへの予見可能性を欠く）
+test('hintを渡すとaccessibilityHintに反映される', () => {
+  const { root } = render({ hint: 'タップして開始します' });
+  expect(root.findByType(TouchableOpacity).props.accessibilityHint).toBe('タップして開始します');
+});
+
+test('hintを渡さない場合、accessibilityHintは付かない', () => {
+  const { root } = render();
+  expect(root.findByType(TouchableOpacity).props.accessibilityHint).toBeUndefined();
+});
