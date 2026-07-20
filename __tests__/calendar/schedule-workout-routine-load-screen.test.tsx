@@ -216,6 +216,18 @@ describe('ScheduleWorkoutRoutineLoadScreen', () => {
     expect(root.findByProps({ children: 'ルーティンを読み込めませんでした' })).toBeDefined();
   });
 
+  test('取得失敗後に「再試行」ボタンを押すと再取得し、成功すれば通常表示に戻る', async () => {
+    const root = await renderResolved(new Error('fail'));
+    mockGetRoutineDetail.mockResolvedValueOnce({ routine: { id: 1, name: '胸トレ' }, reminder: null, exercises: [benchExercise] });
+    const retryBtn = root.findAllByType(TouchableOpacity).find((btn) => btn.props.accessibilityLabel === '再試行')!;
+    await act(async () => {
+      retryBtn.props.onPress();
+      await Promise.resolve();
+      await Promise.resolve();
+    });
+    expect(root.findByProps({ children: 'すべて読み込む' })).toBeDefined();
+  });
+
   test('取得中はActivityIndicatorを表示し、ヘッダー・フッターは非表示', () => {
     mockGetRoutineDetail.mockReturnValue(new Promise(() => {}));
     const root = render();

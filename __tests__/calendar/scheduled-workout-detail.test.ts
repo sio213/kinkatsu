@@ -102,6 +102,7 @@ beforeEach(() => {
   mockSelectWhere.mockResolvedValue([]);
   mockBuildInitialRoutineSets.mockReset();
   mockBuildInitialRoutineSets.mockResolvedValue([{ weight: null, reps: null, durationSeconds: null, distanceMeters: null }]);
+  mockGetRoutineDetail.mockReset();
 });
 
 describe('addExercisesToScheduledWorkout', () => {
@@ -205,6 +206,54 @@ describe('addRoutineExercisesToScheduledWorkout', () => {
     });
     await addRoutineExercisesToScheduledWorkout(1, 10, [{ routineExerciseId: 999 }]);
     expect(mockInsertValues).not.toHaveBeenCalled();
+  });
+
+  it('有効なidと無効なid(削除済み等)が混在する場合、有効な分だけ処理する(クライアントの値を信用しない)', async () => {
+    mockGetRoutineDetail.mockResolvedValueOnce({
+      routine: { id: 10, name: '胸トレ' },
+      reminder: null,
+      exercises: [{ id: 501, exerciseId: 20, sets: [] }],
+    });
+    mockSelectWhere.mockResolvedValueOnce([]); // getMaxOrderIndex
+
+    await addRoutineExercisesToScheduledWorkout(1, 10, [{ routineExerciseId: 501 }, { routineExerciseId: 999 }]);
+
+    const [, exerciseValues] = mockInsertValues.mock.calls[0];
+    expect(exerciseValues).toEqual([expect.objectContaining({ exerciseId: 20 })]);
+  });
+
+  it('種目の追加とあわせて予定のupdatedAtも更新する', async () => {
+    mockGetRoutineDetail.mockResolvedValueOnce({
+      routine: { id: 10, name: '胸トレ' },
+      reminder: null,
+      exercises: [{ id: 501, exerciseId: 20, sets: [] }],
+    });
+    mockSelectWhere.mockResolvedValueOnce([]); // getMaxOrderIndex
+
+    await addRoutineExercisesToScheduledWorkout(1, 10, [{ routineExerciseId: 501 }]);
+
+    // exerciseId更新系の他関数と同様、insert(2回) + updatedAt更新(1回)でmockUpdateWhereが呼ばれる
+    expect(mockUpdateWhere).toHaveBeenCalledTimes(1);
+  });
+
+  it('ルーティンのgetRoutineDetailが失敗した場合はエラーを握りつぶさずthrowする', async () => {
+    mockGetRoutineDetail.mockRejectedValueOnce(new Error('db error'));
+    await expect(addRoutineExercisesToScheduledWorkout(1, 10, [{ routineExerciseId: 501 }])).rejects.toThrow(
+      'db error',
+    );
+  });
+
+  it('insertが失敗した場合もエラーを握りつぶさずthrowする', async () => {
+    mockGetRoutineDetail.mockResolvedValueOnce({
+      routine: { id: 10, name: '胸トレ' },
+      reminder: null,
+      exercises: [{ id: 501, exerciseId: 20, sets: [] }],
+    });
+    mockSelectWhere.mockResolvedValueOnce([]);
+    mockReturning.mockRejectedValueOnce(new Error('insert error'));
+    await expect(addRoutineExercisesToScheduledWorkout(1, 10, [{ routineExerciseId: 501 }])).rejects.toThrow(
+      'insert error',
+    );
   });
 });
 

@@ -1,7 +1,7 @@
 import { db, type Tx } from '@/db/client';
 import { scheduledWorkoutExercises, sets, workoutSessionExercises, workoutSessions, type WorkoutSession } from '@/db/schema';
 import { getScheduledWorkoutSetsForExercise } from '@/lib/calendar/scheduled-workout-detail';
-import { getRoutineDetail, type RoutineDetailExercise } from '@/lib/routines/db';
+import { getRoutineDetail, type RoutineDetailExercise, type RoutineExerciseSelection } from '@/lib/routines/db';
 import { getPreviousSets, hasAnyValue, type PreviousSetValues } from '@/lib/workout/history';
 import { and, desc, eq, isNull } from 'drizzle-orm';
 
@@ -343,8 +343,6 @@ export async function startWorkoutFromScheduledWorkout(
   });
 }
 
-export type RoutineExerciseSelection = { routineExerciseId: number };
-
 // トレーニング中画面ヘッダー⋮「ルーティンから読み込む」用。選んだルーティンのうち、画面3で
 // ユーザーがチェックボックスで選んだ種目だけを既存セッションへ新規カードとして追加する。
 // addHistoryCardsToSessionと同じく、クライアントには選んだ種目のid(routineExerciseId)だけを
@@ -515,3 +513,4 @@ async function getPreviousSetsForCard(
     .where(eq(sets.workoutSessionExerciseId, workoutSessionExerciseId))
     .orderBy(sets.setNumber);
 }
+

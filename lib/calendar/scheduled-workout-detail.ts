@@ -1,6 +1,6 @@
 import { db, type DbOrTx, type Tx } from '@/db/client';
 import { scheduledWorkoutExercises, scheduledWorkoutSets, scheduledWorkouts } from '@/db/schema';
-import { buildInitialRoutineSets, getRoutineDetail, type RoutineDetailExercise } from '@/lib/routines/db';
+import { buildInitialRoutineSets, getRoutineDetail, type RoutineDetailExercise, type RoutineExerciseSelection } from '@/lib/routines/db';
 import { hasAnyValue, type PreviousSetValues } from '@/lib/workout/set-values';
 import { and, desc, eq } from 'drizzle-orm';
 
@@ -72,8 +72,6 @@ export async function addExercisesToScheduledWorkout(scheduledWorkoutId: number,
     await touchScheduledWorkout(tx, scheduledWorkoutId, now);
   });
 }
-
-export type RoutineExerciseSelection = { routineExerciseId: number };
 
 // ヘッダー⋮「ルーティンから読み込み」(app/calendar/schedule-workout-routine-load.tsx)用。
 // lib/workout/session.tsのinsertRoutineCardsIntoSession/addRoutineExercisesToSessionと同じ方針で、
