@@ -59,11 +59,11 @@ jest.mock('@/lib/workout/session', () => ({
 }));
 
 // DirectScheduleExerciseGroup（直接予定の種目一覧カード表示、2026-07-20）がDB接続を必要とする
-// useScheduledExercisePreviewCards/useExercisesに触れないよう、フックレイヤーでモックする
+// useScheduledExerciseCardsに触れないよう、フックレイヤーでモックする
 // （calendar-screen.test.tsxはDBモックチェーンを組んでいない画面レベルテストのため）
-const mockUseScheduledExercisePreviewCards = jest.fn();
-jest.mock('@/hooks/use-scheduled-exercise-preview-cards', () => ({
-  useScheduledExercisePreviewCards: (...args: unknown[]) => mockUseScheduledExercisePreviewCards(...args),
+const mockUseScheduledExerciseCards = jest.fn();
+jest.mock('@/hooks/use-scheduled-exercise-cards', () => ({
+  useScheduledExerciseCards: (...args: unknown[]) => mockUseScheduledExerciseCards(...args),
 }));
 
 const mockRemoveScheduledWorkout = jest.fn();
@@ -132,7 +132,7 @@ beforeEach(() => {
   mockStartWorkoutFromRoutine.mockResolvedValue({ sessionId: 77, cards: [] });
   mockStartWorkoutFromScheduledWorkout.mockResolvedValue({ sessionId: 77, cards: [] });
   mockSkipReminderOccurrence.mockResolvedValue({ notificationSuppressed: true });
-  mockUseScheduledExercisePreviewCards.mockReturnValue({ cards: [], retry: jest.fn() });
+  mockUseScheduledExerciseCards.mockReturnValue({ cards: [], retry: jest.fn() });
 });
 
 describe('CalendarScreen 今日・記録なしパネル', () => {
@@ -272,9 +272,10 @@ describe('CalendarScreen 時間帯グループ', () => {
     expect(root.findByProps({ children: 'ベンチプレス' })).toBeDefined();
   });
 
-  // 過去日パネルの種目カードとは異なり、今日パネルの種目カードは今回の変更対象外
-  // （2026-07-20、要件確認済み）で従来通り種目詳細へ遷移する（回帰防止）
-  test('今日パネルの種目カードをタップすると、記録編集画面ではなく種目詳細(/exercise/{id})へ遷移する', () => {
+  // 過去日パネルの種目カードと同じく記録編集画面へ遷移する（2026-07-21、@ユーザー指摘。
+  // 当初は今日パネルを種目詳細のまま維持していたが、未来予定の種目カードも記録編集画面に
+  // 統一したため一貫性のため今日パネルも合わせた）
+  test('今日パネルの種目カードをタップすると、種目詳細ではなく記録編集画面(/workout/{sessionId})へ遷移する', () => {
     mockUseCalendarDayExercises.mockReturnValue({
       cards: [card({ workoutSessionExerciseId: 1, exerciseId: 10, sessionId: 77 })],
       retry: jest.fn(),
@@ -286,8 +287,8 @@ describe('CalendarScreen 時間帯グループ', () => {
       cardBtn.props.onPress();
     });
 
-    expect(mockPush).toHaveBeenCalledWith('/exercise/10');
-    expect(mockPush).not.toHaveBeenCalledWith('/workout/77');
+    expect(mockPush).toHaveBeenCalledWith('/workout/77');
+    expect(mockPush).not.toHaveBeenCalledWith('/exercise/10');
   });
 
   test('同日に複数セッションがあれば時間帯見出し(朝/夜)が時刻順に表示される', () => {
@@ -728,9 +729,9 @@ describe('CalendarScreen 予定（PR9-2: リマインダー由来の未来予定
       const future = new Date();
       future.setDate(future.getDate() + 5);
       mockUseCalendarDayManualSchedule.mockReturnValue([
-        manualCard({ scheduledWorkoutId: 5, routineId: null, title: 'ベンチプレス 他1種目', exerciseIds: [10, 11] }),
+        manualCard({ scheduledWorkoutId: 5, routineId: null, title: 'ベンチプレス 他1種目' }),
       ]);
-      mockUseScheduledExercisePreviewCards.mockReturnValue({
+      mockUseScheduledExerciseCards.mockReturnValue({
         cards: [
           {
             exerciseId: 10,
@@ -740,7 +741,6 @@ describe('CalendarScreen 予定（PR9-2: リマインダー由来の未来予定
             slug: 'bench_press',
             measurementType: 'weight_reps',
             sets: [],
-            isBest: false,
           },
         ],
         retry: jest.fn(),
@@ -1063,9 +1063,9 @@ describe('CalendarScreen 予定（PR9-2: リマインダー由来の未来予定
 
       test('今日、直接追加予定は種目一覧カードで表示され、種目カードをタップすると種目編集画面へ遷移する（2026-07-20、@ユーザー指摘で過去の記録と同じ種目カード表示に変更）', () => {
         mockUseCalendarDayManualSchedule.mockReturnValue([
-          manualCard({ scheduledWorkoutId: 5, routineId: null, title: 'ベンチプレス 他1種目', exerciseIds: [10, 11] }),
+          manualCard({ scheduledWorkoutId: 5, routineId: null, title: 'ベンチプレス 他1種目' }),
         ]);
-        mockUseScheduledExercisePreviewCards.mockReturnValue({
+        mockUseScheduledExerciseCards.mockReturnValue({
           cards: [
             {
               exerciseId: 10,
@@ -1075,7 +1075,6 @@ describe('CalendarScreen 予定（PR9-2: リマインダー由来の未来予定
               slug: 'bench_press',
               measurementType: 'weight_reps',
               sets: [],
-              isBest: false,
             },
           ],
           retry: jest.fn(),

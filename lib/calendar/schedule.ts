@@ -78,9 +78,6 @@ export type UnifiedScheduleCardInput = {
   exerciseCount: number;
   hour: number;
   minute: number;
-  // 直接予定（routineId===null）のときだけ設定する。種目一覧カード表示
-  // （DirectScheduleExerciseGroup）・編集画面への遷移時の事前選択に使う（2026-07-20）
-  exerciseIds?: number[];
 };
 
 export type UnifiedScheduleCard<TReminder> =
@@ -117,7 +114,6 @@ export function mergeScheduleCards<
       exerciseCount: c.exerciseCount,
       hour: c.hour,
       minute: c.minute,
-      exerciseIds: c.exerciseIds,
       source: 'reminder',
       reminder: c.reminder,
     }));
@@ -129,7 +125,6 @@ export function mergeScheduleCards<
     exerciseCount: c.exerciseCount,
     hour: c.hour,
     minute: c.minute,
-    exerciseIds: c.exerciseIds,
     source: 'manual',
     scheduledWorkoutId: c.scheduledWorkoutId,
   }));

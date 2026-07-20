@@ -4,7 +4,7 @@ import { DropdownMenu, type DropdownMenuItem } from '@/components/ui/dropdown-me
 import { IconSymbol } from '@/components/ui/icon-symbol';
 import { PrimaryButton } from '@/components/ui/primary-button';
 import { Colors, Typography } from '@/constants/theme';
-import { useScheduledExercisePreviewCards } from '@/hooks/use-scheduled-exercise-preview-cards';
+import { useScheduledExerciseCards } from '@/hooks/use-scheduled-exercise-cards';
 import { memo } from 'react';
 import { StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 
@@ -18,7 +18,7 @@ function deleteMenuItems(onDelete: () => void): DropdownMenuItem[] {
 }
 
 type Props = {
-  exerciseIds: number[];
+  scheduledWorkoutId: number;
   // SessionTimeGroupHeaderにそのまま渡す時刻表示用の合成タイムスタンプ（選択日+予定のhour/minute）。
   // 今日パネルは実績セッションと同じ時系列に混ぜるためentry.sortAtをそのまま流用できる
   sessionStartedAt: number;
@@ -36,19 +36,20 @@ type Props = {
 // ルーティン予定(RoutineScheduleCard)と違い、予定の中身（種目）を確認する手段が無いという
 // @designer指摘を受け、要約カード1枚ではなく過去の記録と同じ種目一覧カード
 // (CalendarExerciseCard)をそのまま並べる（サムネ・カテゴリ・前回のセット内容が見える、
-// @ユーザー指摘）。まだ実施していない予定のため、セット内容は「直近の実施記録」を参考値として
-// 表示し(useScheduledExercisePreviewCards)、前回比較(comparison)は今回の実施が無いと成立しない
-// 概念のため常にnullで渡す。自己ベストバッジも同様の理由（まだ実施していないのに「ベスト」と
-// 出ると実績と誤認する、@designer指摘）で常にfalse固定にする
+// @ユーザー指摘）。まだ実施していない予定のため、セット内容は目標セット（設定済みならそれ、
+// 無ければ直近の実施記録を参考値）として表示し(useScheduledExerciseCards)、前回比較
+// (comparison)は今回の実施が無いと成立しない概念のため常にnullで渡す。自己ベストバッジも
+// 同様の理由（まだ実施していないのに「ベスト」と出ると実績と誤認する、@designer指摘）で
+// 常にfalse固定にする
 export const DirectScheduleExerciseGroup = memo(function DirectScheduleExerciseGroup({
-  exerciseIds,
+  scheduledWorkoutId,
   sessionStartedAt,
   title,
   onPressStart,
   onDelete,
   onPress,
 }: Props) {
-  const { cards, retry } = useScheduledExercisePreviewCards(exerciseIds);
+  const { cards, retry } = useScheduledExerciseCards(scheduledWorkoutId);
 
   return (
     <View style={styles.wrapper}>

@@ -79,7 +79,6 @@ describe('useCalendarDirectScheduleSummaries', () => {
       exerciseCount: 3,
       categories: ['chest', 'shoulder'],
       exerciseNames: ['ベンチプレス', 'ショルダープレス', 'インクラインベンチプレス'],
-      exerciseIds: [10, 11, 12],
     });
   });
 
@@ -98,17 +97,15 @@ describe('useCalendarDirectScheduleSummaries', () => {
       exerciseCount: 2,
       categories: ['chest', 'arm'],
       exerciseNames: ['ベンチプレス', 'アームカール'],
-      exerciseIds: [10, 13],
     });
     expect(result.get(2)).toEqual({
       exerciseCount: 1,
       categories: ['leg'],
       exerciseNames: ['スクワット'],
-      exerciseIds: [20],
     });
   });
 
-  it('exerciseNames/exerciseIdsはorderIndex順（クエリのorderBy結果の並び）をそのまま保つ', () => {
+  it('exerciseNamesはorderIndex順（クエリのorderBy結果の並び）をそのまま保つ', () => {
     mockLiveQueryQueue = [
       {
         data: [
@@ -120,6 +117,5 @@ describe('useCalendarDirectScheduleSummaries', () => {
     ];
     const result = mount();
     expect(result.get(1)?.exerciseNames).toEqual(['ベンチプレス', 'デッドリフト', 'スクワット']);
-    expect(result.get(1)?.exerciseIds).toEqual([10, 30, 20]);
   });
 });
