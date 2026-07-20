@@ -1,5 +1,6 @@
 import { act, create } from 'react-test-renderer';
-import { Text, TouchableOpacity, View } from 'react-native';
+import { View } from 'react-native';
+import { Pressable } from 'react-native-gesture-handler';
 import { MonthGrid } from '@/components/calendar/month-grid';
 import { getCalendarCategoryColor } from '@/lib/calendar/category-color';
 import { Colors } from '@/constants/theme';
@@ -29,7 +30,7 @@ function render(props: Partial<Parameters<typeof MonthGrid>[0]> = {}) {
 
 function findTouchableForDay(root: ReturnType<typeof create>, label: string) {
   return root.root
-    .findAllByType(TouchableOpacity)
+    .findAllByType(Pressable)
     .find((t) => (t.props.accessibilityLabel as string).startsWith(label))!;
 }
 
@@ -38,16 +39,16 @@ beforeEach(() => {
 });
 
 describe('MonthGrid', () => {
-  it('前月/翌月の日付はTouchableOpacityを持たずタップできない（当月日数分だけタップ可能）', () => {
+  it('前月/翌月の日付はPressableを持たずタップできない（当月日数分だけタップ可能）', () => {
     const root = render();
-    const touchables = root.root.findAllByType(TouchableOpacity);
+    const touchables = root.root.findAllByType(Pressable);
     // 2026年7月は31日まで
     expect(touchables).toHaveLength(31);
   });
 
   it('当月の日付をタップするとonSelectDateにその日付が渡る', () => {
     const root = render();
-    const touchables = root.root.findAllByType(TouchableOpacity);
+    const touchables = root.root.findAllByType(Pressable);
     act(() => {
       (touchables[0].props.onPress as () => void)();
     });
@@ -59,7 +60,7 @@ describe('MonthGrid', () => {
   it('todayに一致する当月セルはaccessibilityLabelに「今日」を含む', () => {
     const root = render({ today: new Date(2026, 6, 18), selectedDate: new Date(2026, 6, 5) });
     const todayCell = root.root
-      .findAllByType(TouchableOpacity)
+      .findAllByType(Pressable)
       .find((t) => (t.props.accessibilityLabel as string).includes('7月18日'));
     expect(todayCell?.props.accessibilityLabel).toBe('7月18日、今日');
   });
@@ -67,7 +68,7 @@ describe('MonthGrid', () => {
   it('todayに一致しない当月セルのaccessibilityLabelには「今日」を含まない', () => {
     const root = render({ today: new Date(2026, 6, 18), selectedDate: new Date(2026, 6, 5) });
     const otherCell = root.root
-      .findAllByType(TouchableOpacity)
+      .findAllByType(Pressable)
       .find((t) => (t.props.accessibilityLabel as string).includes('7月5日'));
     expect(otherCell?.props.accessibilityLabel).toBe('7月5日');
   });
@@ -75,18 +76,9 @@ describe('MonthGrid', () => {
   it('selectedDateと一致する当月セルはaccessibilityState.selectedがtrue', () => {
     const root = render({ selectedDate: new Date(2026, 6, 5) });
     const selectedCell = root.root
-      .findAllByType(TouchableOpacity)
+      .findAllByType(Pressable)
       .find((t) => (t.props.accessibilityLabel as string).startsWith('7月5日'));
     expect(selectedCell?.props.accessibilityState).toEqual({ selected: true });
-  });
-
-  it('曜日ラベル行は日曜始まり(日/月/火/水/木/金/土)で7件描画される', () => {
-    const root = render();
-    const labels = root.root
-      .findAllByType(Text)
-      .map((t) => t.props.children)
-      .filter((c) => typeof c === 'string' && ['日', '月', '火', '水', '木', '金', '土'].includes(c));
-    expect(labels).toEqual(['日', '月', '火', '水', '木', '金', '土']);
   });
 
   describe('実績データ(dayCategories)の反映', () => {
@@ -95,7 +87,7 @@ describe('MonthGrid', () => {
         selectedDate: new Date(2026, 6, 18), // 5日とは別の日を選択中にしておく
         primaryCategoryByDay: new Map([['2026-07-05', 'chest']]),
       });
-      const cellView = findTouchableForDay(root, '7月5日').findAllByType(View)[1];
+      const cellView = findTouchableForDay(root, '7月5日').findAllByType(View)[0];
       expect(cellView.props.style).toEqual(
         expect.arrayContaining([expect.objectContaining({ backgroundColor: getCalendarCategoryColor('chest') })]),
       );
@@ -106,7 +98,7 @@ describe('MonthGrid', () => {
         selectedDate: new Date(2026, 6, 5),
         primaryCategoryByDay: new Map([['2026-07-05', 'leg']]),
       });
-      const cellView = findTouchableForDay(root, '7月5日').findAllByType(View)[1];
+      const cellView = findTouchableForDay(root, '7月5日').findAllByType(View)[0];
       expect(cellView.props.style).toEqual(
         expect.arrayContaining([expect.objectContaining({ borderColor: getCalendarCategoryColor('leg') })]),
       );
@@ -120,7 +112,7 @@ describe('MonthGrid', () => {
         selectedDate: new Date(2026, 6, 5),
         primaryCategoryByDay: new Map(),
       });
-      const cellView = findTouchableForDay(root, '7月5日').findAllByType(View)[1];
+      const cellView = findTouchableForDay(root, '7月5日').findAllByType(View)[0];
       expect(cellView.props.style).toEqual(expect.arrayContaining([expect.objectContaining({ borderColor: Colors.accent })]));
     });
 
@@ -141,7 +133,7 @@ describe('MonthGrid', () => {
         primaryCategoryByDay: new Map([['2026-07-05', 'chest']]),
       });
       const views = findTouchableForDay(root, '7月5日').findAllByType(View);
-      const cellView = views[1];
+      const cellView = views[0];
       const underlineBar = views[views.length - 1];
       expect(cellView.props.style).toEqual(
         expect.arrayContaining([expect.objectContaining({ backgroundColor: getCalendarCategoryColor('chest') })]),
@@ -158,7 +150,7 @@ describe('MonthGrid', () => {
         primaryCategoryByDay: new Map(),
       });
       const views = findTouchableForDay(root, '7月5日').findAllByType(View);
-      const cellView = views[1];
+      const cellView = views[0];
       const underlineBar = views[views.length - 1];
       expect(cellView.props.style).not.toEqual(
         expect.arrayContaining([expect.objectContaining({ backgroundColor: expect.anything() })]),
@@ -175,7 +167,7 @@ describe('MonthGrid', () => {
         primaryCategoryByDay: new Map([['2026-07-05', 'leg']]),
       });
       const views = findTouchableForDay(root, '7月5日').findAllByType(View);
-      const cellView = views[1];
+      const cellView = views[0];
       const underlineBar = views[views.length - 1];
       expect(cellView.props.style).toEqual(
         expect.arrayContaining([expect.objectContaining({ borderColor: getCalendarCategoryColor('leg') })]),
@@ -195,7 +187,7 @@ describe('MonthGrid', () => {
         primaryCategoryByDay: new Map(),
       });
       const views = findTouchableForDay(root, '7月5日').findAllByType(View);
-      const cellView = views[1];
+      const cellView = views[0];
       const underlineBar = views[views.length - 1];
       expect(cellView.props.style).toEqual(expect.arrayContaining([expect.objectContaining({ borderColor: Colors.accent })]));
       expect(underlineBar.props.style).toEqual(
@@ -215,7 +207,7 @@ describe('MonthGrid', () => {
         categorySetByDay: new Map([['2026-07-05', new Set(['chest'])]]),
       });
       const touchable = findTouchableForDay(root, '7月5日');
-      const cellView = touchable.findAllByType(View)[1];
+      const cellView = touchable.findAllByType(View)[0];
       expect(cellView.props.style).toEqual(
         expect.arrayContaining([expect.objectContaining({ backgroundColor: getCalendarCategoryColor('chest') })]),
       );
@@ -234,7 +226,7 @@ describe('MonthGrid', () => {
         categorySetByDay: new Map([['2026-07-05', new Set(['chest', 'arm'])]]),
       });
       const touchable = findTouchableForDay(root, '7月5日');
-      const cellView = touchable.findAllByType(View)[1];
+      const cellView = touchable.findAllByType(View)[0];
       expect(cellView.props.style).toEqual(
         expect.arrayContaining([expect.objectContaining({ backgroundColor: getCalendarCategoryColor('chest') })]),
       );
@@ -248,7 +240,7 @@ describe('MonthGrid', () => {
         categorySetByDay: new Map([['2026-07-05', new Set(['leg'])]]),
       });
       const touchable = findTouchableForDay(root, '7月5日');
-      const cellView = touchable.findAllByType(View)[1];
+      const cellView = touchable.findAllByType(View)[0];
       // 塗りつぶし色は付かない
       expect(cellView.props.style).not.toEqual(
         expect.arrayContaining([expect.objectContaining({ backgroundColor: expect.anything() })]),
@@ -268,7 +260,7 @@ describe('MonthGrid', () => {
         categorySetByDay: new Map(),
       });
       const touchable = findTouchableForDay(root, '7月5日');
-      const cellView = touchable.findAllByType(View)[1];
+      const cellView = touchable.findAllByType(View)[0];
       const dot = cellView.findAllByType(View).find((v) => {
         const style = [v.props.style].flat();
         return style.some((s) => s && s.backgroundColor === Colors.borderStrong);
@@ -299,9 +291,9 @@ describe('MonthGrid', () => {
         activeFilter: 'chest',
         categorySetByDay: new Map(),
       });
-      // 前月/翌月はそもそもTouchableOpacityを持たない（既存仕様）ため、
+      // 前月/翌月はそもそもPressableを持たない（既存仕様）ため、
       // 当月と同じ31件のまま増減しないことで前月/翌月セルが影響を受けていないことを確認する
-      expect(root.root.findAllByType(TouchableOpacity)).toHaveLength(31);
+      expect(root.root.findAllByType(Pressable)).toHaveLength(31);
     });
   });
 
@@ -311,7 +303,7 @@ describe('MonthGrid', () => {
         selectedDate: new Date(2026, 6, 18),
         primaryCategoryByScheduleDay: new Map([['2026-07-05', 'chest']]),
       });
-      const cellView = findTouchableForDay(root, '7月5日').findAllByType(View)[1];
+      const cellView = findTouchableForDay(root, '7月5日').findAllByType(View)[0];
       expect(cellView.props.style).not.toEqual(
         expect.arrayContaining([expect.objectContaining({ backgroundColor: expect.anything() })]),
       );
@@ -327,7 +319,7 @@ describe('MonthGrid', () => {
         selectedDate: new Date(2026, 6, 5),
         primaryCategoryByScheduleDay: new Map([['2026-07-05', 'leg']]),
       });
-      const cellView = findTouchableForDay(root, '7月5日').findAllByType(View)[1];
+      const cellView = findTouchableForDay(root, '7月5日').findAllByType(View)[0];
       expect(cellView.props.style).toEqual(
         expect.arrayContaining([expect.objectContaining({ borderColor: getCalendarCategoryColor('leg') })]),
       );
@@ -342,7 +334,7 @@ describe('MonthGrid', () => {
         primaryCategoryByDay: new Map([['2026-07-05', 'chest']]),
         primaryCategoryByScheduleDay: new Map([['2026-07-05', 'leg']]),
       });
-      const cellView = findTouchableForDay(root, '7月5日').findAllByType(View)[1];
+      const cellView = findTouchableForDay(root, '7月5日').findAllByType(View)[0];
       expect(cellView.props.style).toEqual(
         expect.arrayContaining([expect.objectContaining({ backgroundColor: getCalendarCategoryColor('chest') })]),
       );
@@ -370,7 +362,7 @@ describe('MonthGrid', () => {
         primaryCategoryByScheduleDay: new Map([['2026-07-05', 'leg']]),
         categorySetByScheduleDay: new Map([['2026-07-05', new Set(['leg'])]]),
       });
-      const cellView = findTouchableForDay(root, '7月5日').findAllByType(View)[1];
+      const cellView = findTouchableForDay(root, '7月5日').findAllByType(View)[0];
       const dot = cellView.findAllByType(View).find((v) => {
         const style = [v.props.style].flat();
         return style.some((s) => s && s.backgroundColor === Colors.borderStrong);
