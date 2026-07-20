@@ -26,6 +26,8 @@ const Palette = {
   blue50: '#EFF6FF',
   blue600: '#2563EB',
 
+  green300: '#86EFAC',
+
   amber100: '#FEF3C7',
   amber300: '#FCD34D',
   amber500: '#F59E0B',
@@ -65,6 +67,8 @@ export const Colors = {
   accent: Palette.blue600,
   accentSurface: Palette.blue50,
   onAccent: Palette.white,
+  // 再開バナー（ResumeWorkoutBanner）の「進行中」ドット。デザイン案指定の#86EFAC
+  accentLiveDot: Palette.green300,
 
   favorite: Palette.amber500,
 

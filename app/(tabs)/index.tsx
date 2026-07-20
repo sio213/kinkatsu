@@ -6,8 +6,9 @@ import { SessionCard } from '@/components/workout/session-card';
 import { Colors, Typography } from '@/constants/theme';
 import type { WorkoutSession } from '@/db/schema';
 import { useDebouncedPush } from '@/hooks/use-debounced-push';
-import { useSessionStats, useWorkoutSessions } from '@/hooks/use-workout-session';
-import { groupSessionsByDate } from '@/lib/workout/summary';
+import { useTickingNow } from '@/hooks/use-ticking-now';
+import { useResumeWorkoutSummary, useSessionStats, useWorkoutSessions } from '@/hooks/use-workout-session';
+import { formatElapsedClock, groupSessionsByDate } from '@/lib/workout/summary';
 import { Stack, useRouter } from 'expo-router';
 import { useCallback } from 'react';
 import { SectionList, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
@@ -18,6 +19,8 @@ export default function RecordScreen() {
   const pushDebounced = useDebouncedPush();
   const { sessions, activeSession } = useWorkoutSessions();
   const summaryBySession = useSessionStats();
+  const resumeSummary = useResumeWorkoutSummary(activeSession);
+  const now = useTickingNow(activeSession != null);
 
   // 進行中セッションは履歴に出さず、開始/再開ボタンから直接遷移する対象にする
   const endedSessions = sessions.filter((s) => s.endedAt != null);
@@ -74,7 +77,14 @@ export default function RecordScreen() {
         </TouchableOpacity>
 
         {activeSession ? (
-          <ResumeWorkoutBanner onPress={handleStart} />
+          <ResumeWorkoutBanner
+            routineName={resumeSummary.routineName}
+            elapsedLabel={formatElapsedClock(now - activeSession.startedAt)}
+            completedExerciseCount={resumeSummary.completedExerciseCount}
+            totalExerciseCount={resumeSummary.totalExerciseCount}
+            completedSetCount={resumeSummary.completedSetCount}
+            onPress={handleStart}
+          />
         ) : sessions.length === 0 ? (
           <View style={styles.empty}>
             <IconSymbol name="list.bullet.clipboard" size={40} color={Colors.borderStrong} />

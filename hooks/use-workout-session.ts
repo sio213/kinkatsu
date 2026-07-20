@@ -1,6 +1,7 @@
 import { db } from '@/db/client';
 import {
   exercises,
+  routines,
   sets,
   workoutSessionExercises,
   workoutSessions,
@@ -69,6 +70,61 @@ export function useSessionSetCount(sessionId: number): number {
       .where(eq(sets.sessionId, sessionId)),
   );
   return data?.[0]?.count ?? 0;
+}
+
+export type ResumeWorkoutSummary = {
+  completedExerciseCount: number;
+  totalExerciseCount: number;
+  completedSetCount: number;
+  // ルーティンから開始したセッションのみルーティン名。手動開始（routineIdがnull）はnull
+  // （呼び出し側のResumeWorkoutBannerが「トレーニング中」にフォールバックする）
+  routineName: string | null;
+};
+
+// 記録タブ・カレンダー今日パネルの再開バナー(ResumeWorkoutBanner)用。進行中セッション1件分の
+// 「種目数（完了/合計）」「完了セット数」「ルーティン名」をまとめて取得する。種目の完了判定は
+// useAutoCollapseCompletedExercisesと同じ基準（セットが1件以上あり、全セットが✓確定済み）に揃える。
+// sessionId/routineIdは呼び出し側のactiveSession（useWorkoutSessions自身のuseLiveQueryが非同期に
+// 解決する）に由来するため、この関数が最初にマウントされた時点ではまだ-1のプレースホルダーで、
+// 後続のレンダーで初めて実際の値になる。drizzle-orm/expo-sqliteのuseLiveQueryは第2引数dependsに
+// 渡した配列が変化したときだけ内部useEffectを再実行してクエリを張り直す仕様（デフォルトは[]＝
+// マウント時の1回きり）のため、sessionId/routineIdをdependsに渡さないと-1で張ったクエリの
+// ままテーブル書き込みイベント頼みで固定されてしまい、実際のsessionId/routineIdが確定した後も
+// 空データのまま更新されない（実機で再現・特定した不具合）
+export function useResumeWorkoutSummary(session: WorkoutSession | null): ResumeWorkoutSummary {
+  const sessionId = session?.id ?? -1;
+  const routineId = session?.routineId ?? -1;
+
+  const { data: exerciseRows } = useLiveQuery(
+    db
+      .select({
+        sessionExerciseId: workoutSessionExercises.id,
+        totalSets: sql<number>`count(${sets.id})`,
+        completedSets: sql<number>`sum(case when ${sets.completedAt} is not null then 1 else 0 end)`,
+      })
+      .from(workoutSessionExercises)
+      .leftJoin(sets, eq(sets.workoutSessionExerciseId, workoutSessionExercises.id))
+      .where(eq(workoutSessionExercises.sessionId, sessionId))
+      .groupBy(workoutSessionExercises.id),
+    [sessionId],
+  );
+
+  const { data: routineRows } = useLiveQuery(
+    db.select({ name: routines.name }).from(routines).where(eq(routines.id, routineId)).limit(1),
+    [routineId],
+  );
+
+  return useMemo(() => {
+    const rows = exerciseRows ?? [];
+    const completedExerciseCount = rows.filter((r) => r.totalSets > 0 && r.completedSets === r.totalSets).length;
+    const completedSetCount = rows.reduce((sum, r) => sum + r.completedSets, 0);
+    return {
+      completedExerciseCount,
+      totalExerciseCount: rows.length,
+      completedSetCount,
+      routineName: session?.routineId != null ? (routineRows?.[0]?.name ?? null) : null,
+    };
+  }, [exerciseRows, routineRows, session?.routineId]);
 }
 
 // sessionExerciseIdはworkoutSessionExercises行自体のid。同じ種目をセッション内に複数回

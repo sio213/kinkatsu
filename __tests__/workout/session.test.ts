@@ -142,6 +142,9 @@ describe('startWorkoutSession', () => {
     expect(payload.startedAt).toBeLessThanOrEqual(after);
     expect(payload.createdAt).toBe(payload.startedAt);
     expect(payload.updatedAt).toBe(payload.startedAt);
+    // 手動開始はルーティンに紐付かないためroutineIdを書き込まない
+    // （再開バナーが「トレーニング中」にフォールバックする分岐の前提）
+    expect(payload.routineId).toBeUndefined();
     expect(result).toEqual({ id: 1, startedAt: 0, endedAt: null });
   });
 
@@ -164,6 +167,8 @@ describe('createPastWorkoutSession', () => {
     // createdAt/updatedAtは(startedAtとは別に)呼び出し時点の現在時刻を使う
     expect(payload.createdAt).toBe(payload.updatedAt);
     expect(payload.createdAt).not.toBe(pastDate);
+    // 手動での過去記録追加もルーティンに紐付かないためroutineIdを書き込まない
+    expect(payload.routineId).toBeUndefined();
   });
 
   it('insertされた行を返す', async () => {
@@ -700,6 +705,7 @@ describe('startWorkoutFromRoutine', () => {
     expect(result?.sessionId).toBe(55);
     const sessionPayload = mockInsertValues.mock.calls[0][0];
     expect(sessionPayload).toEqual({
+      routineId: 1,
       startedAt: expect.any(Number),
       endedAt: null,
       createdAt: expect.any(Number),
@@ -869,6 +875,7 @@ describe('startPastWorkoutFromRoutine', () => {
     const sessionPayload = mockInsertValues.mock.calls[0][0];
     expect(sessionPayload.startedAt).toBe(pastDate);
     expect(sessionPayload.endedAt).toBe(pastDate);
+    expect(sessionPayload.routineId).toBe(1);
   });
 
   it('該当ルーティンが見つからない場合はnullを返し、セッションも作らない', async () => {

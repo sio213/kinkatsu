@@ -15,6 +15,18 @@ jest.mock('expo-router', () => ({
 
 jest.mock('@/hooks/use-workout-session', () => ({
   useWorkoutSessions: () => mockUseWorkoutSessions(),
+  // 再開バナー(ResumeWorkoutBanner)の表示情報。このテストファイルの関心事(バナーの表示有無・
+  // 遷移先)には影響しない固定値でよいため、常に同じ値を返す軽量スタブにしている
+  useResumeWorkoutSummary: () => ({
+    completedExerciseCount: 0,
+    totalExerciseCount: 0,
+    completedSetCount: 0,
+    routineName: null,
+  }),
+}));
+
+jest.mock('@/hooks/use-ticking-now', () => ({
+  useTickingNow: () => 0,
 }));
 
 jest.mock('@/hooks/use-calendar-day-exercises', () => ({
@@ -78,6 +90,15 @@ function render() {
   return instance.root;
 }
 
+// ResumeWorkoutBannerはカード全体が1つのTouchableOpacityで、accessibilityLabelは
+// 経過時間・ルーティン名・種目数を結合した動的な文言になる（record-tab-screen.test.tsxと同じ理由で
+// 固定文言ではなくボタン内のTextの中身で検索する）
+function findResumeBanner(root: ReactTestInstance) {
+  return root
+    .findAllByType(TouchableOpacity)
+    .find((btn) => btn.findAllByType(Text).some((t) => [t.props.children].flat().join('') === 'トレーニングを再開'));
+}
+
 function findTextByJoinedChildren(root: ReactTestInstance, text: string) {
   return root.findAllByType(Text).find((t) => [t.props.children].flat().join('') === text);
 }
@@ -125,9 +146,7 @@ describe('CalendarScreen 今日・記録なしパネル', () => {
     const root = render();
 
     expect(root.findAllByProps({ children: 'トレーニングを開始' }).length).toBe(0);
-    const resumeBtn = root
-      .findAllByType(TouchableOpacity)
-      .find((t) => t.props.accessibilityLabel === '進行中のトレーニングを再開する')!;
+    const resumeBtn = findResumeBanner(root)!;
     act(() => {
       resumeBtn.props.onPress();
     });
@@ -451,9 +470,7 @@ describe('CalendarScreen 予定（PR9-2: リマインダー由来の未来予定
     mockUseCalendarDaySchedule.mockReturnValue(daySchedule([scheduleCard()]));
     const root = render();
 
-    expect(
-      root.findAllByType(TouchableOpacity).find((t) => t.props.accessibilityLabel === '進行中のトレーニングを再開する'),
-    ).toBeDefined();
+    expect(findResumeBanner(root)).toBeDefined();
     expect(root.findByProps({ children: '胸の日' })).toBeDefined();
   });
 
@@ -1045,9 +1062,7 @@ describe('CalendarScreen 予定（PR9-2: リマインダー由来の未来予定
         mockUseCalendarDayManualSchedule.mockReturnValue([manualCard({ routineName: '進行中と併存する脚の日' })]);
         const root = render();
 
-        expect(
-          root.findAllByType(TouchableOpacity).find((t) => t.props.accessibilityLabel === '進行中のトレーニングを再開する'),
-        ).toBeDefined();
+        expect(findResumeBanner(root)).toBeDefined();
         expect(root.findByProps({ children: '進行中と併存する脚の日' })).toBeDefined();
       });
 
