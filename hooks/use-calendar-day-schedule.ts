@@ -11,7 +11,7 @@ import { useMemo } from 'react';
 export type DayScheduleCard = {
   reminderId: number;
   routineId: number;
-  routineName: string;
+  title: string;
   // 種目数が多い順（既存のuseRoutineExerciseSummaries、ルーティン一覧カードと同じ並び順基準に
   // 揃えている。同じルーティンなのに画面ごとにチップの並びが違って見えることを避けるため）
   categories: string[];
@@ -82,7 +82,7 @@ export function useCalendarDaySchedule(selectedDate: Date): DaySchedule {
       cards.push({
         reminderId: r.id,
         routineId: r.routineId!,
-        routineName,
+        title: routineName,
         categories: summary.categories,
         exerciseCount: summary.exerciseCount,
         hour: r.hour,

@@ -29,7 +29,7 @@ export default function StartRoutinePickerScreen() {
   const { routines } = useRoutines();
   const summaries = useRoutineExerciseSummaries();
   // この画面はstart-chooser経由でのみ到達し、start-chooser自体が「進行中セッションが無い」
-  // ことを呼び出し元で保証した上で開かれる前提のため、useStartRoutineWithConfirmの
+  // ことを呼び出し元で保証した上で開かれる前提のため、useStartWithConfirmの
   // 進行中セッション確認ダイアログは不要（start-chooser.tsxの「自分で選ぶ」と同じ理由）。
   // navigate関数はuseCallbackで安定させ、依存するhandleSelect/RoutinePickerListの
   // メモ化を保つ（@reviewer指摘）

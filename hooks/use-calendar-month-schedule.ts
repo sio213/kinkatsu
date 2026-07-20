@@ -1,5 +1,6 @@
 import { db } from '@/db/client';
 import { reminderScheduleSkips, reminders, scheduledWorkouts } from '@/db/schema';
+import { useCalendarDirectScheduleSummaries } from '@/hooks/use-calendar-direct-schedule-summaries';
 import { useRoutineExerciseSummaries } from '@/hooks/use-routines';
 import {
   aggregateSchedulePrimaryCategoryByDay,
@@ -33,6 +34,7 @@ export type CalendarMonthSchedule = {
 // までJOINして自前集計していたが、この流用に一本化した）
 export function useCalendarMonthSchedule(rangeStart: number, rangeEnd: number, todayStart: number): CalendarMonthSchedule {
   const summaries = useRoutineExerciseSummaries();
+  const directSummaries = useCalendarDirectScheduleSummaries();
 
   const { data: reminderRows } = useLiveQuery(
     db.select().from(reminders).where(and(eq(reminders.enabled, true), isNotNull(reminders.routineId))),
@@ -85,8 +87,10 @@ export function useCalendarMonthSchedule(rangeStart: number, rangeEnd: number, t
       // hooks/use-calendar-day-manual-schedule.tsの選択日パネル側は種目0件のルーティンでも
       // {exerciseCount:0, categories:[]}にフォールバックしてカードを表示するが、こちらは
       // 月グリッドのリング/ドットの「色」を決めるための集計であり、そもそも塗る色が無いため
-      // フォールバックできない（意図した非対称。日パネルには出るが月グリッドには出ない）
-      const category = summaries.get(m.routineId)?.categories[0];
+      // フォールバックできない（意図した非対称。日パネルには出るが月グリッドには出ない）。
+      // 「直接追加」予定（routineIdがnull、2026-07-20）はdirectSummariesから同じ基準で代表カテゴリを取る
+      const category =
+        m.routineId != null ? summaries.get(m.routineId)?.categories[0] : directSummaries.get(m.id)?.categories[0];
       if (category === undefined) continue;
       fireRows.push({ dateKey: m.scheduledDate, hour: m.hour, minute: m.minute, category });
     }
@@ -95,5 +99,5 @@ export function useCalendarMonthSchedule(rangeStart: number, rangeEnd: number, t
       primaryCategoryByScheduleDay: aggregateSchedulePrimaryCategoryByDay(fireRows),
       categorySetByScheduleDay: aggregateDailyCategorySet(fireRows),
     };
-  }, [reminderRows, manualRows, skipRows, summaries, rangeStart, rangeEnd, todayStart]);
+  }, [reminderRows, manualRows, skipRows, summaries, directSummaries, rangeStart, rangeEnd, todayStart]);
 }

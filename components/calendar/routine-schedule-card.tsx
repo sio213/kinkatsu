@@ -10,13 +10,23 @@ import { memo } from 'react';
 import { StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 
 type Props = {
-  routineName: string;
+  // ルーティン予定はルーティン名、「直接追加」予定（ルーティンを介さず個別に選んだ種目、
+  // 2026-07-20）はformatDirectScheduleTitleで合成した種目名
+  title: string;
   categories: string[];
   exerciseCount: number;
   // 「毎週 日曜 07:00」（lib/notifications/format.tsのformatKindSummary）または
   // 今日自身の予定なら「今日 07:00」。呼び出し側(app/(tabs)/calendar.tsx)が組み立てて渡す
   timeLabel: string;
-  onPress: () => void;
+  // 直接予定（routineId===null）のときだけ呼び出し側が渡す（ルーティン予定・リマインダー予定は
+  // undefined）。存在自体を「ルーティンではなく直接予定」の判定に使い先頭にダンベルアイコンを
+  // 出す（タップしても反応しないカードだと事前に伝える、@designer指摘）。2種目以上のときは
+  // titleが「先頭の種目名 他N種目」に圧縮されているため、ここから全種目名も表示する
+  // （1種目のときはtitleと重複するため名前一覧は出さずアイコンのみ、2026-07-20）
+  exerciseNames?: string[];
+  // 直接予定（2026-07-20）には対応する編集画面が無いため、その場合は呼び出し側がonPress自体を
+  // 渡さない。undefinedのときはカード全体をタップ領域にせず、⋮メニュー（渡っていれば）のみ操作可能にする
+  onPress?: () => void;
   // 今日自身の予定カードにのみ渡す（デザイン案「未来日は開始ボタンなし・＞のみ」）
   onPressStart?: () => void;
   // 手動で追加した単発予定（PR10）を表す場合true。timeLabelがリマインダーの頻度表示
@@ -57,16 +67,18 @@ function replaceMenuItems(onReplace: () => void): DropdownMenuItem[] {
 // （top行にname+menuSlot(marginLeft:'auto'で右寄せ)、カード全体がタップ領域なのでchevronは不要、
 // ユーザー指示で統一）
 export const RoutineScheduleCard = memo(function RoutineScheduleCard({
-  routineName,
+  title,
   categories,
   exerciseCount,
   timeLabel,
+  exerciseNames,
   onPress,
   onPressStart,
   oneTime = false,
   onDelete,
   onReplace,
 }: Props) {
+  const isDirect = exerciseNames !== undefined;
   // onDelete(手動予定・リマインダー予定共通)・onReplace(リマインダー予定のみ)は同じメニュー内に
   // 区切り線で分けた別グループとして並べて出す(@designer方針)。onReplaceは手動予定には渡らない。
   // 破壊的操作の「削除」はroutine-card-menu.tsx/exercise-card-menu.tsxと同じく必ず最後尾に置く
@@ -79,7 +91,8 @@ export const RoutineScheduleCard = memo(function RoutineScheduleCard({
   // 読み上げ単位をまとめる。カレンダー/一覧のどちらでルーティンを見てもVoiceOver体験が
   // 揃うようにする（@designer指摘）
   const label = [
-    routineName,
+    isDirect ? '直接追加の予定' : null,
+    title,
     categories.length > 0 ? categories.map(getCategoryLabel).join('・') : null,
     `${exerciseCount}種目`,
     timeLabel,
@@ -91,8 +104,11 @@ export const RoutineScheduleCard = memo(function RoutineScheduleCard({
   const inner = (
     <>
       <View style={styles.top}>
+        {isDirect && (
+          <IconSymbol name="dumbbell.fill" size={14} color={Colors.textPlaceholder} style={styles.directIcon} />
+        )}
         <Text style={styles.name} numberOfLines={1}>
-          {routineName}
+          {title}
         </Text>
         {menuGroups && (
           <View style={styles.menuSlot}>
@@ -107,9 +123,9 @@ export const RoutineScheduleCard = memo(function RoutineScheduleCard({
                   onPress={onOpenMenu}
                   hitSlop={{ top: 14, bottom: 14, left: 14, right: 14 }}
                   accessibilityRole="button"
-                  // routineNameだけだと、同じルーティンを同日に複数回スケジュールした場合
+                  // titleだけだと、同じルーティン/種目構成を同日に複数回スケジュールした場合
                   // ラベルが重複し区別できないため、timeLabelも含めて一意にする（PRレビュー指摘対応）
-                  accessibilityLabel={`「${routineName}」${timeLabel}のメニューを開く`}
+                  accessibilityLabel={`「${title}」${timeLabel}のメニューを開く`}
                   accessibilityState={{ expanded: open }}
                 >
                   <IconSymbol name="ellipsis" size={20} color={open ? Colors.accent : Colors.textPlaceholder} />
@@ -126,6 +142,11 @@ export const RoutineScheduleCard = memo(function RoutineScheduleCard({
         {overflowCount > 0 && <Text style={styles.overflow}>{`+${overflowCount}`}</Text>}
         <Text style={styles.countText}>{`${exerciseCount}種目`}</Text>
       </View>
+      {exerciseNames && exerciseNames.length > 1 && (
+        // titleは「先頭の種目名 他N種目」に圧縮済みのため、選んだ種目の全容をここで補う
+        // （タップしても詳細画面が無いため、これが確認できる唯一の場所、@designer指摘）
+        <Text style={styles.exerciseNamesText}>{exerciseNames.join('、')}</Text>
+      )}
       <View style={styles.timeBadge}>
         <DesignIcon name="calendar-today" size={15} color={Colors.accent} />
         <Text style={styles.timeText}>{timeLabel}</Text>
@@ -134,33 +155,12 @@ export const RoutineScheduleCard = memo(function RoutineScheduleCard({
     </>
   );
 
-  if (onPressStart) {
-    // 今日自身の予定: カード行＋開始ボタンを1つの枠で囲む（デザイン案「今日01」）
-    return (
-      <View style={styles.wrapperWithButton}>
-        <TouchableOpacity
-          style={styles.content}
-          onPress={onPress}
-          accessibilityRole="button"
-          accessibilityLabel={label}
-          accessibilityHint="タップして編集画面を開きます"
-        >
-          {inner}
-        </TouchableOpacity>
-        <PrimaryButton
-          label="開始"
-          icon={<IconSymbol name="play.fill" size={16} color={Colors.onAccent} />}
-          onPress={onPressStart}
-          accessibilityLabel={`「${routineName}」のトレーニングを開始`}
-        />
-      </View>
-    );
-  }
-
-  // 他日の予定: カード全体がそのままタップ領域（デザイン案「未来01/未来03」、開始ボタン無し）
-  return (
+  // 直接予定（2026-07-20）にはonPress（編集画面への遷移）が無いため、その場合はTouchableOpacityでは
+  // なくViewにする（タップしても何も起きない要素に見せかけない）。子要素（名前・カテゴリ等の各Text、
+  // ⋮メニューがあればそちらのTouchableOpacity）は個別にVoiceOverで読み上げ可能なまま残る
+  const row = onPress ? (
     <TouchableOpacity
-      style={styles.card}
+      style={onPressStart ? styles.content : styles.card}
       onPress={onPress}
       accessibilityRole="button"
       accessibilityLabel={label}
@@ -168,7 +168,27 @@ export const RoutineScheduleCard = memo(function RoutineScheduleCard({
     >
       {inner}
     </TouchableOpacity>
+  ) : (
+    <View style={onPressStart ? styles.content : styles.card}>{inner}</View>
   );
+
+  if (onPressStart) {
+    // 今日自身の予定: カード行＋開始ボタンを1つの枠で囲む（デザイン案「今日01」）
+    return (
+      <View style={styles.wrapperWithButton}>
+        {row}
+        <PrimaryButton
+          label="開始"
+          icon={<IconSymbol name="play.fill" size={16} color={Colors.onAccent} />}
+          onPress={onPressStart}
+          accessibilityLabel={`「${title}」のトレーニングを開始`}
+        />
+      </View>
+    );
+  }
+
+  // 他日の予定: カード全体がそのままタップ領域（デザイン案「未来01/未来03」、開始ボタン無し）
+  return row;
 });
 
 const styles = StyleSheet.create({
@@ -190,11 +210,13 @@ const styles = StyleSheet.create({
   },
   content: { gap: 10 },
   top: { flexDirection: 'row', alignItems: 'center', gap: 8 },
+  directIcon: { marginRight: -2 },
   name: { ...Typography.bodyStrong, color: Colors.textPrimary, flexShrink: 1 },
   menuSlot: { marginLeft: 'auto' },
   chipsRow: { flexDirection: 'row', alignItems: 'center', gap: 7, flexWrap: 'wrap' },
   overflow: { ...Typography.caption, fontWeight: '700', color: Colors.textPlaceholder },
   countText: { ...Typography.caption, color: Colors.textMuted, fontWeight: '600' },
+  exerciseNamesText: { ...Typography.footnote, color: Colors.textMuted },
   timeBadge: {
     flexDirection: 'row',
     alignItems: 'center',

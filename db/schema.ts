@@ -248,9 +248,11 @@ export const scheduledWorkouts = sqliteTable(
   'scheduled_workouts',
   {
     id: integer('id').primaryKey({ autoIncrement: true }),
-    routineId: integer('routine_id')
-      .notNull()
-      .references(() => routines.id, { onDelete: 'cascade' }),
+    // ルーティンから追加した予定のみ設定。個別に種目を選んで追加した予定（「直接追加」、
+    // 2026-07-20）はnullのまま——中身はscheduledWorkoutExercisesに持つ。routineId有無の
+    // 二値がそのまま「ルーティン予定か直接予定か」の判定になる（workoutSessions.routineIdと
+    // 同じ設計方針）
+    routineId: integer('routine_id').references(() => routines.id, { onDelete: 'cascade' }),
     // カレンダーのtoDateKey(lib/calendar/date-grid.ts)と同じ'YYYY-MM-DD'形式。月表示グリッドとの
     // 突合・範囲検索が文字列比較のみで完結し、epoch msで持つ場合に発生しうるタイムゾーンずれの
     // 心配が要らないため（この行が表すのは「特定の瞬間」ではなく「カレンダー上の1日」）
@@ -268,6 +270,31 @@ export const scheduledWorkouts = sqliteTable(
 
 export type ScheduledWorkout = typeof scheduledWorkouts.$inferSelect;
 export type NewScheduledWorkout = typeof scheduledWorkouts.$inferInsert;
+
+// 「直接追加」（ルーティンを介さず個別に選んだ種目で予定を作る、2026-07-20）の中身。
+// routineExercises/workoutSessionExercisesと同じ形（セットとは独立、並び順を保持）。
+// 目標セット値は持たない（ルーティンの目標セットに相当する概念が無いため、実施時は
+// 種目ごとの前回記録から自動プリフィルする、startWorkoutFromScheduledExercises参照）
+export const scheduledWorkoutExercises = sqliteTable(
+  'scheduled_workout_exercises',
+  {
+    id: integer('id').primaryKey({ autoIncrement: true }),
+    scheduledWorkoutId: integer('scheduled_workout_id')
+      .notNull()
+      .references(() => scheduledWorkouts.id, { onDelete: 'cascade' }),
+    exerciseId: integer('exercise_id')
+      .notNull()
+      .references(() => exercises.id, { onDelete: 'restrict' }),
+    orderIndex: integer('order_index').notNull(),
+    createdAt: integer('created_at').notNull(),
+  },
+  (t) => ({
+    bySchedule: index('idx_swe_schedule').on(t.scheduledWorkoutId),
+  }),
+);
+
+export type ScheduledWorkoutExercise = typeof scheduledWorkoutExercises.$inferSelect;
+export type NewScheduledWorkoutExercise = typeof scheduledWorkoutExercises.$inferInsert;
 
 // リマインダー由来の予定を「特定の1日だけ」打ち消す記録（PR10-6）。リマインダーの繰り返し設定
 // 自体（reminders行）は変更せず、「このreminderIdはこの日だけ発火させない」という除外を

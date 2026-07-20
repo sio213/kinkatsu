@@ -6,10 +6,11 @@ import { Colors, Typography } from '@/constants/theme';
 import type { Routine } from '@/db/schema';
 import { useDebouncedPush } from '@/hooks/use-debounced-push';
 import { useRoutineExerciseSummaries, useRoutineReminders, useRoutines } from '@/hooks/use-routines';
-import { useStartRoutineWithConfirm } from '@/hooks/use-start-routine-with-confirm';
+import { useStartWithConfirm } from '@/hooks/use-start-with-confirm';
 import { useWorkoutSessions } from '@/hooks/use-workout-session';
 import { useRoutineDraftStore } from '@/lib/routines/draft-store';
 import { getRoutineScheduleDisplay } from '@/lib/routines/format';
+import { startWorkoutFromRoutine } from '@/lib/workout/session';
 import { Stack } from 'expo-router';
 import { useCallback, useRef } from 'react';
 import { Alert, FlatList, StyleSheet, Text, View } from 'react-native';
@@ -22,7 +23,11 @@ export default function RoutineListScreen() {
   const { activeSession } = useWorkoutSessions();
   const pushDebounced = useDebouncedPush();
   const resetDraft = useRoutineDraftStore((state) => state.reset);
-  const startRoutine = useStartRoutineWithConfirm(activeSession, (sessionId) => pushDebounced(`/workout/${sessionId}`));
+  const startRoutine = useStartWithConfirm(
+    activeSession,
+    (sessionId) => pushDebounced(`/workout/${sessionId}`),
+    startWorkoutFromRoutine,
+  );
 
   const handleCreate = useCallback(() => {
     // app/routine/new.tsx自身のマウント時resetに加えてここでも空にしておくことで、
@@ -40,7 +45,7 @@ export default function RoutineListScreen() {
   );
 
   // カードの「開始」ボタン専用の処理（カード本体タップは編集画面へ、@designerレビュー）。
-  // 進行中セッションがある場合の確認ダイアログを含むロジックはuseStartRoutineWithConfirmに
+  // 進行中セッションがある場合の確認ダイアログを含むロジックはuseStartWithConfirmに
   // 共通化してある（カレンダー選択日パネルの予定カード「開始」ボタンと挙動が同一のため）
   const handleStartWorkout = useCallback(
     (routine: Routine) => startRoutine(routine.id, routine.name),
