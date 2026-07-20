@@ -1,8 +1,16 @@
 import { db, type DbOrTx, type Tx } from '@/db/client';
-import { scheduledWorkoutExercises, scheduledWorkoutSets } from '@/db/schema';
+import { scheduledWorkoutExercises, scheduledWorkoutSets, scheduledWorkouts } from '@/db/schema';
 import { buildInitialRoutineSets } from '@/lib/routines/db';
 import { hasAnyValue, type PreviousSetValues } from '@/lib/workout/set-values';
 import { desc, eq } from 'drizzle-orm';
+
+// 種目一覧を変える操作（追加・削除・入れ替え・並び替え）ではscheduledWorkouts.updatedAtも
+// 更新する。個々のセット値編集（400msデバウンスの自動保存、addScheduledWorkoutSet等）は
+// 呼び出し頻度が高く、そのたびにscheduledWorkoutIdを引き直してまでupdatedAtを更新する
+// 価値は無い（現状updatedAtを読むコードも無い、@reviewer指摘）ため対象外にする
+async function touchScheduledWorkout(tx: Tx, scheduledWorkoutId: number, now: number): Promise<void> {
+  await tx.update(scheduledWorkouts).set({ updatedAt: now }).where(eq(scheduledWorkouts.id, scheduledWorkoutId));
+}
 
 // カレンダーの「直接追加」予定の種目一覧をまとめて編集する画面（app/calendar/schedule-workout-edit.tsx、
 // 2026-07-20）用。ルーティンの下書きストア(useRoutineDraftStore)と違い、この予定は既にDBに永続化
@@ -61,6 +69,7 @@ export async function addExercisesToScheduledWorkout(scheduledWorkoutId: number,
       )
       .returning();
     await insertInitialScheduledWorkoutSets(tx, inserted, now);
+    await touchScheduledWorkout(tx, scheduledWorkoutId, now);
   });
 }
 
@@ -82,6 +91,7 @@ export async function removeScheduledWorkoutExercise(scheduledWorkoutExerciseId:
     if (siblings.length <= 1) throw new Error('cannot remove the last exercise from a scheduled workout');
 
     await tx.delete(scheduledWorkoutExercises).where(eq(scheduledWorkoutExercises.id, scheduledWorkoutExerciseId));
+    await touchScheduledWorkout(tx, row.scheduledWorkoutId, Date.now());
   });
 }
 
@@ -93,6 +103,12 @@ export async function replaceScheduledWorkoutExercise(scheduledWorkoutExerciseId
   const now = Date.now();
   const newSets = await buildInitialRoutineSets(newExerciseId);
   await db.transaction(async (tx) => {
+    const [row] = await tx
+      .select({ scheduledWorkoutId: scheduledWorkoutExercises.scheduledWorkoutId })
+      .from(scheduledWorkoutExercises)
+      .where(eq(scheduledWorkoutExercises.id, scheduledWorkoutExerciseId));
+    if (!row) return;
+
     await tx
       .update(scheduledWorkoutExercises)
       .set({ exerciseId: newExerciseId })
@@ -109,6 +125,7 @@ export async function replaceScheduledWorkoutExercise(scheduledWorkoutExerciseId
         createdAt: now,
       })),
     );
+    await touchScheduledWorkout(tx, row.scheduledWorkoutId, now);
   });
 }
 
@@ -133,6 +150,7 @@ export async function moveScheduledWorkoutExercise(
   await db.transaction(async (tx) => {
     await tx.update(scheduledWorkoutExercises).set({ orderIndex: target.orderIndex }).where(eq(scheduledWorkoutExercises.id, current.id));
     await tx.update(scheduledWorkoutExercises).set({ orderIndex: current.orderIndex }).where(eq(scheduledWorkoutExercises.id, target.id));
+    await touchScheduledWorkout(tx, scheduledWorkoutId, Date.now());
   });
 }
 

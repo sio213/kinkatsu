@@ -1,12 +1,18 @@
-import {
-  ScheduledWorkoutExerciseCard,
-} from '@/components/calendar/scheduled-workout-exercise-card';
+import { RoutineAddExerciseButton } from '@/components/routines/routine-add-exercise-button';
+import { ScheduledWorkoutExerciseCard } from '@/components/calendar/scheduled-workout-exercise-card';
 import { HeaderMenu, type DropdownMenuItem } from '@/components/ui/dropdown-menu';
+import { HeaderTitle } from '@/components/ui/header-title';
 import { PrimaryButton } from '@/components/ui/primary-button';
 import { Colors } from '@/constants/theme';
 import { useDebouncedPush } from '@/hooks/use-debounced-push';
+import { useKeyboardInset } from '@/hooks/use-keyboard-inset';
+import { useScheduledWorkoutTime } from '@/hooks/use-scheduled-workout';
 import { useScheduledWorkoutExercises } from '@/hooks/use-scheduled-workout-exercises';
+import { parseDateKey } from '@/lib/calendar/date-grid';
+import { formatHourMinuteParts } from '@/lib/calendar/time-of-day';
 import { moveScheduledWorkoutExercise, removeScheduledWorkoutExercise } from '@/lib/calendar/scheduled-workout-detail';
+import { hasAnyValue } from '@/lib/workout/set-values';
+import { formatSessionDateGroup } from '@/lib/workout/summary';
 import { Stack, useLocalSearchParams, useRouter } from 'expo-router';
 import { useCallback } from 'react';
 import { Alert, ScrollView, StyleSheet, View } from 'react-native';
@@ -24,7 +30,15 @@ export default function ScheduleWorkoutEditScreen() {
   const scheduledWorkoutId = Number(scheduledWorkoutIdParam);
   const router = useRouter();
   const pushDebounced = useDebouncedPush();
+  const keyboardInset = useKeyboardInset();
   const exercises = useScheduledWorkoutExercises(scheduledWorkoutId);
+  const scheduledTime = useScheduledWorkoutTime(scheduledWorkoutId);
+
+  // 選択日パネルでは見えていた対象日・時刻を、この画面のヘッダーにも表示する。同日に複数の
+  // 直接予定があるとき、どの予定を編集しているか見失わないようにする（@designer指摘）
+  const dateLabel = scheduledTime
+    ? `${formatSessionDateGroup(parseDateKey(scheduledTime.scheduledDate).getTime())} ${formatHourMinuteParts(scheduledTime.hour, scheduledTime.minute)}`
+    : undefined;
 
   const handleAddExercise = useCallback(() => {
     pushDebounced({
@@ -84,11 +98,16 @@ export default function ScheduleWorkoutEditScreen() {
     <SafeAreaView style={styles.safe} edges={['bottom']}>
       <Stack.Screen
         options={{
-          title: '種目を編集',
+          headerTitle: () => <HeaderTitle title="種目を編集" subtitle={dateLabel} />,
           headerRight: () => <HeaderMenu groups={[menuItems]} accessibilityLabel="種目編集のメニューを開く" />,
         }}
       />
-      <ScrollView contentContainerStyle={styles.content}>
+      <ScrollView
+        contentContainerStyle={styles.content}
+        contentInset={{ bottom: keyboardInset }}
+        scrollIndicatorInsets={{ bottom: keyboardInset }}
+        keyboardShouldPersistTaps="handled"
+      >
         <View style={styles.list}>
           {exercises.map((exercise, index) => (
             <ScheduledWorkoutExerciseCard
@@ -96,12 +115,13 @@ export default function ScheduleWorkoutEditScreen() {
               exercise={exercise}
               isFirst={index === 0}
               isLast={index === exercises.length - 1}
+              isOnlyExercise={exercises.length === 1}
               onSwap={() =>
                 handleSwap(
                   exercise.scheduledWorkoutExerciseId,
                   exercise.exerciseId,
                   exercise.name,
-                  exercise.sets.some((s) => s.weight != null || s.reps != null || s.durationSeconds != null || s.distanceMeters != null),
+                  exercise.sets.some(hasAnyValue),
                 )
               }
               onDelete={() => handleDelete(exercise.scheduledWorkoutExerciseId)}
@@ -109,6 +129,7 @@ export default function ScheduleWorkoutEditScreen() {
               onMoveDown={() => handleMove(exercise.scheduledWorkoutExerciseId, 'down')}
             />
           ))}
+          <RoutineAddExerciseButton variant="ghost" onPress={handleAddExercise} />
         </View>
       </ScrollView>
       <View style={styles.footer}>

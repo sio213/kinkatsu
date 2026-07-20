@@ -209,8 +209,9 @@ export default function RootLayout() {
           <Stack.Screen name="calendar/schedule-routine-picker" options={{ title: '' }} />
           <Stack.Screen name="calendar/schedule-time-picker" options={{ title: '' }} />
           {/* 直接予定の種目一覧・目標セットをまとめて編集する画面（2026-07-20新設）。
-              routine/exercise-edit・exercise-picker・exercise-swapのカレンダー版 */}
-          <Stack.Screen name="calendar/schedule-workout-edit" options={{ title: '種目を編集' }} />
+              routine/exercise-edit・exercise-picker・exercise-swapのカレンダー版。
+              対象日時をヘッダーに動的表示するため、画面側でStack.Screen optionsを上書きする */}
+          <Stack.Screen name="calendar/schedule-workout-edit" options={{ title: '' }} />
           <Stack.Screen name="calendar/schedule-workout-add-exercise" options={{ title: '種目を追加' }} />
           <Stack.Screen name="calendar/schedule-workout-exercise-swap" options={{ title: '種目を入れ替え' }} />
           <Stack.Screen

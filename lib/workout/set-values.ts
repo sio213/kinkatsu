@@ -17,7 +17,9 @@ export type PreviousSetValues = {
 // 全カラムnullの行を返しうる（「セット追加」だけ押されて未入力のまま終わった等）。
 // そのような行は「前回入力した値」として意味を持たないため、コピー元から除外する
 // （除外しないと新しいカードに余分な空行が増えたり、値の無い行が背景色だけゴースト表示される
-// ＝中身が空なのに「前回の値がある」ように見える、という2つの問題が起きる）
-export function hasAnyValue(s: PreviousSetValues): boolean {
+// ＝中身が空なのに「前回の値がある」ように見える、という2つの問題が起きる）。
+// 引数はPreviousSetValuesのsetNumberを持たない形（scheduledWorkoutExercises等、setNumber
+// フィールドが無いオブジェクト）でも呼べるよう4カラムのPickだけを要求する（@reviewer指摘、2026-07-20）
+export function hasAnyValue(s: Pick<PreviousSetValues, 'weight' | 'reps' | 'durationSeconds' | 'distanceMeters'>): boolean {
   return s.weight != null || s.reps != null || s.durationSeconds != null || s.distanceMeters != null;
 }

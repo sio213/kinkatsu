@@ -61,6 +61,7 @@ jest.mock('@/db/schema', () => ({
     orderIndex: 'orderIndex',
   },
   scheduledWorkoutSets: { id: 'id', scheduledWorkoutExerciseId: 'scheduledWorkoutExerciseId', setNumber: 'setNumber' },
+  scheduledWorkouts: { id: 'id', updatedAt: 'updatedAt' },
 }));
 
 jest.mock('drizzle-orm', () => ({
@@ -155,14 +156,24 @@ describe('removeScheduledWorkoutExercise', () => {
 
 describe('replaceScheduledWorkoutExercise', () => {
   it('exerciseIdを更新し、既存の目標セットを削除してから新しい種目の直近実績をプリフィルする', async () => {
+    mockSelectWhere.mockResolvedValueOnce([{ scheduledWorkoutId: 1 }]); // 対象行のscheduledWorkoutId検索
     mockBuildInitialRoutineSets.mockResolvedValueOnce([{ weight: 40, reps: 12, durationSeconds: null, distanceMeters: null }]);
 
     await replaceScheduledWorkoutExercise(100, 55);
 
-    expect(mockUpdateWhere).toHaveBeenCalledTimes(1);
+    // exerciseId更新 + 予定のupdatedAt更新で2回
+    expect(mockUpdateWhere).toHaveBeenCalledTimes(2);
     expect(mockDeleteWhere).toHaveBeenCalledTimes(1);
     const [, setsValues] = mockInsertValues.mock.calls[0];
     expect(setsValues).toEqual([expect.objectContaining({ scheduledWorkoutExerciseId: 100, weight: 40, reps: 12, setNumber: 1 })]);
+  });
+
+  it('対象行が既に存在しない場合は何もしない（安全網）', async () => {
+    mockSelectWhere.mockResolvedValueOnce([]);
+    await replaceScheduledWorkoutExercise(999, 55);
+    expect(mockUpdateWhere).not.toHaveBeenCalled();
+    expect(mockDeleteWhere).not.toHaveBeenCalled();
+    expect(mockInsertValues).not.toHaveBeenCalled();
   });
 });
 
@@ -173,7 +184,8 @@ describe('moveScheduledWorkoutExercise', () => {
       { id: 101, orderIndex: 1 },
     ]);
     await moveScheduledWorkoutExercise(1, 101, 'up');
-    expect(mockUpdateWhere).toHaveBeenCalledTimes(2);
+    // orderIndexの入れ替え2回 + 予定のupdatedAt更新1回
+    expect(mockUpdateWhere).toHaveBeenCalledTimes(3);
   });
 
   it('先頭の種目を上へ移動しようとした場合は何もしない', async () => {

@@ -986,6 +986,39 @@ describe('startWorkoutFromScheduledWorkout', () => {
       expect.objectContaining({ sessionId: 62, exerciseId: 10, weight: 70, reps: 5, completedAt: null }),
     ]);
   });
+
+  it('複数種目が混在する場合、種目ごとに個別判定する（一部だけ目標セット設定済み、他は前回記録にフォールバック。@tester指摘: カード対応のズレ回帰防止）', async () => {
+    mockSelectWhere
+      .mockResolvedValueOnce([
+        { exerciseId: 10, scheduledWorkoutExerciseId: 900 }, // 目標セット未設定
+        { exerciseId: 20, scheduledWorkoutExerciseId: 901 }, // 目標セット設定済み
+      ])
+      .mockResolvedValueOnce([]);
+    mockGetScheduledWorkoutSetsForExercise
+      .mockResolvedValueOnce([]) // exercise 10
+      .mockResolvedValueOnce([{ setNumber: 1, weight: 70, reps: 5, durationSeconds: null, distanceMeters: null }]); // exercise 20
+    mockGetPreviousSets.mockResolvedValueOnce([
+      { setNumber: 1, weight: 40, reps: 12, durationSeconds: null, distanceMeters: null },
+    ]);
+    mockReturning
+      .mockResolvedValueOnce([{ id: 63, startedAt: 0, endedAt: null }])
+      .mockResolvedValueOnce([
+        { id: 302, exerciseId: 10 },
+        { id: 303, exerciseId: 20 },
+      ]);
+    mockSetsReturning.mockResolvedValueOnce([{ id: 902 }, { id: 903 }]);
+
+    await startWorkoutFromScheduledWorkout(5);
+
+    // exercise 10だけ前回記録を参照し、exercise 20は参照しない（取り違え防止）
+    expect(mockGetPreviousSets).toHaveBeenCalledWith(expect.anything(), 10, 63);
+    expect(mockGetPreviousSets).not.toHaveBeenCalledWith(expect.anything(), 20, 63);
+    const setsPayload = mockSetsInsertValues.mock.calls[0][0];
+    expect(setsPayload).toEqual([
+      expect.objectContaining({ exerciseId: 10, weight: 40, reps: 12 }),
+      expect.objectContaining({ exerciseId: 20, weight: 70, reps: 5 }),
+    ]);
+  });
 });
 
 // トレーニング中画面ヘッダー⋮「ルーティンから読み込む」用。startWorkoutFromRoutineと違い

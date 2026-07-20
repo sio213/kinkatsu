@@ -2,6 +2,7 @@ const mockBack = jest.fn();
 const mockPush = jest.fn();
 const mockUseLocalSearchParams = jest.fn();
 const mockUseScheduledWorkoutExercises = jest.fn();
+const mockUseScheduledWorkoutTime = jest.fn();
 const mockRemoveScheduledWorkoutExercise = jest.fn();
 const mockMoveScheduledWorkoutExercise = jest.fn();
 const mockAddScheduledWorkoutSet = jest.fn();
@@ -24,6 +25,10 @@ jest.mock('@/hooks/use-debounced-push', () => ({
 
 jest.mock('@/hooks/use-scheduled-workout-exercises', () => ({
   useScheduledWorkoutExercises: (...args: unknown[]) => mockUseScheduledWorkoutExercises(...args),
+}));
+
+jest.mock('@/hooks/use-scheduled-workout', () => ({
+  useScheduledWorkoutTime: (...args: unknown[]) => mockUseScheduledWorkoutTime(...args),
 }));
 
 jest.mock('@/lib/calendar/scheduled-workout-detail', () => ({
@@ -92,6 +97,7 @@ beforeEach(() => {
   jest.clearAllMocks();
   mockUseLocalSearchParams.mockReturnValue({ scheduledWorkoutId: '5' });
   mockUseScheduledWorkoutExercises.mockReturnValue([benchExercise(), squatExercise()]);
+  mockUseScheduledWorkoutTime.mockReturnValue({ scheduledDate: '2026-07-21', hour: 19, minute: 30 });
   jest.spyOn(Alert, 'alert').mockImplementation(() => {});
 });
 
