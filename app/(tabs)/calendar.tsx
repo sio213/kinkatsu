@@ -29,7 +29,7 @@ import { skipReminderOccurrence, unskipReminderOccurrence } from '@/lib/notifica
 import { removeScheduledWorkout } from '@/lib/notifications/scheduled-workout-scheduler';
 import { formatMonthGroup, formatSessionDateGroup } from '@/lib/workout/summary';
 import { Stack } from 'expo-router';
-import { useCallback, useMemo, useRef, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { ActivityIndicator, Alert, ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
@@ -169,15 +169,43 @@ export default function CalendarScreen() {
 
   // SwipeableMonthViewは前月/当月/翌月の3ヶ月分を同時に描画するため、実績データも
   // その3ヶ月分をまとめて1回のクエリで取得する（月ごとに3クエリ張るとスワイプ時に
-  // 無駄な再購読が増えるため）
-  const { rangeStart, rangeEnd } = useMemo(() => {
+  // 無駄な再購読が増えるため）。この「必要な範囲」自体は毎回viewedに合わせて再センタリングするが、
+  // 実際にクエリへ渡すrangeStart/rangeEndは下のcachedRange（バッファ込みで広めに確保し、
+  // 範囲内のスワイプでは動かさない）を使う
+  const neededRange = useMemo(() => {
     const start = addMonths(viewed.year, viewed.month, -1);
     const endExclusive = addMonths(viewed.year, viewed.month, 2);
     return {
-      rangeStart: new Date(start.year, start.month, 1).getTime(),
-      rangeEnd: new Date(endExclusive.year, endExclusive.month, 1).getTime(),
+      start: new Date(start.year, start.month, 1).getTime(),
+      end: new Date(endExclusive.year, endExclusive.month, 1).getTime(),
     };
   }, [viewed.year, viewed.month]);
+  // 月送りのたびにrangeStart/rangeEndを再センタリングしていると、useLiveQueryのdepsが毎回変わり
+  // 新しい範囲のフェッチが完了するまでの間、着地した月のprimaryCategoryByDayが空(または前の範囲の
+  // まま)になる。実績が多い月ほど「塗りつぶしが一瞬消えてから遅れて浮き出る」形で日付の見た目が
+  // ちらついて見えていた（実機の画面録画で確認済み）。バッファ分だけ広く取ったcachedRangeを
+  // 「必要な範囲がはみ出た時だけ」拡張することで、そのバッファ内のスワイプ往復ではdeps自体が
+  // 変わらず再フェッチが起きないようにする
+  const RANGE_BUFFER_MONTHS = 3;
+  const [cachedRange, setCachedRange] = useState(() => {
+    const start = addMonths(viewed.year, viewed.month, -1 - RANGE_BUFFER_MONTHS);
+    const endExclusive = addMonths(viewed.year, viewed.month, 2 + RANGE_BUFFER_MONTHS);
+    return {
+      start: new Date(start.year, start.month, 1).getTime(),
+      end: new Date(endExclusive.year, endExclusive.month, 1).getTime(),
+    };
+  });
+  useEffect(() => {
+    if (neededRange.start >= cachedRange.start && neededRange.end <= cachedRange.end) return;
+    const start = addMonths(viewed.year, viewed.month, -1 - RANGE_BUFFER_MONTHS);
+    const endExclusive = addMonths(viewed.year, viewed.month, 2 + RANGE_BUFFER_MONTHS);
+    setCachedRange({
+      start: new Date(start.year, start.month, 1).getTime(),
+      end: new Date(endExclusive.year, endExclusive.month, 1).getTime(),
+    });
+  }, [neededRange, cachedRange, viewed.year, viewed.month]);
+  const rangeStart = cachedRange.start;
+  const rangeEnd = cachedRange.end;
   const { primaryCategoryByDay, categorySetByDay } = useCalendarMonthRecords(rangeStart, rangeEnd);
   // 予定（ルーティン紐付きリマインダー由来）はtodayStart以降のみを対象にする
   // （過去日は上のuseCalendarMonthRecordsが担当する実績のみを表示する）
@@ -440,15 +468,6 @@ export default function CalendarScreen() {
         <View style={styles.legend}>
           <CategoryColorLegend />
         </View>
-        {/* 予定（リング/ドット表現）が実際に画面上にある場合だけ表示する。予定を使っていない
-            （＝ルーティン紐付きリマインダーも手動予定も無い）ユーザーには不要な説明のため
-            常時表示にはしない（@designer指摘: 塗り=実施/リング・ドット=予定の凡例が無いと
-            初見で誤読されるおそれがあるとの指摘への対応）。手動予定(PR10)もリング/ドットに
-            反映されるようになったため「リマインダー由来」の限定は外す */}
-        {primaryCategoryByScheduleDay.size > 0 && (
-          <Text style={styles.scheduleLegendHint}>塗りつぶし＝実施済み、輪郭・点＝予定</Text>
-        )}
-
         <View style={styles.dayPanel}>
           <Text style={styles.dayHeading}>{formatSessionDateGroup(selectedDate.getTime())}</Text>
           {dayCards === null ? (
@@ -590,7 +609,6 @@ const styles = StyleSheet.create({
   navButton: { width: 36, height: 36, alignItems: 'center', justifyContent: 'center' },
   filterRow: { marginBottom: 10 },
   legend: { marginTop: 10 },
-  scheduleLegendHint: { ...Typography.caption, color: Colors.textPlaceholder, marginTop: 6 },
 
   dayPanel: { marginTop: 16, paddingTop: 12, borderTopWidth: 1, borderTopColor: Colors.border },
   // 記録タブ(app/(tabs)/index.tsx)の日付グループ見出しと同じ役割（formatSessionDateGroupを
