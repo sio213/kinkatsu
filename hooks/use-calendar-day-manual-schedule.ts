@@ -17,9 +17,9 @@ export type ManualScheduleCard = {
   exerciseCount: number;
   hour: number;
   minute: number;
-  // 直接予定（routineId===null）のときだけ選択した種目名を選択順のまま保持する。
-  // titleは圧縮済みのため、カード側で全種目名を表示するために使う（@designer指摘、2026-07-20）
-  exerciseNames?: string[];
+  // 直接予定（routineId===null）のときだけ、種目一覧カード表示（DirectScheduleExerciseGroup）・
+  // 編集画面への遷移時の事前選択に使う（選択順=orderIndex順）
+  exerciseIds?: number[];
 };
 
 // カレンダーの選択日パネル用。手動追加した予定（PR10、リマインダーとは無関係）を選択日ちょうどの
@@ -80,7 +80,7 @@ export function useCalendarDayManualSchedule(selectedDate: Date): ManualSchedule
           exerciseCount: summary.exerciseCount,
           hour: r.hour,
           minute: r.minute,
-          exerciseNames: summary.exerciseNames,
+          exerciseIds: summary.exerciseIds,
         });
       }
     }

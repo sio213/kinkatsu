@@ -1,6 +1,7 @@
 import { CalendarExerciseCard } from '@/components/calendar/calendar-exercise-card';
 import { CategoryColorLegend } from '@/components/calendar/category-color-legend';
 import { DayEmptyState } from '@/components/calendar/day-empty-state';
+import { DirectScheduleExerciseGroup } from '@/components/calendar/direct-schedule-exercise-group';
 import { RoutineScheduleCard } from '@/components/calendar/routine-schedule-card';
 import { SessionTimeGroupHeader } from '@/components/calendar/session-time-group-header';
 import { SwipeableMonthView } from '@/components/calendar/swipeable-month-view';
@@ -90,9 +91,9 @@ function ScheduleEntryCard({
 }: {
   card: MergedScheduleCard;
   timeLabel: string;
-  // 直接予定（routineId===null、2026-07-20）には編集画面が無いため、その場合は呼び出し側が
-  // onPress自体を渡さない
-  onPress?: () => void;
+  // 直接予定（routineId===null、2026-07-20）はDirectScheduleExerciseGroupで別途描画するため、
+  // このコンポーネントに到達する時点でcard.routineIdは必ずnumber（呼び出し側で分岐済み）
+  onPress: () => void;
   onPressStart?: () => void;
   onDeleteManual: (scheduledWorkoutId: number, title: string) => void;
   // リマインダー予定の⋮メニュー「削除」用（2026-07-19: 「今回だけスキップ」から変更、
@@ -109,7 +110,6 @@ function ScheduleEntryCard({
       categories={card.categories}
       exerciseCount={card.exerciseCount}
       timeLabel={timeLabel}
-      exerciseNames={card.exerciseNames}
       onPress={onPress}
       onPressStart={onPressStart}
       oneTime={card.source === 'manual'}
@@ -302,6 +302,24 @@ export default function CalendarScreen() {
   // 経由するよう変更）。日付は選択日で確定済みのためdateKeyだけ渡す
   const handlePressAddSchedule = useCallback(
     () => pushDebounced({ pathname: '/calendar/schedule-chooser', params: { dateKey: toDateKey(selectedDate) } }),
+    [pushDebounced, selectedDate],
+  );
+  // 直接予定（routineId===null、2026-07-20）の種目一覧カードタップ用。過去の記録の種目カードが
+  // 記録編集画面(/workout/[sessionId])へ飛ぶのと同じ考え方で、この予定の種目一覧をまとめて
+  // 編集する画面（schedule-exercise-picker.tsxの編集モード）へ遷移する（@ユーザー指摘）。
+  // 既存の選択済みexerciseIdsはこの時点で手元にある値をそのままパラメータで渡す（遷移先で
+  // 改めてDBを引き直さない。@tester指摘: 引き直す設計だと読み込み中/該当予定が見つからない
+  // 場合の区別ができず永続的な空白画面になりかねない）
+  const handleEditDirectScheduleExercises = useCallback(
+    (scheduledWorkoutId: number, exerciseIds: number[]) =>
+      pushDebounced({
+        pathname: '/calendar/schedule-exercise-picker',
+        params: {
+          dateKey: toDateKey(selectedDate),
+          scheduledWorkoutId: String(scheduledWorkoutId),
+          exerciseIds: exerciseIds.join(','),
+        },
+      }),
     [pushDebounced, selectedDate],
   );
   // 手動予定カードの⋮メニュー「削除」用（PR10-3、PR10-5で通知キャンセルも合わせて行うよう変更）。
@@ -519,26 +537,34 @@ export default function CalendarScreen() {
                     // RoutineScheduleCard自身が時刻バッジを持つため、SessionTimeGroupHeaderを
                     // 重ねると同じ時刻が2回表示されてしまっていた（@designer指摘、PR10-4で削除）
                     const { card } = entry;
-                    // 直接予定（routineId===null、2026-07-20）には編集画面(/routine/edit/[id])が
-                    // 無いためonPressを渡さない。開始ボタンはルーティン予定/直接予定どちらも
-                    // 対応するため、routineIdの有無でstartWorkoutFromRoutine/
-                    // startWorkoutFromScheduledWorkoutのどちらを使うかだけ出し分ける
-                    // （sourceは'manual'のはず——reminderは常にルーティン紐付きのためroutineIdが
-                    // nullになることが無い）
-                    const routineId = card.routineId;
+                    // 直接予定（routineId===null、2026-07-20）は種目一覧カード表示に切り替える
+                    // （@ユーザー指摘）。reminderは常にルーティン紐付きのためroutineIdがnullに
+                    // なることは無く、card.source==='manual'で必ずscheduledWorkoutIdが取れる
+                    if (card.routineId == null && card.source === 'manual') {
+                      const exerciseIds = card.exerciseIds ?? [];
+                      return (
+                        <View key={entry.key} style={styles.dayGroup}>
+                          <DirectScheduleExerciseGroup
+                            exerciseIds={exerciseIds}
+                            sessionStartedAt={entry.sortAt}
+                            title={card.title}
+                            onPressStart={() => handleStartDirectSchedule(card.scheduledWorkoutId, card.title)}
+                            onDelete={() => handleDeleteSchedule(card.scheduledWorkoutId, card.title)}
+                            onPress={() => handleEditDirectScheduleExercises(card.scheduledWorkoutId, exerciseIds)}
+                          />
+                        </View>
+                      );
+                    }
+                    // 直接予定は上のif分岐で処理済みのため、ここに来る時点でcard.routineIdは
+                    // 必ずnumber（reminderは常にルーティン紐付き、manualも上でnullを弾いている）
+                    const routineId = card.routineId!;
                     return (
                       <View key={entry.key} style={styles.dayGroup}>
                         <ScheduleEntryCard
                           card={card}
                           timeLabel={`今日 ${formatHourMinute(new Date(entry.sortAt))}`}
-                          onPress={routineId != null ? () => handlePressRoutine(routineId) : undefined}
-                          onPressStart={
-                            routineId != null
-                              ? () => handleStartRoutine(routineId, card.title)
-                              : card.source === 'manual'
-                                ? () => handleStartDirectSchedule(card.scheduledWorkoutId, card.title)
-                                : undefined
-                          }
+                          onPress={() => handlePressRoutine(routineId)}
+                          onPressStart={() => handleStartRoutine(routineId, card.title)}
                           onDeleteManual={handleDeleteSchedule}
                           onDeleteReminder={handleDeleteReminderOccurrence}
                           onReplace={handlePressReplace}
@@ -565,8 +591,31 @@ export default function CalendarScreen() {
             ) : (
               <View style={styles.dayCardList}>
                 {mergedSchedule.map((card) => {
-                  // 直接予定（routineId===null、2026-07-20）には編集画面が無いためonPressを渡さない
-                  const { routineId } = card;
+                  // 直接予定（routineId===null、2026-07-20）は種目一覧カード表示に切り替える
+                  // （今日パネルと同じ、@ユーザー指摘）
+                  if (card.routineId == null && card.source === 'manual') {
+                    const sessionStartedAt = new Date(
+                      selectedDate.getFullYear(),
+                      selectedDate.getMonth(),
+                      selectedDate.getDate(),
+                      card.hour,
+                      card.minute,
+                    ).getTime();
+                    const exerciseIds = card.exerciseIds ?? [];
+                    return (
+                      <DirectScheduleExerciseGroup
+                        key={card.key}
+                        exerciseIds={exerciseIds}
+                        sessionStartedAt={sessionStartedAt}
+                        title={card.title}
+                        onDelete={() => handleDeleteSchedule(card.scheduledWorkoutId, card.title)}
+                        onPress={() => handleEditDirectScheduleExercises(card.scheduledWorkoutId, exerciseIds)}
+                      />
+                    );
+                  }
+                  // 直接予定は上のif分岐で処理済みのため、ここに来る時点でcard.routineIdは
+                  // 必ずnumber（reminderは常にルーティン紐付き、manualも上でnullを弾いている）
+                  const routineId = card.routineId!;
                   return (
                     <ScheduleEntryCard
                       key={card.key}
@@ -576,7 +625,7 @@ export default function CalendarScreen() {
                           ? formatKindSummary(card.reminder)
                           : formatHourMinuteParts(card.hour, card.minute)
                       }
-                      onPress={routineId != null ? () => handlePressRoutine(routineId) : undefined}
+                      onPress={() => handlePressRoutine(routineId)}
                       onDeleteManual={handleDeleteSchedule}
                       onDeleteReminder={handleDeleteReminderOccurrence}
                       onReplace={handlePressReplace}

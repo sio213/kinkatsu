@@ -5,11 +5,17 @@
 var mockInsertValues: jest.Mock;
 var mockReturning: jest.Mock;
 var mockDeleteWhere: jest.Mock;
+var mockUpdateSet: jest.Mock;
+var mockUpdateWhere: jest.Mock;
 
 jest.mock('@/db/client', () => {
   mockReturning = jest.fn().mockResolvedValue([{ id: 42 }]);
   mockInsertValues = jest.fn().mockReturnValue({ returning: (...args: unknown[]) => mockReturning(...args) });
   mockDeleteWhere = jest.fn().mockResolvedValue(undefined);
+  mockUpdateWhere = jest.fn().mockResolvedValue(undefined);
+  mockUpdateSet = jest.fn((table: unknown, ...args: unknown[]) => ({
+    where: (...whereArgs: unknown[]) => mockUpdateWhere(table, ...args, ...whereArgs),
+  }));
 
   // scheduledWorkoutExercisesへのinsertは.returning()を呼ばず.values()の戻り値を直接awaitする
   // （idを使わないため）。mockInsertValuesのデフォルト戻り値は非Promiseのプレーンオブジェクトだが、
@@ -17,6 +23,12 @@ jest.mock('@/db/client', () => {
   const tx = {
     insert: jest.fn((table: unknown) => ({
       values: (...args: unknown[]) => mockInsertValues(table, ...args),
+    })),
+    delete: jest.fn((table: unknown) => ({
+      where: (...args: unknown[]) => mockDeleteWhere(table, ...args),
+    })),
+    update: jest.fn((table: unknown) => ({
+      set: (...args: unknown[]) => mockUpdateSet(table, ...args),
     })),
   };
 
@@ -38,12 +50,19 @@ jest.mock('drizzle-orm', () => ({
   eq: jest.fn((col, val) => ({ col, val })),
 }));
 
-import { addDirectScheduledWorkout, addScheduledWorkout, deleteScheduledWorkout } from '@/lib/calendar/scheduled-workouts';
+import {
+  addDirectScheduledWorkout,
+  addScheduledWorkout,
+  deleteScheduledWorkout,
+  updateScheduledWorkoutExercises,
+} from '@/lib/calendar/scheduled-workouts';
 
 beforeEach(() => {
   mockInsertValues.mockClear();
   mockReturning.mockClear();
   mockDeleteWhere.mockClear();
+  mockUpdateSet.mockClear();
+  mockUpdateWhere.mockClear();
   // scheduledWorkoutExercisesへのinsertは.values()の戻り値が直接awaitされるため、
   // デフォルトでresolveするPromiseにしておく（addDirectScheduledWorkoutのテスト用）
   mockInsertValues.mockReturnValue({ returning: (...args: unknown[]) => mockReturning(...args) });
@@ -109,6 +128,29 @@ describe('addDirectScheduledWorkout', () => {
   ])('%s はinsertを呼ばず例外を投げる', async (_label, hour, minute) => {
     await expect(addDirectScheduledWorkout([1], '2026-07-25', hour, minute)).rejects.toThrow();
     expect(mockInsertValues).not.toHaveBeenCalled();
+  });
+});
+
+// 直接予定の種目一覧をまとめて編集する画面（schedule-exercise-picker.tsxの編集モード、2026-07-20）用
+describe('updateScheduledWorkoutExercises', () => {
+  it('既存のscheduledWorkoutExercisesを削除してから、新しい選択順でinsertし直し、scheduledWorkoutsのupdatedAtも更新する', async () => {
+    await updateScheduledWorkoutExercises(5, [8, 3]);
+
+    expect(mockDeleteWhere).toHaveBeenCalledTimes(1);
+    expect(mockInsertValues).toHaveBeenCalledTimes(1);
+    const [, exerciseValues] = mockInsertValues.mock.calls[0];
+    expect(exerciseValues).toEqual([
+      expect.objectContaining({ scheduledWorkoutId: 5, exerciseId: 8, orderIndex: 0 }),
+      expect.objectContaining({ scheduledWorkoutId: 5, exerciseId: 3, orderIndex: 1 }),
+    ]);
+    expect(mockUpdateWhere).toHaveBeenCalledTimes(1);
+  });
+
+  it('exerciseIdsが空の場合は削除・insert・updateのいずれも呼ばず例外を投げる', async () => {
+    await expect(updateScheduledWorkoutExercises(5, [])).rejects.toThrow();
+    expect(mockDeleteWhere).not.toHaveBeenCalled();
+    expect(mockInsertValues).not.toHaveBeenCalled();
+    expect(mockUpdateWhere).not.toHaveBeenCalled();
   });
 });
 

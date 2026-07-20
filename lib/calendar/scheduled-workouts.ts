@@ -10,6 +10,16 @@ function assertValidTime(hour: number, minute: number): void {
   if (!Number.isInteger(minute) || minute < 0 || minute > 59) throw new Error(`invalid minute: ${minute}`);
 }
 
+// addDirectScheduledWorkout/updateScheduledWorkoutExercises共通のinsert values生成（@reviewer指摘）
+function toScheduledExerciseRows(scheduledWorkoutId: number, exerciseIds: number[], now: number) {
+  return exerciseIds.map((exerciseId, orderIndex) => ({
+    scheduledWorkoutId,
+    exerciseId,
+    orderIndex,
+    createdAt: now,
+  }));
+}
+
 // カレンダーで手動追加する予定（リマインダーとは無関係、PR10確定仕様）。呼び出し側
 // （画面）でtry/catch + Alert.alertするルール（CLAUDE.md実装ルール）のため、ここでは
 // エラーハンドリングをせず素直にthrowする
@@ -46,15 +56,23 @@ export async function addDirectScheduledWorkout(
       .insert(scheduledWorkouts)
       .values({ routineId: null, scheduledDate, hour, minute, createdAt: now, updatedAt: now })
       .returning();
-    await tx.insert(scheduledWorkoutExercises).values(
-      exerciseIds.map((exerciseId, orderIndex) => ({
-        scheduledWorkoutId: inserted.id,
-        exerciseId,
-        orderIndex,
-        createdAt: now,
-      })),
-    );
+    await tx.insert(scheduledWorkoutExercises).values(toScheduledExerciseRows(inserted.id, exerciseIds, now));
     return inserted.id;
+  });
+}
+
+// 「直接追加」予定の種目一覧をまとめて編集する画面（schedule-exercise-picker.tsxの編集モード、
+// 2026-07-20）用。既存のscheduledWorkoutExercisesを一旦全て削除し、新しい選択順で入れ直す
+// （個々の行をdiffして増減させるより、選択内容全体を置き換える方が実装・検証ともに単純なため。
+// 過去の実績には触れない別テーブルのため、入れ替えても記録に影響しない）
+export async function updateScheduledWorkoutExercises(scheduledWorkoutId: number, exerciseIds: number[]): Promise<void> {
+  if (exerciseIds.length === 0) throw new Error('exerciseIds must not be empty');
+
+  const now = Date.now();
+  await db.transaction(async (tx) => {
+    await tx.delete(scheduledWorkoutExercises).where(eq(scheduledWorkoutExercises.scheduledWorkoutId, scheduledWorkoutId));
+    await tx.insert(scheduledWorkoutExercises).values(toScheduledExerciseRows(scheduledWorkoutId, exerciseIds, now));
+    await tx.update(scheduledWorkouts).set({ updatedAt: now }).where(eq(scheduledWorkouts.id, scheduledWorkoutId));
   });
 }
 

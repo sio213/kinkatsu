@@ -58,6 +58,14 @@ jest.mock('@/lib/workout/session', () => ({
   startWorkoutFromScheduledWorkout: (...args: unknown[]) => mockStartWorkoutFromScheduledWorkout(...args),
 }));
 
+// DirectScheduleExerciseGroup（直接予定の種目一覧カード表示、2026-07-20）がDB接続を必要とする
+// useScheduledExercisePreviewCards/useExercisesに触れないよう、フックレイヤーでモックする
+// （calendar-screen.test.tsxはDBモックチェーンを組んでいない画面レベルテストのため）
+const mockUseScheduledExercisePreviewCards = jest.fn();
+jest.mock('@/hooks/use-scheduled-exercise-preview-cards', () => ({
+  useScheduledExercisePreviewCards: (...args: unknown[]) => mockUseScheduledExercisePreviewCards(...args),
+}));
+
 const mockRemoveScheduledWorkout = jest.fn();
 jest.mock('@/lib/notifications/scheduled-workout-scheduler', () => ({
   removeScheduledWorkout: (...args: unknown[]) => mockRemoveScheduledWorkout(...args),
@@ -124,6 +132,7 @@ beforeEach(() => {
   mockStartWorkoutFromRoutine.mockResolvedValue({ sessionId: 77, cards: [] });
   mockStartWorkoutFromScheduledWorkout.mockResolvedValue({ sessionId: 77, cards: [] });
   mockSkipReminderOccurrence.mockResolvedValue({ notificationSuppressed: true });
+  mockUseScheduledExercisePreviewCards.mockReturnValue({ cards: [], retry: jest.fn() });
 });
 
 describe('CalendarScreen 今日・記録なしパネル', () => {
@@ -714,24 +723,45 @@ describe('CalendarScreen 予定（PR9-2: リマインダー由来の未来予定
       });
     });
 
-    test('未来日の「直接追加」予定（routineId===null）はカードをタップしても何も起きないが、⋮メニューからの削除はルーティン予定と同じく機能する（2026-07-20）', async () => {
+    test('未来日の「直接追加」予定（routineId===null）は種目一覧カードで表示され、種目カードをタップすると種目編集画面へ遷移し、⋮メニューからの削除も機能する（2026-07-20、@ユーザー指摘で過去の記録と同じ種目カード表示に変更）', async () => {
       const root = render();
       const future = new Date();
       future.setDate(future.getDate() + 5);
       mockUseCalendarDayManualSchedule.mockReturnValue([
-        manualCard({ scheduledWorkoutId: 5, routineId: null, title: 'ベンチプレス 他2種目' }),
+        manualCard({ scheduledWorkoutId: 5, routineId: null, title: 'ベンチプレス 他1種目', exerciseIds: [10, 11] }),
       ]);
+      mockUseScheduledExercisePreviewCards.mockReturnValue({
+        cards: [
+          {
+            exerciseId: 10,
+            name: 'ベンチプレス',
+            category: 'chest',
+            source: 'preset',
+            slug: 'bench_press',
+            measurementType: 'weight_reps',
+            sets: [],
+            isBest: false,
+          },
+        ],
+        retry: jest.fn(),
+      });
       selectDate(future);
 
-      expect(root.findByProps({ children: 'ベンチプレス 他2種目' })).toBeDefined();
-      const card = root
+      const expectedDateKey = `${future.getFullYear()}-${String(future.getMonth() + 1).padStart(2, '0')}-${String(future.getDate()).padStart(2, '0')}`;
+      const exerciseCard = root
         .findAllByType(TouchableOpacity)
-        .find((t) => typeof t.props.accessibilityLabel === 'string' && t.props.accessibilityLabel.startsWith('ベンチプレス 他2種目、'));
-      expect(card === undefined || card.props.onPress === undefined).toBe(true);
+        .find((t) => typeof t.props.accessibilityLabel === 'string' && t.props.accessibilityLabel.startsWith('ベンチプレス、'))!;
+      act(() => {
+        exerciseCard.props.onPress();
+      });
+      expect(mockPush).toHaveBeenCalledWith({
+        pathname: '/calendar/schedule-exercise-picker',
+        params: { dateKey: expectedDateKey, scheduledWorkoutId: '5', exerciseIds: '10,11' },
+      });
 
       const menuTrigger = root
         .findAllByType(TouchableOpacity)
-        .find((t) => typeof t.props.accessibilityLabel === 'string' && t.props.accessibilityLabel.startsWith('「ベンチプレス 他2種目」') && t.props.accessibilityLabel.endsWith('のメニューを開く'))!;
+        .find((t) => typeof t.props.accessibilityLabel === 'string' && t.props.accessibilityLabel.startsWith('「ベンチプレス 他1種目」') && t.props.accessibilityLabel.endsWith('のメニューを開く'))!;
       act(() => {
         menuTrigger.props.onPress();
       });
@@ -1032,16 +1062,42 @@ describe('CalendarScreen 予定（PR9-2: リマインダー由来の未来予定
         expect(mockPush).toHaveBeenCalledWith('/workout/77');
       });
 
-      test('今日、直接追加予定のカード自体（開始ボタン以外）はタップしても何も起きない（編集画面が無いため、2026-07-20）', () => {
+      test('今日、直接追加予定は種目一覧カードで表示され、種目カードをタップすると種目編集画面へ遷移する（2026-07-20、@ユーザー指摘で過去の記録と同じ種目カード表示に変更）', () => {
         mockUseCalendarDayManualSchedule.mockReturnValue([
-          manualCard({ scheduledWorkoutId: 5, routineId: null, title: 'ベンチプレス 他2種目' }),
+          manualCard({ scheduledWorkoutId: 5, routineId: null, title: 'ベンチプレス 他1種目', exerciseIds: [10, 11] }),
         ]);
+        mockUseScheduledExercisePreviewCards.mockReturnValue({
+          cards: [
+            {
+              exerciseId: 10,
+              name: 'ベンチプレス',
+              category: 'chest',
+              source: 'preset',
+              slug: 'bench_press',
+              measurementType: 'weight_reps',
+              sets: [],
+              isBest: false,
+            },
+          ],
+          retry: jest.fn(),
+        });
         const root = render();
 
-        const card = root
+        const exerciseCard = root
           .findAllByType(TouchableOpacity)
-          .find((t) => typeof t.props.accessibilityLabel === 'string' && t.props.accessibilityLabel.startsWith('ベンチプレス 他2種目、'));
-        expect(card === undefined || card.props.onPress === undefined).toBe(true);
+          .find((t) => typeof t.props.accessibilityLabel === 'string' && t.props.accessibilityLabel.startsWith('ベンチプレス、'))!;
+        act(() => {
+          exerciseCard.props.onPress();
+        });
+
+        const todayDateKey = (() => {
+          const d = new Date();
+          return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+        })();
+        expect(mockPush).toHaveBeenCalledWith({
+          pathname: '/calendar/schedule-exercise-picker',
+          params: { dateKey: todayDateKey, scheduledWorkoutId: '5', exerciseIds: '10,11' },
+        });
       });
 
       test('今日、同じルーティンがリマインダー予定・手動予定の両方にある場合、手動予定だけが表示される（未来日と同じdedupeを今日にも適用、PR10-4）', () => {

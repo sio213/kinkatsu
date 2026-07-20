@@ -25,7 +25,7 @@ type TestManualCard = {
   exerciseCount: number;
   hour: number;
   minute: number;
-  exerciseNames?: string[];
+  exerciseIds?: number[];
 };
 
 function reminderCard(overrides: Partial<TestReminderCard> = {}): TestReminderCard {
@@ -162,12 +162,12 @@ describe('mergeScheduleCards', () => {
     expect(mergeScheduleCards([], [])).toEqual([]);
   });
 
-  it('manualCardのexerciseNamesがそのままマージ後のカードに引き継がれる（直接予定の全種目名表示、@designer指摘、2026-07-20）', () => {
+  it('manualCardのexerciseIdsがそのままマージ後のカードに引き継がれる（直接予定の種目一覧カード表示・編集画面遷移用、2026-07-20）', () => {
     const merged = mergeScheduleCards(
       [],
-      [manualCard({ routineId: null, title: 'ベンチプレス 他1種目', exerciseNames: ['ベンチプレス', 'スクワット'] })],
+      [manualCard({ routineId: null, title: 'ベンチプレス 他1種目', exerciseIds: [10, 11] })],
     );
-    expect(merged[0].exerciseNames).toEqual(['ベンチプレス', 'スクワット']);
+    expect(merged[0].exerciseIds).toEqual([10, 11]);
   });
 
   it('同一routineIdの手動予定が同日に複数件あっても、どちらも残る（manual同士はdedupeしない）', () => {
