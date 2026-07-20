@@ -84,28 +84,43 @@ export type ResumeWorkoutSummary = {
 // 記録タブ・カレンダー今日パネルの再開バナー(ResumeWorkoutBanner)用。進行中セッション1件分の
 // 「種目数（完了/合計）」「完了セット数」「ルーティン名」をまとめて取得する。種目の完了判定は
 // useAutoCollapseCompletedExercisesと同じ基準（セットが1件以上あり、全セットが✓確定済み）に揃える。
+//
 // sessionId/routineIdは呼び出し側のactiveSession（useWorkoutSessions自身のuseLiveQueryが非同期に
 // 解決する）に由来するため、この関数が最初にマウントされた時点ではまだ-1のプレースホルダーで、
 // 後続のレンダーで初めて実際の値になる。drizzle-orm/expo-sqliteのuseLiveQueryは第2引数dependsに
 // 渡した配列が変化したときだけ内部useEffectを再実行してクエリを張り直す仕様（デフォルトは[]＝
 // マウント時の1回きり）のため、sessionId/routineIdをdependsに渡さないと-1で張ったクエリの
 // ままテーブル書き込みイベント頼みで固定されてしまい、実際のsessionId/routineIdが確定した後も
-// 空データのまま更新されない（実機で再現・特定した不具合）
+// 空データのまま更新されない（実機で再現・特定した不具合）。
+//
+// また、useLiveQueryの書き込み監視は「クエリのfrom()に渡した最初のテーブル」だけを見ており、
+// leftJoinで結合した側のテーブルへの書き込みは検知しない（expo-sqliteのaddDatabaseChangeListener
+// コールバックがconfig.name===tableNameで一致判定しているため）。そのためworkoutSessionExercises
+// にsetsをleftJoinする実装だと、セット✓確定（setsテーブルへの書き込み）では再フェッチされず、
+// セット数・完了状態が画面に戻ってもすぐ反映されない（実機で再現・特定）。setsの集計は
+// useSessionSets等と同じくsetsテーブル単体のクエリに分け、種目カードとの突き合わせはJS側で行う
 export function useResumeWorkoutSummary(session: WorkoutSession | null): ResumeWorkoutSummary {
   const sessionId = session?.id ?? -1;
   const routineId = session?.routineId ?? -1;
 
-  const { data: exerciseRows } = useLiveQuery(
+  const { data: exerciseIdRows } = useLiveQuery(
+    db
+      .select({ sessionExerciseId: workoutSessionExercises.id })
+      .from(workoutSessionExercises)
+      .where(eq(workoutSessionExercises.sessionId, sessionId)),
+    [sessionId],
+  );
+
+  const { data: setAggRows } = useLiveQuery(
     db
       .select({
-        sessionExerciseId: workoutSessionExercises.id,
+        sessionExerciseId: sets.workoutSessionExerciseId,
         totalSets: sql<number>`count(${sets.id})`,
         completedSets: sql<number>`sum(case when ${sets.completedAt} is not null then 1 else 0 end)`,
       })
-      .from(workoutSessionExercises)
-      .leftJoin(sets, eq(sets.workoutSessionExerciseId, workoutSessionExercises.id))
-      .where(eq(workoutSessionExercises.sessionId, sessionId))
-      .groupBy(workoutSessionExercises.id),
+      .from(sets)
+      .where(eq(sets.sessionId, sessionId))
+      .groupBy(sets.workoutSessionExerciseId),
     [sessionId],
   );
 
@@ -115,16 +130,24 @@ export function useResumeWorkoutSummary(session: WorkoutSession | null): ResumeW
   );
 
   return useMemo(() => {
-    const rows = exerciseRows ?? [];
-    const completedExerciseCount = rows.filter((r) => r.totalSets > 0 && r.completedSets === r.totalSets).length;
-    const completedSetCount = rows.reduce((sum, r) => sum + r.completedSets, 0);
+    const exerciseRows = exerciseIdRows ?? [];
+    const setsByCard = new Map((setAggRows ?? []).map((r) => [r.sessionExerciseId, r]));
+    let completedExerciseCount = 0;
+    let completedSetCount = 0;
+    for (const ex of exerciseRows) {
+      const agg = setsByCard.get(ex.sessionExerciseId);
+      const totalSets = agg?.totalSets ?? 0;
+      const completedSets = agg?.completedSets ?? 0;
+      if (totalSets > 0 && completedSets === totalSets) completedExerciseCount++;
+      completedSetCount += completedSets;
+    }
     return {
       completedExerciseCount,
-      totalExerciseCount: rows.length,
+      totalExerciseCount: exerciseRows.length,
       completedSetCount,
       routineName: session?.routineId != null ? (routineRows?.[0]?.name ?? null) : null,
     };
-  }, [exerciseRows, routineRows, session?.routineId]);
+  }, [exerciseIdRows, setAggRows, routineRows, session?.routineId]);
 }
 
 // sessionExerciseIdはworkoutSessionExercises行自体のid。同じ種目をセッション内に複数回

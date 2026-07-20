@@ -294,7 +294,7 @@ describe('useResumeWorkoutSummary', () => {
   }
 
   it('session=nullのときすべて0・routineNameはnull', () => {
-    mockLiveQueryQueue = [{ data: undefined }, { data: undefined }];
+    mockLiveQueryQueue = [{ data: undefined }, { data: undefined }, { data: undefined }];
     expect(mountSummary(null)).toEqual({
       completedExerciseCount: 0,
       totalExerciseCount: 0,
@@ -309,26 +309,35 @@ describe('useResumeWorkoutSummary', () => {
   // クエリが張り直されず空データに固定されてしまう不具合が実機で見つかったため、
   // ここで確実にdepsへ渡っていることを回帰テストとして固定する
   it('sessionId/routineIdをuseLiveQueryのdepsに渡す（渡さないとactiveSession確定後もクエリが空のまま固定される不具合の回帰防止）', () => {
-    mockLiveQueryQueue = [{ data: [] }, { data: [] }];
+    mockLiveQueryQueue = [{ data: [] }, { data: [] }, { data: [] }];
     mountSummary(routineSession);
-    expect(mockLiveQueryDepsCalls).toEqual([[2], [10]]);
+    expect(mockLiveQueryDepsCalls).toEqual([[2], [2], [10]]);
   });
 
-  it('種目0件（exerciseRowsが空配列）', () => {
-    mockLiveQueryQueue = [{ data: [] }, { data: undefined }];
+  it('種目0件（exerciseIdRowsが空配列）', () => {
+    mockLiveQueryQueue = [{ data: [] }, { data: undefined }, { data: undefined }];
     const result = mountSummary(manualSession);
     expect(result.totalExerciseCount).toBe(0);
     expect(result.completedExerciseCount).toBe(0);
     expect(result.completedSetCount).toBe(0);
   });
 
+  // setsの集計をworkoutSessionExercisesにleftJoinする実装だと、useLiveQueryの書き込み監視が
+  // クエリのfrom()テーブル(workoutSessionExercises)しか見ないため、セット✓確定(setsへの書き込み)
+  // では再フェッチされず画面に戻っても反映されない不具合があった（実機で再現・特定）。
+  // setsテーブル単体のクエリに分けてJS側で突き合わせているため、ここではその2クエリの結果を
+  // 個別に渡してテストする
   it('totalSets>0かつcompletedSets===totalSetsの種目のみ完了扱いにする（useAutoCollapseCompletedExercisesと同じ基準）', () => {
     mockLiveQueryQueue = [
+      {
+        data: [{ sessionExerciseId: 1 }, { sessionExerciseId: 2 }, { sessionExerciseId: 3 }],
+      },
       {
         data: [
           { sessionExerciseId: 1, totalSets: 3, completedSets: 3 }, // 完了
           { sessionExerciseId: 2, totalSets: 3, completedSets: 2 }, // 一部完了
-          { sessionExerciseId: 3, totalSets: 0, completedSets: 0 }, // セット未追加（totalSets=0は完了扱いにしない）
+          // sessionExerciseId:3はsetsに1件も無いためsetAggRowsに現れない
+          // （セット未追加の種目。totalSets=0扱いになり完了カウントに含めない）
         ],
       },
       { data: undefined },
@@ -341,6 +350,7 @@ describe('useResumeWorkoutSummary', () => {
 
   it('routineId有り・ルーティン名が解決できる場合はroutineNameを返す', () => {
     mockLiveQueryQueue = [
+      { data: [{ sessionExerciseId: 1 }] },
       { data: [{ sessionExerciseId: 1, totalSets: 1, completedSets: 1 }] },
       { data: [{ name: '胸の日' }] },
     ];
@@ -348,14 +358,18 @@ describe('useResumeWorkoutSummary', () => {
   });
 
   it('routineId有りだがルーティンが見つからない（削除済み等）場合はnullにフォールバックする', () => {
-    mockLiveQueryQueue = [{ data: [{ sessionExerciseId: 1, totalSets: 1, completedSets: 1 }] }, { data: [] }];
+    mockLiveQueryQueue = [
+      { data: [{ sessionExerciseId: 1 }] },
+      { data: [{ sessionExerciseId: 1, totalSets: 1, completedSets: 1 }] },
+      { data: [] },
+    ];
     expect(mountSummary(routineSession).routineName).toBeNull();
   });
 
   it('routineId=null（手動開始）の場合、routineRows側に何か返っていてもroutineNameは必ずnull', () => {
     // sessionId/routineIdのフォールバック値(-1)が誤って別セッションの行にヒットするような実装ミスを
     // 検知するため、あえてroutineRowsに値を入れた状態でテストする
-    mockLiveQueryQueue = [{ data: [] }, { data: [{ name: '無関係なルーティン' }] }];
+    mockLiveQueryQueue = [{ data: [] }, { data: [] }, { data: [{ name: '無関係なルーティン' }] }];
     expect(mountSummary(manualSession).routineName).toBeNull();
   });
 });
