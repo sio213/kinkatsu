@@ -1,12 +1,14 @@
 import { db } from '@/db/client';
 import { reminders } from '@/db/schema';
-import { getActiveSession, startWorkoutFromRoutine } from '@/lib/workout/session';
+import { getActiveSession, startWorkoutFromRoutine, startWorkoutFromScheduledWorkout } from '@/lib/workout/session';
 import { eq } from 'drizzle-orm';
 import type { NotificationResponse } from 'expo-notifications';
 import {
   REMINDER_NOTIFICATION_TYPE,
+  SCHEDULED_WORKOUT_DIRECT_NOTIFICATION_TYPE,
   SCHEDULED_WORKOUT_NOTIFICATION_TYPE,
   type ReminderNotificationData,
+  type ScheduledWorkoutDirectNotificationData,
   type ScheduledWorkoutNotificationData,
 } from './types';
 
@@ -30,6 +32,17 @@ async function resolveRoutineTapDestination(routineId: number): Promise<Reminder
   return result ? `/workout/${result.sessionId}` : '/';
 }
 
+// 「直接追加」予定（scheduledWorkoutExercises、ルーティンを介さず個別に選んだ種目、2026-07-20）の
+// 通知タップ用。resolveRoutineTapDestinationと同じく進行中セッションがあればそちらへ合流し、
+// 無ければその予定の種目でセッションを新規開始する
+async function resolveDirectScheduleTapDestination(scheduledWorkoutId: number): Promise<ReminderTapDestination> {
+  const activeSession = await getActiveSession();
+  if (activeSession) return `/workout/${activeSession.id}`;
+
+  const result = await startWorkoutFromScheduledWorkout(scheduledWorkoutId);
+  return result ? `/workout/${result.sessionId}` : '/';
+}
+
 // 通知タップのレスポンスから遷移先を判定する。判定・セッション作成にDBの参照が要るため非同期
 export async function resolveReminderTapDestination(
   response: NotificationResponse | null | undefined,
@@ -49,14 +62,24 @@ export async function resolveReminderTapDestination(
     return resolveRoutineTapDestination(reminder.routineId);
   }
 
-  // カレンダーの手動予定(PR10-5)。単発かつ必ずroutineIdを持つため、リマインダーと違いDBを
-  // 引き直さずdataのroutineIdをそのまま使える
+  // カレンダーのルーティン紐付き手動予定(PR10-5)。単発かつroutineIdを持つため、リマインダーと違いDBを
+  // 引き直さずdataのroutineIdをそのまま使える（routineIdを持たない直接予定は下のSCHEDULED_WORKOUT_DIRECT分岐）
   if (
     data?.type === SCHEDULED_WORKOUT_NOTIFICATION_TYPE &&
     typeof data.routineId === 'number'
   ) {
     const { routineId } = data as ScheduledWorkoutNotificationData;
     return resolveRoutineTapDestination(routineId);
+  }
+
+  // カレンダーの「直接追加」予定（2026-07-20）。種目リストは可変長のためdataには
+  // scheduledWorkoutIdのみ積まれており、タップ時にscheduledWorkoutExercisesを引き直す
+  if (
+    data?.type === SCHEDULED_WORKOUT_DIRECT_NOTIFICATION_TYPE &&
+    typeof data.scheduledWorkoutId === 'number'
+  ) {
+    const { scheduledWorkoutId } = data as ScheduledWorkoutDirectNotificationData;
+    return resolveDirectScheduleTapDestination(scheduledWorkoutId);
   }
 
   return null;

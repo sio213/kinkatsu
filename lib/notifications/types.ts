@@ -49,3 +49,13 @@ export type ScheduledWorkoutNotificationData = {
   type: typeof SCHEDULED_WORKOUT_NOTIFICATION_TYPE;
   routineId: number;
 };
+
+// カレンダーの「直接追加」予定（scheduledWorkoutExercises、ルーティンを介さず個別に選んだ種目、
+// 2026-07-20）の通知。種目リストは可変長でdataに埋め込むには不向きなため、ルーティン版と違い
+// scheduledWorkoutIdだけを積み、タップ時にscheduledWorkoutExercisesをDBから引き直す
+export const SCHEDULED_WORKOUT_DIRECT_NOTIFICATION_TYPE = 'scheduled_workout_direct' as const;
+
+export type ScheduledWorkoutDirectNotificationData = {
+  type: typeof SCHEDULED_WORKOUT_DIRECT_NOTIFICATION_TYPE;
+  scheduledWorkoutId: number;
+};

@@ -12,6 +12,34 @@ export type ScheduleFireRow = {
   category: string;
 };
 
+// 「直接追加」予定（ルーティンを介さず個別に選んだ種目、2026-07-20）の表示タイトル・通知タイトルを
+// 種目名から合成する。ルーティン名に相当するものが無いため、選んだ種目名自体をタイトルにする
+// （user-advisor方針: 「ルーティンとして保存しますか？」のような命名ステップを挟まない）。
+// exerciseNamesは選択順（orderIndex順）を想定
+export function formatDirectScheduleTitle(exerciseNames: string[]): string {
+  if (exerciseNames.length <= 1) return exerciseNames[0] ?? '';
+  return `${exerciseNames[0]} 他${exerciseNames.length - 1}種目`;
+}
+
+// scheduledWorkoutExercisesをexercisesとJOINした行から、scheduledWorkoutIdごとの種目名リストを
+// 組み立てる純粋関数。hooks/use-calendar-direct-schedule-summaries.tsとlib/notifications/
+// scheduled-workout-scheduler.tsの両方が同じ集計を必要とするため共通化する（@reviewer指摘）。
+// rowsの並び順（orderBy済み想定）をそのまま保持する
+export function groupExerciseNamesByScheduleId(
+  rows: { scheduledWorkoutId: number; name: string }[],
+): Map<number, string[]> {
+  const namesById = new Map<number, string[]>();
+  for (const row of rows) {
+    const names = namesById.get(row.scheduledWorkoutId);
+    if (names) {
+      names.push(row.name);
+    } else {
+      namesById.set(row.scheduledWorkoutId, [row.name]);
+    }
+  }
+  return namesById;
+}
+
 // リマインダー由来の予定を特定の1日だけ打ち消す記録(PR10-6)。reminderId+日付の組み合わせを
 // 1つのキーにまとめ、Set.hasでの判定を各hookから共通して使えるようにする
 export function buildReminderSkipKey(reminderId: number, dateKey: string): string {
@@ -41,12 +69,19 @@ export function aggregateSchedulePrimaryCategoryByDay(rows: ScheduleFireRow[]): 
 }
 
 export type UnifiedScheduleCardInput = {
-  routineId: number;
-  routineName: string;
+  // ルーティン紐付きの予定はnumber、「直接追加」予定（ルーティンを介さず個別に選んだ種目、
+  // 2026-07-20）はnull。リマインダー由来の予定は常にルーティン紐付きのためnumberになる
+  routineId: number | null;
+  // ルーティン予定はルーティン名、直接予定はformatDirectScheduleTitleで合成した種目名
+  title: string;
   categories: string[];
   exerciseCount: number;
   hour: number;
   minute: number;
+  // 直接予定（routineId===null）が2種目以上のとき、titleが「先頭の種目名 他N種目」に
+  // 圧縮されてしまい選んだ種目の全容が分からなくなる（@designer指摘、2026-07-20）ため、
+  // カード側で全種目名を表示するために保持する。ルーティン予定・リマインダー予定は常にundefined
+  exerciseNames?: string[];
 };
 
 export type UnifiedScheduleCard<TReminder> =
@@ -68,28 +103,34 @@ export function mergeScheduleCards<
   reminderCards: TReminderCard[],
   manualCards: TManualCard[],
 ): UnifiedScheduleCard<TReminderCard['reminder']>[] {
-  const manualRoutineIds = new Set(manualCards.map((c) => c.routineId));
+  // 直接予定（routineIdがnull）はそもそもリマインダーと同じルーティンを指すことがあり得ないため
+  // dedupe対象に含めない（リマインダーは常にルーティン紐付き）
+  const manualRoutineIds = new Set(
+    manualCards.flatMap((c) => (c.routineId != null ? [c.routineId] : [])),
+  );
   const reminderEntries: UnifiedScheduleCard<TReminderCard['reminder']>[] = reminderCards
-    .filter((c) => !manualRoutineIds.has(c.routineId))
+    .filter((c) => c.routineId == null || !manualRoutineIds.has(c.routineId))
     .map((c) => ({
       key: `reminder-${c.reminderId}`,
       routineId: c.routineId,
-      routineName: c.routineName,
+      title: c.title,
       categories: c.categories,
       exerciseCount: c.exerciseCount,
       hour: c.hour,
       minute: c.minute,
+      exerciseNames: c.exerciseNames,
       source: 'reminder',
       reminder: c.reminder,
     }));
   const manualEntries: UnifiedScheduleCard<TReminderCard['reminder']>[] = manualCards.map((c) => ({
     key: `manual-${c.scheduledWorkoutId}`,
     routineId: c.routineId,
-    routineName: c.routineName,
+    title: c.title,
     categories: c.categories,
     exerciseCount: c.exerciseCount,
     hour: c.hour,
     minute: c.minute,
+    exerciseNames: c.exerciseNames,
     source: 'manual',
     scheduledWorkoutId: c.scheduledWorkoutId,
   }));

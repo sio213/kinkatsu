@@ -101,7 +101,7 @@ describe('useCalendarDaySchedule', () => {
     expect(result.cards[0]).toMatchObject({
       reminderId: 1,
       routineId: 10,
-      routineName: '胸の日',
+      title: '胸の日',
       categories: ['chest', 'shoulder'],
       exerciseCount: 2,
       hour: 7,
@@ -147,7 +147,7 @@ describe('useCalendarDaySchedule', () => {
       { id: 20, name: '朝の予定' },
     ];
     const getResult = renderHook(new Date(2026, 6, 20));
-    expect(getResult().cards.map((c) => c.routineName)).toEqual(['朝の予定', '夜の予定']);
+    expect(getResult().cards.map((c) => c.title)).toEqual(['朝の予定', '夜の予定']);
   });
 
   describe('削除済みリマインダー発火の除外(reminderScheduleSkips、2026-07-19に「今回だけスキップ」から「削除」へ変更)', () => {

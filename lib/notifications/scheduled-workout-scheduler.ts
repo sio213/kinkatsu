@@ -1,13 +1,19 @@
 import { db } from '@/db/client';
-import { routines, scheduledWorkouts } from '@/db/schema';
+import { exercises, routines, scheduledWorkoutExercises, scheduledWorkouts } from '@/db/schema';
+import { formatDirectScheduleTitle, groupExerciseNamesByScheduleId } from '@/lib/calendar/schedule';
 import { parseDateKey, toDateKey } from '@/lib/calendar/date-grid';
-import { addScheduledWorkout, deleteScheduledWorkout } from '@/lib/calendar/scheduled-workouts';
-import { eq, gte } from 'drizzle-orm';
+import { addDirectScheduledWorkout, addScheduledWorkout, deleteScheduledWorkout } from '@/lib/calendar/scheduled-workouts';
+import { eq, gte, inArray } from 'drizzle-orm';
 import * as Notifications from 'expo-notifications';
 import { REMINDER_CHANNEL_ID } from './channels';
 import { DEFAULT_REMINDER_BODY } from './messages';
 import { getPermissionState } from './permissions';
-import { SCHEDULED_WORKOUT_NOTIFICATION_TYPE, type ScheduledWorkoutNotificationData } from './types';
+import {
+  SCHEDULED_WORKOUT_DIRECT_NOTIFICATION_TYPE,
+  SCHEDULED_WORKOUT_NOTIFICATION_TYPE,
+  type ScheduledWorkoutDirectNotificationData,
+  type ScheduledWorkoutNotificationData,
+} from './types';
 
 // カレンダーで手動追加する予定(scheduledWorkouts)への通知(PR10-5)。1レコード=1回のみの
 // 通知で、繰り返しリマインダー(lib/notifications/scheduler.ts)のキュー補充・ネイティブ
@@ -27,23 +33,25 @@ export function buildScheduledWorkoutFireDate(scheduledDate: string, hour: numbe
 
 type ScheduledWorkoutLike = {
   id: number;
-  routineId: number;
+  // ルーティン予定はnumber、「直接追加」予定（2026-07-20）はnull
+  routineId: number | null;
   scheduledDate: string;
   hour: number;
   minute: number;
 };
 
 // 権限確認・過去日時判定を済ませた前提で通知を登録する内部関数。権限チェックは呼び出し元の
-// 粒度(単発/一括)によってコストが変わるため、ここでは持たない
-async function scheduleNotificationCore(sw: ScheduledWorkoutLike, routineName: string, fireDate: Date): Promise<void> {
-  const data: ScheduledWorkoutNotificationData = {
-    type: SCHEDULED_WORKOUT_NOTIFICATION_TYPE,
-    routineId: sw.routineId,
-  };
+// 粒度(単発/一括)によってコストが変わるため、ここでは持たない。titleはルーティン名または
+// formatDirectScheduleTitleで合成した種目名（呼び出し側が解決して渡す）
+async function scheduleNotificationCore(sw: ScheduledWorkoutLike, title: string, fireDate: Date): Promise<void> {
+  const data: ScheduledWorkoutNotificationData | ScheduledWorkoutDirectNotificationData =
+    sw.routineId != null
+      ? { type: SCHEDULED_WORKOUT_NOTIFICATION_TYPE, routineId: sw.routineId }
+      : { type: SCHEDULED_WORKOUT_DIRECT_NOTIFICATION_TYPE, scheduledWorkoutId: sw.id };
   await Notifications.scheduleNotificationAsync({
     identifier: notificationIdFor(sw.id),
     content: {
-      title: routineName,
+      title,
       body: DEFAULT_REMINDER_BODY,
       sound: true,
       data,
@@ -56,11 +64,11 @@ async function scheduleNotificationCore(sw: ScheduledWorkoutLike, routineName: s
 // 権限が無い場合・過去日時の場合は無言でスキップする(呼び出し画面側でensurePermission()＋
 // PermissionBannerにより案内済みのため、ここで重ねてAlertは出さない設計、PR10-5計画フェーズの
 // @designer方針)
-async function scheduleNotification(sw: ScheduledWorkoutLike, routineName: string): Promise<void> {
+async function scheduleNotification(sw: ScheduledWorkoutLike, title: string): Promise<void> {
   const fireDate = buildScheduledWorkoutFireDate(sw.scheduledDate, sw.hour, sw.minute);
   if (fireDate.getTime() <= Date.now()) return;
   if ((await getPermissionState()) !== 'granted') return;
-  await scheduleNotificationCore(sw, routineName, fireDate);
+  await scheduleNotificationCore(sw, title, fireDate);
 }
 
 async function cancelNotification(scheduledWorkoutId: number): Promise<void> {
@@ -83,6 +91,26 @@ export async function createScheduledWorkout(
     await scheduleNotification({ id, routineId, scheduledDate, hour, minute }, routineName);
   } catch (e) {
     console.error('[schedule scheduled-workout notification]', e);
+  }
+  return id;
+}
+
+// 選択日パネル「予定を追加」→「直接追加」(app/calendar/schedule-exercise-picker.tsx経由)専用の
+// オーケストレータ。createScheduledWorkoutと同じく予定の保存(DB)と通知登録をセットで行い、
+// 通知登録の失敗は握りつぶす（予定自体は残す）。titleは呼び出し側(schedule-time-picker.tsx)が
+// formatDirectScheduleTitleで合成済みのものを渡す
+export async function createDirectScheduledWorkout(
+  exerciseIds: number[],
+  title: string,
+  scheduledDate: string,
+  hour: number,
+  minute: number,
+): Promise<number> {
+  const id = await addDirectScheduledWorkout(exerciseIds, scheduledDate, hour, minute);
+  try {
+    await scheduleNotification({ id, routineId: null, scheduledDate, hour, minute }, title);
+  } catch (e) {
+    console.error('[schedule direct scheduled-workout notification]', e);
   }
   return id;
 }
@@ -129,15 +157,39 @@ export async function syncScheduledWorkoutNotifications(): Promise<void> {
   const routineRows = await db.select({ id: routines.id, name: routines.name }).from(routines);
   const routineNameById = new Map(routineRows.map((r) => [r.id, r.name] as const));
 
+  // 「直接追加」予定（routineIdがnull）の種目名をscheduledWorkoutId単位でまとめて取得する
+  // （行ごとに問い合わせると対象日以降の予定数だけクエリが増えるため、useRoutineExerciseSummaries等と
+  // 同じくバッチで1クエリにまとめる）
+  const directScheduleIds = rows.filter((sw) => sw.routineId == null).map((sw) => sw.id);
+  const directTitleById = new Map<number, string>();
+  if (directScheduleIds.length > 0) {
+    const exerciseRows = await db
+      .select({
+        scheduledWorkoutId: scheduledWorkoutExercises.scheduledWorkoutId,
+        exerciseName: exercises.name,
+        orderIndex: scheduledWorkoutExercises.orderIndex,
+      })
+      .from(scheduledWorkoutExercises)
+      .innerJoin(exercises, eq(scheduledWorkoutExercises.exerciseId, exercises.id))
+      .where(inArray(scheduledWorkoutExercises.scheduledWorkoutId, directScheduleIds))
+      .orderBy(scheduledWorkoutExercises.orderIndex);
+    const namesById = groupExerciseNamesByScheduleId(
+      exerciseRows.map((row) => ({ scheduledWorkoutId: row.scheduledWorkoutId, name: row.exerciseName })),
+    );
+    for (const [scheduledWorkoutId, names] of namesById) {
+      directTitleById.set(scheduledWorkoutId, formatDirectScheduleTitle(names));
+    }
+  }
+
   const now = Date.now();
   await Promise.all(
     rows.map(async (sw) => {
-      const routineName = routineNameById.get(sw.routineId);
-      if (routineName === undefined) return;
+      const title = sw.routineId != null ? routineNameById.get(sw.routineId) : directTitleById.get(sw.id);
+      if (title === undefined) return;
       const fireDate = buildScheduledWorkoutFireDate(sw.scheduledDate, sw.hour, sw.minute);
       if (fireDate.getTime() <= now) return;
       try {
-        await scheduleNotificationCore(sw, routineName, fireDate);
+        await scheduleNotificationCore(sw, title, fireDate);
       } catch (e) {
         console.error('[sync scheduled-workout notification]', e);
       }

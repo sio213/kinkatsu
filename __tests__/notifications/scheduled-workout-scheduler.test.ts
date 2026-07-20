@@ -2,8 +2,12 @@
 /* eslint-disable no-var */
 var mockScheduledWorkoutRows: unknown[];
 var mockRoutineRows: unknown[];
+// 「直接追加」予定(routineId===null、2026-07-20)の種目名解決用。
+// scheduledWorkoutExercises×exercisesのJOIN結果を模す
+var mockDirectExerciseRows: unknown[];
 
 const mockAddScheduledWorkout = jest.fn();
+const mockAddDirectScheduledWorkout = jest.fn();
 const mockDeleteScheduledWorkout = jest.fn();
 const mockGetPermissionState = jest.fn();
 const mockScheduleNotificationAsync = jest.fn();
@@ -12,6 +16,9 @@ const mockCancelScheduledNotificationAsync = jest.fn();
 // 呼び出しを記録するjest.fnにする(自動レビューの指摘: 誤った列を渡す回帰があっても
 // このテストが通ってしまう問題への対応)
 const mockWhere = jest.fn((..._args: unknown[]) => Promise.resolve(mockScheduledWorkoutRows));
+// scheduledWorkoutExercises×exercisesのJOIN用.where()（inArray）は上のmockWhereとは別に検証したい
+// (mockScheduledWorkoutRowsではなくmockDirectExerciseRowsを返す必要があるため)
+const mockDirectExerciseWhere = jest.fn((..._args: unknown[]) => Promise.resolve(mockDirectExerciseRows));
 
 // scheduledWorkouts側は.from(table)を直接await(syncScheduledWorkoutNotifications)する場合と
 // .from(table).where(...)をawait(cancelScheduledWorkoutNotificationsForRoutine)する場合の
@@ -35,6 +42,15 @@ jest.mock('@/db/client', () => {
         from: (table: unknown) => {
           if (table === schema.scheduledWorkouts) return mockChainable(mockScheduledWorkoutRows);
           if (table === schema.routines) return Promise.resolve(mockRoutineRows);
+          if (table === schema.scheduledWorkoutExercises) {
+            return {
+              innerJoin: (..._joinArgs: unknown[]) => ({
+                where: (...args: unknown[]) => ({
+                  orderBy: (..._orderArgs: unknown[]) => mockDirectExerciseWhere(...args),
+                }),
+              }),
+            };
+          }
           throw new Error(`unexpected table: ${JSON.stringify(table)} (cols=${JSON.stringify(cols)})`);
         },
       })),
@@ -51,15 +67,23 @@ jest.mock('@/db/schema', () => ({
     scheduledDate: 'scheduledWorkouts.scheduledDate',
   },
   routines: { id: 'routines.id', name: 'routines.name' },
+  scheduledWorkoutExercises: {
+    scheduledWorkoutId: 'scheduledWorkoutExercises.scheduledWorkoutId',
+    exerciseId: 'scheduledWorkoutExercises.exerciseId',
+    orderIndex: 'scheduledWorkoutExercises.orderIndex',
+  },
+  exercises: { id: 'exercises.id', name: 'exercises.name' },
 }));
 
 jest.mock('drizzle-orm', () => ({
   eq: jest.fn((col, val) => ({ op: 'eq', col, val })),
   gte: jest.fn((col, val) => ({ op: 'gte', col, val })),
+  inArray: jest.fn((col, vals) => ({ op: 'inArray', col, vals })),
 }));
 
 jest.mock('@/lib/calendar/scheduled-workouts', () => ({
   addScheduledWorkout: (...args: unknown[]) => mockAddScheduledWorkout(...args),
+  addDirectScheduledWorkout: (...args: unknown[]) => mockAddDirectScheduledWorkout(...args),
   deleteScheduledWorkout: (...args: unknown[]) => mockDeleteScheduledWorkout(...args),
 }));
 
@@ -77,6 +101,7 @@ jest.mock('expo-notifications', () => ({
 
 import {
   cancelScheduledWorkoutNotificationsForRoutine,
+  createDirectScheduledWorkout,
   createScheduledWorkout,
   removeScheduledWorkout,
   syncScheduledWorkoutNotifications,
@@ -93,7 +118,9 @@ beforeEach(() => {
   jest.clearAllMocks();
   mockScheduledWorkoutRows = [];
   mockRoutineRows = [];
+  mockDirectExerciseRows = [];
   mockAddScheduledWorkout.mockResolvedValue(42);
+  mockAddDirectScheduledWorkout.mockResolvedValue(42);
   mockDeleteScheduledWorkout.mockResolvedValue(undefined);
   mockGetPermissionState.mockResolvedValue('granted');
   mockScheduleNotificationAsync.mockResolvedValue('os-id-1');
@@ -161,6 +188,50 @@ describe('createScheduledWorkout', () => {
   it('addScheduledWorkout自体が失敗した場合は握りつぶさずそのままrejectする(通知登録は行われない)', async () => {
     mockAddScheduledWorkout.mockRejectedValueOnce(new Error('db error'));
     await expect(createScheduledWorkout(10, '胸の日', dateKeyOffsetDays(1), 19, 0)).rejects.toThrow('db error');
+    expect(mockScheduleNotificationAsync).not.toHaveBeenCalled();
+  });
+});
+
+// 「直接追加」予定(ルーティンを介さず個別に選んだ種目、2026-07-20)。createScheduledWorkoutと
+// 同じ流れだが、addDirectScheduledWorkoutを使い通知データのtypeがscheduled_workout_directになる
+describe('createDirectScheduledWorkout', () => {
+  it('addDirectScheduledWorkoutで予定を保存し、挿入行のidを返す', async () => {
+    const id = await createDirectScheduledWorkout([1, 2], 'ベンチプレス 他1種目', dateKeyOffsetDays(1), 19, 0);
+    expect(mockAddDirectScheduledWorkout).toHaveBeenCalledWith([1, 2], dateKeyOffsetDays(1), 19, 0);
+    expect(id).toBe(42);
+  });
+
+  it('権限がgrantedかつ未来日時なら、渡されたタイトルでscheduled_workout_direct種別の通知を登録する', async () => {
+    await createDirectScheduledWorkout([1, 2], 'ベンチプレス 他1種目', dateKeyOffsetDays(1), 19, 30);
+    expect(mockScheduleNotificationAsync).toHaveBeenCalledTimes(1);
+    const [request] = mockScheduleNotificationAsync.mock.calls[0];
+    expect(request.identifier).toBe('scheduled-workout-42');
+    expect(request.content.title).toBe('ベンチプレス 他1種目');
+    expect(request.content.data).toEqual({
+      type: 'scheduled_workout_direct',
+      scheduledWorkoutId: 42,
+    });
+  });
+
+  it('権限がdeniedの場合は通知登録をスキップするが、予定自体は保存される', async () => {
+    mockGetPermissionState.mockResolvedValue('denied');
+    const id = await createDirectScheduledWorkout([1], 'ベンチプレス', dateKeyOffsetDays(1), 19, 0);
+    expect(id).toBe(42);
+    expect(mockScheduleNotificationAsync).not.toHaveBeenCalled();
+  });
+
+  it('通知登録が失敗しても例外を投げず、予定作成のidはそのまま返す', async () => {
+    mockScheduleNotificationAsync.mockRejectedValueOnce(new Error('schedule failed'));
+    await expect(
+      createDirectScheduledWorkout([1], 'ベンチプレス', dateKeyOffsetDays(1), 19, 0),
+    ).resolves.toBe(42);
+  });
+
+  it('addDirectScheduledWorkout自体が失敗した場合は握りつぶさずそのままrejectする(通知登録は行われない)', async () => {
+    mockAddDirectScheduledWorkout.mockRejectedValueOnce(new Error('db error'));
+    await expect(
+      createDirectScheduledWorkout([1], 'ベンチプレス', dateKeyOffsetDays(1), 19, 0),
+    ).rejects.toThrow('db error');
     expect(mockScheduleNotificationAsync).not.toHaveBeenCalled();
   });
 });
@@ -284,6 +355,86 @@ describe('syncScheduledWorkoutNotifications', () => {
     await syncScheduledWorkoutNotifications();
 
     expect(mockGetPermissionState).toHaveBeenCalledTimes(1);
+  });
+
+  // 「直接追加」予定(routineId===null、2026-07-20)。タイトルはscheduledWorkoutExercises×exercisesの
+  // JOINから合成する（routinesは引かない）
+  describe('直接追加予定(routineId===null)のタイトル解決', () => {
+    it('種目名から合成したタイトルで通知登録される', async () => {
+      mockScheduledWorkoutRows = [
+        { id: 1, routineId: null, scheduledDate: dateKeyOffsetDays(1), hour: 8, minute: 0 },
+      ];
+      mockDirectExerciseRows = [
+        { scheduledWorkoutId: 1, exerciseName: 'ベンチプレス', orderIndex: 0 },
+        { scheduledWorkoutId: 1, exerciseName: 'スクワット', orderIndex: 1 },
+      ];
+
+      await syncScheduledWorkoutNotifications();
+
+      expect(mockScheduleNotificationAsync).toHaveBeenCalledTimes(1);
+      const [request] = mockScheduleNotificationAsync.mock.calls[0];
+      expect(request.identifier).toBe('scheduled-workout-1');
+      expect(request.content.title).toBe('ベンチプレス 他1種目');
+      expect(request.content.data).toEqual({ type: 'scheduled_workout_direct', scheduledWorkoutId: 1 });
+    });
+
+    it('対応する種目が1件も見つからない場合(安全網、通常は起こらない)はスキップする', async () => {
+      mockScheduledWorkoutRows = [
+        { id: 1, routineId: null, scheduledDate: dateKeyOffsetDays(1), hour: 8, minute: 0 },
+      ];
+      mockDirectExerciseRows = [];
+
+      await syncScheduledWorkoutNotifications();
+
+      expect(mockScheduleNotificationAsync).not.toHaveBeenCalled();
+    });
+
+    it('ルーティン予定と直接予定が混在していても、それぞれ正しいタイトルで通知登録される', async () => {
+      mockScheduledWorkoutRows = [
+        { id: 1, routineId: 10, scheduledDate: dateKeyOffsetDays(1), hour: 8, minute: 0 },
+        { id: 2, routineId: null, scheduledDate: dateKeyOffsetDays(1), hour: 9, minute: 0 },
+      ];
+      mockRoutineRows = [{ id: 10, name: '胸の日' }];
+      mockDirectExerciseRows = [{ scheduledWorkoutId: 2, exerciseName: 'スクワット', orderIndex: 0 }];
+
+      await syncScheduledWorkoutNotifications();
+
+      expect(mockScheduleNotificationAsync).toHaveBeenCalledTimes(2);
+      const titles = mockScheduleNotificationAsync.mock.calls.map(([request]) => request.content.title);
+      expect(titles).toEqual(expect.arrayContaining(['胸の日', 'スクワット']));
+    });
+
+    it('直接予定が複数(異なるscheduledWorkoutId)あっても、JOIN結果からscheduledWorkoutIdごとに正しくグルーピングされてそれぞれ別タイトルで通知登録される', async () => {
+      mockScheduledWorkoutRows = [
+        { id: 1, routineId: null, scheduledDate: dateKeyOffsetDays(1), hour: 8, minute: 0 },
+        { id: 2, routineId: null, scheduledDate: dateKeyOffsetDays(1), hour: 9, minute: 0 },
+      ];
+      mockDirectExerciseRows = [
+        { scheduledWorkoutId: 1, exerciseName: 'ベンチプレス', orderIndex: 0 },
+        { scheduledWorkoutId: 2, exerciseName: 'スクワット', orderIndex: 0 },
+        { scheduledWorkoutId: 1, exerciseName: 'デッドリフト', orderIndex: 1 },
+      ];
+
+      await syncScheduledWorkoutNotifications();
+
+      expect(mockScheduleNotificationAsync).toHaveBeenCalledTimes(2);
+      const byIdentifier = new Map(
+        mockScheduleNotificationAsync.mock.calls.map(([request]) => [request.identifier, request.content.title]),
+      );
+      expect(byIdentifier.get('scheduled-workout-1')).toBe('ベンチプレス 他1種目');
+      expect(byIdentifier.get('scheduled-workout-2')).toBe('スクワット');
+    });
+
+    it('直接予定が無ければscheduledWorkoutExercisesは引かない(無駄なクエリを発行しない)', async () => {
+      mockScheduledWorkoutRows = [
+        { id: 1, routineId: 10, scheduledDate: dateKeyOffsetDays(1), hour: 8, minute: 0 },
+      ];
+      mockRoutineRows = [{ id: 10, name: '胸の日' }];
+
+      await syncScheduledWorkoutNotifications();
+
+      expect(mockDirectExerciseWhere).not.toHaveBeenCalled();
+    });
   });
 });
 

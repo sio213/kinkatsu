@@ -27,13 +27,27 @@ function seedRoutine(db: Database.Database, name: string): number {
   return (db.prepare('SELECT id FROM routines ORDER BY id DESC LIMIT 1').get() as { id: number }).id;
 }
 
-function seedScheduledWorkout(db: Database.Database, routineId: number, scheduledDate: string): number {
+function seedScheduledWorkout(db: Database.Database, routineId: number | null, scheduledDate: string): number {
   const now = Date.now();
   db.prepare(
     `INSERT INTO scheduled_workouts (routine_id, scheduled_date, hour, minute, created_at, updated_at)
      VALUES (?, ?, 19, 0, ?, ?)`,
   ).run(routineId, scheduledDate, now, now);
   return (db.prepare('SELECT id FROM scheduled_workouts ORDER BY id DESC LIMIT 1').get() as { id: number }).id;
+}
+
+function seedExercise(db: Database.Database, name: string): number {
+  const now = Date.now();
+  db.prepare(
+    `INSERT INTO exercises (name, category, source, measurement_type, created_at, updated_at) VALUES (?, 'chest', 'preset', 'weight_reps', ?, ?)`,
+  ).run(name, now, now);
+  return (db.prepare('SELECT id FROM exercises ORDER BY id DESC LIMIT 1').get() as { id: number }).id;
+}
+
+function seedScheduledWorkoutExercise(db: Database.Database, scheduledWorkoutId: number, exerciseId: number, orderIndex: number): void {
+  db.prepare(
+    `INSERT INTO scheduled_workout_exercises (scheduled_workout_id, exercise_id, order_index, created_at) VALUES (?, ?, ?, ?)`,
+  ).run(scheduledWorkoutId, exerciseId, orderIndex, Date.now());
 }
 
 describe('scheduled_workoutsスキーマ - 実SQLite上でのFK挙動', () => {
@@ -95,5 +109,105 @@ describe('scheduled_workoutsスキーマ - 実SQLite上でのFK挙動', () => {
     db.pragma('foreign_keys = ON');
     applyAllMigrations(db);
     expect(() => seedScheduledWorkout(db, 999999, '2026-07-25')).toThrow(/FOREIGN KEY constraint failed/);
+  });
+
+  it('routine_idはnullを許容する（「直接追加」予定、2026-07-20のNOT NULL解除マイグレーション）', () => {
+    db = new Database(':memory:');
+    db.pragma('foreign_keys = ON');
+    applyAllMigrations(db);
+    const scheduledWorkoutId = seedScheduledWorkout(db, null, '2026-07-25');
+
+    const row = db.prepare('SELECT routine_id AS routineId FROM scheduled_workouts WHERE id = ?').get(scheduledWorkoutId) as {
+      routineId: number | null;
+    };
+    expect(row.routineId).toBeNull();
+  });
+});
+
+describe('scheduled_workout_exercisesスキーマ - 実SQLite上でのFK挙動（2026-07-20の「直接追加」予定）', () => {
+  let db: Database.Database;
+
+  afterEach(() => {
+    db.close();
+  });
+
+  it('予定(scheduled_workouts)の削除はscheduled_workout_exercisesにcascadeする', () => {
+    db = new Database(':memory:');
+    db.pragma('foreign_keys = ON');
+    applyAllMigrations(db);
+    const exerciseId = seedExercise(db, 'ベンチプレス');
+    const scheduledWorkoutId = seedScheduledWorkout(db, null, '2026-07-25');
+    seedScheduledWorkoutExercise(db, scheduledWorkoutId, exerciseId, 0);
+
+    db.prepare('DELETE FROM scheduled_workouts WHERE id = ?').run(scheduledWorkoutId);
+
+    const count = (
+      db
+        .prepare('SELECT COUNT(*) AS c FROM scheduled_workout_exercises WHERE scheduled_workout_id = ?')
+        .get(scheduledWorkoutId) as { c: number }
+    ).c;
+    expect(count).toBe(0);
+  });
+
+  it('種目(exercises)の削除はscheduled_workout_exercisesが参照している限りFK制約違反で拒否される(onDelete: restrict)', () => {
+    db = new Database(':memory:');
+    db.pragma('foreign_keys = ON');
+    applyAllMigrations(db);
+    const exerciseId = seedExercise(db, 'ベンチプレス');
+    const scheduledWorkoutId = seedScheduledWorkout(db, null, '2026-07-25');
+    seedScheduledWorkoutExercise(db, scheduledWorkoutId, exerciseId, 0);
+
+    expect(() => db.prepare('DELETE FROM exercises WHERE id = ?').run(exerciseId)).toThrow(
+      /FOREIGN KEY constraint failed/,
+    );
+  });
+
+  it('別の予定を削除しても、無関係な予定の種目は消えない', () => {
+    db = new Database(':memory:');
+    db.pragma('foreign_keys = ON');
+    applyAllMigrations(db);
+    const benchPress = seedExercise(db, 'ベンチプレス');
+    const squat = seedExercise(db, 'スクワット');
+    const scheduleA = seedScheduledWorkout(db, null, '2026-07-25');
+    const scheduleB = seedScheduledWorkout(db, null, '2026-07-26');
+    seedScheduledWorkoutExercise(db, scheduleA, benchPress, 0);
+    seedScheduledWorkoutExercise(db, scheduleB, squat, 0);
+
+    db.prepare('DELETE FROM scheduled_workouts WHERE id = ?').run(scheduleB);
+
+    const remaining = db
+      .prepare('SELECT scheduled_workout_id AS scheduledWorkoutId FROM scheduled_workout_exercises')
+      .all() as { scheduledWorkoutId: number }[];
+    expect(remaining).toEqual([{ scheduledWorkoutId: scheduleA }]);
+  });
+
+  it('存在しないexercise_idへのINSERTはFK制約違反で例外を投げる', () => {
+    db = new Database(':memory:');
+    db.pragma('foreign_keys = ON');
+    applyAllMigrations(db);
+    const scheduledWorkoutId = seedScheduledWorkout(db, null, '2026-07-25');
+    expect(() => seedScheduledWorkoutExercise(db, scheduledWorkoutId, 999999, 0)).toThrow(
+      /FOREIGN KEY constraint failed/,
+    );
+  });
+
+  it('idx_swe_scheduleインデックスにより、scheduled_workout_id指定のクエリが例外を投げず期待順(order_index)で返る', () => {
+    db = new Database(':memory:');
+    db.pragma('foreign_keys = ON');
+    applyAllMigrations(db);
+    const benchPress = seedExercise(db, 'ベンチプレス');
+    const squat = seedExercise(db, 'スクワット');
+    const deadlift = seedExercise(db, 'デッドリフト');
+    const scheduledWorkoutId = seedScheduledWorkout(db, null, '2026-07-25');
+    seedScheduledWorkoutExercise(db, scheduledWorkoutId, squat, 1);
+    seedScheduledWorkoutExercise(db, scheduledWorkoutId, benchPress, 0);
+    seedScheduledWorkoutExercise(db, scheduledWorkoutId, deadlift, 2);
+
+    const rows = db
+      .prepare(
+        'SELECT exercise_id AS exerciseId FROM scheduled_workout_exercises WHERE scheduled_workout_id = ? ORDER BY order_index',
+      )
+      .all(scheduledWorkoutId) as { exerciseId: number }[];
+    expect(rows.map((r) => r.exerciseId)).toEqual([benchPress, squat, deadlift]);
   });
 });

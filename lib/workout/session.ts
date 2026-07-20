@@ -1,5 +1,5 @@
 import { db, type Tx } from '@/db/client';
-import { sets, workoutSessionExercises, workoutSessions, type WorkoutSession } from '@/db/schema';
+import { scheduledWorkoutExercises, sets, workoutSessionExercises, workoutSessions, type WorkoutSession } from '@/db/schema';
 import { getRoutineDetail, type RoutineDetailExercise } from '@/lib/routines/db';
 import { getPreviousSets, hasAnyValue, type PreviousSetValues } from '@/lib/workout/history';
 import { and, desc, eq, isNull } from 'drizzle-orm';
@@ -304,6 +304,57 @@ export async function startWorkoutFromRoutine(routineId: number) {
 // 目標セットは通常のstartWorkoutFromRoutineと同じくその場で流し込む
 export async function startPastWorkoutFromRoutine(routineId: number, pastDate: number) {
   return createRoutineSession(routineId, pastDate, pastDate);
+}
+
+// カレンダーの「直接追加」予定（scheduledWorkoutExercises、ルーティンを介さず個別に選んだ種目、
+// 2026-07-20）を実施する用。今日パネルの予定カード「開始」ボタン・その予定の通知タップから呼ばれる。
+// ルーティンの目標セットに相当する値を持たないため、addExercisesToSessionと同じく種目ごとの
+// 前回記録から自動プリフィルする（createRoutineSessionのルーティン目標セットとは異なる経路）。
+// routineIdは渡さず(schema既定のnullのまま)、手動開始と同じ「トレーニング中」表示になる
+export async function startWorkoutFromScheduledExercises(
+  exerciseIds: number[],
+  startedAt: number,
+  endedAt: number | null,
+): Promise<{ sessionId: number; cards: PrefilledCard[] } | null> {
+  if (exerciseIds.length === 0) return null;
+  const now = Date.now();
+
+  return db.transaction(async (tx) => {
+    const [session] = await tx
+      .insert(workoutSessions)
+      .values({ startedAt, endedAt, createdAt: now, updatedAt: now })
+      .returning();
+
+    const cards = await insertSessionExerciseCards(
+      tx,
+      session.id,
+      exerciseIds.map((exerciseId) => ({ exerciseId })),
+      now,
+      'new',
+      (t, spec) => getPreviousSets(t, spec.exerciseId, session.id),
+    );
+
+    return { sessionId: session.id, cards };
+  });
+}
+
+// カレンダーの「直接追加」予定（scheduledWorkoutExercises、2026-07-20）をscheduledWorkoutId
+// から実施する用。今日パネルの予定カード「開始」ボタン(app/(tabs)/calendar.tsx)・その予定の
+// 通知タップ(lib/notifications/tap-handler.ts)の両方から呼ばれる。種目idの解決を1箇所に
+// まとめることで、両呼び出し元でクエリを重複させない
+export async function startWorkoutFromScheduledWorkout(
+  scheduledWorkoutId: number,
+): Promise<{ sessionId: number; cards: PrefilledCard[] } | null> {
+  const rows = await db
+    .select({ exerciseId: scheduledWorkoutExercises.exerciseId })
+    .from(scheduledWorkoutExercises)
+    .where(eq(scheduledWorkoutExercises.scheduledWorkoutId, scheduledWorkoutId))
+    .orderBy(scheduledWorkoutExercises.orderIndex);
+  return startWorkoutFromScheduledExercises(
+    rows.map((r) => r.exerciseId),
+    Date.now(),
+    null,
+  );
 }
 
 export type RoutineExerciseSelection = { routineExerciseId: number };

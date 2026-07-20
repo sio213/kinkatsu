@@ -1,6 +1,7 @@
 const mockWhere = jest.fn();
 const mockGetActiveSession = jest.fn();
 const mockStartWorkoutFromRoutine = jest.fn();
+const mockStartWorkoutFromScheduledWorkout = jest.fn();
 
 jest.mock('@/db/client', () => ({
   db: {
@@ -21,6 +22,7 @@ jest.mock('drizzle-orm', () => ({
 jest.mock('@/lib/workout/session', () => ({
   getActiveSession: (...args: unknown[]) => mockGetActiveSession(...args),
   startWorkoutFromRoutine: (...args: unknown[]) => mockStartWorkoutFromRoutine(...args),
+  startWorkoutFromScheduledWorkout: (...args: unknown[]) => mockStartWorkoutFromScheduledWorkout(...args),
 }));
 
 import { resolveReminderTapDestination } from '@/lib/notifications/tap-handler';
@@ -44,6 +46,8 @@ beforeEach(() => {
   mockGetActiveSession.mockResolvedValue(null);
   mockStartWorkoutFromRoutine.mockReset();
   mockStartWorkoutFromRoutine.mockResolvedValue(null);
+  mockStartWorkoutFromScheduledWorkout.mockReset();
+  mockStartWorkoutFromScheduledWorkout.mockResolvedValue(null);
 });
 
 describe('resolveReminderTapDestination', () => {
@@ -210,6 +214,64 @@ describe('resolveReminderTapDestination', () => {
       await expect(
         resolveReminderTapDestination(
           makeResponse({ type: 'scheduled_workout', scheduledWorkoutId: 1, routineId: 42 }),
+        ),
+      ).rejects.toThrow('start error');
+    });
+  });
+
+  // 「直接追加」予定(scheduled_workout_direct、ルーティンを介さず個別に選んだ種目、2026-07-20)の通知。
+  // 種目リストは可変長でdataに積めないため、scheduledWorkoutIdのみを使いDBの引き直しは
+  // startWorkoutFromScheduledWorkout側に委譲する(mockWhereが呼ばれないことで確認する)
+  describe('「直接追加」予定(scheduled_workout_direct)由来の通知', () => {
+    test('scheduledWorkoutIdが欠落/非numberなら遷移せず、startWorkoutFromScheduledWorkoutも呼ばない', async () => {
+      expect(await resolveReminderTapDestination(makeResponse({ type: 'scheduled_workout_direct' }))).toBeNull();
+      expect(
+        await resolveReminderTapDestination(
+          makeResponse({ type: 'scheduled_workout_direct', scheduledWorkoutId: '1' }),
+        ),
+      ).toBeNull();
+      expect(mockStartWorkoutFromScheduledWorkout).not.toHaveBeenCalled();
+    });
+
+    test('進行中セッションが無ければ、scheduledWorkoutIdからワークアウトを開始しそのセッション画面への遷移を返す(DBは引かない)', async () => {
+      mockStartWorkoutFromScheduledWorkout.mockResolvedValue({ sessionId: 7, cards: [] });
+
+      const route = await resolveReminderTapDestination(
+        makeResponse({ type: 'scheduled_workout_direct', scheduledWorkoutId: 3 }),
+      );
+
+      expect(mockWhere).not.toHaveBeenCalled();
+      expect(mockStartWorkoutFromScheduledWorkout).toHaveBeenCalledWith(3);
+      expect(route).toBe('/workout/7');
+    });
+
+    test('既にトレーニングが進行中の場合、新規セッションは開始せずその進行中のセッション画面への遷移を返す', async () => {
+      mockGetActiveSession.mockResolvedValue({ id: 9, startedAt: 0, endedAt: null });
+
+      const route = await resolveReminderTapDestination(
+        makeResponse({ type: 'scheduled_workout_direct', scheduledWorkoutId: 3 }),
+      );
+
+      expect(mockStartWorkoutFromScheduledWorkout).not.toHaveBeenCalled();
+      expect(route).toBe('/workout/9');
+    });
+
+    test('対象の予定が見つからない場合(startWorkoutFromScheduledWorkoutがnullを返す)は記録タブへの遷移を返す', async () => {
+      mockStartWorkoutFromScheduledWorkout.mockResolvedValue(null);
+
+      const route = await resolveReminderTapDestination(
+        makeResponse({ type: 'scheduled_workout_direct', scheduledWorkoutId: 3 }),
+      );
+
+      expect(route).toBe('/');
+    });
+
+    test('ワークアウト開始が失敗した場合、握りつぶさずそのままrejectする', async () => {
+      mockStartWorkoutFromScheduledWorkout.mockRejectedValue(new Error('start error'));
+
+      await expect(
+        resolveReminderTapDestination(
+          makeResponse({ type: 'scheduled_workout_direct', scheduledWorkoutId: 3 }),
         ),
       ).rejects.toThrow('start error');
     });

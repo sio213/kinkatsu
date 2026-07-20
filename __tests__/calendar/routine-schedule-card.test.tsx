@@ -9,7 +9,7 @@ const onReplace = jest.fn();
 
 function render(props: Partial<Parameters<typeof RoutineScheduleCard>[0]> = {}) {
   const merged = {
-    routineName: '胸の日',
+    title: '胸の日',
     categories: ['chest', 'shoulder'],
     exerciseCount: 4,
     timeLabel: '毎週 日曜 07:00',
@@ -188,6 +188,69 @@ describe('RoutineScheduleCard', () => {
     it('onReplaceのみを渡した場合（onDelete無し）、⋮メニューは表示されない（呼び出し側は常にonDeleteと併せて渡す想定のため）', () => {
       const root = render({ onReplace });
       expect(findByAccessibilityLabel(root.root, '「胸の日」毎週 日曜 07:00のメニューを開く')).toBeUndefined();
+    });
+  });
+
+  describe('onPress未指定（直接予定、routineId===null、2026-07-20。編集画面が無いためカード全体はタップ不可にする）', () => {
+    it('onPressStartが無い場合、TouchableOpacityではなくViewになりタップしても何も起きない', () => {
+      const root = render({ onPress: undefined });
+      expect(root.root.findAllByType(TouchableOpacity)).toHaveLength(0);
+      const texts = root.root.findAllByType(Text).map((t) => t.props.children);
+      expect(texts).toContain('胸の日');
+    });
+
+    it('onPressStartがある場合（今日自身の直接予定）でも、カード行はViewのまま開始ボタンだけ操作できる', () => {
+      const root = render({ onPress: undefined, onPressStart });
+      const touchables = root.root.findAllByType(TouchableOpacity);
+      // 開始ボタン(PrimaryButton内部のTouchableOpacity)のみ存在する
+      expect(touchables).toHaveLength(1);
+      act(() => {
+        touchables[0].props.onPress();
+      });
+      expect(onPressStart).toHaveBeenCalledTimes(1);
+    });
+
+    it('onDeleteがあれば、onPress未指定でも⋮メニューは操作できる', () => {
+      const root = render({ onPress: undefined, onDelete });
+      const menuTrigger = findByAccessibilityLabel(root.root, '「胸の日」毎週 日曜 07:00のメニューを開く')!;
+      act(() => {
+        menuTrigger.props.onPress();
+      });
+      const deleteItem = findByAccessibilityLabel(root.root, '削除')!;
+      act(() => {
+        deleteItem.props.onPress();
+      });
+      expect(onDelete).toHaveBeenCalledTimes(1);
+    });
+  });
+
+  describe('exerciseNames（直接予定の全種目名表示、@designer指摘。titleが「先頭の種目名 他N種目」に圧縮され全容を確認する手段が無かった問題、2026-07-20）', () => {
+    it('exerciseNamesが2件以上のとき、titleとは別に全種目名を「、」区切りで表示する', () => {
+      const root = render({
+        title: 'ベンチプレス 他2種目',
+        exerciseNames: ['ベンチプレス', 'インクラインダンベルプレス', 'ケーブルフライ'],
+      });
+      const texts = root.root.findAllByType(Text).map((t) => t.props.children);
+      expect(texts).toContain('ベンチプレス、インクラインダンベルプレス、ケーブルフライ');
+    });
+
+    it('exerciseNamesが1件以下のときは、titleと重複するため全種目名の行を表示しない', () => {
+      const root = render({ title: 'ベンチプレス', exerciseNames: ['ベンチプレス'] });
+      const texts = root.root.findAllByType(Text).map((t) => t.props.children);
+      expect(texts).not.toContain('ベンチプレス、ベンチプレス');
+    });
+
+    it('exerciseNames未指定（ルーティン予定・リマインダー予定）のときは全種目名の行を表示しない', () => {
+      const root = render();
+      const texts = root.root.findAllByType(Text).map((t) => t.props.children);
+      // 全種目名の行はexerciseNames.join('、')の形式のため、「、」を含むテキストが無いことで代替確認する
+      expect(texts.some((t) => typeof t === 'string' && t.includes('、'))).toBe(false);
+    });
+
+    it('exerciseNamesが渡されている（直接予定である）場合、accessibilityLabelにも「直接追加の予定」を含める', () => {
+      const root = render({ title: 'ベンチプレス', exerciseNames: ['ベンチプレス'] });
+      const label = root.root.findByType(TouchableOpacity).props.accessibilityLabel as string;
+      expect(label).toBe('直接追加の予定、ベンチプレス、胸・肩、4種目、毎週 日曜 07:00');
     });
   });
 });

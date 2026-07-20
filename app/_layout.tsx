@@ -200,6 +200,10 @@ export default function RootLayout() {
           {/* 過去日モード（pastDateKey付き）のときだけ選択中の日付をサブタイトルに動的表示
               するため、その場合のみ画面側でStack.Screen optionsを上書きする */}
           <Stack.Screen name="workout/start-routine-picker" options={{ title: 'ルーティンを選択' }} />
+          {/* 選択中の日付をヘッダーに動的表示するため、画面側でStack.Screen optionsを
+              上書きする（workout/routine-loadと同じ方針、2026-07-20新設） */}
+          <Stack.Screen name="calendar/schedule-chooser" options={{ title: 'どう予定する？' }} />
+          <Stack.Screen name="calendar/schedule-exercise-picker" options={{ title: '種目を選択' }} />
           {/* どちらも選択中の日付をヘッダーに動的表示するため、画面側でStack.Screen optionsを
               上書きする（workout/routine-loadと同じ方針） */}
           <Stack.Screen name="calendar/schedule-routine-picker" options={{ title: '' }} />

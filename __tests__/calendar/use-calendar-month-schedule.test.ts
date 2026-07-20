@@ -46,6 +46,13 @@ jest.mock('@/hooks/use-routines', () => ({
   useRoutineExerciseSummaries: () => mockSummaries,
 }));
 
+// 直接予定（routineId===null、2026-07-20）の代表カテゴリ解決用。このテストファイルの関心事
+// （既存のルーティン予定・リマインダー予定の集計）には影響しないため、常に空Mapを返す
+// 軽量スタブにしている（use-calendar-day-manual-schedule.test.tsと同じ方針）
+jest.mock('@/hooks/use-calendar-direct-schedule-summaries', () => ({
+  useCalendarDirectScheduleSummaries: () => new Map(),
+}));
+
 // lib/notifications/scheduler.ts経由でexpo-notificationsが読み込まれる（getFireDatesInRange/
 // parseReminderの再エクスポート元）ため、他のテスト(scheduler.test.ts)と同様にモックしておく
 jest.mock('expo-notifications', () => ({
