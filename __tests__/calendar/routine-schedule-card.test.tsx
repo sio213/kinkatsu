@@ -5,7 +5,6 @@ import { RoutineScheduleCard } from '@/components/calendar/routine-schedule-card
 const onPress = jest.fn();
 const onPressStart = jest.fn();
 const onDelete = jest.fn();
-const onSkip = jest.fn();
 const onReplace = jest.fn();
 
 function render(props: Partial<Parameters<typeof RoutineScheduleCard>[0]> = {}) {
@@ -32,7 +31,6 @@ beforeEach(() => {
   onPress.mockClear();
   onPressStart.mockClear();
   onDelete.mockClear();
-  onSkip.mockClear();
   onReplace.mockClear();
 });
 
@@ -109,7 +107,7 @@ describe('RoutineScheduleCard', () => {
     expect(texts).not.toContain('1回のみ');
   });
 
-  describe('⋮メニュー(onDelete、PR10-3)', () => {
+  describe('⋮メニュー(onDelete、PR10-3・PR10-6a共通。2026-07-19にリマインダー予定側も「今回だけスキップ」から「削除」へ統一)', () => {
     it('onDeleteを渡さない場合（リマインダー予定）、⋮メニューは表示されない', () => {
       const root = render();
       expect(findByAccessibilityLabel(root.root, '「胸の日」毎週 日曜 07:00のメニューを開く')).toBeUndefined();
@@ -155,83 +153,27 @@ describe('RoutineScheduleCard', () => {
     });
   });
 
-  describe('⋮メニュー(onSkip、PR10-6a)', () => {
-    it('onSkipを渡した場合（リマインダー予定）、⋮メニューが表示される', () => {
-      const root = render({ onSkip });
-      expect(findByAccessibilityLabel(root.root, '「胸の日」毎週 日曜 07:00のメニューを開く')).toBeDefined();
-    });
-
-    it('onSkipを渡した場合、メニューには「今回だけスキップ」のみで「削除」は出ない', () => {
-      const root = render({ onSkip });
-      act(() => {
-        findByAccessibilityLabel(root.root, '「胸の日」毎週 日曜 07:00のメニューを開く')!.props.onPress();
-      });
-      expect(findByAccessibilityLabel(root.root, '今回だけスキップ')).toBeDefined();
-      expect(findByAccessibilityLabel(root.root, '削除')).toBeUndefined();
-    });
-
-    it('⋮メニューを開いて「今回だけスキップ」を押すとonSkipが呼ばれ、カード本体のonPressは呼ばれない', () => {
-      const root = render({ onSkip });
-      act(() => {
-        findByAccessibilityLabel(root.root, '「胸の日」毎週 日曜 07:00のメニューを開く')!.props.onPress();
-      });
-      act(() => {
-        findByAccessibilityLabel(root.root, '今回だけスキップ')!.props.onPress();
-      });
-      expect(onSkip).toHaveBeenCalledTimes(1);
-      expect(onPress).not.toHaveBeenCalled();
-    });
-
-    it('「今回だけスキップ」を押した後、メニュー自体が閉じる', () => {
-      const root = render({ onSkip });
-      act(() => {
-        findByAccessibilityLabel(root.root, '「胸の日」毎週 日曜 07:00のメニューを開く')!.props.onPress();
-      });
-      expect(findByAccessibilityLabel(root.root, '今回だけスキップ')).toBeDefined();
-
-      act(() => {
-        findByAccessibilityLabel(root.root, '今回だけスキップ')!.props.onPress();
-      });
-      expect(findByAccessibilityLabel(root.root, '今回だけスキップ')).toBeUndefined();
-    });
-
-    it('onDeleteとonSkipが両方渡された場合、onDeleteが優先される（現状の実装仕様の明文化。呼び出し側は常に排他的に渡すため実運用では起きない）', () => {
-      const root = render({ onDelete, onSkip });
+  describe('⋮メニュー(onReplace、PR10-6b。2026-07-19: onDeleteと併用する構成に変更)', () => {
+    it('onDelete+onReplaceを渡した場合（リマインダー予定）、メニューに「削除」「今回だけ差し替え」の両方が並ぶ', () => {
+      const root = render({ onDelete, onReplace });
       act(() => {
         findByAccessibilityLabel(root.root, '「胸の日」毎週 日曜 07:00のメニューを開く')!.props.onPress();
       });
       expect(findByAccessibilityLabel(root.root, '削除')).toBeDefined();
-      expect(findByAccessibilityLabel(root.root, '今回だけスキップ')).toBeUndefined();
-    });
-
-    it('onDelete/onSkipどちらも無ければ⋮メニューは表示されない', () => {
-      const root = render();
-      expect(findByAccessibilityLabel(root.root, '「胸の日」毎週 日曜 07:00のメニューを開く')).toBeUndefined();
-    });
-  });
-
-  describe('⋮メニュー(onReplace、PR10-6b)', () => {
-    it('onSkip+onReplaceを渡した場合、メニューに「今回だけスキップ」「今回だけ差し替え」の両方が並ぶ', () => {
-      const root = render({ onSkip, onReplace });
-      act(() => {
-        findByAccessibilityLabel(root.root, '「胸の日」毎週 日曜 07:00のメニューを開く')!.props.onPress();
-      });
-      expect(findByAccessibilityLabel(root.root, '今回だけスキップ')).toBeDefined();
       expect(findByAccessibilityLabel(root.root, '今回だけ差し替え')).toBeDefined();
     });
 
-    it('onReplaceのみを渡した場合、⋮メニューには「今回だけ差し替え」だけが表示される', () => {
-      const root = render({ onReplace });
+    it('onDeleteのみを渡した場合（onReplace無し）、⋮メニューには「削除」だけが表示される', () => {
+      const root = render({ onDelete });
       act(() => {
         findByAccessibilityLabel(root.root, '「胸の日」毎週 日曜 07:00のメニューを開く')!.props.onPress();
       });
-      expect(findByAccessibilityLabel(root.root, '今回だけ差し替え')).toBeDefined();
-      expect(findByAccessibilityLabel(root.root, '今回だけスキップ')).toBeUndefined();
-      expect(findByAccessibilityLabel(root.root, '削除')).toBeUndefined();
+      expect(findByAccessibilityLabel(root.root, '削除')).toBeDefined();
+      expect(findByAccessibilityLabel(root.root, '今回だけ差し替え')).toBeUndefined();
     });
 
-    it('「今回だけ差し替え」を押すとonReplaceが呼ばれ、カード本体のonPressは呼ばれない', () => {
-      const root = render({ onSkip, onReplace });
+    it('「今回だけ差し替え」を押すとonReplaceが呼ばれ、onDelete・カード本体のonPressは呼ばれない', () => {
+      const root = render({ onDelete, onReplace });
       act(() => {
         findByAccessibilityLabel(root.root, '「胸の日」毎週 日曜 07:00のメニューを開く')!.props.onPress();
       });
@@ -239,17 +181,13 @@ describe('RoutineScheduleCard', () => {
         findByAccessibilityLabel(root.root, '今回だけ差し替え')!.props.onPress();
       });
       expect(onReplace).toHaveBeenCalledTimes(1);
-      expect(onSkip).not.toHaveBeenCalled();
+      expect(onDelete).not.toHaveBeenCalled();
       expect(onPress).not.toHaveBeenCalled();
     });
 
-    it('onDeleteとonReplaceが両方渡された場合、onDeleteが優先される（現状の実装仕様の明文化）', () => {
-      const root = render({ onDelete, onReplace });
-      act(() => {
-        findByAccessibilityLabel(root.root, '「胸の日」毎週 日曜 07:00のメニューを開く')!.props.onPress();
-      });
-      expect(findByAccessibilityLabel(root.root, '削除')).toBeDefined();
-      expect(findByAccessibilityLabel(root.root, '今回だけ差し替え')).toBeUndefined();
+    it('onReplaceのみを渡した場合（onDelete無し）、⋮メニューは表示されない（呼び出し側は常にonDeleteと併せて渡す想定のため）', () => {
+      const root = render({ onReplace });
+      expect(findByAccessibilityLabel(root.root, '「胸の日」毎週 日曜 07:00のメニューを開く')).toBeUndefined();
     });
   });
 });

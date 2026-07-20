@@ -23,20 +23,8 @@ export type DayScheduleCard = {
   reminder: Reminder;
 };
 
-// 「今回だけスキップ」(PR10-6a)で打ち消された、選択日のリマインダー予定。ゴーストカード
-// （取り消し線+「元に戻す」）の表示に必要な最小限の情報のみ持つ（カテゴリ・種目数は
-// ゴースト表示では使わないためDayScheduleCardより軽量）
-export type SkippedReminderCard = {
-  reminderId: number;
-  routineId: number;
-  routineName: string;
-  hour: number;
-  minute: number;
-};
-
 export type DaySchedule = {
   cards: DayScheduleCard[];
-  skipped: SkippedReminderCard[];
 };
 
 // カレンダーの選択日パネル用。selectedDateの0時〜翌0時ちょうどに発火するルーティン紐付き・
@@ -47,7 +35,10 @@ export type DaySchedule = {
 // ルーティン名・カテゴリ・種目数は既存のuseRoutines/useRoutineExerciseSummaries（ルーティン
 // 一覧カードと同じ集計）をそのまま流用し、reminders単体のクエリと組み合わせる
 // （以前はroutines/routineExercises/exercisesまでJOINして自前集計していたが、この流用に一本化した）。
-// 発火するが打ち消し済み(reminderScheduleSkips、PR10-6a)のものはcardsから除きskippedへ回す
+// 発火するが削除済み(reminderScheduleSkips。手動予定の削除と同様、取り消し不可の削除として
+// 扱う。テーブル名・内部関数名は元の「今回だけスキップ」実装から流用しており「その日の
+// このリマインダー発火は無かったことにする」マーカーとしての役割自体は変わらない)のものは
+// cardsから単純に除外する
 export function useCalendarDaySchedule(selectedDate: Date): DaySchedule {
   const summaries = useRoutineExerciseSummaries();
   const { routines } = useRoutines();
@@ -60,7 +51,7 @@ export function useCalendarDaySchedule(selectedDate: Date): DaySchedule {
   return useMemo(() => {
     const rows = data ?? [];
     const skips = skipRows ?? [];
-    if (rows.length === 0) return { cards: [], skipped: [] };
+    if (rows.length === 0) return { cards: [] };
 
     const routineNameById = new Map(routines.map((r) => [r.id, r.name] as const));
     const skipSet = buildReminderSkipSet(skips);
@@ -71,7 +62,6 @@ export function useCalendarDaySchedule(selectedDate: Date): DaySchedule {
     const dateKey = toDateKey(selectedDate);
 
     const cards: DayScheduleCard[] = [];
-    const skipped: SkippedReminderCard[] = [];
     for (const r of rows) {
       const summary = summaries.get(r.routineId!);
       const routineName = routineNameById.get(r.routineId!);
@@ -87,10 +77,7 @@ export function useCalendarDaySchedule(selectedDate: Date): DaySchedule {
       }
       if (!fires) continue;
 
-      if (skipSet.has(buildReminderSkipKey(r.id, dateKey))) {
-        skipped.push({ reminderId: r.id, routineId: r.routineId!, routineName, hour: r.hour, minute: r.minute });
-        continue;
-      }
+      if (skipSet.has(buildReminderSkipKey(r.id, dateKey))) continue;
 
       cards.push({
         reminderId: r.id,
@@ -104,12 +91,7 @@ export function useCalendarDaySchedule(selectedDate: Date): DaySchedule {
       });
     }
 
-    return {
-      cards: cards.sort((a, b) => a.hour - b.hour || a.minute - b.minute),
-      // ゴーストカードもcardsと同じ時刻順に揃える(@designer指摘: 未ソートだとクエリ返却順のまま
-      // バラバラに並んでしまう)
-      skipped: skipped.sort((a, b) => a.hour - b.hour || a.minute - b.minute),
-    };
+    return { cards: cards.sort((a, b) => a.hour - b.hour || a.minute - b.minute) };
     // selectedDateはDateオブジェクトのため参照が毎回変わり得る。実際に意味を持つのは
     // 年月日のみなのでtoDateKeyで安定した依存値にする
     // eslint-disable-next-line react-hooks/exhaustive-deps

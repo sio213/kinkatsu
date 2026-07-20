@@ -14,7 +14,8 @@ export async function addReminderScheduleSkip(reminderId: number, skippedDate: s
   return inserted.id;
 }
 
-// 選択日パネルの「元に戻す」用
+// 2026-07-19にユーザー向けの「元に戻す」UIは廃止され、現在は「今回だけ差し替え」フローの
+// 内部ロールバック専用（lib/notifications/reminder-skip-scheduler.tsのunskipReminderOccurrence経由）
 export async function removeReminderScheduleSkip(reminderId: number, skippedDate: string): Promise<void> {
   await db
     .delete(reminderScheduleSkips)

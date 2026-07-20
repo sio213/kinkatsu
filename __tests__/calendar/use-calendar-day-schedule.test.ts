@@ -88,7 +88,7 @@ beforeEach(() => {
 describe('useCalendarDaySchedule', () => {
   it('データが未定義(初回ロード中)なら空配列を返す', () => {
     const getResult = renderHook(new Date(2026, 6, 20));
-    expect(getResult()).toEqual({ cards: [], skipped: [] });
+    expect(getResult()).toEqual({ cards: [] });
   });
 
   it('選択日に発火する毎日(interval)リマインダーを、ルーティン名・カテゴリ・種目数付きで返す', () => {
@@ -98,7 +98,6 @@ describe('useCalendarDaySchedule', () => {
     const getResult = renderHook(new Date(2026, 6, 20));
     const result = getResult();
     expect(result.cards).toHaveLength(1);
-    expect(result.skipped).toEqual([]);
     expect(result.cards[0]).toMatchObject({
       reminderId: 1,
       routineId: 10,
@@ -151,35 +150,32 @@ describe('useCalendarDaySchedule', () => {
     expect(getResult().cards.map((c) => c.routineName)).toEqual(['朝の予定', '夜の予定']);
   });
 
-  describe('「今回だけスキップ」(PR10-6a)', () => {
-    it('選択日にスキップ記録があるリマインダーはcardsから除外され、skippedに回る', () => {
+  describe('削除済みリマインダー発火の除外(reminderScheduleSkips、2026-07-19に「今回だけスキップ」から「削除」へ変更)', () => {
+    it('選択日に削除記録があるリマインダーはcardsから除外される', () => {
       mockRows = [{ ...BASE_REMINDER, id: 1, routineId: 10, kind: 'interval', intervalDays: 1, hour: 7, minute: 0 }];
       mockSkipRows = [{ reminderId: 1, skippedDate: '2026-07-20' }];
       mockSummaries = new Map([[10, { exerciseCount: 1, categories: ['chest'] }]]);
       mockRoutines = [{ id: 10, name: '胸の日' }];
       const result = renderHook(new Date(2026, 6, 20))();
       expect(result.cards).toEqual([]);
-      expect(result.skipped).toEqual([{ reminderId: 1, routineId: 10, routineName: '胸の日', hour: 7, minute: 0 }]);
     });
 
-    it('スキップ記録の日付が選択日と異なる場合は除外されない', () => {
+    it('削除記録の日付が選択日と異なる場合は除外されない', () => {
       mockRows = [{ ...BASE_REMINDER, id: 1, routineId: 10, kind: 'interval', intervalDays: 1, hour: 7, minute: 0 }];
       mockSkipRows = [{ reminderId: 1, skippedDate: '2026-07-21' }]; // 別日
       mockSummaries = new Map([[10, { exerciseCount: 1, categories: ['chest'] }]]);
       mockRoutines = [{ id: 10, name: '胸の日' }];
       const result = renderHook(new Date(2026, 6, 20))();
       expect(result.cards).toHaveLength(1);
-      expect(result.skipped).toEqual([]);
     });
 
-    it('スキップ記録のreminderIdが異なる場合は除外されない', () => {
+    it('削除記録のreminderIdが異なる場合は除外されない', () => {
       mockRows = [{ ...BASE_REMINDER, id: 1, routineId: 10, kind: 'interval', intervalDays: 1, hour: 7, minute: 0 }];
       mockSkipRows = [{ reminderId: 999, skippedDate: '2026-07-20' }]; // 別リマインダー
       mockSummaries = new Map([[10, { exerciseCount: 1, categories: ['chest'] }]]);
       mockRoutines = [{ id: 10, name: '胸の日' }];
       const result = renderHook(new Date(2026, 6, 20))();
       expect(result.cards).toHaveLength(1);
-      expect(result.skipped).toEqual([]);
     });
   });
 });

@@ -160,8 +160,9 @@ export default function ScheduleTimePickerScreen() {
       if (skippedForReplace && replaceReminderIdNum !== undefined) {
         // 前半(スキップ)は成立済みなので、後半(手動予定の追加)の失敗を「差し替えできませんでした」
         // で伝えるだけだと、実際には元の予定が消えたままの中途半端な状態が残ってしまう。
-        // 巻き戻し自体が失敗しても(この場合ゴーストカードの「元に戻す」で手動復旧できるため)、
-        // ユーザーに見せるエラー自体は変えずログにのみ残す
+        // 巻き戻し自体が失敗した場合、2026-07-19のゴーストカードUI廃止以降はユーザー向けの
+        // 手動復旧手段が無くなった（元のリマインダー予定は削除されたまま残る）。この二重失敗は
+        // 極めて稀だがユーザーへの追加のエラーAlertは出さずログにのみ残す（変更前と同じ方針を維持）
         try {
           await unskipReminderOccurrence(replaceReminderIdNum, dateKey);
         } catch (rollbackError) {

@@ -209,7 +209,7 @@ describe('useCalendarMonthSchedule', () => {
     expect(result.primaryCategoryByScheduleDay.get('2026-07-20')).toBe('leg');
   });
 
-  describe('「今回だけスキップ」(PR10-6a)による除外', () => {
+  describe('削除済み(reminderScheduleSkips、2026-07-19に「今回だけスキップ」から変更)による除外', () => {
     it('スキップ記録がある日は月グリッド集計から除外される', () => {
       mockRows = [{ ...BASE_REMINDER, id: 1, routineId: 10, kind: 'interval', intervalDays: 1, hour: 7, minute: 0 }];
       mockSummaries = new Map([[10, { exerciseCount: 1, categories: ['chest'] }]]);
