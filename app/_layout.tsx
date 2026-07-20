@@ -218,6 +218,9 @@ export default function RootLayout() {
           <Stack.Screen name="calendar/schedule-workout-routine-picker" options={{ title: 'ルーティン' }} />
           {/* 画面3はヘッダーにルーティン名を動的表示するため、画面側でStack.Screen optionsを上書きする */}
           <Stack.Screen name="calendar/schedule-workout-routine-load" options={{ title: '' }} />
+          <Stack.Screen name="calendar/schedule-workout-history-picker" options={{ title: '過去の記録' }} />
+          {/* 画面3はヘッダーに日付を動的表示するため、画面側でStack.Screen optionsを上書きする */}
+          <Stack.Screen name="calendar/schedule-workout-history-load" options={{ title: '' }} />
           <Stack.Screen
             name="modal"
             options={{ presentation: 'modal', title: 'Modal' }}

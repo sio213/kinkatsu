@@ -1,6 +1,7 @@
 import { db, type DbOrTx, type Tx } from '@/db/client';
 import { scheduledWorkoutExercises, scheduledWorkoutSets, scheduledWorkouts } from '@/db/schema';
-import { buildInitialRoutineSets, getRoutineDetail, type RoutineDetailExercise, type RoutineExerciseSelection } from '@/lib/routines/db';
+import { buildInitialRoutineSets, getRoutineDetail, type RoutineExerciseSelection } from '@/lib/routines/db';
+import { getPreviousSetsForCard } from '@/lib/workout/history';
 import { hasAnyValue, type PreviousSetValues } from '@/lib/workout/set-values';
 import { and, desc, eq } from 'drizzle-orm';
 
@@ -113,23 +114,63 @@ export async function addRoutineExercisesToScheduledWorkout(
     // 単一のINSERT...RETURNINGは挿入した値の順序で行を返す（lib/workout/session.tsの
     // insertSessionExerciseCardsと同じSQLite/expo-sqliteの実際の挙動への依存）ため、
     // inserted[i]とselectedExercises[i]は対応する
-    await insertRoutineSetsForScheduledWorkout(
+    await insertScheduledWorkoutSetsFromValues(
       tx,
-      inserted.map((row, i) => ({ scheduledWorkoutExerciseId: row.id, routineSets: selectedExercises[i].sets })),
+      inserted.map((row, i) => ({ scheduledWorkoutExerciseId: row.id, values: selectedExercises[i].sets })),
       now,
     );
     await touchScheduledWorkout(tx, scheduledWorkoutId, now);
   });
 }
 
-async function insertRoutineSetsForScheduledWorkout(
+export type HistoryCardSelection = { exerciseId: number; sourceWorkoutSessionExerciseId: number };
+
+// ヘッダー⋮「過去の記録から読み込み」(app/calendar/schedule-workout-history-load.tsx)用。
+// lib/workout/session.tsのaddHistoryCardsToSessionと同じ方針で、選んだ過去カードそのものの
+// セット値をコピーする（種目単位で直近を自動特定するaddExercisesToScheduledWorkoutとは異なり、
+// 画面上で確認した過去カードそのものの値を使う）。同じ種目が既にこの予定にあっても上書きはせず、
+// 常に新規行として追加する（種目追加ピッカーと同じ「同じ種目を複数回追加できる」仕様を踏襲）
+export async function addHistoryCardsToScheduledWorkout(
+  scheduledWorkoutId: number,
+  selections: HistoryCardSelection[],
+): Promise<void> {
+  if (selections.length === 0) return;
+  const now = Date.now();
+  const startIndex = (await getMaxOrderIndex(scheduledWorkoutId)) + 1;
+
+  await db.transaction(async (tx) => {
+    const inserted = await tx
+      .insert(scheduledWorkoutExercises)
+      .values(
+        selections.map((s, i) => ({
+          scheduledWorkoutId,
+          exerciseId: s.exerciseId,
+          orderIndex: startIndex + i,
+          createdAt: now,
+        })),
+      )
+      .returning();
+
+    // カードごとに直列でawaitする（lib/workout/session.tsのinsertSessionExerciseCardsと同じ理由。
+    // 同一トランザクション内での並列クエリ発行を避け、insertedとselectionsの対応順を保つ）
+    for (const [i, row] of inserted.entries()) {
+      const historySets = (await getPreviousSetsForCard(tx, selections[i].sourceWorkoutSessionExerciseId)).filter(
+        hasAnyValue,
+      );
+      await insertScheduledWorkoutSetsFromValues(tx, [{ scheduledWorkoutExerciseId: row.id, values: historySets }], now);
+    }
+    await touchScheduledWorkout(tx, scheduledWorkoutId, now);
+  });
+}
+
+async function insertScheduledWorkoutSetsFromValues(
   tx: Tx,
-  rows: { scheduledWorkoutExerciseId: number; routineSets: RoutineDetailExercise['sets'] }[],
+  rows: { scheduledWorkoutExerciseId: number; values: PreviousSetValues[] }[],
   now: number,
 ): Promise<void> {
   for (const row of rows) {
-    const sets = row.routineSets.length > 0
-      ? row.routineSets
+    const sets = row.values.length > 0
+      ? row.values
       : [{ weight: null, reps: null, durationSeconds: null, distanceMeters: null }];
     await tx.insert(scheduledWorkoutSets).values(
       sets.map((s, i) => ({

@@ -58,6 +58,13 @@ export default function ScheduleWorkoutEditScreen() {
     });
   }, [pushDebounced, scheduledWorkoutId]);
 
+  const handleLoadFromHistory = useCallback(() => {
+    pushDebounced({
+      pathname: '/calendar/schedule-workout-history-picker',
+      params: { scheduledWorkoutId: String(scheduledWorkoutId) },
+    });
+  }, [pushDebounced, scheduledWorkoutId]);
+
   const handleSwap = useCallback(
     (scheduledWorkoutExerciseId: number, currentExerciseId: number, currentExerciseName: string, hasRecordedData: boolean) => {
       pushDebounced({
@@ -149,6 +156,17 @@ export default function ScheduleWorkoutEditScreen() {
           ? '保存済みのルーティンがありません'
           : '保存済みのルーティンを選んで種目と目標セット値をまとめて追加します',
       onPress: handleLoadFromRoutine,
+    },
+    {
+      key: 'history',
+      label: '過去の記録から読み込み',
+      icon: 'history',
+      // app/workout/[id].tsxのhandleLoadFromHistoryと同じ文言（あちらは種目カード個別の
+      // ⋮メニューにも同名の項目があるため区別する目的も兼ねるが、この画面のカードには
+      // 履歴読み込み項目自体が無い。「過去のセッション単位で複数種目をまとめて追加する」
+      // という操作の性質自体は変わらないため、同じ説明文をそのまま踏襲する）
+      hint: '過去のトレーニングを選んで複数の種目をまとめて追加します',
+      onPress: handleLoadFromHistory,
     },
     {
       key: 'reorder',
