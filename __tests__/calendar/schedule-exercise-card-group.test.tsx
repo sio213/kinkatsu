@@ -98,7 +98,7 @@ describe('ScheduleExerciseCardGroup', () => {
 
   it('⋮メニューの「削除」を押すとonDeleteが呼ばれる', () => {
     const root = render();
-    const menuTrigger = findByAccessibilityLabel(root.root, '「ベンチプレス 他1種目」のメニューを開く')!;
+    const menuTrigger = findByAccessibilityLabel(root.root, '「ベンチプレス 他1種目」夜 19:30のメニューを開く')!;
     act(() => {
       menuTrigger.props.onPress();
     });
@@ -111,7 +111,7 @@ describe('ScheduleExerciseCardGroup', () => {
 
   it('onReplaceを渡さない場合（直接予定・実体化済みルーティン予定）、⋮メニューに「今回だけ差し替え」は出ない', () => {
     const root = render();
-    const menuTrigger = findByAccessibilityLabel(root.root, '「ベンチプレス 他1種目」のメニューを開く')!;
+    const menuTrigger = findByAccessibilityLabel(root.root, '「ベンチプレス 他1種目」夜 19:30のメニューを開く')!;
     act(() => {
       menuTrigger.props.onPress();
     });
@@ -120,7 +120,7 @@ describe('ScheduleExerciseCardGroup', () => {
 
   it('onReplaceを渡す場合（未実体化のリマインダー予定）、⋮メニューに「今回だけ差し替え」が出てタップでonReplaceが呼ばれる', () => {
     const root = render({ onReplace });
-    const menuTrigger = findByAccessibilityLabel(root.root, '「ベンチプレス 他1種目」のメニューを開く')!;
+    const menuTrigger = findByAccessibilityLabel(root.root, '「ベンチプレス 他1種目」夜 19:30のメニューを開く')!;
     act(() => {
       menuTrigger.props.onPress();
     });
@@ -139,7 +139,7 @@ describe('ScheduleExerciseCardGroup', () => {
 
   it('onPressStartを渡す場合（今日自身の予定）、開始ボタンが表示されタップでonPressStartが呼ばれる', () => {
     const root = render({ onPressStart });
-    const startBtn = findByAccessibilityLabel(root.root, '「ベンチプレス 他1種目」のトレーニングを開始')!;
+    const startBtn = findByAccessibilityLabel(root.root, '「ベンチプレス 他1種目」夜 19:30のトレーニングを開始')!;
     act(() => {
       startBtn.props.onPress();
     });

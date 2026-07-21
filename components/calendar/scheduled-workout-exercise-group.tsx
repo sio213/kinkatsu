@@ -1,6 +1,6 @@
 import { ScheduleExerciseCardGroup } from '@/components/calendar/schedule-exercise-card-group';
 import { useScheduledExerciseCards } from '@/hooks/use-scheduled-exercise-cards';
-import { memo } from 'react';
+import { memo, useMemo } from 'react';
 
 type Props = {
   scheduledWorkoutId: number;
@@ -30,14 +30,24 @@ export const ScheduledWorkoutExerciseGroup = memo(function ScheduledWorkoutExerc
   onDelete,
   onPress,
 }: Props) {
-  const { cards, retry } = useScheduledExerciseCards(scheduledWorkoutId);
+  const { cards: rawCards, retry } = useScheduledExerciseCards(scheduledWorkoutId);
+  // 変換をuseMemoに包み、ScheduleExerciseCardGroup(memo)が毎レンダー新しい配列参照で
+  // 再描画される事故を防ぐ（@reviewer指摘）。scheduledWorkoutExerciseIdは分解代入で落とし、
+  // 呼び出し先の型に無いフィールドが余分に残らないようにする
+  const cards = useMemo(
+    () =>
+      rawCards === 'error' || rawCards === null
+        ? rawCards
+        : rawCards.map(({ scheduledWorkoutExerciseId, ...card }) => ({ key: String(scheduledWorkoutExerciseId), ...card })),
+    [rawCards],
+  );
 
   return (
     <ScheduleExerciseCardGroup
       routineName={routineName}
       sessionStartedAt={sessionStartedAt}
       title={title}
-      cards={cards === 'error' || cards === null ? cards : cards.map((card) => ({ key: String(card.scheduledWorkoutExerciseId), ...card }))}
+      cards={cards}
       onRetryCards={retry}
       onPressStart={onPressStart}
       onDelete={onDelete}

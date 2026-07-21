@@ -1,6 +1,7 @@
 import { ScheduleExerciseCardGroup } from '@/components/calendar/schedule-exercise-card-group';
 import { useRoutinePreviewExerciseCards } from '@/hooks/use-routine-preview-exercise-cards';
-import { memo } from 'react';
+import { hasAnyValue } from '@/lib/workout/set-values';
+import { memo, useMemo } from 'react';
 
 type Props = {
   routineId: number;
@@ -34,26 +35,35 @@ export const ReminderScheduleExerciseGroup = memo(function ReminderScheduleExerc
   onPress,
 }: Props) {
   const { exercises, loaded } = useRoutinePreviewExerciseCards(routineId);
+  // useScheduledExerciseCards（hooks/use-scheduled-exercise-cards.ts:107）と同じくhasAnyValueで
+  // 全カラムnullの空セット行を除外してからセンチネルを付与する（@reviewer指摘: フィルタが無いと
+  // 「値の無い空セット行」を持つルーティンで、実体化前(プレビュー)は「1セット」と表示され、
+  // タップして実体化した後は「実施記録なし」に変わってしまい、この改修が統一しようとしている
+  // 当の見た目が割れる）。cards変換自体もuseMemoに包み、ScheduleExerciseCardGroup(memo)が
+  // 毎レンダー新しい配列参照で再描画される事故を防ぐ（@reviewer指摘）
+  const cards = useMemo(
+    () =>
+      loaded
+        ? exercises.map((exercise) => ({
+            key: String(exercise.routineExerciseId),
+            exerciseId: exercise.exerciseId,
+            name: exercise.name,
+            category: exercise.category,
+            source: exercise.source,
+            slug: exercise.slug,
+            measurementType: exercise.measurementType,
+            sets: exercise.sets.filter(hasAnyValue).map((set) => ({ ...set, completedAt: 0 })),
+          }))
+        : null,
+    [exercises, loaded],
+  );
 
   return (
     <ScheduleExerciseCardGroup
       routineName={routineName}
       sessionStartedAt={sessionStartedAt}
       title={routineName}
-      cards={
-        loaded
-          ? exercises.map((exercise) => ({
-              key: String(exercise.routineExerciseId),
-              exerciseId: exercise.exerciseId,
-              name: exercise.name,
-              category: exercise.category,
-              source: exercise.source,
-              slug: exercise.slug,
-              measurementType: exercise.measurementType,
-              sets: exercise.sets.map((set) => ({ ...set, completedAt: 0 })),
-            }))
-          : null
-      }
+      cards={cards}
       onPressStart={onPressStart}
       onDelete={onDelete}
       onReplace={onReplace}
