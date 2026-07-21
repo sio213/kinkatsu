@@ -1,8 +1,8 @@
 import { CalendarExerciseCard } from '@/components/calendar/calendar-exercise-card';
 import { CategoryColorLegend } from '@/components/calendar/category-color-legend';
 import { DayEmptyState } from '@/components/calendar/day-empty-state';
-import { DirectScheduleExerciseGroup } from '@/components/calendar/direct-schedule-exercise-group';
-import { RoutineScheduleCard } from '@/components/calendar/routine-schedule-card';
+import { ReminderScheduleExerciseGroup } from '@/components/calendar/reminder-schedule-exercise-group';
+import { ScheduledWorkoutExerciseGroup } from '@/components/calendar/scheduled-workout-exercise-group';
 import { SessionTimeGroupHeader } from '@/components/calendar/session-time-group-header';
 import { SwipeableMonthView } from '@/components/calendar/swipeable-month-view';
 import { CategoryFilterChips } from '@/components/exercises/category-filter-chips';
@@ -25,14 +25,12 @@ import { addMonths, isSameDay, toDateKey } from '@/lib/calendar/date-grid';
 import { CATEGORY_ALL, EXERCISE_CATEGORIES } from '@/lib/exercises/constants';
 import { buildTodayTimeline, groupCardsBySession } from '@/lib/calendar/session-groups';
 import { DIRECT_SCHEDULE_DELETE_MESSAGE, mergeScheduleCards, type UnifiedScheduleCard } from '@/lib/calendar/schedule';
-import { formatHourMinute, formatHourMinuteParts } from '@/lib/calendar/time-of-day';
-import { formatKindSummary } from '@/lib/notifications/format';
 import { skipReminderOccurrence } from '@/lib/notifications/reminder-skip-scheduler';
-import { removeScheduledWorkout } from '@/lib/notifications/scheduled-workout-scheduler';
+import { materializeReminderOccurrence, removeScheduledWorkout } from '@/lib/notifications/scheduled-workout-scheduler';
 import { startWorkoutFromRoutine, startWorkoutFromScheduledWorkout } from '@/lib/workout/session';
 import { formatElapsedClock, formatMonthGroup, formatSessionDateGroup } from '@/lib/workout/summary';
 import { Stack } from 'expo-router';
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { ActivityIndicator, Alert, ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
@@ -66,68 +64,6 @@ function MonthNavButton({
         color={Colors.textPlaceholder}
       />
     </TouchableOpacity>
-  );
-}
-
-// UnifiedScheduleCard（lib/calendar/schedule.tsのmergeScheduleCards出力）を
-// RoutineScheduleCardのpropsへ変換する部分を今日パネル・未来日パネルで共有する
-// （oneTime/onDeleteの分岐がJSX2箇所に複製されていた、PRレビュー指摘対応）。
-// cardを通常の関数引数として受け取ることで、source==='manual'の絞り込みが
-// scheduledWorkoutId参照までそのまま効く（entry.card.xxxのような複合参照だとTSが
-// 絞り込みを保持できずIIFEが必要だった、PRレビュー指摘対応）
-// ReturnType<typeof mergeScheduleCards>はmergeScheduleCardsの型パラメータ制約
-// （reminder: unknown）で解決されてしまい、card.reminderへのプロパティアクセスが
-// 効かなくなる（実際の呼び出し箇所のcardは型推論で正しくReminderになるため問題なかったが、
-// このコンポーネント内でcard.reminder.idにアクセスする際に顕在化した）。呼び出し元
-// （lib/calendar/schedule.tsのUnifiedScheduleCard）をReminderで具体化して参照する
-type MergedScheduleCard = UnifiedScheduleCard<Reminder>;
-function ScheduleEntryCard({
-  card,
-  timeLabel,
-  onPress,
-  onPressStart,
-  onDeleteManual,
-  onDeleteReminder,
-  onReplace,
-}: {
-  card: MergedScheduleCard;
-  timeLabel: string;
-  // 直接予定（routineId===null、2026-07-20）はDirectScheduleExerciseGroupで別途描画するため、
-  // このコンポーネントに到達する時点でcard.routineIdは必ずnumber（呼び出し側で分岐済み）
-  onPress: () => void;
-  onPressStart?: () => void;
-  // 直接予定は上のコメント通りこのコンポーネントに到達しないため、titleは常にルーティン名
-  onDeleteManual: (scheduledWorkoutId: number, routineName: string) => void;
-  // リマインダー予定の⋮メニュー「削除」用（2026-07-19: 「今回だけスキップ」から変更、
-  // 呼び出し先は確認ダイアログを挟む）。リマインダーは常にルーティン紐付きのためtitleは常に
-  // ルーティン名になる
-  onDeleteReminder: (reminderId: number, routineName: string) => void;
-  // リマインダー予定の⋮メニュー「今回だけ差し替え」用（PR10-6b、リマインダー予定専用のため
-  // 常にルーティン名）
-  onReplace: (reminderId: number, routineName: string, hour: number, minute: number) => void;
-}) {
-  return (
-    <RoutineScheduleCard
-      title={card.title}
-      categories={card.categories}
-      exerciseCount={card.exerciseCount}
-      timeLabel={timeLabel}
-      onPress={onPress}
-      onPressStart={onPressStart}
-      oneTime={card.source === 'manual'}
-      // 手動予定・リマインダー予定どちらも「削除」——出所ごとに呼び出す先の関数だけが異なる
-      // （RoutineScheduleCard側は出所を意識せず共通のonDeleteとして受け取る）
-      onDelete={
-        card.source === 'manual'
-          ? () => onDeleteManual(card.scheduledWorkoutId, card.title)
-          : () => onDeleteReminder(card.reminder.id, card.title)
-      }
-      onReplace={
-        card.source === 'reminder'
-          ? () => onReplace(card.reminder.id, card.title, card.hour, card.minute)
-          : undefined
-      }
-    />
   );
 }
 
@@ -165,6 +101,91 @@ function DayCardList({
         />
       ))}
     </View>
+  );
+}
+
+// mergeScheduleCards（lib/calendar/schedule.ts）出力をUnifiedScheduleCard<Reminder>で具体化して
+// 参照する（旧ScheduleEntryCardのコメントと同じ理由: ReturnType<typeof mergeScheduleCards>だと
+// 型パラメータ制約でcard.reminderへのアクセスが効かなくなる）
+type MergedScheduleCard = UnifiedScheduleCard<Reminder>;
+
+// 直接予定/実体化済みルーティン予定/未実体化リマインダー予定の3分岐ディスパッチを、今日パネル・
+// 未来日パネルの2箇所で重複させないよう共通化する（2026-07-21、@reviewer指摘: 分岐ロジックが
+// 丸ごと複製されており、将来4種類目の予定が増えた場合や分岐条件を変えた場合に片側だけ
+// 直すと表示が割れるリスクがあった）。今日パネルだけ開始ボタンを持つ(showStart)ため、
+// それ以外の差分（Viewでのラップ有無・keyの付け方・sessionStartedAtの算出方法）は
+// 呼び出し側に委ねる
+function ScheduleTimelineEntry({
+  card,
+  sessionStartedAt,
+  showStart,
+  onEditScheduledWorkoutExercises,
+  onStartScheduledWorkout,
+  onDeleteDirectSchedule,
+  onDeleteRoutineSchedule,
+  onStartRoutine,
+  onDeleteReminderOccurrence,
+  onReplace,
+  onMaterializeAndEdit,
+}: {
+  card: MergedScheduleCard;
+  sessionStartedAt: number;
+  showStart: boolean;
+  onEditScheduledWorkoutExercises: (scheduledWorkoutId: number) => void;
+  onStartScheduledWorkout: (scheduledWorkoutId: number, title: string) => void;
+  onDeleteDirectSchedule: (scheduledWorkoutId: number) => void;
+  onDeleteRoutineSchedule: (scheduledWorkoutId: number, routineName: string) => void;
+  onStartRoutine: (routineId: number, title: string) => void;
+  onDeleteReminderOccurrence: (reminderId: number, routineName: string) => void;
+  onReplace: (reminderId: number, routineName: string, hour: number, minute: number) => void;
+  onMaterializeAndEdit: (reminderId: number, routineId: number, routineName: string, hour: number, minute: number) => void;
+}) {
+  // 直接予定（routineId===null、2026-07-20）は種目一覧カード表示に切り替える（@ユーザー指摘）。
+  // reminderは常にルーティン紐付きのためroutineIdがnullになることは無く、
+  // card.source==='manual'で必ずscheduledWorkoutIdが取れる
+  if (card.routineId == null && card.source === 'manual') {
+    return (
+      <ScheduledWorkoutExerciseGroup
+        scheduledWorkoutId={card.scheduledWorkoutId}
+        sessionStartedAt={sessionStartedAt}
+        title={card.title}
+        onPressStart={showStart ? () => onStartScheduledWorkout(card.scheduledWorkoutId, card.title) : undefined}
+        onDelete={() => onDeleteDirectSchedule(card.scheduledWorkoutId)}
+        onPress={() => onEditScheduledWorkoutExercises(card.scheduledWorkoutId)}
+      />
+    );
+  }
+  // 直接予定は上のif分岐で処理済みのため、ここに来る時点でcard.routineIdは必ずnumber
+  // （reminderは常にルーティン紐付き、manualも上でnullを弾いている）
+  const routineId = card.routineId!;
+  // 手動で追加したルーティン予定（実体化済み、scheduledWorkoutIdを持つ）。この予定インスタンス
+  // 専用にコピーされた種目・目標セットを編集・表示する（2026-07-21、ルーティン予定を直接予定と
+  // 同じアーキテクチャに統一）
+  if (card.source === 'manual') {
+    return (
+      <ScheduledWorkoutExerciseGroup
+        scheduledWorkoutId={card.scheduledWorkoutId}
+        routineName={card.title}
+        sessionStartedAt={sessionStartedAt}
+        title={card.title}
+        onPressStart={showStart ? () => onStartScheduledWorkout(card.scheduledWorkoutId, card.title) : undefined}
+        onDelete={() => onDeleteRoutineSchedule(card.scheduledWorkoutId, card.title)}
+        onPress={() => onEditScheduledWorkoutExercises(card.scheduledWorkoutId)}
+      />
+    );
+  }
+  // リマインダー由来の未実体化予定。ルーティン本体の現在の中身をプレビュー表示し、種目カード
+  // タップ時に初めてscheduledWorkoutsとして実体化してから編集画面へ遷移する
+  return (
+    <ReminderScheduleExerciseGroup
+      routineId={routineId}
+      routineName={card.title}
+      sessionStartedAt={sessionStartedAt}
+      onPressStart={showStart ? () => onStartRoutine(routineId, card.title) : undefined}
+      onDelete={() => onDeleteReminderOccurrence(card.reminder.id, card.title)}
+      onReplace={() => onReplace(card.reminder.id, card.title, card.hour, card.minute)}
+      onPress={() => onMaterializeAndEdit(card.reminder.id, routineId, card.title, card.hour, card.minute)}
+    />
   );
 }
 
@@ -292,21 +313,18 @@ export default function CalendarScreen() {
     (card: CalendarDayCard) => pushDebounced(`/workout/${card.sessionId}`),
     [pushDebounced],
   );
-  const handlePressRoutine = useCallback(
-    (routineId: number) => pushDebounced(`/routine/edit/${routineId}`),
-    [pushDebounced],
-  );
   // 未来日パネルの「予定を追加」ボタン用（PR10、2026-07-20に開始方法選択画面(schedule-chooser)を
   // 経由するよう変更）。日付は選択日で確定済みのためdateKeyだけ渡す
   const handlePressAddSchedule = useCallback(
     () => pushDebounced({ pathname: '/calendar/schedule-chooser', params: { dateKey: toDateKey(selectedDate) } }),
     [pushDebounced, selectedDate],
   );
-  // 直接予定（routineId===null、2026-07-20）の種目一覧カードタップ用。過去の記録の種目カードが
-  // 記録編集画面(/workout/[sessionId])へ飛ぶのと同じ考え方で、この予定の種目一覧・目標セットを
-  // まとめて編集する画面（schedule-workout-edit.tsx）へ遷移する（@ユーザー指摘）。この画面は
+  // scheduledWorkoutId実体を持つ予定（直接予定、および実体化済みルーティン予定、2026-07-21に
+  // 対象を拡大）の種目一覧カードタップ用。過去の記録の種目カードが記録編集画面
+  // (/workout/[sessionId])へ飛ぶのと同じ考え方で、この予定の種目一覧・目標セットをまとめて
+  // 編集する画面（schedule-workout-edit.tsx）へ遷移する（@ユーザー指摘）。この画面は
   // scheduledWorkoutIdのlive queryで自前にDBを引くため、種目idの受け渡しは不要
-  const handleEditDirectScheduleExercises = useCallback(
+  const handleEditScheduledWorkoutExercises = useCallback(
     (scheduledWorkoutId: number) =>
       pushDebounced({
         pathname: '/calendar/schedule-workout-edit',
@@ -419,6 +437,50 @@ export default function CalendarScreen() {
       }),
     [pushDebounced, selectedDate],
   );
+  // リマインダー由来の未実体化予定（ReminderScheduleExerciseGroup）の種目カードタップ用
+  // （2026-07-21）。まだscheduledWorkouts行が存在しないため、初めてこの日付・時刻の実体を
+  // 作ってから種目編集画面へ遷移する。reminderId単位のガードで、非同期処理中の連打による
+  // 二重実体化（materializeReminderOccurrence自体はcreate側に冪等性が無い、PR2で確認済み）を防ぐ
+  const materializingReminderIdsRef = useRef<Set<number>>(new Set());
+  const handleMaterializeAndEditRoutineSchedule = useCallback(
+    async (reminderId: number, routineId: number, routineName: string, hour: number, minute: number) => {
+      if (materializingReminderIdsRef.current.has(reminderId)) return;
+      materializingReminderIdsRef.current.add(reminderId);
+      try {
+        const { scheduledWorkoutId, notificationSuppressed } = await materializeReminderOccurrence(
+          reminderId,
+          routineId,
+          routineName,
+          toDateKey(selectedDate),
+          hour,
+          minute,
+        );
+        const goToEditScreen = () =>
+          pushDebounced({
+            pathname: '/calendar/schedule-workout-edit',
+            params: { scheduledWorkoutId: String(scheduledWorkoutId) },
+          });
+        // schedule-time-picker.tsxのisReplaceMode分岐と同じ扱い（@reviewer指摘: 無言だと
+        // 「消えたはずの通知が鳴った」で信頼を損なう）。編集画面へ着地する前に一言伝える
+        if (!notificationSuppressed) {
+          Alert.alert(
+            '予定を開きました',
+            '元の予定の新しい通知の登録処理に失敗した可能性があるため、念のため指定時刻に通知が届いていないかご確認ください。',
+            [{ text: 'OK', onPress: goToEditScreen }],
+            { cancelable: false },
+          );
+        } else {
+          goToEditScreen();
+        }
+      } catch (e) {
+        console.error('[materialize reminder occurrence]', e);
+        Alert.alert('エラー', '予定を開けませんでした。');
+      } finally {
+        materializingReminderIdsRef.current.delete(reminderId);
+      }
+    },
+    [pushDebounced, selectedDate],
+  );
 
   const { activeSession } = useWorkoutSessions();
   const resumeSummary = useResumeWorkoutSummary(activeSession);
@@ -457,15 +519,23 @@ export default function CalendarScreen() {
 
   // 今日の予定カードの「開始」ボタン用。進行中セッションがある場合の確認ダイアログを含む
   // ロジックはuseStartWithConfirmに共通化してある（ルーティン一覧のカード
-  // 「開始」ボタンと挙動が同一のため）
+  // 「開始」ボタンと挙動が同一のため）。まだ実体化していないリマインダー予定
+  // （card.source==='reminder'）専用——scheduledWorkoutIdを持たないため、開始時点では
+  // ルーティン本体から直接プリフィルするしかない
   const handleStartRoutine = useStartWithConfirm(
     activeSession,
     (sessionId) => pushDebounced(`/workout/${sessionId}`),
     startWorkoutFromRoutine,
   );
-  // 今日の「直接追加」予定カードの「開始」ボタン用（2026-07-20）。handleStartRoutineと同じ
-  // useStartWithConfirmだが、startWorkoutFromScheduledWorkoutで開始する
-  const handleStartDirectSchedule = useStartWithConfirm(
+  // scheduledWorkoutId実体を持つ予定（直接予定、および実体化済みルーティン予定）共通の
+  // 「開始」ボタン用（2026-07-20、2026-07-21に対象を拡大）。handleStartRoutineと同じ
+  // useStartWithConfirmだが、startWorkoutFromScheduledWorkoutで開始する。実体化済みルーティン
+  // 予定は、schedule-workout-edit.tsxでこの予定インスタンス専用に編集した目標セット
+  // （scheduledWorkoutSets）を持つため、開始時もルーティン本体(startWorkoutFromRoutine)ではなく
+  // 必ずこちらを使う（@ユーザー指摘: routineId!=nullでもhandleStartRoutineを使うと、編集画面で
+  // 変更した目標セットが「開始」に反映されない。旧ScheduleEntryCardの分岐をそのまま踏襲すると
+  // このバグを引き継ぐため、計画時点の想定から意図的に変更した）
+  const handleStartScheduledWorkout = useStartWithConfirm(
     activeSession,
     (sessionId) => pushDebounced(`/workout/${sessionId}`),
     startWorkoutFromScheduledWorkout,
@@ -556,39 +626,23 @@ export default function CalendarScreen() {
                       );
                     }
                     // 予定エントリは常にentry1件=カード1枚（グルーピングされない）で、
-                    // RoutineScheduleCard自身が時刻バッジを持つため、SessionTimeGroupHeaderを
-                    // 重ねると同じ時刻が2回表示されてしまっていた（@designer指摘、PR10-4で削除）
-                    const { card } = entry;
-                    // 直接予定（routineId===null、2026-07-20）は種目一覧カード表示に切り替える
-                    // （@ユーザー指摘）。reminderは常にルーティン紐付きのためroutineIdがnullに
-                    // なることは無く、card.source==='manual'で必ずscheduledWorkoutIdが取れる
-                    if (card.routineId == null && card.source === 'manual') {
-                      return (
-                        <View key={entry.key} style={styles.dayGroup}>
-                          <DirectScheduleExerciseGroup
-                            scheduledWorkoutId={card.scheduledWorkoutId}
-                            sessionStartedAt={entry.sortAt}
-                            title={card.title}
-                            onPressStart={() => handleStartDirectSchedule(card.scheduledWorkoutId, card.title)}
-                            onDelete={() => handleDeleteDirectSchedule(card.scheduledWorkoutId)}
-                            onPress={() => handleEditDirectScheduleExercises(card.scheduledWorkoutId)}
-                          />
-                        </View>
-                      );
-                    }
-                    // 直接予定は上のif分岐で処理済みのため、ここに来る時点でcard.routineIdは
-                    // 必ずnumber（reminderは常にルーティン紐付き、manualも上でnullを弾いている）
-                    const routineId = card.routineId!;
+                    // ScheduleExerciseCardGroup自身がSessionTimeGroupHeaderを内包するため、
+                    // ここで重ねて出す必要はない（2026-07-21、旧RoutineScheduleCardの
+                    // 「自身が時刻バッジを持つため重ねない」制約を全予定種別で統一）
                     return (
                       <View key={entry.key} style={styles.dayGroup}>
-                        <ScheduleEntryCard
-                          card={card}
-                          timeLabel={`今日 ${formatHourMinute(new Date(entry.sortAt))}`}
-                          onPress={() => handlePressRoutine(routineId)}
-                          onPressStart={() => handleStartRoutine(routineId, card.title)}
-                          onDeleteManual={handleDeleteRoutineSchedule}
-                          onDeleteReminder={handleDeleteReminderOccurrence}
+                        <ScheduleTimelineEntry
+                          card={entry.card}
+                          sessionStartedAt={entry.sortAt}
+                          showStart
+                          onEditScheduledWorkoutExercises={handleEditScheduledWorkoutExercises}
+                          onStartScheduledWorkout={handleStartScheduledWorkout}
+                          onDeleteDirectSchedule={handleDeleteDirectSchedule}
+                          onDeleteRoutineSchedule={handleDeleteRoutineSchedule}
+                          onStartRoutine={handleStartRoutine}
+                          onDeleteReminderOccurrence={handleDeleteReminderOccurrence}
                           onReplace={handlePressReplace}
+                          onMaterializeAndEdit={handleMaterializeAndEditRoutineSchedule}
                         />
                       </View>
                     );
@@ -625,43 +679,31 @@ export default function CalendarScreen() {
             ) : (
               <View style={styles.dayCardList}>
                 {mergedSchedule.map((card) => {
-                  // 直接予定（routineId===null、2026-07-20）は種目一覧カード表示に切り替える
-                  // （今日パネルと同じ、@ユーザー指摘）
-                  if (card.routineId == null && card.source === 'manual') {
-                    const sessionStartedAt = new Date(
-                      selectedDate.getFullYear(),
-                      selectedDate.getMonth(),
-                      selectedDate.getDate(),
-                      card.hour,
-                      card.minute,
-                    ).getTime();
-                    return (
-                      <DirectScheduleExerciseGroup
-                        key={card.key}
-                        scheduledWorkoutId={card.scheduledWorkoutId}
-                        sessionStartedAt={sessionStartedAt}
-                        title={card.title}
-                        onDelete={() => handleDeleteDirectSchedule(card.scheduledWorkoutId)}
-                        onPress={() => handleEditDirectScheduleExercises(card.scheduledWorkoutId)}
-                      />
-                    );
-                  }
-                  // 直接予定は上のif分岐で処理済みのため、ここに来る時点でcard.routineIdは
-                  // 必ずnumber（reminderは常にルーティン紐付き、manualも上でnullを弾いている）
-                  const routineId = card.routineId!;
+                  // 予定エントリはSessionTimeGroupHeaderをsessionStartedAt(選択日+予定のhour/minute
+                  // で合成)から自前で組み立てる（今日パネルと同じ、2026-07-21に全予定種別で統一）
+                  const sessionStartedAt = new Date(
+                    selectedDate.getFullYear(),
+                    selectedDate.getMonth(),
+                    selectedDate.getDate(),
+                    card.hour,
+                    card.minute,
+                  ).getTime();
+                  // 未来日パネルは開始ボタンを持たない（デザイン案「未来日は開始ボタンなし」）
+                  // ためshowStart=falseで渡す
                   return (
-                    <ScheduleEntryCard
+                    <ScheduleTimelineEntry
                       key={card.key}
                       card={card}
-                      timeLabel={
-                        card.source === 'reminder'
-                          ? formatKindSummary(card.reminder)
-                          : formatHourMinuteParts(card.hour, card.minute)
-                      }
-                      onPress={() => handlePressRoutine(routineId)}
-                      onDeleteManual={handleDeleteRoutineSchedule}
-                      onDeleteReminder={handleDeleteReminderOccurrence}
+                      sessionStartedAt={sessionStartedAt}
+                      showStart={false}
+                      onEditScheduledWorkoutExercises={handleEditScheduledWorkoutExercises}
+                      onStartScheduledWorkout={handleStartScheduledWorkout}
+                      onDeleteDirectSchedule={handleDeleteDirectSchedule}
+                      onDeleteRoutineSchedule={handleDeleteRoutineSchedule}
+                      onStartRoutine={handleStartRoutine}
+                      onDeleteReminderOccurrence={handleDeleteReminderOccurrence}
                       onReplace={handlePressReplace}
+                      onMaterializeAndEdit={handleMaterializeAndEditRoutineSchedule}
                     />
                   );
                 })}

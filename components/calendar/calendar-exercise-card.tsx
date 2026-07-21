@@ -29,16 +29,17 @@ type Props = {
   // 比較対象が無い/変化なしならnull
   comparison: SetComparison | null;
   // 遷移先はこのカード自身では決めず、呼び出し元(app/(tabs)/calendar.tsxのDayCardList)に
-  // 委ねる。今日・過去日パネルは記録編集画面、直接予定の種目一覧
-  // (DirectScheduleExerciseGroup)は目標セット編集画面と、同じカードでも文脈によって
-  // 遷移先が異なるため（2026-07-21更新: 当初は今日パネルだけ種目詳細だったが記録編集画面に統一）
+  // 委ねる。今日・過去日パネルは記録編集画面、予定の種目一覧
+  // (components/calendar/schedule-exercise-card-group.tsx)は目標セット編集画面と、同じカードでも
+  // 文脈によって遷移先が異なるため（2026-07-21更新: 当初は今日パネルだけ種目詳細だったが記録編集画面に統一）
   onPress: () => void;
   // 遷移先の説明（例:「タップして種目の詳細を見ます」）。exercise-card.tsx/session-card.tsxは
   // accessibilityLabel自体に行き先を含めているが、このカードは種目名・カテゴリ・セット概要の
   // 読み上げが既に長いため、行き先の説明はhintに分離する（@designer指摘: 遷移先が文脈で
   // 変わるようになった以上、読み上げだけでは行き先を予見できない）
   accessibilityHint?: string;
-  // 直接予定の種目プレビュー（DirectScheduleExerciseGroup）用。setsが空のとき、通常の
+  // 予定（直接予定・ルーティン予定どちらも）の種目プレビュー
+  // (components/calendar/schedule-exercise-card-group.tsx)用。setsが空のとき、通常の
   // 「0セット」（実在のセッションで記録し忘れた場合の表示、既存の意味）ではなくこちらを表示する
   // ことで、「一度も実施したことが無い」を「記録し忘れた」と混同させない（@designer指摘、2026-07-20）
   emptySetsLabel?: string;

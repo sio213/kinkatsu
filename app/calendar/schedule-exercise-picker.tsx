@@ -17,8 +17,8 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 // （ルーティン版のschedule-routine-picker→schedule-time-pickerと同じ2段階構成）。
 // 既存予定に種目を追加する場合はapp/calendar/schedule-workout-add-exercise.tsx、
 // 既存予定の種目・目標セットをまとめて編集する場合はapp/calendar/schedule-workout-edit.tsxを使う
-// （どちらも既存予定の種目一覧カード(DirectScheduleExerciseGroup)タップ後の導線で、この画面は
-// 新規作成専用、2026-07-20に編集モードを分離）
+// （どちらも既存予定の種目一覧カード(components/calendar/scheduled-workout-exercise-group.tsx)
+// タップ後の導線で、この画面は新規作成専用、2026-07-20に編集モードを分離）
 export default function ScheduleExercisePickerScreen() {
   const { dateKey } = useLocalSearchParams<{ dateKey: string }>();
   const router = useRouter();

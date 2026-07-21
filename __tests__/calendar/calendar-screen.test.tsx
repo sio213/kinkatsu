@@ -58,17 +58,27 @@ jest.mock('@/lib/workout/session', () => ({
   startWorkoutFromScheduledWorkout: (...args: unknown[]) => mockStartWorkoutFromScheduledWorkout(...args),
 }));
 
-// DirectScheduleExerciseGroup（直接予定の種目一覧カード表示、2026-07-20）がDB接続を必要とする
-// useScheduledExerciseCardsに触れないよう、フックレイヤーでモックする
-// （calendar-screen.test.tsxはDBモックチェーンを組んでいない画面レベルテストのため）
+// ScheduledWorkoutExerciseGroup（scheduledWorkoutId実体を持つ予定の種目一覧カード表示、
+// 2026-07-20新設・2026-07-21一般化）がDB接続を必要とするuseScheduledExerciseCardsに触れないよう、
+// フックレイヤーでモックする（calendar-screen.test.tsxはDBモックチェーンを組んでいない
+// 画面レベルテストのため）
 const mockUseScheduledExerciseCards = jest.fn();
 jest.mock('@/hooks/use-scheduled-exercise-cards', () => ({
   useScheduledExerciseCards: (...args: unknown[]) => mockUseScheduledExerciseCards(...args),
 }));
 
+// ReminderScheduleExerciseGroup（未実体化のリマインダー予定プレビュー、2026-07-21）が
+// DB接続を必要とするuseRoutinePreviewExerciseCardsに触れないよう、同じ理由でモックする
+const mockUseRoutinePreviewExerciseCards = jest.fn();
+jest.mock('@/hooks/use-routine-preview-exercise-cards', () => ({
+  useRoutinePreviewExerciseCards: (...args: unknown[]) => mockUseRoutinePreviewExerciseCards(...args),
+}));
+
 const mockRemoveScheduledWorkout = jest.fn();
+const mockMaterializeReminderOccurrence = jest.fn();
 jest.mock('@/lib/notifications/scheduled-workout-scheduler', () => ({
   removeScheduledWorkout: (...args: unknown[]) => mockRemoveScheduledWorkout(...args),
+  materializeReminderOccurrence: (...args: unknown[]) => mockMaterializeReminderOccurrence(...args),
 }));
 
 const mockSkipReminderOccurrence = jest.fn();
@@ -133,6 +143,8 @@ beforeEach(() => {
   mockStartWorkoutFromScheduledWorkout.mockResolvedValue({ sessionId: 77, cards: [] });
   mockSkipReminderOccurrence.mockResolvedValue({ notificationSuppressed: true });
   mockUseScheduledExerciseCards.mockReturnValue({ cards: [], retry: jest.fn() });
+  mockUseRoutinePreviewExerciseCards.mockReturnValue({ exercises: [], loaded: true });
+  mockMaterializeReminderOccurrence.mockResolvedValue({ scheduledWorkoutId: 99, notificationSuppressed: true });
 });
 
 describe('CalendarScreen 今日・記録なしパネル', () => {
@@ -242,7 +254,7 @@ describe('CalendarScreen 今日・記録なしパネル', () => {
     const root = render();
 
     expect(
-      root.findAllByType(TouchableOpacity).find((t) => t.props.accessibilityLabel === '「夜の予定」のトレーニングを開始'),
+      root.findAllByType(TouchableOpacity).find((t) => t.props.accessibilityLabel === '「夜の予定」夜 19:30のトレーニングを開始'),
     ).toBeDefined();
     expect(root.findAllByType(TouchableOpacity).find((t) => t.props.accessibilityLabel === 'トレーニングを開始')).toBeUndefined();
     expect(root.findAllByType(TouchableOpacity).find((t) => t.props.accessibilityLabel === '予定を追加')).toBeDefined();
@@ -534,19 +546,24 @@ describe('CalendarScreen 予定（PR9-2: リマインダー由来の未来予定
     return { cards };
   }
 
-  test('今日、実績が無く予定だけある場合、予定カードに「今日 HH:MM」と開始ボタンが表示される', () => {
+  test('今日、実績が無く予定だけある場合、予定カードに時間帯見出し「夜 HH:MM」と開始ボタンが表示される', () => {
     mockUseCalendarDaySchedule.mockReturnValue(daySchedule([scheduleCard()]));
     const root = render();
 
     expect(root.findByProps({ children: '胸の日' })).toBeDefined();
-    expect(findTextByJoinedChildren(root, '今日 20:00')).toBeDefined();
+    expect(findTextByJoinedChildren(root, '夜 20:00')).toBeDefined();
     expect(root.findAllByProps({ children: '開始' }).length).toBeGreaterThan(0);
   });
 
-  test('今日、予定カードには「予定」ラベルの見出しが付かない（カード自身の時刻バッジと二重表示になるため、PR10-4でSessionTimeGroupHeaderを予定エントリには出さないよう変更）', () => {
+  // 2026-07-21、ルーティン予定を直接予定と同じ種目カード一覧表示に統一したことで、
+  // 予定エントリもScheduleExerciseCardGroup(SessionTimeGroupHeaderを内包)を使うようになり、
+  // 直接予定と同じく常に「予定」ピルが付くようになった（旧PR10-4の「二重表示回避のため出さない」
+  // という制約は、旧RoutineScheduleCardが自前の時刻バッジを持っていたことに起因しており、
+  // 統一後は不要になった）
+  test('今日、予定カードには「予定」ラベルの見出しが付く（直接予定と同じSessionTimeGroupHeaderを使うため）', () => {
     mockUseCalendarDaySchedule.mockReturnValue(daySchedule([scheduleCard()]));
     const root = render();
-    expect(findTextByJoinedChildren(root, '予定')).toBeUndefined();
+    expect(findTextByJoinedChildren(root, '予定')).toBeDefined();
   });
 
   test('今日、実績と予定が両方ある場合、時刻順に混ざって表示される（予定側は自身の時刻バッジのみで、実績側とは別カード形状のため見出しの「予定」ラベルは付けない、PR10-4で時刻の二重表示を解消）', () => {
@@ -575,11 +592,11 @@ describe('CalendarScreen 予定（PR9-2: リマインダー由来の未来予定
     expect(findTextByJoinedChildren(root, '朝 07:10')).toBeDefined();
     expect(root.findByProps({ children: '朝の種目' })).toBeDefined();
     expect(root.findByProps({ children: '胸の日' })).toBeDefined();
-    expect(findTextByJoinedChildren(root, '今日 20:00')).toBeDefined();
+    expect(findTextByJoinedChildren(root, '夜 20:00')).toBeDefined();
 
     const allTexts = root.findAllByType(Text).map((t) => [t.props.children].flat().join(''));
     const morningIndex = allTexts.indexOf('朝 07:10');
-    const scheduleTimeIndex = allTexts.indexOf('今日 20:00');
+    const scheduleTimeIndex = allTexts.indexOf('夜 20:00');
     expect(scheduleTimeIndex).toBeGreaterThan(morningIndex);
   });
 
@@ -769,7 +786,10 @@ describe('CalendarScreen 予定（PR9-2: リマインダー由来の未来予定
       };
     }
 
-    test('未来日に手動予定があれば表示され、時刻ラベルは「HH:MM」の素の表記になる（頻度表示は付かない）', () => {
+    // 2026-07-21、予定エントリは直接予定と同じSessionTimeGroupHeader（時間帯ラベル+時刻）を
+    // 使うよう統一されたため、手動予定・リマインダー予定どちらも同じ表記になる
+    // （旧「HH:MMの素の表記」というリマインダー予定との差別化は無くなった）
+    test('未来日に手動予定があれば表示され、時間帯見出し「夜 HH:MM」が付く', () => {
       const root = render();
       const future = new Date();
       future.setDate(future.getDate() + 5);
@@ -777,7 +797,7 @@ describe('CalendarScreen 予定（PR9-2: リマインダー由来の未来予定
       selectDate(future);
 
       expect(root.findByProps({ children: '脚の日' })).toBeDefined();
-      expect(findTextByJoinedChildren(root, '19:30')).toBeDefined();
+      expect(findTextByJoinedChildren(root, '夜 19:30')).toBeDefined();
     });
 
     test('同じルーティンがリマインダー予定・手動予定の両方にある場合、手動予定だけが表示される（重複排除）', () => {
@@ -788,15 +808,14 @@ describe('CalendarScreen 予定（PR9-2: リマインダー由来の未来予定
       mockUseCalendarDayManualSchedule.mockReturnValue([manualCard({ routineId: 20, title: '脚の日' })]);
       selectDate(future);
 
-      // 「脚の日」の予定カードは1枚だけ（重複表示されない）。findAllByType(TouchableOpacity)の
-      // accessibilityLabelで数える（findAllByProps({children:'脚の日'})はTextの内部ホスト要素まで
-      // 二重にマッチするため、カード単位の存在確認には使えない）
+      // 「脚の日」の予定カードは1枚だけ（重複表示されない）。⋮メニュートリガーの
+      // accessibilityLabel（ルーティン名+時刻を含み一意）で数える（findAllByProps({children:'脚の日'})
+      // はTextの内部ホスト要素まで二重にマッチするため、カード単位の存在確認には使えない）
       const cards = root
         .findAllByType(TouchableOpacity)
-        .filter((t) => typeof t.props.accessibilityLabel === 'string' && t.props.accessibilityLabel.startsWith('脚の日、'));
+        .filter((t) => typeof t.props.accessibilityLabel === 'string' && t.props.accessibilityLabel === '「脚の日」夜 19:30のメニューを開く');
       expect(cards.length).toBe(1);
-      // 手動予定側の素の時刻表記が使われている（リマインダー側のformatKindSummaryではない）
-      expect(findTextByJoinedChildren(root, '19:30')).toBeDefined();
+      expect(findTextByJoinedChildren(root, '夜 19:30')).toBeDefined();
     });
 
     test('過去日を選択すると、手動予定を返していても表示されない（過去日は実績のみ）', () => {
@@ -1092,13 +1111,13 @@ describe('CalendarScreen 予定（PR9-2: リマインダー由来の未来予定
         });
       });
 
-      test('今日自身の手動予定も選択日パネルに表示され、「今日 HH:MM」表記＋⋮メニューが出る（PR10-4、選択日が今日になった瞬間消えていたバグの修正）', () => {
+      test('今日自身の手動予定も選択日パネルに表示され、時間帯見出し「夜 HH:MM」＋⋮メニューが出る（PR10-4、選択日が今日になった瞬間消えていたバグの修正）', () => {
         mockUseCalendarDayManualSchedule.mockReturnValue([manualCard({ title: '今日だけの脚の日', hour: 19, minute: 30 })]);
         const root = render();
         // selectDateしない=今日が選択されたまま
 
         expect(root.findByProps({ children: '今日だけの脚の日' })).toBeDefined();
-        expect(findTextByJoinedChildren(root, '今日 19:30')).toBeDefined();
+        expect(findTextByJoinedChildren(root, '夜 19:30')).toBeDefined();
         expect(findMenuTrigger(root, '今日だけの脚の日')).toBeDefined();
       });
 
@@ -1144,18 +1163,24 @@ describe('CalendarScreen 予定（PR9-2: リマインダー由来の未来予定
         expect(Alert.alert).toHaveBeenCalledWith('エラー', '予定を削除できませんでした。');
       });
 
-      test('今日自身の手動予定にも「開始」ボタンが表示され、押すとstartWorkoutFromRoutineが呼ばれる（リマインダー予定と同じ扱い、PR10-4）', async () => {
-        mockUseCalendarDayManualSchedule.mockReturnValue([manualCard({ routineId: 20, title: '今日だけの脚の日' })]);
+      // 2026-07-21、手動追加のルーティン予定（実体化済み、scheduledWorkoutIdを持つ）の「開始」は
+      // ルーティン本体(startWorkoutFromRoutine)ではなく、この予定インスタンス専用にコピーされた
+      // 目標セット(startWorkoutFromScheduledWorkout)から開始するよう変更した。ルーティン本体から
+      // 開始すると、schedule-workout-edit.tsxで編集した目標セットが「開始」に反映されない
+      // バグになるため（@ユーザー指摘、計画時点の想定から意図的に変更）
+      test('今日自身の手動予定にも「開始」ボタンが表示され、押すとstartWorkoutFromScheduledWorkoutがscheduledWorkoutIdで呼ばれる（編集画面で変更した目標セットを反映するため、ルーティン本体からは開始しない）', async () => {
+        mockUseCalendarDayManualSchedule.mockReturnValue([manualCard({ scheduledWorkoutId: 1, routineId: 20, title: '今日だけの脚の日' })]);
         const root = render();
 
         const startBtn = root
           .findAllByType(TouchableOpacity)
-          .find((t) => t.props.accessibilityLabel === '「今日だけの脚の日」のトレーニングを開始')!;
+          .find((t) => t.props.accessibilityLabel === '「今日だけの脚の日」夜 19:30のトレーニングを開始')!;
         await act(async () => {
           await startBtn.props.onPress();
         });
 
-        expect(mockStartWorkoutFromRoutine).toHaveBeenCalledWith(20);
+        expect(mockStartWorkoutFromScheduledWorkout).toHaveBeenCalledWith(1);
+        expect(mockStartWorkoutFromRoutine).not.toHaveBeenCalled();
         expect(mockPush).toHaveBeenCalledWith('/workout/77');
       });
 
@@ -1167,7 +1192,7 @@ describe('CalendarScreen 予定（PR9-2: リマインダー由来の未来予定
 
         const startBtn = root
           .findAllByType(TouchableOpacity)
-          .find((t) => t.props.accessibilityLabel === '「ベンチプレス 他2種目」のトレーニングを開始')!;
+          .find((t) => t.props.accessibilityLabel === '「ベンチプレス 他2種目」夜 19:30のトレーニングを開始')!;
         await act(async () => {
           await startBtn.props.onPress();
         });
@@ -1218,7 +1243,7 @@ describe('CalendarScreen 予定（PR9-2: リマインダー由来の未来予定
 
         const cards = root
           .findAllByType(TouchableOpacity)
-          .filter((t) => typeof t.props.accessibilityLabel === 'string' && t.props.accessibilityLabel.startsWith('脚の日、'));
+          .filter((t) => typeof t.props.accessibilityLabel === 'string' && t.props.accessibilityLabel === '「脚の日」夜 19:30のメニューを開く');
         expect(cards.length).toBe(1);
         expect(findMenuTrigger(root, '脚の日')).toBeDefined();
       });
@@ -1698,7 +1723,7 @@ describe('CalendarScreen 予定（PR9-2: リマインダー由来の未来予定
     function findStartButton(root: ReactTestInstance) {
       return root
         .findAllByType(TouchableOpacity)
-        .find((t) => t.props.accessibilityLabel === '「胸の日」のトレーニングを開始')!;
+        .find((t) => t.props.accessibilityLabel === '「胸の日」夜 20:00のトレーニングを開始')!;
     }
 
     test('進行中セッションが無ければAlertを出さず、そのままstartWorkoutFromRoutineでワークアウトを開始する', async () => {
@@ -1750,6 +1775,137 @@ describe('CalendarScreen 予定（PR9-2: リマインダー由来の未来予定
       expect(mockEndWorkoutSession).toHaveBeenCalledWith(9);
       expect(mockStartWorkoutFromRoutine).toHaveBeenCalledWith(10);
       expect(mockPush).toHaveBeenCalledWith('/workout/77');
+    });
+  });
+
+  // リマインダー由来の未実体化予定（ReminderScheduleExerciseGroup）の種目カードタップ用
+  // （2026-07-21）。まだscheduledWorkouts行が存在しないため、初めてこの日付・時刻の実体を
+  // 作ってから種目編集画面へ遷移する（handleMaterializeAndEditRoutineSchedule）
+  describe('リマインダー予定の種目カードタップ→実体化(materializeReminderOccurrence)', () => {
+    function mockRoutinePreviewWithExercise() {
+      mockUseRoutinePreviewExerciseCards.mockReturnValue({
+        exercises: [
+          {
+            routineExerciseId: 100,
+            exerciseId: 10,
+            name: 'ベンチプレス',
+            category: 'chest',
+            source: 'preset',
+            slug: 'bench_press',
+            measurementType: 'weight_reps',
+            sets: [{ id: 900, weight: 60, reps: 8, durationSeconds: null, distanceMeters: null }],
+          },
+        ],
+        loaded: true,
+      });
+    }
+
+    function findExerciseCard(root: ReactTestInstance) {
+      return root
+        .findAllByType(TouchableOpacity)
+        .find((t) => typeof t.props.accessibilityLabel === 'string' && t.props.accessibilityLabel.startsWith('ベンチプレス、'))!;
+    }
+
+    test('未実体化のリマインダー予定の種目カードをタップすると、reminderId/routineId/routineName/選択日のdateKey/hour/minuteでmaterializeReminderOccurrenceを呼び、成功したらschedule-workout-editへ遷移する', async () => {
+      mockRoutinePreviewWithExercise();
+      mockUseCalendarDaySchedule.mockReturnValue(daySchedule([scheduleCard()]));
+      mockMaterializeReminderOccurrence.mockResolvedValue({ scheduledWorkoutId: 55, notificationSuppressed: true });
+      const root = render();
+
+      await act(async () => {
+        await findExerciseCard(root).props.onPress();
+      });
+
+      expect(mockMaterializeReminderOccurrence).toHaveBeenCalledWith(1, 10, '胸の日', toDateKey(new Date()), 20, 0);
+      expect(mockPush).toHaveBeenCalledWith({
+        pathname: '/calendar/schedule-workout-edit',
+        params: { scheduledWorkoutId: '55' },
+      });
+    });
+
+    test('notificationSuppressed:falseの場合、遷移前に警告Alertを出し、OKを押してから遷移する（schedule-time-picker.tsxのisReplaceMode分岐と同じ扱い）', async () => {
+      mockRoutinePreviewWithExercise();
+      mockUseCalendarDaySchedule.mockReturnValue(daySchedule([scheduleCard()]));
+      mockMaterializeReminderOccurrence.mockResolvedValue({ scheduledWorkoutId: 55, notificationSuppressed: false });
+      const root = render();
+
+      await act(async () => {
+        await findExerciseCard(root).props.onPress();
+      });
+
+      expect(mockPush).not.toHaveBeenCalled();
+      const alertCall = (Alert.alert as jest.Mock).mock.calls[0];
+      expect(alertCall[0]).toBe('予定を開きました');
+      await act(async () => {
+        await alertCall[2][0].onPress();
+      });
+      expect(mockPush).toHaveBeenCalledWith({
+        pathname: '/calendar/schedule-workout-edit',
+        params: { scheduledWorkoutId: '55' },
+      });
+    });
+
+    test('materializeReminderOccurrenceが失敗した場合はエラーAlertを表示し、遷移しない', async () => {
+      mockRoutinePreviewWithExercise();
+      mockUseCalendarDaySchedule.mockReturnValue(daySchedule([scheduleCard()]));
+      mockMaterializeReminderOccurrence.mockRejectedValueOnce(new Error('fail'));
+      jest.spyOn(console, 'error').mockImplementation(() => {});
+      const root = render();
+
+      await act(async () => {
+        await findExerciseCard(root).props.onPress();
+      });
+
+      expect(Alert.alert).toHaveBeenCalledWith('エラー', '予定を開けませんでした。');
+      expect(mockPush).not.toHaveBeenCalled();
+    });
+
+    test('二重タップ防止: 実行中に同じ種目カードを連打しても、materializeReminderOccurrenceは1回しか呼ばれない', async () => {
+      mockRoutinePreviewWithExercise();
+      mockUseCalendarDaySchedule.mockReturnValue(daySchedule([scheduleCard()]));
+      let resolveMaterialize!: (v: { scheduledWorkoutId: number; notificationSuppressed: boolean }) => void;
+      mockMaterializeReminderOccurrence.mockImplementationOnce(
+        () =>
+          new Promise((resolve) => {
+            resolveMaterialize = resolve;
+          }),
+      );
+      const root = render();
+      const card = findExerciseCard(root);
+
+      act(() => {
+        card.props.onPress();
+        card.props.onPress();
+      });
+      expect(mockMaterializeReminderOccurrence).toHaveBeenCalledTimes(1);
+
+      await act(async () => {
+        resolveMaterialize({ scheduledWorkoutId: 55, notificationSuppressed: true });
+        await Promise.resolve();
+      });
+    });
+
+    // ここまでは今日パネル側のみのテスト。未来日パネルも同じhandleMaterializeAndEditRoutineSchedule
+    // に配線されているが、ScheduleTimelineEntryへのprops渡し間違い（コピペ時のtypo等）を
+    // 拾うため、未来日側でも最低1本は実際にタップして検証しておく（@tester指摘）
+    test('未来日: 未実体化のリマインダー予定の種目カードをタップすると、選択日のdateKeyでmaterializeReminderOccurrenceを呼び、成功したらschedule-workout-editへ遷移する', async () => {
+      const root = render();
+      const future = new Date();
+      future.setDate(future.getDate() + 5);
+      mockRoutinePreviewWithExercise();
+      mockUseCalendarDaySchedule.mockReturnValue(daySchedule([scheduleCard()]));
+      mockMaterializeReminderOccurrence.mockResolvedValue({ scheduledWorkoutId: 55, notificationSuppressed: true });
+      selectDate(future);
+
+      await act(async () => {
+        await findExerciseCard(root).props.onPress();
+      });
+
+      expect(mockMaterializeReminderOccurrence).toHaveBeenCalledWith(1, 10, '胸の日', toDateKey(future), 20, 0);
+      expect(mockPush).toHaveBeenCalledWith({
+        pathname: '/calendar/schedule-workout-edit',
+        params: { scheduledWorkoutId: '55' },
+      });
     });
   });
 });
