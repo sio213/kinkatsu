@@ -28,9 +28,11 @@ export type UseCalendarDayExercisesResult = {
   retry: () => void;
 };
 
-// 選択中の日付に開始した完了済みセッション（複数セッションがあれば全て）の種目カードを、
-// 自己ベスト判定・前回比較つきでまとめて返す。cards: null=読み込み中、'error'=取得失敗、
-// 配列=取得成功（0件含む）（session-history-load-view.tsxと同じ三値管理）。
+// 選択中の日付に開始した終了済みセッション（複数セッションがあれば全て）の種目カードを、
+// 自己ベスト判定・前回比較つきでまとめて返す。getSessionExerciseCardsにincludeUnconfirmedCards:true
+// を渡しており、✓未確定セットのみのカード（月グリッドの実績マーカーと表示対象を揃えるため）も
+// 含む点が「読み込む種目を選ぶ」画面（確定セットを持つカードのみ）と異なる。cards: null=読み込み中、
+// 'error'=取得失敗、配列=取得成功（0件含む）（session-history-load-view.tsxと同じ三値管理）。
 // 対象日のセッション自体はuseWorkoutSessions()のlive queryから絞り込むため一覧の増減に追従するが、
 // 各カードの中身（種目・セット・自己ベスト・前回比較）はgetSessionExerciseCards等の一括取得を
 // 都度実行する一時点のスナップショットで、live query化はしていない（カレンダーで過去日を見ている間に
@@ -73,7 +75,7 @@ export function useCalendarDayExercises(selectedDate: Date): UseCalendarDayExerc
         // ここでカードへ付与しておく
         const cardsBySession = await Promise.all(
           daySessions.map(async ({ id: sessionId, startedAt: sessionStartedAt }) => {
-            const cards = await getSessionExerciseCards(sessionId);
+            const cards = await getSessionExerciseCards(sessionId, { includeUnconfirmedCards: true });
             return cards.map((c) => ({ ...c, sessionId, sessionStartedAt }));
           }),
         );

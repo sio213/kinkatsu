@@ -10,7 +10,8 @@ export type DailyCategoryRow = {
   category: string;
 };
 
-// rowsは「完了済みセット1件につき1行」を想定する。日付(dateKey)をまたいだ行の順序は
+// rowsは「集計対象のセット1件につき1行」を想定する（どのセットを集計対象にするかは呼び出し側の
+// 責務。hooks/use-calendar-month-records.tsを参照）。日付(dateKey)をまたいだ行の順序は
 // 結果に影響しない（日ごとに独立集計するため）が、同じdateKey内の行は実施順（セッション
 // 開始時刻→種目追加順）で並んでいる必要がある。この順序が「その日最初にやった種目」の判定に使われる
 export function aggregateDailyPrimaryCategory(rows: DailyCategoryRow[]): Map<string, string> {

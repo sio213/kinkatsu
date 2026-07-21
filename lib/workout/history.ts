@@ -290,11 +290,17 @@ export type SessionHistoryCard = {
   sets: HistorySetValues[];
 };
 
-// 「読み込む種目を選ぶ」画面用。指定した過去セッション内のカードを、種目情報とセット内容つきで
-// orderIndex順に返す。✓確定セットが1件も無いカードは対象外（getExerciseHistoryEntriesと同じ理由）。
-// measurementTypeは想定外のDB値でも画面側でフォールバックできるようstringのまま返す
-// （history-picker.tsxのexerciseと同じ扱い）
-export async function getSessionExerciseCards(sessionId: number): Promise<SessionHistoryCard[]> {
+// 「読み込む種目を選ぶ」画面・カレンダー日別詳細で共用。指定した過去セッション内のカードを、
+// 種目情報とセット内容つきでorderIndex順に返す。デフォルトは✓確定セットが1件も無いカードを
+// 対象外にする（getExerciseHistoryEntriesと同じ理由。読み込み画面は過去の「確定した」値を
+// 引き継ぐための機能なので下書きを含めない）。カレンダー日別詳細のように未確定カードも
+// そのまま表示したい呼び出し元はincludeUnconfirmedCards: trueを渡す
+// （measurementTypeは想定外のDB値でも画面側でフォールバックできるようstringのまま返す。
+// history-picker.tsxのexerciseと同じ扱い）
+export async function getSessionExerciseCards(
+  sessionId: number,
+  options?: { includeUnconfirmedCards?: boolean },
+): Promise<SessionHistoryCard[]> {
   const cards = await db
     .select({
       workoutSessionExerciseId: workoutSessionExercises.id,
@@ -337,12 +343,12 @@ export async function getSessionExerciseCards(sessionId: number): Promise<Sessio
     }
   }
 
-  return cards
-    .map((c) => ({
-      ...c,
-      sets: setsByCard.get(c.workoutSessionExerciseId) ?? [],
-    }))
-    .filter((card) => card.sets.some((s) => s.completedAt != null));
+  const cardsWithSets = cards.map((c) => ({
+    ...c,
+    sets: setsByCard.get(c.workoutSessionExerciseId) ?? [],
+  }));
+  if (options?.includeUnconfirmedCards) return cardsWithSets;
+  return cardsWithSets.filter((card) => card.sets.some((s) => s.completedAt != null));
 }
 
 // nullを無視した最大値。全件nullならnull（0にフォールバックしない。0にすると値の無い

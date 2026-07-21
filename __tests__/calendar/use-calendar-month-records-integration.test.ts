@@ -1,8 +1,8 @@
 // db/client.ts はexpo-sqlite依存でjest環境では動かせないため、history-integration.test.tsと
 // 同様にbetter-sqlite3で実SQLiteを立て、hooks/use-calendar-month-records.tsが発行するJOINクエリを
 // 再現して検証する。単体テスト（day-category.test.ts等）はJS側の集計ロジックしか見ておらず、
-// SQL側の境界条件（日付範囲の閉区間/開区間、進行中セッション・未確定セットの除外）は
-// ここでしか確認できない。
+// SQL側の境界条件（日付範囲の閉区間/開区間、進行中セッションの除外、確定セット0件セッションの
+// 未確定セットによる補完）はここでしか確認できない。
 // 注意: use-calendar-month-records.ts側のクエリ・カラムを変更した場合はこのヘルパーも
 // 合わせて更新すること（自動追従はしない）
 import Database from 'better-sqlite3';
@@ -87,7 +87,13 @@ function getCalendarMonthRecordsSql(db: Database.Database, startMs: number, endM
        JOIN exercises e ON wse.exercise_id = e.id
        WHERE ws.started_at >= ? AND ws.started_at < ?
          AND ws.ended_at IS NOT NULL
-         AND s.completed_at IS NOT NULL
+         AND (
+           s.completed_at IS NOT NULL
+           OR NOT EXISTS (
+             SELECT 1 FROM sets s2
+             WHERE s2.session_id = s.session_id AND s2.completed_at IS NOT NULL
+           )
+         )
        ORDER BY ws.started_at ASC, ws.id ASC, wse.order_index ASC`,
     )
     .all(startMs, endMs) as { startedAt: number; category: string }[];
@@ -109,7 +115,13 @@ function getCalendarMonthCategorySetSql(db: Database.Database, startMs: number, 
        JOIN exercises e ON wse.exercise_id = e.id
        WHERE ws.started_at >= ? AND ws.started_at < ?
          AND ws.ended_at IS NOT NULL
-         AND s.completed_at IS NOT NULL
+         AND (
+           s.completed_at IS NOT NULL
+           OR NOT EXISTS (
+             SELECT 1 FROM sets s2
+             WHERE s2.session_id = s.session_id AND s2.completed_at IS NOT NULL
+           )
+         )
        ORDER BY ws.started_at ASC, ws.id ASC, wse.order_index ASC`,
     )
     .all(startMs, endMs) as { startedAt: number; category: string }[];
@@ -142,14 +154,14 @@ describe('useCalendarMonthRecordsのSQLクエリ（実SQLite）', () => {
     expect(result.size).toBe(0);
   });
 
-  it('✓未確定セット(completed_at IS NULL)は実績に含めない', () => {
+  it('✓未確定セット(completed_at IS NULL)のみのセッションも、終了済みなら実績として日付キーに反映される', () => {
     const chest = insertExercise(db, 'ベンチプレス', 'chest');
     const session = insertSession(db, new Date(2026, 6, 16).getTime(), new Date(2026, 6, 16, 1).getTime());
     const card = insertCard(db, session, chest, 0);
     insertSet(db, session, chest, card, 1, false); // 未確定
 
     const result = getCalendarMonthRecordsSql(db, 0, Number.MAX_SAFE_INTEGER);
-    expect(result.size).toBe(0);
+    expect(result.get('2026-07-16')).toBe('chest');
   });
 
   it('完了済みセッション・確定済みセットは実績として日付キーに反映される', () => {
@@ -230,5 +242,60 @@ describe('useCalendarMonthRecordsのSQLクエリ（実SQLite）', () => {
     const categorySet = getCalendarMonthCategorySetSql(db, 0, Number.MAX_SAFE_INTEGER);
     expect(primary.get('2026-07-16')).toBe('chest');
     expect(categorySet.get('2026-07-16')).toEqual(new Set(['chest', 'arm']));
+  });
+
+  it('確定セットを持つセッションでは、同セッション内の未確定セットは代表カテゴリの集計に混入しない', () => {
+    const leg = insertExercise(db, 'スクワット', 'leg');
+    const chest = insertExercise(db, 'ベンチプレス', 'chest');
+    const session = insertSession(db, new Date(2026, 6, 16).getTime(), new Date(2026, 6, 16, 1).getTime());
+    // legは確定3セット、chestは未確定5セット（✓押し忘れの雑な入力を想定）。
+    // 未確定セットが集計に入るとchest(5)がleg(3)を上回ってしまうため、legのままであることを検証する
+    const legCard = insertCard(db, session, leg, 0);
+    insertSet(db, session, leg, legCard, 1, true);
+    insertSet(db, session, leg, legCard, 2, true);
+    insertSet(db, session, leg, legCard, 3, true);
+    const chestCard = insertCard(db, session, chest, 1);
+    for (let i = 1; i <= 5; i++) insertSet(db, session, chest, chestCard, i, false);
+
+    const primary = getCalendarMonthRecordsSql(db, 0, Number.MAX_SAFE_INTEGER);
+    const categorySet = getCalendarMonthCategorySetSql(db, 0, Number.MAX_SAFE_INTEGER);
+    expect(primary.get('2026-07-16')).toBe('leg');
+    // 未確定のみのchestはcategorySetByDay（フィルタ用の集合）にも含まれない
+    expect(categorySet.get('2026-07-16')).toEqual(new Set(['leg']));
+  });
+
+  it('確定セットが0件のセッションのみの日は、未確定セットで代表カテゴリを補完する', () => {
+    const arm = insertExercise(db, 'ダンベルカール', 'arm');
+    const session = insertSession(db, new Date(2026, 6, 16).getTime(), new Date(2026, 6, 16, 1).getTime());
+    const card = insertCard(db, session, arm, 0);
+    insertSet(db, session, arm, card, 1, false);
+    insertSet(db, session, arm, card, 2, false);
+
+    const primary = getCalendarMonthRecordsSql(db, 0, Number.MAX_SAFE_INTEGER);
+    const categorySet = getCalendarMonthCategorySetSql(db, 0, Number.MAX_SAFE_INTEGER);
+    expect(primary.get('2026-07-16')).toBe('arm');
+    expect(categorySet.get('2026-07-16')).toEqual(new Set(['arm']));
+  });
+
+  it('確定0件セッションと確定済みセッションが同日にある場合、両方が代表カテゴリの集計に参加する', () => {
+    const leg = insertExercise(db, 'スクワット', 'leg');
+    const arm = insertExercise(db, 'ダンベルカール', 'arm');
+    // 朝: legを確定2セットだけ実施
+    const morning = insertSession(db, new Date(2026, 6, 16, 7, 0).getTime(), new Date(2026, 6, 16, 8, 0).getTime());
+    const legCard = insertCard(db, morning, leg, 0);
+    insertSet(db, morning, leg, legCard, 1, true);
+    insertSet(db, morning, leg, legCard, 2, true);
+    // 夜: armを未確定のまま3セット入力して終了（このセッション単体では確定0件）
+    const evening = insertSession(db, new Date(2026, 6, 16, 20, 0).getTime(), new Date(2026, 6, 16, 21, 0).getTime());
+    const armCard = insertCard(db, evening, arm, 0);
+    insertSet(db, evening, arm, armCard, 1, false);
+    insertSet(db, evening, arm, armCard, 2, false);
+    insertSet(db, evening, arm, armCard, 3, false);
+
+    const primary = getCalendarMonthRecordsSql(db, 0, Number.MAX_SAFE_INTEGER);
+    const categorySet = getCalendarMonthCategorySetSql(db, 0, Number.MAX_SAFE_INTEGER);
+    // armのセッションは確定0件で未確定3セットが補完され、legの確定2セットを上回るため代表になる
+    expect(primary.get('2026-07-16')).toBe('arm');
+    expect(categorySet.get('2026-07-16')).toEqual(new Set(['leg', 'arm']));
   });
 });
