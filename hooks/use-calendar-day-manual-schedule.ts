@@ -1,7 +1,7 @@
 import { db } from '@/db/client';
 import { scheduledWorkouts } from '@/db/schema';
 import { useCalendarDirectScheduleSummaries } from '@/hooks/use-calendar-direct-schedule-summaries';
-import { useRoutineExerciseSummaries, useRoutines } from '@/hooks/use-routines';
+import { useRoutines } from '@/hooks/use-routines';
 import { formatDirectScheduleTitle } from '@/lib/calendar/schedule';
 import { toDateKey } from '@/lib/calendar/date-grid';
 import { useLiveQuery } from 'drizzle-orm/expo-sqlite';
@@ -20,15 +20,18 @@ export type ManualScheduleCard = {
 };
 
 // カレンダーの選択日パネル用。手動追加した予定（PR10、リマインダーとは無関係）を選択日ちょうどの
-// 分だけ返す。ルーティン名・カテゴリ・種目数はhooks/use-calendar-day-schedule.tsと同じく
-// 既存のuseRoutines/useRoutineExerciseSummariesに委譲する（画面ごとに集計基準がズレないように）。
-// 「直接追加」予定（routineIdがnull、2026-07-20）はuseCalendarDirectScheduleSummariesに委譲する
+// 分だけ返す。ルーティン名はuseRoutinesから引くが、カテゴリ・種目数はルーティン紐付き・
+// 「直接追加」（routineIdがnull、2026-07-20）のどちらもuseCalendarDirectScheduleSummaries
+// （scheduledWorkoutExercises、このインスタンス自身の中身）から取る。ルーティン紐付き予定も
+// addScheduledWorkout時点でルーティンの種目をこのテーブルへコピーしており、以後は
+// schedule-workout-edit.tsxでこのインスタンス単位で編集される（2026-07-21統一）ため、
+// ルーティン本体(useRoutineExerciseSummaries)を参照するとカード編集の内容が反映されない
+// バグになる（@ユーザー指摘で発覚、2026-07-21修正）
 //
 // 日付での絞り込みはuseLiveQuery側ではなくJS側(useMemo)で行う。useLiveQueryの再購読は
 // 第2引数のdeps([]固定)でしか効かず、SQLのWHEREにselectedDate由来の値を挟んでもそこだけを
 // 変えて再購読されることは無い（use-calendar-day-schedule.tsと同じ理由でJS側フィルタに揃える）
 export function useCalendarDayManualSchedule(selectedDate: Date): ManualScheduleCard[] {
-  const summaries = useRoutineExerciseSummaries();
   const directSummaries = useCalendarDirectScheduleSummaries();
   const { routines } = useRoutines();
 
@@ -45,15 +48,18 @@ export function useCalendarDayManualSchedule(selectedDate: Date): ManualSchedule
     for (const r of rows) {
       if (r.scheduledDate !== dateKey) continue;
 
+      // 種目0件（addDirectScheduledWorkoutは作成時点で弾いているが、schedule-workout-edit.tsx
+      // 側の⋮「削除」で最後の1件まで削除できる、2026-07-22、@ユーザー指摘で安全網を撤廃）の
+      // 予定はuseCalendarDirectScheduleSummaries（innerJoin集計）にキー自体が存在しない。
+      // ここでcontinueすると、カード自体が選択日パネルから消えて二度と辿り着けなくなる
+      // （@designer指摘: 実際に発生するバグだった）ため、0件・カテゴリ無しにフォールバックする
+      const summary = directSummaries.get(r.id) ?? { exerciseCount: 0, categories: [], exerciseNames: [] };
+
       if (r.routineId != null) {
         const routineName = routineNameById.get(r.routineId);
         // 削除済みルーティンを指す予定（安全網、通常はcascadeで一緒に消える）は名前を
-        // 決められず対象外。種目0件のルーティンはschedule-routine-picker.tsx側で選択できて
-        // しまう（workout/routine-picker.tsxと同じ「0種目でも選べる」仕様）ため、ここで
-        // summary無しを除外すると「選べたのに選択日パネルへ永久に表示されない」予定が
-        // 生まれてしまう。summaryが無ければ0種目・カテゴリ無しにフォールバックして表示する
+        // 決められず対象外
         if (routineName === undefined) continue;
-        const summary = summaries.get(r.routineId) ?? { exerciseCount: 0, categories: [] };
         cards.push({
           scheduledWorkoutId: r.id,
           routineId: r.routineId,
@@ -64,14 +70,6 @@ export function useCalendarDayManualSchedule(selectedDate: Date): ManualSchedule
           minute: r.minute,
         });
       } else {
-        // 直接追加はaddDirectScheduledWorkoutが作成時点では種目0件を弾いているが、
-        // schedule-workout-edit.tsx側の⋮「削除」で最後の1件まで削除できるようになったため
-        // （2026-07-22、@ユーザー指摘で安全網を撤廃）、後から0件に到達しうる。
-        // useCalendarDirectScheduleSummariesはinnerJoin集計のため0件の予定はキー自体が
-        // 存在しない。ここでcontinueすると、カード自体が選択日パネルから消えて二度と
-        // 辿り着けなくなる（@designer指摘: 実際に発生するバグだった）ため、ルーティン予定
-        // 側と同じく0件・カテゴリ無しにフォールバックして表示する
-        const summary = directSummaries.get(r.id) ?? { exerciseCount: 0, categories: [], exerciseNames: [] };
         cards.push({
           scheduledWorkoutId: r.id,
           routineId: null,
@@ -88,5 +86,5 @@ export function useCalendarDayManualSchedule(selectedDate: Date): ManualSchedule
     // selectedDateはDateオブジェクトのため参照が毎回変わり得る。実際に意味を持つのは
     // 年月日のみなのでtoDateKeyで安定した依存値にする（use-calendar-day-schedule.tsと同じ）
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [data, summaries, directSummaries, routines, toDateKey(selectedDate)]);
+  }, [data, directSummaries, routines, toDateKey(selectedDate)]);
 }

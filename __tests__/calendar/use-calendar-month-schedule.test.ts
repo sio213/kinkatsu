@@ -4,6 +4,7 @@ var mockRows: unknown[] | undefined;
 var mockManualRows: unknown[] | undefined;
 var mockSkipRows: unknown[] | undefined;
 var mockSummaries: Map<number, { exerciseCount: number; categories: string[] }>;
+var mockDirectSummaries: Map<number, { exerciseCount: number; categories: string[]; exerciseNames: string[] }>;
 
 jest.mock('@/db/client', () => {
   return {
@@ -46,11 +47,12 @@ jest.mock('@/hooks/use-routines', () => ({
   useRoutineExerciseSummaries: () => mockSummaries,
 }));
 
-// 直接予定（routineId===null、2026-07-20）の代表カテゴリ解決用。このテストファイルの関心事
-// （既存のルーティン予定・リマインダー予定の集計）には影響しないため、常に空Mapを返す
-// 軽量スタブにしている（use-calendar-day-manual-schedule.test.tsと同じ方針）
+// 手動予定(scheduledWorkouts)の代表カテゴリ解決用。ルーティン紐付き・直接追加どちらも、
+// この予定インスタンス自身(scheduledWorkoutId)の中身から取る（use-calendar-day-manual-schedule.ts
+// と同じ理由、2026-07-21修正）。未実体化のリマインダー予定側の集計(mockSummaries、ルーティン本体)
+// とは別物のため、テストごとに使い分ける
 jest.mock('@/hooks/use-calendar-direct-schedule-summaries', () => ({
-  useCalendarDirectScheduleSummaries: () => new Map(),
+  useCalendarDirectScheduleSummaries: () => mockDirectSummaries,
 }));
 
 // lib/notifications/scheduler.ts経由でexpo-notificationsが読み込まれる（getFireDatesInRange/
@@ -96,6 +98,7 @@ beforeEach(() => {
   mockManualRows = undefined;
   mockSkipRows = undefined;
   mockSummaries = new Map();
+  mockDirectSummaries = new Map();
 });
 
 describe('useCalendarMonthSchedule', () => {
@@ -167,7 +170,7 @@ describe('useCalendarMonthSchedule', () => {
 
   it('手動予定(scheduledWorkouts、PR10)だけがある場合も、日付ごとの代表カテゴリに反映される', () => {
     mockManualRows = [{ id: 1, routineId: 10, scheduledDate: '2026-07-20', hour: 19, minute: 30 }];
-    mockSummaries = new Map([[10, { exerciseCount: 2, categories: ['leg'] }]]);
+    mockDirectSummaries = new Map([[1, { exerciseCount: 2, categories: ['leg'], exerciseNames: [] }]]);
     const todayStart = new Date(2026, 6, 20).getTime();
     const rangeEnd = new Date(2026, 6, 23).getTime();
     const getResult = renderHook(todayStart, rangeEnd, todayStart);
@@ -179,10 +182,8 @@ describe('useCalendarMonthSchedule', () => {
   it('同日にリマインダー予定と手動予定の両方がある場合、時刻が早い方のカテゴリが代表になる', () => {
     mockRows = [{ ...BASE_REMINDER, id: 1, routineId: 10, kind: 'interval', intervalDays: 1, hour: 19, minute: 0 }];
     mockManualRows = [{ id: 1, routineId: 20, scheduledDate: '2026-07-20', hour: 7, minute: 0 }];
-    mockSummaries = new Map([
-      [10, { exerciseCount: 1, categories: ['leg'] }],
-      [20, { exerciseCount: 1, categories: ['chest'] }],
-    ]);
+    mockSummaries = new Map([[10, { exerciseCount: 1, categories: ['leg'] }]]);
+    mockDirectSummaries = new Map([[1, { exerciseCount: 1, categories: ['chest'], exerciseNames: [] }]]);
     const todayStart = new Date(2026, 6, 20).getTime();
     const rangeEnd = new Date(2026, 6, 21).getTime();
     const getResult = renderHook(todayStart, rangeEnd, todayStart);
@@ -191,13 +192,34 @@ describe('useCalendarMonthSchedule', () => {
     expect(result.categorySetByScheduleDay.get('2026-07-20')).toEqual(new Set(['leg', 'chest']));
   });
 
-  it('手動予定もsummariesに代表カテゴリが無いルーティン(種目0件)は対象外', () => {
+  it('手動予定もdirectSummariesに代表カテゴリが無い(種目0件)場合は対象外（ルーティン本体側summariesにエントリがあっても無視される）', () => {
     mockManualRows = [{ id: 1, routineId: 10, scheduledDate: '2026-07-20', hour: 19, minute: 30 }];
-    mockSummaries = new Map(); // routineId=10のエントリなし
+    // ルーティン本体(summaries)側には代表カテゴリがあっても、手動予定はdirectSummariesしか
+    // 見ないため無視されるべき（下のdirectSummaries優先テストと対になる検証）
+    mockSummaries = new Map([[10, { exerciseCount: 1, categories: ['chest'] }]]);
+    mockDirectSummaries = new Map(); // この予定インスタンス(id=1)のエントリなし
     const todayStart = new Date(2026, 6, 20).getTime();
     const rangeEnd = new Date(2026, 6, 21).getTime();
     const getResult = renderHook(todayStart, rangeEnd, todayStart);
     expect(getResult().primaryCategoryByScheduleDay.size).toBe(0);
+  });
+
+  // ルーティン本体(summaries)とこの予定インスタンス自身(directSummaries)の中身が乖離していても
+  // 常にdirectSummaries側が使われることを明示する回帰テスト（誤ってsummaries.get(m.routineId)に
+  // 戻す変更をしてしまった場合に検出できるよう、@tester指摘で追加。use-calendar-day-manual-schedule
+  // 側の同種テストと対になる）
+  it('手動予定(ルーティン紐付き)の代表カテゴリは、ルーティン本体(summaries)ではなくこの予定インスタンス自身(directSummaries)から決まる', () => {
+    mockManualRows = [{ id: 1, routineId: 10, scheduledDate: '2026-07-20', hour: 19, minute: 30 }];
+    // ルーティン本体は胸(chest)のままだが、この予定インスタンスだけ脚(leg)に差し替え済み、
+    // という乖離状態を再現する
+    mockSummaries = new Map([[10, { exerciseCount: 3, categories: ['chest'] }]]);
+    mockDirectSummaries = new Map([[1, { exerciseCount: 1, categories: ['leg'], exerciseNames: [] }]]);
+    const todayStart = new Date(2026, 6, 20).getTime();
+    const rangeEnd = new Date(2026, 6, 21).getTime();
+    const getResult = renderHook(todayStart, rangeEnd, todayStart);
+    const result = getResult();
+    expect(result.primaryCategoryByScheduleDay.get('2026-07-20')).toBe('leg');
+    expect(result.categorySetByScheduleDay.get('2026-07-20')).toEqual(new Set(['leg']));
   });
 
   it('手動予定も範囲外([effectiveStart, rangeEnd)外)の日付は対象外', () => {
@@ -206,7 +228,7 @@ describe('useCalendarMonthSchedule', () => {
       { id: 2, routineId: 10, scheduledDate: '2026-07-23', hour: 19, minute: 30 }, // rangeEnd以降
       { id: 3, routineId: 10, scheduledDate: '2026-07-20', hour: 19, minute: 30 }, // 範囲内
     ];
-    mockSummaries = new Map([[10, { exerciseCount: 1, categories: ['leg'] }]]);
+    mockDirectSummaries = new Map([[3, { exerciseCount: 1, categories: ['leg'], exerciseNames: [] }]]);
     const todayStart = new Date(2026, 6, 20).getTime();
     const rangeEnd = new Date(2026, 6, 23).getTime();
     const getResult = renderHook(todayStart, rangeEnd, todayStart);
@@ -253,10 +275,8 @@ describe('useCalendarMonthSchedule', () => {
       mockRows = [{ ...BASE_REMINDER, id: 1, routineId: 10, kind: 'interval', intervalDays: 1, hour: 7, minute: 0 }];
       mockManualRows = [{ id: 1, routineId: 20, scheduledDate: '2026-07-20', hour: 19, minute: 30 }];
       mockSkipRows = [{ reminderId: 1, skippedDate: '2026-07-20' }];
-      mockSummaries = new Map([
-        [10, { exerciseCount: 1, categories: ['chest'] }],
-        [20, { exerciseCount: 1, categories: ['leg'] }],
-      ]);
+      mockSummaries = new Map([[10, { exerciseCount: 1, categories: ['chest'] }]]);
+      mockDirectSummaries = new Map([[1, { exerciseCount: 1, categories: ['leg'], exerciseNames: [] }]]);
       const todayStart = new Date(2026, 6, 20).getTime();
       const rangeEnd = new Date(2026, 6, 21).getTime();
       const getResult = renderHook(todayStart, rangeEnd, todayStart);
