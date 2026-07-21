@@ -60,4 +60,36 @@ describe('SessionTimeGroupHeader', () => {
       expect(header.props.accessibilityLabel).toBe('夜 20:00、予定');
     });
   });
+
+  // ルーティン紐付き予定の見出し左端にルーティン名を表示する（2026-07-21、@ユーザー指摘）
+  describe('routineName（ルーティン紐付き予定の見出し左端に表示）', () => {
+    it('routineName未指定なら何も表示しない（直接予定・実績セッション側の従来挙動を維持）', () => {
+      const root = render({ sessionStartedAt: new Date(2026, 6, 16, 7, 10).getTime() });
+      const texts = root.root.findAllByType(Text).map((t) => [t.props.children].flat().join(''));
+      expect(texts).not.toContain('胸の日');
+    });
+
+    it('routineNameを渡すと時刻ラベルより前（左端）に表示される', () => {
+      const root = render({ sessionStartedAt: new Date(2026, 6, 16, 7, 10).getTime(), routineName: '胸の日' });
+      const texts = root.root.findAllByType(Text).map((t) => [t.props.children].flat().join(''));
+      expect(texts).toContain('胸の日');
+      expect(texts.indexOf('胸の日')).toBeLessThan(texts.indexOf('朝 07:10'));
+    });
+
+    it('routineNameを渡すとaccessibilityLabelの先頭に含まれる', () => {
+      const root = render({
+        sessionStartedAt: new Date(2026, 6, 16, 20, 0).getTime(),
+        routineName: '胸の日',
+        isSchedule: true,
+      });
+      const header = root.root.findAllByType(View).find((v) => v.props.accessibilityRole === 'header')!;
+      expect(header.props.accessibilityLabel).toBe('胸の日、夜 20:00、予定');
+    });
+
+    it('長いルーティン名でも1行に収まるようnumberOfLines={1}が指定される', () => {
+      const root = render({ sessionStartedAt: new Date(2026, 6, 16, 7, 10).getTime(), routineName: '胸・肩・二頭の日' });
+      const nameText = root.root.findAllByType(Text).find((t) => [t.props.children].flat().join('') === '胸・肩・二頭の日')!;
+      expect(nameText.props.numberOfLines).toBe(1);
+    });
+  });
 });
