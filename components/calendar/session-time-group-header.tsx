@@ -20,35 +20,52 @@ type Props = {
   // リストに混ぜて表示するときにtrueを渡す（2026-07-19確定）。太字の主見出しと紛らわしく
   // ならないよう、実績とは別の控えめな「予定」ラベルを添えるだけに留める
   isSchedule?: boolean;
+  // ルーティン紐付き予定（自動・手動どちらも）の見出し左端に表示するルーティン名（2026-07-21）。
+  // 直接予定（個別種目選択、ルーティン名に相当するものが無い）では渡さない。実績セッション側は
+  // workoutSessionsにroutineIdが無く解決できないため、引き続き渡さない（下記コメント参照）
+  routineName?: string;
 };
 
 // 選択日パネルで同日複数セッションを時間帯ごとに分けて表示するときの見出し
 // （デザイン案「複数18: 時間帯アイコン（朝・夕方・夜）」）。ルーティン名の右寄せ表示は
-// workoutSessionsにroutineIdが無く実現できないため、マイグレーション対応まで保留している。
-// periodはsessionStartedAtから一意に決まるためpropとして受け取らず内部で導出する
-// （呼び出し側が矛盾した値を渡す余地を無くすため）
-export function SessionTimeGroupHeader({ sessionStartedAt, isSchedule = false }: Props) {
+// workoutSessionsにroutineIdが無く実現できないため、マイグレーション対応まで保留している
+// （これは実績セッション側の制約。予定側はカードが既にルーティン名を持っているため
+// 2026-07-21よりrouteNameプロパティで対応済み）。periodはsessionStartedAtから一意に
+// 決まるためpropとして受け取らず内部で導出する（呼び出し側が矛盾した値を渡す余地を無くすため）
+export function SessionTimeGroupHeader({ sessionStartedAt, isSchedule = false, routineName }: Props) {
   const period = getTimeOfDay(new Date(sessionStartedAt));
   const { icon, color } = TIME_OF_DAY_STYLE[period];
   const timeLabel = `${getTimeOfDayLabel(period)} ${formatHourMinute(new Date(sessionStartedAt))}`;
-  const accessibilityLabel = isSchedule ? `${timeLabel}、予定` : timeLabel;
+  const accessibilityLabel = [routineName, timeLabel, isSchedule ? '予定' : null].filter(Boolean).join('、');
   return (
     <View style={styles.row} accessible accessibilityRole="header" accessibilityLabel={accessibilityLabel}>
-      <DesignIcon name={icon} size={17} color={color} />
-      <Text style={styles.label}>{timeLabel}</Text>
-      {/* テキストの太さ・色の差だけだと「夜20:00予定」と1語に読めてしまう懸念（@designer指摘）
-          があるため、ピル形状の背景で実績見出しとの境界を明示する */}
-      {isSchedule && (
-        <View style={styles.scheduleTag}>
-          <Text style={styles.scheduleTagText}>予定</Text>
-        </View>
+      {/* ルーティン名は可変長のため、長い名前でも時刻情報側（アイコン・時刻・予定ピル）が
+          押し出されて見切れないよう、ルーティン名だけflexShrinkさせ、時刻情報側は
+          flexShrink:0で固定幅を維持する */}
+      {routineName != null && (
+        <Text style={styles.routineName} numberOfLines={1}>
+          {routineName}
+        </Text>
       )}
+      <View style={styles.timeGroup}>
+        <DesignIcon name={icon} size={17} color={color} />
+        <Text style={styles.label}>{timeLabel}</Text>
+        {/* テキストの太さ・色の差だけだと「夜20:00予定」と1語に読めてしまう懸念（@designer指摘）
+            があるため、ピル形状の背景で実績見出しとの境界を明示する */}
+        {isSchedule && (
+          <View style={styles.scheduleTag}>
+            <Text style={styles.scheduleTagText}>予定</Text>
+          </View>
+        )}
+      </View>
     </View>
   );
 }
 
 const styles = StyleSheet.create({
   row: { flexDirection: 'row', alignItems: 'center', gap: 7 },
+  routineName: { ...Typography.footnote, fontWeight: '700', color: Colors.textPrimary, flexShrink: 1 },
+  timeGroup: { flexDirection: 'row', alignItems: 'center', gap: 7, flexShrink: 0 },
   label: { ...Typography.footnote, fontWeight: '700', color: Colors.textPrimary },
   scheduleTag: {
     backgroundColor: Colors.surfaceSubtle,
