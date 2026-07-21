@@ -208,6 +208,17 @@ describe('useScheduledExerciseCards', () => {
     expect(getCards().find((c) => c.exerciseId === 12)?.sets).toEqual([]);
   });
 
+  it('必要な履歴取得が全て失敗した場合はcards全体を\'error\'にする（部分失敗とは区別し、retryを意味のあるものにする）', async () => {
+    jest.spyOn(console, 'error').mockImplementation(() => {});
+    mockUseScheduledWorkoutExercises.mockReturnValue([
+      { ...benchExercise, sets: [{ id: 1, weight: null, reps: null, durationSeconds: null, distanceMeters: null }] },
+    ]);
+    mockGetExerciseHistoryEntries.mockRejectedValue(new Error('fail'));
+    const { getResult, root } = renderHook(5);
+    await flush(root);
+    expect(getResult()).toBe('error');
+  });
+
   it('retryを呼ぶと履歴を再取得する', async () => {
     mockUseScheduledWorkoutExercises.mockReturnValue([
       { ...benchExercise, sets: [{ id: 1, weight: null, reps: null, durationSeconds: null, distanceMeters: null }] },

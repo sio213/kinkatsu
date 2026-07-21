@@ -2,6 +2,7 @@ import { RoutineAddExerciseButton } from '@/components/routines/routine-add-exer
 import { ScheduledWorkoutExerciseCard } from '@/components/calendar/scheduled-workout-exercise-card';
 import { HeaderMenu, type DropdownMenuItem } from '@/components/ui/dropdown-menu';
 import { HeaderTitle } from '@/components/ui/header-title';
+import { NotFoundState } from '@/components/ui/not-found-state';
 import { PrimaryButton } from '@/components/ui/primary-button';
 import { Colors } from '@/constants/theme';
 import { useDebouncedPush } from '@/hooks/use-debounced-push';
@@ -11,6 +12,7 @@ import { useScheduledWorkoutExercises } from '@/hooks/use-scheduled-workout-exer
 import { parseDateKey } from '@/lib/calendar/date-grid';
 import { formatHourMinuteParts } from '@/lib/calendar/time-of-day';
 import { moveScheduledWorkoutExercise, removeScheduledWorkoutExercise } from '@/lib/calendar/scheduled-workout-detail';
+import { removeScheduledWorkout } from '@/lib/notifications/scheduled-workout-scheduler';
 import { hasAnyValue } from '@/lib/workout/set-values';
 import { formatSessionDateGroup } from '@/lib/workout/summary';
 import { Stack, useLocalSearchParams, useRouter } from 'expo-router';
@@ -32,7 +34,7 @@ export default function ScheduleWorkoutEditScreen() {
   const pushDebounced = useDebouncedPush();
   const keyboardInset = useKeyboardInset();
   const exercises = useScheduledWorkoutExercises(scheduledWorkoutId);
-  const scheduledTime = useScheduledWorkoutTime(scheduledWorkoutId);
+  const { time: scheduledTime, loaded: scheduledTimeLoaded } = useScheduledWorkoutTime(scheduledWorkoutId);
 
   // 選択日パネルでは見えていた対象日・時刻を、この画面のヘッダーにも表示する。同日に複数の
   // 直接予定があるとき、どの予定を編集しているか見失わないようにする（@designer指摘）
@@ -92,7 +94,65 @@ export default function ScheduleWorkoutEditScreen() {
     [scheduledWorkoutId],
   );
 
-  const menuItems: DropdownMenuItem[] = [{ key: 'add', label: '種目を追加', icon: 'add', onPress: handleAddExercise }];
+  // 選択日パネルの⋮メニュー「削除」(app/(tabs)/calendar.tsxのhandleDeleteSchedule)と同じ操作を
+  // この画面からも行えるようにする（@ユーザー指摘）。この画面自体を編集し終えてから「この予定
+  // 自体をやめる」と判断するケースのため、都度カレンダーへ戻らなくて済むようにする
+  const handleDeleteWorkout = useCallback(() => {
+    // Alertはヘッダーの日時表示ごと覆い隠すため、同日に複数の直接予定があるケースでも
+    // どの予定を削除しようとしているか分かるよう本文にも日時を含める（@designer指摘）
+    const target = dateLabel ? `${dateLabel}の予定` : 'この予定';
+    Alert.alert('この予定を削除しますか？', `${target}を削除します。設定していた通知も届かなくなります。`, [
+      { text: 'キャンセル', style: 'cancel' },
+      {
+        text: '削除',
+        style: 'destructive',
+        onPress: async () => {
+          try {
+            await removeScheduledWorkout(scheduledWorkoutId);
+            router.back();
+          } catch (e) {
+            console.error('[scheduled workout delete]', e);
+            Alert.alert('エラー', '予定を削除できませんでした。');
+          }
+        },
+      },
+    ]);
+  }, [scheduledWorkoutId, router, dateLabel]);
+
+  // app/routine/exercise-edit.tsxのhandleReorder/menuItemsと同じ方針
+  // （並び替え画面は種目2件以上でしか意味を持たないため、1件以下では無効化する）
+  const handleReorder = useCallback(() => {
+    pushDebounced({
+      pathname: '/calendar/schedule-workout-exercise-reorder',
+      params: { scheduledWorkoutId: String(scheduledWorkoutId) },
+    });
+  }, [pushDebounced, scheduledWorkoutId]);
+
+  const menuItems: DropdownMenuItem[] = [
+    { key: 'add', label: '種目を追加', icon: 'add', onPress: handleAddExercise },
+    {
+      key: 'reorder',
+      label: '種目を並び替え',
+      icon: 'swap-vert',
+      disabled: exercises.length <= 1,
+      hint: exercises.length <= 1 ? '2種目以上あるときに使えます' : undefined,
+      onPress: handleReorder,
+    },
+    { key: 'delete', label: 'この予定を削除', icon: 'delete-outline', danger: true, onPress: handleDeleteWorkout },
+  ];
+
+  // 「この予定を削除」実行後、DBの削除完了からrouter.back()による画面遷移までの間にlive query
+  // が再購読され、この画面が一瞬「種目0件の空リスト」としてフラッシュ表示されてしまう
+  // （@designer指摘）。app/workout/[id].tsxが自分自身のセッション削除後に同じ構図でNotFoundState
+  // へ切り替えるのと同じガードをここにも入れ、空リストではなく空状態を出す
+  if (scheduledTimeLoaded && scheduledTime == null) {
+    return (
+      <SafeAreaView style={styles.safe} edges={['bottom']}>
+        <Stack.Screen options={{ title: '予定' }} />
+        <NotFoundState message="予定が見つかりません" actionLabel="戻る" onPressAction={() => router.back()} />
+      </SafeAreaView>
+    );
+  }
 
   return (
     <SafeAreaView style={styles.safe} edges={['bottom']}>

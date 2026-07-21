@@ -67,6 +67,7 @@ jest.mock('@/db/schema', () => ({
 jest.mock('drizzle-orm', () => ({
   eq: jest.fn((col, val) => ({ col, val })),
   desc: jest.fn((col) => ({ desc: col })),
+  and: jest.fn((...conditions) => ({ and: conditions })),
 }));
 
 const mockBuildInitialRoutineSets = jest.fn();
@@ -83,6 +84,7 @@ import {
   getScheduledWorkoutSetsForExercise,
   moveScheduledWorkoutExercise,
   removeScheduledWorkoutExercise,
+  reorderScheduledWorkoutExercises,
   replaceScheduledWorkoutExercise,
   updateScheduledWorkoutSetValues,
 } from '@/lib/calendar/scheduled-workout-detail';
@@ -203,6 +205,22 @@ describe('moveScheduledWorkoutExercise', () => {
       { id: 101, orderIndex: 1 },
     ]);
     await moveScheduledWorkoutExercise(1, 101, 'down');
+    expect(mockUpdateWhere).not.toHaveBeenCalled();
+  });
+});
+
+describe('reorderScheduledWorkoutExercises', () => {
+  it('渡された順にorderIndexを振り直し、最後に予定のupdatedAtも更新する', async () => {
+    await reorderScheduledWorkoutExercises(1, [102, 100, 101]);
+    // 3件のorderIndex更新 + 予定のupdatedAt更新で4回
+    expect(mockUpdateWhere).toHaveBeenCalledTimes(4);
+    expect(mockUpdateSet.mock.calls[0][1]).toEqual({ orderIndex: 0 });
+    expect(mockUpdateSet.mock.calls[1][1]).toEqual({ orderIndex: 1 });
+    expect(mockUpdateSet.mock.calls[2][1]).toEqual({ orderIndex: 2 });
+  });
+
+  it('空配列なら何もしない', async () => {
+    await reorderScheduledWorkoutExercises(1, []);
     expect(mockUpdateWhere).not.toHaveBeenCalled();
   });
 });

@@ -2,7 +2,7 @@ import { db, type DbOrTx, type Tx } from '@/db/client';
 import { scheduledWorkoutExercises, scheduledWorkoutSets, scheduledWorkouts } from '@/db/schema';
 import { buildInitialRoutineSets } from '@/lib/routines/db';
 import { hasAnyValue, type PreviousSetValues } from '@/lib/workout/set-values';
-import { desc, eq } from 'drizzle-orm';
+import { and, desc, eq } from 'drizzle-orm';
 
 // 種目一覧を変える操作（追加・削除・入れ替え・並び替え）ではscheduledWorkouts.updatedAtも
 // 更新する。個々のセット値編集（400msデバウンスの自動保存、addScheduledWorkoutSet等）は
@@ -151,6 +151,31 @@ export async function moveScheduledWorkoutExercise(
     await tx.update(scheduledWorkoutExercises).set({ orderIndex: target.orderIndex }).where(eq(scheduledWorkoutExercises.id, current.id));
     await tx.update(scheduledWorkoutExercises).set({ orderIndex: current.orderIndex }).where(eq(scheduledWorkoutExercises.id, target.id));
     await touchScheduledWorkout(tx, scheduledWorkoutId, Date.now());
+  });
+}
+
+// ヘッダー⋮「並び替え」(app/calendar/schedule-workout-exercise-reorder.tsx)から一括で呼ばれる。
+// lib/workout/session.tsのreorderSessionExercisesと同じ方針で、ドロップのたびに全件のorderIndexを
+// 振り直す（隣接swapのmoveScheduledWorkoutExerciseとは別に、ドラッグ&ドロップの並び替え画面専用）
+export async function reorderScheduledWorkoutExercises(
+  scheduledWorkoutId: number,
+  orderedScheduledWorkoutExerciseIds: number[],
+): Promise<void> {
+  if (orderedScheduledWorkoutExerciseIds.length === 0) return;
+  const now = Date.now();
+  await db.transaction(async (tx) => {
+    for (const [orderIndex, scheduledWorkoutExerciseId] of orderedScheduledWorkoutExerciseIds.entries()) {
+      await tx
+        .update(scheduledWorkoutExercises)
+        .set({ orderIndex })
+        .where(
+          and(
+            eq(scheduledWorkoutExercises.id, scheduledWorkoutExerciseId),
+            eq(scheduledWorkoutExercises.scheduledWorkoutId, scheduledWorkoutId),
+          ),
+        );
+    }
+    await touchScheduledWorkout(tx, scheduledWorkoutId, now);
   });
 }
 
