@@ -73,6 +73,23 @@ describe('ScheduleExerciseCardGroup', () => {
     expect(root.root.findAllByProps({ children: 'ベンチプレス' })).toHaveLength(0);
   });
 
+  it('cardsがnull（読み込み中）のときは「種目がありません」の空状態も表示しない（読み込み中と本当に0件を混同しない）', () => {
+    const root = render({ cards: null });
+    expect(root.root.findAllByProps({ children: '種目がありません' })).toHaveLength(0);
+  });
+
+  // ルーティン削除等で種目が0件になった予定（極めて稀なレース条件）が、見出しだけ残り
+  // 何もタップできない状態になっていたバグの修正（ユーザー報告、2026-07-22）
+  it('cardsが読み込み済みで0件のときは「種目がありません」の空状態を表示し、タップするとonPressが呼ばれる', () => {
+    const root = render({ cards: [] });
+    expect(root.root.findByProps({ children: '種目がありません' })).toBeDefined();
+    const emptyRow = findByAccessibilityLabel(root.root, '「ベンチプレス 他1種目」夜 19:30に種目を追加')!;
+    act(() => {
+      emptyRow.props.onPress();
+    });
+    expect(onPress).toHaveBeenCalledTimes(1);
+  });
+
   it("cardsが'error'かつonRetryCardsが渡されているときはエラー文言と再試行ボタンを表示し、押すとonRetryCardsが呼ばれる", () => {
     const root = render({ cards: 'error', onRetryCards });
     expect(root.root.findByProps({ children: '種目を読み込めませんでした' })).toBeDefined();

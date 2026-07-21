@@ -127,7 +127,7 @@ export const ScheduleExerciseCardGroup = memo(function ScheduleExerciseCardGroup
       ) : (
         <SessionTimeGroupHeader sessionStartedAt={sessionStartedAt} isSchedule routineName={routineName} />
       )}
-      {cards != null && cards !== 'error' && (
+      {cards != null && cards !== 'error' && cards.length > 0 && (
         <View style={styles.cardList}>
           {cards.map((card) => (
             <CalendarExerciseCard
@@ -147,6 +147,22 @@ export const ScheduleExerciseCardGroup = memo(function ScheduleExerciseCardGroup
             />
           ))}
         </View>
+      )}
+      {/* ルーティン削除等で種目が0件になった予定（極めて稀なレース条件、
+          lib/calendar/scheduled-workouts.tsのaddScheduledWorkoutの0件フォールバック参照）は、
+          見出しだけが残り種目カードが1枚も無い「何もタップできない」状態になっていた
+          （ユーザー報告のバグ）。見出しの下に必ずタップ可能な行を出し、編集画面へ誘導する */}
+      {cards != null && cards !== 'error' && cards.length === 0 && (
+        <TouchableOpacity
+          style={styles.emptyRow}
+          onPress={onPress}
+          accessibilityRole="button"
+          accessibilityLabel={`「${title}」${timeLabel}に種目を追加`}
+          accessibilityHint="タップして予定の種目を追加します"
+        >
+          <Text style={styles.emptyRowText}>種目がありません</Text>
+          <Text style={styles.emptyRowHint}>タップして追加</Text>
+        </TouchableOpacity>
       )}
       {cards === 'error' && onRetryCards && (
         // useCalendarDayExercises(過去日パネル)のエラー表示・再試行ボタンと同じ体験に揃える
@@ -182,6 +198,19 @@ const styles = StyleSheet.create({
   header: { flexDirection: 'row', alignItems: 'center', gap: 8 },
   menuSlot: { marginLeft: 'auto' },
   cardList: { gap: 8 },
+  // CalendarExerciseCardと縦のリズムを揃えつつ、破線で「まだ何も無い」ことを示す
+  // （components/routines/routine-add-exercise-button.tsxのvariant="empty"と近い見た目）
+  emptyRow: {
+    borderWidth: 1.5,
+    borderStyle: 'dashed',
+    borderColor: Colors.borderStrong,
+    borderRadius: 10,
+    paddingVertical: 14,
+    alignItems: 'center',
+    gap: 2,
+  },
+  emptyRowText: { ...Typography.footnote, fontWeight: '600', color: Colors.textMuted },
+  emptyRowHint: { ...Typography.caption, color: Colors.accent, fontWeight: '600' },
   errorRow: { flexDirection: 'row', alignItems: 'center', gap: 8, flexWrap: 'wrap' },
   errorText: { ...Typography.body, color: Colors.danger },
   retryText: { ...Typography.bodyStrong, color: Colors.accent },
