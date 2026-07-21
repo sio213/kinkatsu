@@ -149,19 +149,21 @@ export default function ScheduleTimePickerScreen() {
         skippedForReplace = true;
         notificationSuppressed = result.notificationSuppressed;
       }
-      // 直接追加（自分で選ぶ）で作った予定は、種目は決めたが重量・回数（目標セット）はまだ
-      // 何も入れていない状態のため、このまま選択日パネルへ戻すと再度カードを探してタップし直す
-      // 手間が生まれる。選択日パネルで直接予定カードをタップした時の遷移先
+      // 作った予定は、種目は決めたが重量・回数（目標セット）はまだ何も入れていない状態
+      // （ルーティン予定も、addScheduledWorkoutがルーティン本体の目標セットをこの予定インスタンス
+      // 専用にコピーするようになったPR1以降は同様）のため、このまま選択日パネルへ戻すと再度カードを
+      // 探してタップし直す手間が生まれる。選択日パネルでカードをタップした時の遷移先
       // (app/(tabs)/calendar.tsxのhandleEditScheduledWorkoutExercises)と同じく目標セット編集画面
       // (schedule-workout-edit.tsx)が「この予定の唯一の詳細/編集ビュー」であるため、作成直後に
       // そのままそこへ連れて行く（@ユーザー指摘。@designer指摘: 「過去の記録から読み込むフローを
       // 参考に」という当初の説明は、あちらが「既にいた画面へ戻る」のに対しこちらは「新しい画面へ
-      // 進む」ため厳密には性質が異なる）。ルーティン予定は編集画面自体を持たないため対象外
+      // 進む」ため厳密には性質が異なる）。ルーティン予定（通常追加・「今回だけ差し替え」とも）も
+      // 直接追加と同じ画面遷移に統一する（PR7、ユーザー確認済み: 「はい、同じ遷移にする」）
       let createdScheduledWorkoutId: number | null = null;
       if (isDirectMode) {
         createdScheduledWorkoutId = await createDirectScheduledWorkout(exerciseIds, directTitle, dateKey, hour, minute);
       } else {
-        await createScheduledWorkout(routineId, routineName ?? '', dateKey, hour, minute);
+        createdScheduledWorkoutId = await createScheduledWorkout(routineId, routineName ?? '', dateKey, hour, minute);
       }
       // 選択した時刻が既に過去(今日の過ぎた時刻を選んだ場合)は、
       // scheduled-workout-scheduler.tsのscheduleNotificationが通知登録を無言でスキップするため、
@@ -183,10 +185,11 @@ export default function ScheduleTimePickerScreen() {
       // handlePressReplace(app/(tabs)/calendar.tsx)がschedule-chooserを経由せず
       // schedule-routine-pickerへ直接pushするため、カレンダーからは2階層分で済む
       const dismissCount = isReplaceMode ? 2 : 3;
-      // カレンダーからの3階層（schedule-chooser/schedule-exercise-picker/この画面）をdismissで
-      // 一旦閉じてから、直接追加の場合だけ目標セット編集画面をpushし直す。dismiss/pushとも
-      // 同期的にルーターの状態へ反映されるため、この順で呼んでも遷移が競合しない
-      // (app/workout/routine-load.tsx等の既存のdismiss(N)単体パターンを拡張したもの)
+      // カレンダーからの階層をdismissで一旦閉じてから、作成した予定（直接追加・ルーティンとも）の
+      // 目標セット編集画面をpushし直す。dismiss/pushとも同期的にルーターの状態へ反映されるため、
+      // この順で呼んでも遷移が競合しない(app/workout/routine-load.tsx等の既存のdismiss(N)単体
+      // パターンを拡張したもの)。createdScheduledWorkoutIdはこの時点で必ず非nullだが、
+      // 型（number | null）に忠実にガードを残している
       const finishNavigation = () => {
         router.dismiss(dismissCount);
         if (createdScheduledWorkoutId != null) {
@@ -202,7 +205,9 @@ export default function ScheduleTimePickerScreen() {
             ? isPastTime
               ? '通知は届きませんが、差し替えは完了しました。'
               : '差し替えが完了しました。'
-            : '通知は届きませんが、予定はカレンダーに追加されました。',
+            // OK後は編集画面へ遷移するため、遷移先を「カレンダー」と名指しする表現は避ける
+            // (@designer指摘: 文言と実際の着地先のズレ)
+            : '通知は届きませんが、予定は追加されました。',
         ];
         if (notificationSuppressionWarning) lines.push(notificationSuppressionWarning);
         // cancelable:falseが無いと、Android物理戻るボタンでこのAlertを無視できてしまう。isSubmitting系は
