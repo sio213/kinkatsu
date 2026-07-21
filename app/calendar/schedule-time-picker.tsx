@@ -10,7 +10,6 @@ import { formatDirectScheduleTitle } from '@/lib/calendar/schedule';
 import { isValidDateKey, parseDateKey } from '@/lib/calendar/date-grid';
 import { formatHourMinuteParts } from '@/lib/calendar/time-of-day';
 import { ensurePermission } from '@/lib/notifications/permissions';
-import { skipReminderOccurrence, unskipReminderOccurrence } from '@/lib/notifications/reminder-skip-scheduler';
 import {
   buildScheduledWorkoutFireDate,
   createDirectScheduledWorkout,
@@ -48,9 +47,6 @@ export default function ScheduleTimePickerScreen() {
     routineId: routineIdParam,
     routineName,
     exerciseIds: exerciseIdsParam,
-    replaceReminderId,
-    replaceHour,
-    replaceMinute,
   } = useLocalSearchParams<{
     dateKey: string;
     // ルーティン版(schedule-routine-picker経由)はroutineId、直接追加版
@@ -58,11 +54,6 @@ export default function ScheduleTimePickerScreen() {
     routineId?: string;
     routineName?: string;
     exerciseIds?: string;
-    // 「今回だけ差し替え」（PR10-6b、schedule-routine-picker.tsx経由）のときだけ渡る。この3項目は
-    // セットで存在する。直接追加には差し替え機能が無い
-    replaceReminderId?: string;
-    replaceHour?: string;
-    replaceMinute?: string;
   }>();
   const { exercises } = useExercises();
   const routineId = Number(routineIdParam);
@@ -76,30 +67,13 @@ export default function ScheduleTimePickerScreen() {
     const nameById = new Map(exercises.map((e) => [e.id, e.name] as const));
     return formatDirectScheduleTitle(exerciseIds.map((id) => nameById.get(id)).filter((n): n is string => n != null));
   }, [isDirectMode, exerciseIds, exercises]);
-  // routineIdと同じ理由(不正な直リンク対策)で、replaceReminderIdもNumber.isInteger等で
-  // 検証してから使う。素通しだとNaNのreminderIdでskipReminderOccurrence/DB書き込みを
-  // 試みることになる(@reviewer指摘)。isPositiveIntegerは上のroutineIdガードとも共有する。
-  // 「今回だけ差し替え」はルーティン版限定の機能のため、直接追加モードでは常にfalseにする
-  const replaceReminderIdNum = replaceReminderId !== undefined ? Number(replaceReminderId) : undefined;
-  const isReplaceMode = isRoutineMode && replaceReminderIdNum !== undefined && isPositiveInteger(replaceReminderIdNum);
   const router = useRouter();
   const isSubmittingRef = useRef(false);
 
   const [permState, setPermState] = usePermissionState();
   const [showAndroidTimePicker, setShowAndroidTimePicker] = useState(false);
-  // 差し替え時は元のリマインダーの時刻をデフォルトにする(差し替えたいのは基本的に「中身」であって
-  // 「時間帯」ではないため、毎回18:00から手動で直す手間を無くす、@designer方針)
-  // replaceHour/replaceMinuteもreplaceReminderIdと同じ直リンク対策が必要(@reviewer追加指摘)。
-  // 不正値(例:"abc")のまま素通しするとhour/minute stateがNaNになり、DateTimePickerに
-  // Invalid Dateが渡ってしまうため、範囲外ならデフォルトの18:00にフォールバックする
-  const [hour, setHour] = useState(() => {
-    const h = replaceHour !== undefined ? Number(replaceHour) : NaN;
-    return isReplaceMode && Number.isInteger(h) && h >= 0 && h <= 23 ? h : 18;
-  });
-  const [minute, setMinute] = useState(() => {
-    const m = replaceMinute !== undefined ? Number(replaceMinute) : NaN;
-    return isReplaceMode && Number.isInteger(m) && m >= 0 && m <= 59 ? m : 0;
-  });
+  const [hour, setHour] = useState(18);
+  const [minute, setMinute] = useState(0);
   // isSubmittingRefは連打防止用の同期ガード、こちらはボタンの見た目のフィードバック用
   // (ensurePermission()がOSネイティブの許可ダイアログ応答待ちで数秒ブロックしうるため、
   // 押した直後に何も反応が無く見えるのを防ぐ、@designerレビュー指摘)
@@ -126,28 +100,11 @@ export default function ScheduleTimePickerScreen() {
     if (isSubmittingRef.current) return;
     isSubmittingRef.current = true;
     setIsSubmitting(true);
-    // 差し替え合成(スキップ→手動予定追加)の前半が成立したかどうか。後半が失敗した場合の
-    // 巻き戻し判定に使う(@reviewer Major指摘: 後半だけ失敗すると元の予定が無言で消えたまま残る)
-    let skippedForReplace = false;
     try {
       try {
         setPermState(await ensurePermission());
       } catch (e) {
         console.error('[ensure permission]', e);
-      }
-      // 「今回だけ差し替え」（PR10-6b）: 元のリマインダー予定をこの日だけスキップしてから、
-      // 選んだ新しいルーティンを手動予定として追加する。「差し替え = スキップ + 手動予定追加」という
-      // 計画フェーズの合成方針の通り、既存のskipReminderOccurrence/createScheduledWorkoutを
-      // そのまま2回呼ぶだけで実現する（専用の差し替えテーブルは持たない）。PR10-6cにより
-      // ネイティブ方式リマインダーも一時キュー化で通知を止められるようになったため、
-      // notificationSuppressedはトリガー方式ではなく通知API側の想定外エラーのみを示す。
-      // 通常のスキップ(handleSkipReminder)と同じく、抑止できなかった場合は後で警告する
-      // (@reviewer Major指摘: この経路だけ戻り値を握り潰していた)
-      let notificationSuppressed = true;
-      if (isReplaceMode && replaceReminderIdNum !== undefined) {
-        const result = await skipReminderOccurrence(replaceReminderIdNum, dateKey);
-        skippedForReplace = true;
-        notificationSuppressed = result.notificationSuppressed;
       }
       // 作った予定は、種目は決めたが重量・回数（目標セット）はまだ何も入れていない状態
       // （ルーティン予定も、addScheduledWorkoutがルーティン本体の目標セットをこの予定インスタンス
@@ -157,8 +114,8 @@ export default function ScheduleTimePickerScreen() {
       // (schedule-workout-edit.tsx)が「この予定の唯一の詳細/編集ビュー」であるため、作成直後に
       // そのままそこへ連れて行く（@ユーザー指摘。@designer指摘: 「過去の記録から読み込むフローを
       // 参考に」という当初の説明は、あちらが「既にいた画面へ戻る」のに対しこちらは「新しい画面へ
-      // 進む」ため厳密には性質が異なる）。ルーティン予定（通常追加・「今回だけ差し替え」とも）も
-      // 直接追加と同じ画面遷移に統一する（PR7、ユーザー確認済み: 「はい、同じ遷移にする」）
+      // 進む」ため厳密には性質が異なる）。ルーティン予定も直接追加と同じ画面遷移に統一する
+      // （PR7、ユーザー確認済み）
       let createdScheduledWorkoutId: number | null = null;
       if (isDirectMode) {
         createdScheduledWorkoutId = await createDirectScheduledWorkout(exerciseIds, directTitle, dateKey, hour, minute);
@@ -172,24 +129,15 @@ export default function ScheduleTimePickerScreen() {
       // scheduled-workout-scheduler.tsから公開されたbuildScheduledWorkoutFireDateを再利用する
       const fireDate = buildScheduledWorkoutFireDate(dateKey, hour, minute);
       const isPastTime = fireDate.getTime() <= Date.now();
-      // 「通知停止処理」という表現は不正確——ネイティブ方式の実体はcancelReminderOsNotifications
-      // (個別に.catch(()=>{})で握りつぶすため実質失敗しない)ではなく、その後の一時キュー化で
-      // 新しい通知を登録するscheduleQueueNotification側が失敗している可能性が高い(@reviewer指摘)
-      const notificationSuppressionWarning =
-        isReplaceMode && !notificationSuppressed
-          ? '元の予定の新しい通知の登録処理に失敗した可能性があります。念のため指定時刻に通知が届いていないかご確認ください。'
-          : null;
-      // 通常のフロー（「予定を追加」→schedule-chooser→schedule-routine-picker/schedule-exercise-picker→
-      // この画面）はカレンダーからの3階層分をまとめて閉じる必要がある(app/workout/routine-load.tsxの
-      // router.dismiss(2)と同じ考え方だが、schedule-chooserが1枚増えた分+1)。一方「今回だけ差し替え」は
-      // handlePressReplace(app/(tabs)/calendar.tsx)がschedule-chooserを経由せず
-      // schedule-routine-pickerへ直接pushするため、カレンダーからは2階層分で済む
-      const dismissCount = isReplaceMode ? 2 : 3;
-      // カレンダーからの階層をdismissで一旦閉じてから、作成した予定（直接追加・ルーティンとも）の
-      // 目標セット編集画面をpushし直す。dismiss/pushとも同期的にルーターの状態へ反映されるため、
-      // この順で呼んでも遷移が競合しない(app/workout/routine-load.tsx等の既存のdismiss(N)単体
-      // パターンを拡張したもの)。createdScheduledWorkoutIdはこの時点で必ず非nullだが、
-      // 型（number | null）に忠実にガードを残している
+      // カレンダーからの3階層（schedule-chooser/schedule-routine-picker or
+      // schedule-exercise-picker/この画面）をまとめて閉じる必要がある(app/workout/routine-load.tsxの
+      // router.dismiss(2)と同じ考え方だが、schedule-chooserが1枚増えた分+1)
+      const dismissCount = 3;
+      // dismissしてから、作成した予定（直接追加・ルーティンとも）の目標セット編集画面をpushし直す。
+      // dismiss/pushとも同期的にルーターの状態へ反映されるため、この順で呼んでも遷移が競合しない
+      // (app/workout/routine-load.tsx等の既存のdismiss(N)単体パターンを拡張したもの)。
+      // createdScheduledWorkoutIdはこの時点で必ず非nullだが、型（number | null）に忠実に
+      // ガードを残している
       const finishNavigation = () => {
         router.dismiss(dismissCount);
         if (createdScheduledWorkoutId != null) {
@@ -199,23 +147,13 @@ export default function ScheduleTimePickerScreen() {
           });
         }
       };
-      if (isPastTime || notificationSuppressionWarning) {
-        const lines = [
-          isReplaceMode
-            ? isPastTime
-              ? '通知は届きませんが、差し替えは完了しました。'
-              : '差し替えが完了しました。'
-            // OK後は編集画面へ遷移するため、遷移先を「カレンダー」と名指しする表現は避ける
-            // (@designer指摘: 文言と実際の着地先のズレ)
-            : '通知は届きませんが、予定は追加されました。',
-        ];
-        if (notificationSuppressionWarning) lines.push(notificationSuppressionWarning);
+      if (isPastTime) {
         // cancelable:falseが無いと、Android物理戻るボタンでこのAlertを無視できてしまう。isSubmitting系は
         // Alert表示前(finally節)で既に解除済みのため、その場合ボタンが再度押せる状態のまま画面に残り、
         // 同じ予定を重複作成できてしまう(自動レビュー指摘: Major)
         Alert.alert(
-          isPastTime ? 'この時刻は過ぎています' : '差し替えました',
-          lines.join('\n'),
+          'この時刻は過ぎています',
+          '通知は届きませんが、予定は追加されました。',
           [{ text: 'OK', onPress: finishNavigation }],
           { cancelable: false },
         );
@@ -224,37 +162,12 @@ export default function ScheduleTimePickerScreen() {
       }
     } catch (e) {
       console.error('[add scheduled workout]', e);
-      if (skippedForReplace && replaceReminderIdNum !== undefined) {
-        // 前半(スキップ)は成立済みなので、後半(手動予定の追加)の失敗を「差し替えできませんでした」
-        // で伝えるだけだと、実際には元の予定が消えたままの中途半端な状態が残ってしまう。
-        // 巻き戻し自体が失敗した場合、2026-07-19のゴーストカードUI廃止以降はユーザー向けの
-        // 手動復旧手段が無くなった（元のリマインダー予定は削除されたまま残る）。この二重失敗は
-        // 極めて稀だがユーザーへの追加のエラーAlertは出さずログにのみ残す（変更前と同じ方針を維持）
-        try {
-          await unskipReminderOccurrence(replaceReminderIdNum, dateKey);
-        } catch (rollbackError) {
-          console.error('[rollback skip after replace failure]', rollbackError);
-        }
-      }
-      Alert.alert('エラー', isReplaceMode ? '差し替えできませんでした。' : '予定を追加できませんでした。');
+      Alert.alert('エラー', '予定を追加できませんでした。');
     } finally {
       isSubmittingRef.current = false;
       setIsSubmitting(false);
     }
-  }, [
-    isDirectMode,
-    exerciseIds,
-    directTitle,
-    routineId,
-    routineName,
-    dateKey,
-    hour,
-    minute,
-    router,
-    setPermState,
-    isReplaceMode,
-    replaceReminderIdNum,
-  ]);
+  }, [isDirectMode, exerciseIds, directTitle, routineId, routineName, dateKey, hour, minute, router, setPermState]);
 
   const handleRequestPermission = useCallback(async () => {
     setPermState(await ensurePermission());
@@ -315,11 +228,7 @@ export default function ScheduleTimePickerScreen() {
         </FormField>
       </View>
       <View style={styles.footer}>
-        <PrimaryButton
-          label={isReplaceMode ? 'この時刻で差し替え' : 'この時刻で追加'}
-          onPress={handleConfirm}
-          disabled={isSubmitting}
-        />
+        <PrimaryButton label="この時刻で追加" onPress={handleConfirm} disabled={isSubmitting} />
       </View>
     </SafeAreaView>
   );

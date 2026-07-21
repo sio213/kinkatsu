@@ -64,12 +64,9 @@ export function SessionTimeGroupHeader({ sessionStartedAt, isSchedule = false, r
 }
 
 const styles = StyleSheet.create({
-  // flexGrow:1が無いと、⋮メニューと横並びのrow親（schedule-exercise-card-group.tsxのheader）に
-  // 置かれたときにこのView自身が内容サイズに縮んでしまい、routineNameのmarginLeft:'auto'が
-  // 効く余地（余白）が無くなる（@reviewer指摘Major: リマインダー予定側でルーティン名が時刻の
-  // 直後に密着してしまうバグがあった）。column親（wrapper、実体化済み予定でメニュー無しの場合）
-  // では既にalignItems:stretchで全幅になるため実質影響しない
-  row: { flexDirection: 'row', alignItems: 'center', flexGrow: 1 },
+  // このViewは常にcolumn親（wrapper/dayGroup）の唯一の子として置かれ、alignItems:stretchで
+  // 全幅になるため、routineNameのmarginLeft:'auto'による右寄せが成立する
+  row: { flexDirection: 'row', alignItems: 'center' },
   timeGroup: { flexDirection: 'row', alignItems: 'center', gap: 7, flexShrink: 0 },
   label: { ...Typography.footnote, fontWeight: '700', color: Colors.textPrimary },
   // デザイン案通り、時刻ラベル(footnote/13px)より一段小さく控えめなトーンにする

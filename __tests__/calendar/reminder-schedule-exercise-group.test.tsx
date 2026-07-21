@@ -9,16 +9,13 @@ import { Text, TouchableOpacity } from 'react-native';
 import { ReminderScheduleExerciseGroup } from '@/components/calendar/reminder-schedule-exercise-group';
 
 const onPress = jest.fn();
-const onDelete = jest.fn();
 const onPressStart = jest.fn();
-const onReplace = jest.fn();
 
 function render(props: Partial<Parameters<typeof ReminderScheduleExerciseGroup>[0]> = {}) {
   const merged = {
     routineId: 10,
     routineName: '胸の日',
     sessionStartedAt: new Date(2026, 6, 25, 19, 30).getTime(),
-    onDelete,
     onPress,
     ...props,
   };
@@ -46,9 +43,7 @@ const benchPressExercise = {
 
 beforeEach(() => {
   onPress.mockClear();
-  onDelete.mockClear();
   onPressStart.mockClear();
-  onReplace.mockClear();
   mockUseRoutinePreviewExerciseCards.mockReturnValue({ exercises: [benchPressExercise], loaded: true });
 });
 
@@ -114,30 +109,11 @@ describe('ReminderScheduleExerciseGroup', () => {
     expect(onPress).toHaveBeenCalledTimes(1);
   });
 
-  it('⋮メニューの「削除」を押すとonDeleteが呼ばれる', () => {
+  // ⋮メニュー（削除・今回だけ差し替え）は2026-07-22に全種別で撤去した（@ユーザー指摘）。
+  // 削除はカードタップ先の目標セット編集画面（実体化後）に一本化し、今回だけ差し替え機能自体を廃止した
+  it('⋮メニューは表示されない（削除・差し替えは廃止済み）', () => {
     const root = render();
-    const menuTrigger = findByAccessibilityLabel(root.root, '「胸の日」夜 19:30のメニューを開く')!;
-    act(() => {
-      menuTrigger.props.onPress();
-    });
-    const deleteItem = findByAccessibilityLabel(root.root, '削除')!;
-    act(() => {
-      deleteItem.props.onPress();
-    });
-    expect(onDelete).toHaveBeenCalledTimes(1);
-  });
-
-  it('onReplaceを渡すと⋮メニューに「今回だけ差し替え」が出てタップでonReplaceが呼ばれる', () => {
-    const root = render({ onReplace });
-    const menuTrigger = findByAccessibilityLabel(root.root, '「胸の日」夜 19:30のメニューを開く')!;
-    act(() => {
-      menuTrigger.props.onPress();
-    });
-    const replaceItem = findByAccessibilityLabel(root.root, '今回だけ差し替え')!;
-    act(() => {
-      replaceItem.props.onPress();
-    });
-    expect(onReplace).toHaveBeenCalledTimes(1);
+    expect(findByAccessibilityLabel(root.root, '「胸の日」夜 19:30のメニューを開く')).toBeUndefined();
   });
 
   it('onPressStartを渡す場合、開始ボタンが表示されタップでonPressStartが呼ばれる', () => {

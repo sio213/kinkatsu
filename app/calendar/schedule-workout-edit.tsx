@@ -227,7 +227,6 @@ export default function ScheduleWorkoutEditScreen() {
 
   // ルーティン紐付き予定（実体化済み）のときだけ表示する。種目編集アクション群・削除とは
   // 性質が異なる「ルーティン本体への移動」のため、区切り線で分けた別グループにする
-  // （components/calendar/schedule-exercise-card-group.tsxのreplaceMenuItemsと同じ方針）
   const menuGroups: DropdownMenuItem[][] =
     scheduledTime?.routineId != null
       ? [

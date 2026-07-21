@@ -118,25 +118,22 @@ export async function createDirectScheduledWorkout(
 
 export type MaterializeReminderOccurrenceResult = {
   scheduledWorkoutId: number;
-  // schedule-time-picker.tsxのisReplaceMode分岐と同じくskipReminderOccurrenceの結果をそのまま
-  // 透過する。falseは通知API側の想定外エラーのみを意味し（PR10-6cによりトリガー方式の制約では
-  // なくなった）、呼び出し側（次PRのUI）がpicker側と同じ「新しい通知の登録に失敗した可能性が
-  // あります」という警告を出せるようにする（@reviewer Major指摘: 破棄すると二重通知が起きても
-  // 無言になる）
+  // skipReminderOccurrenceの結果をそのまま透過する。falseは通知API側の想定外エラーのみを
+  // 意味し（PR10-6cによりトリガー方式の制約ではなくなった）、呼び出し側（app/(tabs)/calendar.tsx）
+  // が「新しい通知の登録に失敗した可能性があります」という警告を出せるようにする
+  // （@reviewer Major指摘: 破棄すると二重通知が起きても無言になる）
   notificationSuppressed: boolean;
 };
 
 // リマインダー由来の予定インスタンス（scheduledWorkouts行を持たず、reminders設定から毎回
 // 動的に計算されているだけ）を、種目カードタップ時に初めてscheduledWorkouts実体として書き出す
 // （2026-07-21、ルーティン予定を直接予定と同じ種目カード一覧表示・編集に統一する改修）。
-// app/calendar/schedule-time-picker.tsxの「今回だけ差し替え」(isReplaceMode)と同じ
-// 「skip+create」の合成だが、差し替えは別ルーティン・別時刻を選び直せるのに対し、こちらは
-// 同じroutineId/hour/minuteのまま実体化するだけの違い。通知の二重登録防止（元のリマインダー
-// 発火をスキップしないと、新しいscheduledWorkouts側の通知と重複する）のため、表示側dedupe
+// 「skip+create」の合成で、通知の二重登録防止（元のリマインダー発火をスキップしないと、
+// 新しいscheduledWorkouts側の通知と重複する）のため、表示側dedupe
 // (lib/calendar/schedule.tsのmergeScheduleCards)だけでは代替できずskipが必須。
 // 呼び出し側は種目カードタップのたびに呼ばれるため冪等ではない点に注意（skipReminderOccurrence
 // 自体は冪等だが、createScheduledWorkoutは冪等でなくscheduledWorkouts行が毎回作られる。
-// 二重実体化を防ぐガードは呼び出し側（次PRのタップハンドラ）の責務とする）
+// 二重実体化を防ぐガードは呼び出し側（app/(tabs)/calendar.tsxのタップハンドラ）の責務とする）
 export async function materializeReminderOccurrence(
   reminderId: number,
   routineId: number,
@@ -150,8 +147,8 @@ export async function materializeReminderOccurrence(
     const scheduledWorkoutId = await createScheduledWorkout(routineId, routineName, scheduledDate, hour, minute);
     return { scheduledWorkoutId, notificationSuppressed };
   } catch (e) {
-    // schedule-time-picker.tsxのhandleConfirmと同じロールバック方針（前半のskipだけ成立して
-    // 元の予定が無言で消えたままになるのを防ぐ、@reviewer Major指摘の再発防止）
+    // 前半のskipだけ成立して元の予定が無言で消えたままになるのを防ぐロールバック
+    // （@reviewer Major指摘の再発防止）
     try {
       await unskipReminderOccurrence(reminderId, scheduledDate);
     } catch (rollbackError) {

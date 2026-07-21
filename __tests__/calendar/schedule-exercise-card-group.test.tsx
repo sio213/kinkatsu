@@ -3,9 +3,7 @@ import { Text, TouchableOpacity } from 'react-native';
 import { ScheduleExerciseCardGroup, type ScheduleExerciseCardGroupCard } from '@/components/calendar/schedule-exercise-card-group';
 
 const onPress = jest.fn();
-const onDelete = jest.fn();
 const onPressStart = jest.fn();
-const onReplace = jest.fn();
 const onRetryCards = jest.fn();
 
 const benchPressCard: ScheduleExerciseCardGroupCard = {
@@ -24,7 +22,6 @@ function render(props: Partial<Parameters<typeof ScheduleExerciseCardGroup>[0]> 
     sessionStartedAt: new Date(2026, 6, 25, 19, 30).getTime(),
     title: 'ベンチプレス 他1種目',
     cards: [benchPressCard],
-    onDelete,
     onPress,
     ...props,
   };
@@ -41,14 +38,13 @@ function findByAccessibilityLabel(root: ReactTestInstance, label: string) {
 
 beforeEach(() => {
   onPress.mockClear();
-  onDelete.mockClear();
   onPressStart.mockClear();
-  onReplace.mockClear();
   onRetryCards.mockClear();
 });
 
 // 予定（直接予定・ルーティン予定どちらも）の選択日パネル表示の見た目のみを担う共通コンポーネント
-// （2026-07-21、旧DirectScheduleExerciseGroupから分割。データ取得は呼び出し元のコンテナが担う）
+// （2026-07-21、旧DirectScheduleExerciseGroupから分割。データ取得は呼び出し元のコンテナが担う）。
+// ⋮メニュー（削除・今回だけ差し替え）は2026-07-22に全種別で撤去した（@ユーザー指摘）
 describe('ScheduleExerciseCardGroup', () => {
   it('cardsを種目名付きで表示し、まだ実施していないため自己ベストバッジは出さない', () => {
     const root = render();
@@ -113,63 +109,9 @@ describe('ScheduleExerciseCardGroup', () => {
     expect(texts).not.toContain('0セット');
   });
 
-  it('⋮メニューの「削除」を押すとonDeleteが呼ばれる', () => {
+  it('⋮メニューは表示されない（削除・差し替えは廃止済み）', () => {
     const root = render();
-    const menuTrigger = findByAccessibilityLabel(root.root, '「ベンチプレス 他1種目」夜 19:30のメニューを開く')!;
-    act(() => {
-      menuTrigger.props.onPress();
-    });
-    const deleteItem = findByAccessibilityLabel(root.root, '削除')!;
-    act(() => {
-      deleteItem.props.onPress();
-    });
-    expect(onDelete).toHaveBeenCalledTimes(1);
-  });
-
-  // onDeleteは実体化済み予定（直接予定・手動追加ルーティン予定）のときは呼び出し元
-  // （scheduled-workout-exercise-group.tsx）が渡さないため、⋮メニュー自体が無くなる
-  // （2026-07-22、@ユーザー指摘: 削除は遷移先のschedule-workout-edit.tsxに一本化）
-  it('onDeleteを渡さない場合（実体化済み予定）、⋮メニュー自体が描画されない', () => {
-    const root = render({ onDelete: undefined });
     expect(findByAccessibilityLabel(root.root, '「ベンチプレス 他1種目」夜 19:30のメニューを開く')).toBeUndefined();
-  });
-
-  // 呼び出し元の設計上あり得ない組み合わせだが、コンポーネント自身がonDelete優先で
-  // ガードしていること（onDelete省略時はonReplaceだけ渡っていてもメニューが出ないこと）を
-  // 保証しておく防御的テスト（@tester指摘）
-  it('onDeleteを渡さずonReplaceだけ渡した場合でも⋮メニューは描画されない', () => {
-    const root = render({ onDelete: undefined, onReplace });
-    expect(findByAccessibilityLabel(root.root, '「ベンチプレス 他1種目」夜 19:30のメニューを開く')).toBeUndefined();
-    expect(findByAccessibilityLabel(root.root, '今回だけ差し替え')).toBeUndefined();
-  });
-
-  it('onDeleteを渡さない場合でも見出し（時刻・routineName）は表示され続ける', () => {
-    const root = render({ onDelete: undefined, routineName: '胸の日' });
-    const texts = root.root.findAllByType(Text).map((t) => [t.props.children].flat().join(''));
-    expect(texts.some((t) => t.includes('19:30'))).toBe(true);
-    expect(texts).toContain('胸の日');
-  });
-
-  it('onReplaceを渡さない場合（直接予定・実体化済みルーティン予定）、⋮メニューに「今回だけ差し替え」は出ない', () => {
-    const root = render();
-    const menuTrigger = findByAccessibilityLabel(root.root, '「ベンチプレス 他1種目」夜 19:30のメニューを開く')!;
-    act(() => {
-      menuTrigger.props.onPress();
-    });
-    expect(findByAccessibilityLabel(root.root, '今回だけ差し替え')).toBeUndefined();
-  });
-
-  it('onReplaceを渡す場合（未実体化のリマインダー予定）、⋮メニューに「今回だけ差し替え」が出てタップでonReplaceが呼ばれる', () => {
-    const root = render({ onReplace });
-    const menuTrigger = findByAccessibilityLabel(root.root, '「ベンチプレス 他1種目」夜 19:30のメニューを開く')!;
-    act(() => {
-      menuTrigger.props.onPress();
-    });
-    const replaceItem = findByAccessibilityLabel(root.root, '今回だけ差し替え')!;
-    act(() => {
-      replaceItem.props.onPress();
-    });
-    expect(onReplace).toHaveBeenCalledTimes(1);
   });
 
   it('onPressStartを渡さない場合（未来日）、開始ボタンは表示されない', () => {

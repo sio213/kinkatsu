@@ -25,7 +25,6 @@ import { addMonths, isSameDay, toDateKey } from '@/lib/calendar/date-grid';
 import { CATEGORY_ALL, EXERCISE_CATEGORIES } from '@/lib/exercises/constants';
 import { buildTodayTimeline, groupCardsBySession } from '@/lib/calendar/session-groups';
 import { mergeScheduleCards, type UnifiedScheduleCard } from '@/lib/calendar/schedule';
-import { skipReminderOccurrence } from '@/lib/notifications/reminder-skip-scheduler';
 import { materializeReminderOccurrence } from '@/lib/notifications/scheduled-workout-scheduler';
 import { startWorkoutFromRoutine, startWorkoutFromScheduledWorkout } from '@/lib/workout/session';
 import { formatElapsedClock, formatMonthGroup, formatSessionDateGroup } from '@/lib/workout/summary';
@@ -122,8 +121,6 @@ function ScheduleTimelineEntry({
   onEditScheduledWorkoutExercises,
   onStartScheduledWorkout,
   onStartRoutine,
-  onDeleteReminderOccurrence,
-  onReplace,
   onMaterializeAndEdit,
 }: {
   card: MergedScheduleCard;
@@ -132,8 +129,6 @@ function ScheduleTimelineEntry({
   onEditScheduledWorkoutExercises: (scheduledWorkoutId: number) => void;
   onStartScheduledWorkout: (scheduledWorkoutId: number, title: string) => void;
   onStartRoutine: (routineId: number, title: string) => void;
-  onDeleteReminderOccurrence: (reminderId: number, routineName: string) => void;
-  onReplace: (reminderId: number, routineName: string, hour: number, minute: number) => void;
   onMaterializeAndEdit: (reminderId: number, routineId: number, routineName: string, hour: number, minute: number) => void;
 }) {
   // 直接予定（routineId===null、2026-07-20）は種目一覧カード表示に切り替える（@ユーザー指摘）。
@@ -176,8 +171,6 @@ function ScheduleTimelineEntry({
       routineName={card.title}
       sessionStartedAt={sessionStartedAt}
       onPressStart={showStart ? () => onStartRoutine(routineId, card.title) : undefined}
-      onDelete={() => onDeleteReminderOccurrence(card.reminder.id, card.title)}
-      onReplace={() => onReplace(card.reminder.id, card.title, card.hour, card.minute)}
       onPress={() => onMaterializeAndEdit(card.reminder.id, routineId, card.title, card.hour, card.minute)}
     />
   );
@@ -326,68 +319,6 @@ export default function CalendarScreen() {
       }),
     [pushDebounced],
   );
-  // リマインダー予定の⋮メニュー「削除」用（2026-07-19: 「今回だけスキップ」(取り消し可能・
-  // ゴーストカードで元に戻せた)から、手動予定と同じ「削除」(取り消し不可)へ変更）。
-  // 内部的にはreminderScheduleSkips/skipReminderOccurrenceの仕組みをそのまま流用する
-  // （「今回だけ差し替え」機能がschedule-time-picker.tsx経由でこの同じテーブル・関数に依存して
-  // いるため。テーブル名・関数名が「スキップ」のままなのはその名残で、役割自体は「その日の
-  // この発火は無かったことにする」マーカーで変わらない）。取り消し不可になったため、
-  // schedule-workout-edit.tsxのヘッダー⋮「削除」と同じAlert確認を挟む。タイトルは他の予定削除
-  // （ルーティン予定・直接予定）と統一し「この予定を削除しますか？」にする（@ユーザー指摘）
-  const handleDeleteReminderOccurrence = useCallback(
-    (reminderId: number, routineName: string) => {
-      Alert.alert(
-        'この予定を削除しますか？',
-        `「${routineName}」の次回以降の予定には影響しません。今回分の予定と通知だけを削除します。`,
-        [
-          { text: 'キャンセル', style: 'cancel' },
-          {
-            text: '削除',
-            style: 'destructive',
-            onPress: async () => {
-              try {
-                const { notificationSuppressed } = await skipReminderOccurrence(reminderId, toDateKey(selectedDate));
-                if (!notificationSuppressed) {
-                  // PR10-6cにより、毎日/毎週/単純な毎月の「ネイティブ方式」リマインダーも一時的に
-                  // キュー方式へ切り替えることで該当日の通知を止められるようになった。
-                  // notificationSuppressed=falseはトリガー方式による既知の制約ではなく通知API側の
-                  // 想定外エラーのみを意味するため、その場合はその場で一言知らせる
-                  // （@reviewer指摘: 無言だと「削除したのに鳴った」で信頼を損なう）
-                  Alert.alert(
-                    '予定を削除しました',
-                    '削除自体は完了しています。ただし新しい通知の登録処理に失敗した可能性があるため、念のため指定時刻に通知が届いていないかご確認ください。',
-                  );
-                }
-              } catch (e) {
-                console.error('[delete reminder occurrence]', e);
-                Alert.alert('エラー', '予定を削除できませんでした。');
-              }
-            },
-          },
-        ],
-      );
-    },
-    [selectedDate],
-  );
-  // リマインダー予定の⋮メニュー「今回だけ差し替え」用（PR10-6b）。ここではまだ何もDBを
-  // 変更せず、既存の「予定を追加」フロー（schedule-routine-picker→schedule-time-picker）を
-  // 差し替えパラメータ付きで再利用するだけ。実際のスキップ+手動予定追加はschedule-time-picker.tsxの
-  // 確定操作まで遅延させる（途中で戻る操作をした場合に元のリマインダー予定が無言で消えたままに
-  // ならないようにするため）
-  const handlePressReplace = useCallback(
-    (reminderId: number, routineName: string, hour: number, minute: number) =>
-      pushDebounced({
-        pathname: '/calendar/schedule-routine-picker',
-        params: {
-          dateKey: toDateKey(selectedDate),
-          replaceReminderId: String(reminderId),
-          replaceRoutineName: routineName,
-          replaceHour: String(hour),
-          replaceMinute: String(minute),
-        },
-      }),
-    [pushDebounced, selectedDate],
-  );
   // リマインダー由来の未実体化予定（ReminderScheduleExerciseGroup）の種目カードタップ用
   // （2026-07-21）。まだscheduledWorkouts行が存在しないため、初めてこの日付・時刻の実体を
   // 作ってから種目編集画面へ遷移する。reminderId単位のガードで、非同期処理中の連打による
@@ -411,8 +342,8 @@ export default function CalendarScreen() {
             pathname: '/calendar/schedule-workout-edit',
             params: { scheduledWorkoutId: String(scheduledWorkoutId) },
           });
-        // schedule-time-picker.tsxのisReplaceMode分岐と同じ扱い（@reviewer指摘: 無言だと
-        // 「消えたはずの通知が鳴った」で信頼を損なう）。編集画面へ着地する前に一言伝える
+        // 通知登録の失敗を無言で握りつぶさない（@reviewer指摘: 無言だと「消えたはずの通知が
+        // 鳴った」で信頼を損なう）。編集画面へ着地する前に一言伝える
         if (!notificationSuppressed) {
           Alert.alert(
             '予定を開きました',
@@ -589,8 +520,6 @@ export default function CalendarScreen() {
                           onEditScheduledWorkoutExercises={handleEditScheduledWorkoutExercises}
                           onStartScheduledWorkout={handleStartScheduledWorkout}
                           onStartRoutine={handleStartRoutine}
-                          onDeleteReminderOccurrence={handleDeleteReminderOccurrence}
-                          onReplace={handlePressReplace}
                           onMaterializeAndEdit={handleMaterializeAndEditRoutineSchedule}
                         />
                       </View>
@@ -648,8 +577,6 @@ export default function CalendarScreen() {
                         onEditScheduledWorkoutExercises={handleEditScheduledWorkoutExercises}
                         onStartScheduledWorkout={handleStartScheduledWorkout}
                         onStartRoutine={handleStartRoutine}
-                        onDeleteReminderOccurrence={handleDeleteReminderOccurrence}
-                        onReplace={handlePressReplace}
                         onMaterializeAndEdit={handleMaterializeAndEditRoutineSchedule}
                       />
                     </View>

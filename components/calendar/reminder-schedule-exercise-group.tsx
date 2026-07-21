@@ -9,9 +9,6 @@ type Props = {
   sessionStartedAt: number;
   // 今日自身の予定にのみ渡す
   onPressStart?: () => void;
-  onDelete: () => void;
-  // リマインダー予定専用（PR10-6b）
-  onReplace?: () => void;
   // 未実体化のため、タップ時にmaterializeReminderOccurrence（DB書き込み+遷移）を行う想定。
   // 呼び出し元（app/(tabs)/calendar.tsx）が非同期処理・二重タップ防止・エラーハンドリングの
   // 責務を持つ（このコンポーネント自身はUIのみ）
@@ -30,8 +27,6 @@ export const ReminderScheduleExerciseGroup = memo(function ReminderScheduleExerc
   routineName,
   sessionStartedAt,
   onPressStart,
-  onDelete,
-  onReplace,
   onPress,
 }: Props) {
   const { exercises, loaded } = useRoutinePreviewExerciseCards(routineId);
@@ -65,8 +60,6 @@ export const ReminderScheduleExerciseGroup = memo(function ReminderScheduleExerc
       title={routineName}
       cards={cards}
       onPressStart={onPressStart}
-      onDelete={onDelete}
-      onReplace={onReplace}
       onPress={onPress}
     />
   );

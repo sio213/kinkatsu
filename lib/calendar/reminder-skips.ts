@@ -14,15 +14,16 @@ export async function addReminderScheduleSkip(reminderId: number, skippedDate: s
   return inserted.id;
 }
 
-// 2026-07-19にユーザー向けの「元に戻す」UIは廃止され、現在は「今回だけ差し替え」フローの
-// 内部ロールバック専用（lib/notifications/reminder-skip-scheduler.tsのunskipReminderOccurrence経由）
+// 2026-07-19にユーザー向けの「元に戻す」UIは廃止され、現在はmaterializeReminderOccurrence
+// （lib/notifications/scheduled-workout-scheduler.ts）の内部ロールバック専用
+// （lib/notifications/reminder-skip-scheduler.tsのunskipReminderOccurrence経由）
 export async function removeReminderScheduleSkip(reminderId: number, skippedDate: string): Promise<void> {
   await db
     .delete(reminderScheduleSkips)
     .where(and(eq(reminderScheduleSkips.reminderId, reminderId), eq(reminderScheduleSkips.skippedDate, skippedDate)));
 }
 
-// lib/notifications/reminder-skip-scheduler.tsのskipReminderOccurrenceが、⋮メニュー連打等での
+// lib/notifications/reminder-skip-scheduler.tsのskipReminderOccurrenceが、種目カード連打等での
 // 二重スキップ(reminderId+skippedDateのunique制約違反)を避けて冪等に振る舞うための存在チェック
 export async function hasReminderScheduleSkip(reminderId: number, skippedDate: string): Promise<boolean> {
   const rows = await db
