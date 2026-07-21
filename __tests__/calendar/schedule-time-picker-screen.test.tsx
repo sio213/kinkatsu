@@ -1,5 +1,6 @@
 const mockBack = jest.fn();
 const mockDismiss = jest.fn();
+const mockPush = jest.fn();
 const mockUseLocalSearchParams = jest.fn();
 const mockCreateScheduledWorkout = jest.fn();
 const mockCreateDirectScheduledWorkout = jest.fn();
@@ -9,7 +10,7 @@ const mockUnskipReminderOccurrence = jest.fn();
 let mockExercises: { id: number; name: string }[];
 
 jest.mock('expo-router', () => ({
-  useRouter: () => ({ back: mockBack, dismiss: mockDismiss }),
+  useRouter: () => ({ back: mockBack, dismiss: mockDismiss, push: mockPush }),
   useLocalSearchParams: () => mockUseLocalSearchParams(),
   Stack: {
     Screen: ({ options }: { options?: { headerTitle?: () => unknown } }) =>
@@ -112,6 +113,8 @@ test('確定を押すとcreateScheduledWorkoutにroutineId/routineName/dateKey/h
   });
   expect(mockCreateScheduledWorkout).toHaveBeenCalledWith(10, '胸の日', '2026-07-25', 18, 0);
   expect(mockDismiss).toHaveBeenCalledWith(3);
+  // ルーティン予定は目標セット編集画面を持たないため、直接追加と違いpushは発生しない
+  expect(mockPush).not.toHaveBeenCalled();
 });
 
 test('確定を押すと先にensurePermissionを呼ぶ（通知が届くよう権限をリクエストしておく）', async () => {
@@ -663,6 +666,58 @@ describe('直接追加モード（exerciseIdsパラメータ、schedule-exercise
     expect(mockCreateDirectScheduledWorkout).toHaveBeenCalledWith([1, 2], 'ベンチプレス 他1種目', '2026-07-25', 18, 0);
     expect(mockCreateScheduledWorkout).not.toHaveBeenCalled();
     expect(mockDismiss).toHaveBeenCalledWith(3);
+  });
+
+  test('確定後、作成した予定の目標セット編集画面(schedule-workout-edit)へ遷移する（過去の記録から読み込むフローと同じく、作成直後にそのまま編集先へ連れて行く、@ユーザー指摘）', async () => {
+    mockCreateDirectScheduledWorkout.mockResolvedValueOnce(42);
+    const root = render();
+    const submitBtn = findByLabel(root, 'この時刻で追加')!;
+    await act(async () => {
+      submitBtn.props.onPress();
+      await Promise.resolve();
+      await Promise.resolve();
+    });
+    expect(mockDismiss).toHaveBeenCalledWith(3);
+    expect(mockPush).toHaveBeenCalledWith({
+      pathname: '/calendar/schedule-workout-edit',
+      params: { scheduledWorkoutId: '42' },
+    });
+    // dismissしてからpushする順序が入れ替わらないことを固定する
+    const dismissOrder = mockDismiss.mock.invocationCallOrder[0];
+    const pushOrder = mockPush.mock.invocationCallOrder[0];
+    expect(dismissOrder).toBeLessThan(pushOrder);
+  });
+
+  test('過去時刻の警告Alert経由でも、OKを押した後にdismissしてから目標セット編集画面へpushする', async () => {
+    mockCreateDirectScheduledWorkout.mockResolvedValueOnce(42);
+    const today = new Date();
+    const dateKey = `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, '0')}-${String(today.getDate()).padStart(2, '0')}`;
+    mockUseLocalSearchParams.mockReturnValue({ dateKey, exerciseIds: '1,2' });
+    const root = render();
+    const picker = root.findByType(DateTimePicker);
+    const pastTime = new Date(today.getTime() - 60 * 60 * 1000); // 1時間前
+    act(() => {
+      picker.props.onChange({}, pastTime);
+    });
+    const submitBtn = findByLabel(root, 'この時刻で追加')!;
+    await act(async () => {
+      submitBtn.props.onPress();
+      await Promise.resolve();
+      await Promise.resolve();
+    });
+    expect(mockDismiss).not.toHaveBeenCalled();
+    expect(mockPush).not.toHaveBeenCalled();
+
+    const alertCall = (Alert.alert as jest.Mock).mock.calls[0];
+    const okAction = alertCall[2].find((b: { text?: string }) => b.text === 'OK');
+    act(() => {
+      okAction.onPress();
+    });
+    expect(mockDismiss).toHaveBeenCalledWith(3);
+    expect(mockPush).toHaveBeenCalledWith({
+      pathname: '/calendar/schedule-workout-edit',
+      params: { scheduledWorkoutId: '42' },
+    });
   });
 
   test('exerciseIdsに不正な値が1件でも混ざっていれば直接モードとして扱わず、ルーティン未指定と同じ「見つからない」表示になる', () => {

@@ -2,7 +2,10 @@ const mockUseScheduledWorkoutExercises = jest.fn();
 const mockGetExerciseHistoryEntries = jest.fn();
 
 jest.mock('@/hooks/use-scheduled-workout-exercises', () => ({
-  useScheduledWorkoutExercises: (...args: unknown[]) => mockUseScheduledWorkoutExercises(...args),
+  // mockUseScheduledWorkoutExercises自体は従来通り種目配列を返す形のまま(既存の大量の
+  // mockReturnValue呼び出しを書き換えずに済む)、ここでフックの実際の返り値の形
+  // {exercises, loaded}に包む。このフックはloadedを使わないため常にtrueで固定してよい
+  useScheduledWorkoutExercises: (...args: unknown[]) => ({ exercises: mockUseScheduledWorkoutExercises(...args), loaded: true }),
 }));
 
 jest.mock('@/lib/workout/history', () => ({

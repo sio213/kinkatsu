@@ -38,7 +38,7 @@ export type UseScheduledExerciseCardsResult = {
 // 取得するスナップショットとして補う（use-calendar-day-exercises.tsと同じ理由でlive query化は
 // していない。実施履歴自体はこの予定の編集操作では変化しないため）
 export function useScheduledExerciseCards(scheduledWorkoutId: number): UseScheduledExerciseCardsResult {
-  const exercises = useScheduledWorkoutExercises(scheduledWorkoutId);
+  const { exercises } = useScheduledWorkoutExercises(scheduledWorkoutId);
 
   const idsNeedingHistory = useMemo(
     // 同じ種目が複数回予定に入っていると重複したexerciseIdが並びうるため、履歴取得の冗長な

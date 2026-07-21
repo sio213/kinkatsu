@@ -17,7 +17,7 @@ import { removeScheduledWorkout } from '@/lib/notifications/scheduled-workout-sc
 import { hasAnyValue } from '@/lib/workout/set-values';
 import { formatSessionDateGroup } from '@/lib/workout/summary';
 import { Stack, useLocalSearchParams, useRouter } from 'expo-router';
-import { useCallback } from 'react';
+import { useCallback, useEffect, useRef } from 'react';
 import { Alert, ScrollView, StyleSheet, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
@@ -34,9 +34,29 @@ export default function ScheduleWorkoutEditScreen() {
   const router = useRouter();
   const pushDebounced = useDebouncedPush();
   const keyboardInset = useKeyboardInset();
-  const exercises = useScheduledWorkoutExercises(scheduledWorkoutId);
+  const { exercises, loaded: exercisesLoaded } = useScheduledWorkoutExercises(scheduledWorkoutId);
   const { time: scheduledTime, loaded: scheduledTimeLoaded } = useScheduledWorkoutTime(scheduledWorkoutId);
   const { routines } = useRoutines();
+  const scrollRef = useRef<ScrollView>(null);
+
+  // 「種目を追加」「ルーティンから読み込み」「過去の記録から読み込み」はいずれも子画面へ
+  // 遷移してDBに書き込んでから戻ってくる形（種目は必ずorderIndex末尾に追加される）のため、
+  // ここではexercisesの件数が増えたタイミングを検知して末尾までスクロールするだけでよい
+  // （app/workout/[id].tsxの種目追加時の自動スクロールと同じ体験、@ユーザー指摘）。
+  // useLiveQueryは「未解決(exercises=[]相当)→解決後のN件」という2段階を経るため、単に
+  // 「エフェクトを一度でも実行したか」だけを見るセンチネルだと、開いた直後の初回データ到着
+  // （0件→N件）そのものを「追加された」と誤検知してしまう（@reviewer指摘: 既存の複数種目
+  // 予定を開くたびに末尾へスクロールしてしまうバグを実際に含んでいた）。exercisesLoadedが
+  // trueになる前は比較・記録どちらも行わないことで、prevExerciseCountRefには必ず
+  // 「読み込み完了後の実件数」が最初に入るようにする
+  const prevExerciseCountRef = useRef<number | null>(null);
+  useEffect(() => {
+    if (!exercisesLoaded) return;
+    if (prevExerciseCountRef.current !== null && exercises.length > prevExerciseCountRef.current) {
+      scrollRef.current?.scrollToEnd({ animated: true });
+    }
+    prevExerciseCountRef.current = exercises.length;
+  }, [exercises.length, exercisesLoaded]);
 
   // 選択日パネルでは見えていた対象日・時刻を、この画面のヘッダーにも表示する。同日に複数の
   // 直接予定があるとき、どの予定を編集しているか見失わないようにする（@designer指摘）
@@ -177,7 +197,10 @@ export default function ScheduleWorkoutEditScreen() {
       hint: exercises.length <= 1 ? '2種目以上あるときに使えます' : undefined,
       onPress: handleReorder,
     },
-    { key: 'delete', label: 'この予定を削除', icon: 'delete-outline', danger: true, onPress: handleDeleteWorkout },
+    // app/workout/[id].tsxのヘッダー⋮「削除」とラベルを揃える（@ユーザー指摘）。種目カード個別の
+    // 「削除」とはメニューの開く場所（ヘッダー固定 vs カード内）が離れており、workout/[id].tsx側でも
+    // 同じ「削除」ラベルで両者が共存しているため、取り違えリスクの実害は無いと判断
+    { key: 'delete', label: '削除', icon: 'delete-outline', danger: true, onPress: handleDeleteWorkout },
   ];
 
   // 「この予定を削除」実行後、DBの削除完了からrouter.back()による画面遷移までの間にlive query
@@ -202,6 +225,7 @@ export default function ScheduleWorkoutEditScreen() {
         }}
       />
       <ScrollView
+        ref={scrollRef}
         contentContainerStyle={styles.content}
         contentInset={{ bottom: keyboardInset }}
         scrollIndicatorInsets={{ bottom: keyboardInset }}

@@ -63,9 +63,14 @@ beforeEach(() => {
 describe('useScheduledWorkoutExercises', () => {
   const mount = makeHarness(() => useScheduledWorkoutExercises(1));
 
-  it('exerciseRows/setRowsどちらもundefinedのとき空配列を返す', () => {
+  it('exerciseRows/setRowsどちらもundefinedのとき、loaded:falseで空配列を返す', () => {
     mockLiveQueryQueue = [{ data: undefined }, { data: undefined }];
-    expect(mount()).toEqual([]);
+    expect(mount()).toEqual({ exercises: [], loaded: false });
+  });
+
+  it('exerciseRows/setRowsの一方だけ解決済みのとき、まだloaded:falseのまま（@reviewer指摘: 両方揃うまでは「読み込み中」として扱う必要がある）', () => {
+    mockLiveQueryQueue = [{ data: [] }, { data: undefined }];
+    expect(mount()).toEqual({ exercises: [], loaded: false });
   });
 
   it('種目一覧をorderIndex順（クエリのorderBy結果の並び）のまま返し、各種目に対応するsetsをまとめる', () => {
@@ -84,30 +89,33 @@ describe('useScheduledWorkoutExercises', () => {
       },
     ];
     const result = mount();
-    expect(result).toEqual([
-      {
-        scheduledWorkoutExerciseId: 100,
-        exerciseId: 1,
-        name: 'ベンチプレス',
-        category: 'chest',
-        measurementType: 'weight_reps',
-        source: 'preset',
-        slug: 'bench_press',
-        sets: [
-          { id: 900, weight: 60, reps: 8, durationSeconds: null, distanceMeters: null },
-          { id: 901, weight: 65, reps: 6, durationSeconds: null, distanceMeters: null },
-        ],
-      },
-      {
-        scheduledWorkoutExerciseId: 101,
-        exerciseId: 2,
-        name: 'スクワット',
-        category: 'leg',
-        measurementType: 'weight_reps',
-        source: 'preset',
-        slug: 'squat',
-        sets: [],
-      },
-    ]);
+    expect(result).toEqual({
+      exercises: [
+        {
+          scheduledWorkoutExerciseId: 100,
+          exerciseId: 1,
+          name: 'ベンチプレス',
+          category: 'chest',
+          measurementType: 'weight_reps',
+          source: 'preset',
+          slug: 'bench_press',
+          sets: [
+            { id: 900, weight: 60, reps: 8, durationSeconds: null, distanceMeters: null },
+            { id: 901, weight: 65, reps: 6, durationSeconds: null, distanceMeters: null },
+          ],
+        },
+        {
+          scheduledWorkoutExerciseId: 101,
+          exerciseId: 2,
+          name: 'スクワット',
+          category: 'leg',
+          measurementType: 'weight_reps',
+          source: 'preset',
+          slug: 'squat',
+          sets: [],
+        },
+      ],
+      loaded: true,
+    });
   });
 });

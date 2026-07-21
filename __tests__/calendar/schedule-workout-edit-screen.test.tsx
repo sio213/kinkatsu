@@ -106,7 +106,7 @@ function render() {
 beforeEach(() => {
   jest.clearAllMocks();
   mockUseLocalSearchParams.mockReturnValue({ scheduledWorkoutId: '5' });
-  mockUseScheduledWorkoutExercises.mockReturnValue([benchExercise(), squatExercise()]);
+  mockUseScheduledWorkoutExercises.mockReturnValue({ exercises: [benchExercise(), squatExercise()], loaded: true });
   mockUseScheduledWorkoutTime.mockReturnValue({
     time: { scheduledDate: '2026-07-21', hour: 19, minute: 30 },
     loaded: true,
@@ -224,7 +224,7 @@ describe('ScheduleWorkoutEditScreen', () => {
   });
 
   it('種目が1件以下のとき、ヘッダー⋮「種目を並び替え」は無効になる', () => {
-    mockUseScheduledWorkoutExercises.mockReturnValue([benchExercise()]);
+    mockUseScheduledWorkoutExercises.mockReturnValue({ exercises: [benchExercise()], loaded: true });
     const root = render();
     const headerMenuTrigger = root
       .findAllByType(TouchableOpacity)
@@ -236,7 +236,7 @@ describe('ScheduleWorkoutEditScreen', () => {
     expect(reorderItem.props.disabled).toBe(true);
   });
 
-  it('ヘッダー⋮「この予定を削除」→確認Alertで確定するとremoveScheduledWorkoutが呼ばれ、router.back()する', async () => {
+  it('ヘッダー⋮「削除」→確認Alertで確定するとremoveScheduledWorkoutが呼ばれ、router.back()する（@ユーザー指摘: app/workout/[id].tsxとラベルを揃えた）', async () => {
     const root = render();
     const headerMenuTrigger = root
       .findAllByType(TouchableOpacity)
@@ -244,7 +244,7 @@ describe('ScheduleWorkoutEditScreen', () => {
     act(() => {
       headerMenuTrigger.props.onPress();
     });
-    const deleteWorkoutItem = findMenuItem(root, 'この予定を削除')!;
+    const deleteWorkoutItem = findMenuItem(root, '削除')!;
     act(() => {
       deleteWorkoutItem.props.onPress();
     });
@@ -257,7 +257,7 @@ describe('ScheduleWorkoutEditScreen', () => {
     expect(mockBack).toHaveBeenCalledTimes(1);
   });
 
-  it('ヘッダー⋮「この予定を削除」の確認Alertで「キャンセル」を押してもremoveScheduledWorkoutは呼ばれない', () => {
+  it('ヘッダー⋮「削除」の確認Alertで「キャンセル」を押してもremoveScheduledWorkoutは呼ばれない', () => {
     const root = render();
     const headerMenuTrigger = root
       .findAllByType(TouchableOpacity)
@@ -265,7 +265,7 @@ describe('ScheduleWorkoutEditScreen', () => {
     act(() => {
       headerMenuTrigger.props.onPress();
     });
-    const deleteWorkoutItem = findMenuItem(root, 'この予定を削除')!;
+    const deleteWorkoutItem = findMenuItem(root, '削除')!;
     act(() => {
       deleteWorkoutItem.props.onPress();
     });
@@ -277,7 +277,7 @@ describe('ScheduleWorkoutEditScreen', () => {
 
   it('削除完了後、live queryが空(scheduledTime=null)を返すとNotFoundStateへ切り替わる（種目0件の空リストがフラッシュしない、@designer指摘）', () => {
     mockUseScheduledWorkoutTime.mockReturnValue({ time: null, loaded: true });
-    mockUseScheduledWorkoutExercises.mockReturnValue([]);
+    mockUseScheduledWorkoutExercises.mockReturnValue({ exercises: [], loaded: true });
     const root = render();
     expect(root.findByProps({ children: '予定が見つかりません' })).toBeDefined();
   });
@@ -288,7 +288,7 @@ describe('ScheduleWorkoutEditScreen', () => {
     expect(() => root.findByProps({ children: '予定が見つかりません' })).toThrow();
   });
 
-  it('ヘッダー⋮「この予定を削除」に失敗した場合はエラーAlertを表示し、router.back()しない', async () => {
+  it('ヘッダー⋮「削除」に失敗した場合はエラーAlertを表示し、router.back()しない', async () => {
     mockRemoveScheduledWorkout.mockRejectedValueOnce(new Error('fail'));
     jest.spyOn(console, 'error').mockImplementation(() => {});
     const root = render();
@@ -298,7 +298,7 @@ describe('ScheduleWorkoutEditScreen', () => {
     act(() => {
       headerMenuTrigger.props.onPress();
     });
-    const deleteWorkoutItem = findMenuItem(root, 'この予定を削除')!;
+    const deleteWorkoutItem = findMenuItem(root, '削除')!;
     act(() => {
       deleteWorkoutItem.props.onPress();
     });
