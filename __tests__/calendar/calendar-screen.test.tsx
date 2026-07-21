@@ -877,6 +877,13 @@ describe('CalendarScreen 予定（PR9-2: リマインダー由来の未来予定
       act(() => {
         deleteItem.props.onPress();
       });
+      // schedule-workout-edit画面自身のヘッダー⋮削除と同じ文言であることを確認する
+      // （@ユーザー指摘・@reviewer指摘: 入口ごとに文言が食い違っていた問題の回帰防止）
+      expect(Alert.alert).toHaveBeenCalledWith(
+        'この予定を削除しますか？',
+        'この予定に設定した種目と目標セットもすべて削除され、通知も届かなくなります。',
+        expect.any(Array),
+      );
       const alertCall = (Alert.alert as jest.Mock).mock.calls[0];
       const confirmAction = alertCall[2].find((b: { text?: string }) => b.text === '削除');
       await act(async () => {
@@ -947,7 +954,7 @@ describe('CalendarScreen 予定（PR9-2: リマインダー由来の未来予定
 
         expect(Alert.alert).toHaveBeenCalledWith(
           'この予定を削除しますか？',
-          '「脚の日」の予定を削除します。ルーティン自体や記録には影響しませんが、設定していた通知も届かなくなります。',
+          '「脚の日」自体には影響しません。この予定と通知だけを削除します。',
           expect.any(Array),
         );
         expect(mockRemoveScheduledWorkout).not.toHaveBeenCalled();
@@ -1036,7 +1043,7 @@ describe('CalendarScreen 予定（PR9-2: リマインダー由来の未来予定
 
           expect(Alert.alert).toHaveBeenCalledWith(
             'この予定を削除しますか？',
-            '「背中の日」の予定を削除します。ルーティン自体や記録には影響しませんが、設定していた通知も届かなくなります。',
+            '「背中の日」自体には影響しません。この予定と通知だけを削除します。',
             expect.any(Array),
           );
           const alertCall = (Alert.alert as jest.Mock).mock.calls[0];
@@ -1392,8 +1399,8 @@ describe('CalendarScreen 予定（PR9-2: リマインダー由来の未来予定
       });
 
       expect(Alert.alert).toHaveBeenCalledWith(
-        'この回の予定を削除しますか？',
-        '「胸の日」の今回の予定を削除します。次回以降の予定やリマインダー自体には影響しません。今回分の通知も届かなくなります。',
+        'この予定を削除しますか？',
+        '「胸の日」の次回以降の予定には影響しません。今回分の予定と通知だけを削除します。',
         expect.any(Array),
       );
       expect(mockSkipReminderOccurrence).not.toHaveBeenCalled();

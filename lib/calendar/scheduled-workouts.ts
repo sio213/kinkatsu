@@ -60,7 +60,8 @@ export async function addDirectScheduledWorkout(
 }
 
 // 選択日パネルの手動予定カードの⋮メニュー「削除」から呼ばれる（PR10-3、
-// components/calendar/routine-schedule-card.tsx・app/(tabs)/calendar.tsxのhandleDeleteSchedule）。
+// components/calendar/routine-schedule-card.tsx・app/(tabs)/calendar.tsxの
+// handleDeleteRoutineSchedule/handleDeleteDirectSchedule）。
 // scheduledWorkoutExercisesはscheduledWorkoutIdにonDelete cascadeが張られているため、
 // 直接予定でもこの1行を消すだけで種目も連動して消える
 export async function deleteScheduledWorkout(id: number): Promise<void> {

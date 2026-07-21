@@ -12,6 +12,14 @@ export type ScheduleFireRow = {
   category: string;
 };
 
+// 直接予定（個別種目選択、routineIdなし）の削除確認Alertの本文。カレンダー日パネルの⋮
+// (app/(tabs)/calendar.tsxのhandleDeleteDirectSchedule)と、直接予定自身の編集画面ヘッダー⋮
+// (app/calendar/schedule-workout-edit.tsxのhandleDeleteWorkout)の2つの入口で同じ操作を
+// 表しているため、文言をここに1箇所だけ持たせて両方から参照する（@ユーザー指摘・@reviewer指摘:
+// 元々は入口ごとに別々の文言がハードコードされており、一方だけ変更されるとまた食い違う）
+export const DIRECT_SCHEDULE_DELETE_MESSAGE =
+  'この予定に設定した種目と目標セットもすべて削除され、通知も届かなくなります。';
+
 // 「直接追加」予定（ルーティンを介さず個別に選んだ種目、2026-07-20）の表示タイトル・通知タイトルを
 // 種目名から合成する。ルーティン名に相当するものが無いため、選んだ種目名自体をタイトルにする
 // （user-advisor方針: 「ルーティンとして保存しますか？」のような命名ステップを挟まない）。

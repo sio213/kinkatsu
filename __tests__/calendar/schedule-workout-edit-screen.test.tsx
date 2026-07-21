@@ -248,6 +248,13 @@ describe('ScheduleWorkoutEditScreen', () => {
     act(() => {
       deleteWorkoutItem.props.onPress();
     });
+    // カレンダー日パネル⋮の削除(handleDeleteDirectSchedule)と同じ文言であることを確認する
+    // （@ユーザー指摘・@reviewer指摘: 入口ごとに文言が食い違っていた問題の回帰防止）
+    expect(Alert.alert).toHaveBeenCalledWith(
+      'この予定を削除しますか？',
+      'この予定に設定した種目と目標セットもすべて削除され、通知も届かなくなります。',
+      expect.any(Array),
+    );
     const alertCall = (Alert.alert as jest.Mock).mock.calls[0];
     const confirmAction = alertCall[2].find((b: { text?: string }) => b.text === '削除');
     await act(async () => {
