@@ -60,6 +60,12 @@ export type RoutineDetail = {
   reminder: Reminder | null;
 };
 
+// 「ルーティンから読み込む」画面で選んだ種目1件を表す。lib/workout/session.tsの
+// addRoutineExercisesToSession・lib/calendar/scheduled-workout-detail.tsの
+// addRoutineExercisesToScheduledWorkoutの両方で使う共通の入力型（2026-07-21、@reviewer指摘:
+// 両ファイルで同名・同形の型が二重定義されていたのをこちらへ集約）
+export type RoutineExerciseSelection = { routineExerciseId: number };
+
 // 種目追加ピッカーで選ばれた種目をルーティンの下書きに加える際の初期セット値。
 // その種目の直近の実績（実際のトレーニング記録）をプリフィルし、記録が無ければ
 // 空欄1セットにフォールバックする（トレーニング中画面の新規カード追加時と同じ挙動をルーティンにも揃える）

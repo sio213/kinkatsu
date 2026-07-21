@@ -71,13 +71,16 @@ jest.mock('drizzle-orm', () => ({
 }));
 
 const mockBuildInitialRoutineSets = jest.fn();
+const mockGetRoutineDetail = jest.fn();
 jest.mock('@/lib/routines/db', () => ({
   buildInitialRoutineSets: (...args: unknown[]) => mockBuildInitialRoutineSets(...args),
+  getRoutineDetail: (...args: unknown[]) => mockGetRoutineDetail(...args),
 }));
 
 import { db } from '@/db/client';
 import {
   addExercisesToScheduledWorkout,
+  addRoutineExercisesToScheduledWorkout,
   addScheduledWorkoutSet,
   deleteLastScheduledWorkoutSet,
   deleteScheduledWorkoutSet,
@@ -99,6 +102,7 @@ beforeEach(() => {
   mockSelectWhere.mockResolvedValue([]);
   mockBuildInitialRoutineSets.mockReset();
   mockBuildInitialRoutineSets.mockResolvedValue([{ weight: null, reps: null, durationSeconds: null, distanceMeters: null }]);
+  mockGetRoutineDetail.mockReset();
 });
 
 describe('addExercisesToScheduledWorkout', () => {
@@ -131,6 +135,125 @@ describe('addExercisesToScheduledWorkout', () => {
     await addExercisesToScheduledWorkout(1, [30]);
     const [, exerciseValues] = mockInsertValues.mock.calls[0];
     expect(exerciseValues).toEqual([expect.objectContaining({ orderIndex: 0 })]);
+  });
+});
+
+describe('addRoutineExercisesToScheduledWorkout', () => {
+  it('selectionsが空なら何もしない', async () => {
+    await addRoutineExercisesToScheduledWorkout(1, 10, []);
+    expect(mockGetRoutineDetail).not.toHaveBeenCalled();
+    expect(mockInsertValues).not.toHaveBeenCalled();
+  });
+
+  it('ルーティンが見つからない場合は何もしない', async () => {
+    mockGetRoutineDetail.mockResolvedValueOnce(null);
+    await addRoutineExercisesToScheduledWorkout(1, 10, [{ routineExerciseId: 501 }]);
+    expect(mockInsertValues).not.toHaveBeenCalled();
+  });
+
+  it('選んだ種目だけを、ルーティン内の表示順(orderIndex順)で追加し、ルーティンの目標セットの値をそのままコピーする', async () => {
+    mockGetRoutineDetail.mockResolvedValueOnce({
+      routine: { id: 10, name: '胸トレ' },
+      reminder: null,
+      exercises: [
+        {
+          id: 501,
+          exerciseId: 20,
+          sets: [{ id: 1, setNumber: 1, weight: 60, reps: 8, durationSeconds: null, distanceMeters: null }],
+        },
+        {
+          id: 502,
+          exerciseId: 21,
+          sets: [{ id: 2, setNumber: 1, weight: 40, reps: 12, durationSeconds: null, distanceMeters: null }],
+        },
+      ],
+    });
+    mockSelectWhere.mockResolvedValueOnce([{ orderIndex: 0 }]); // getMaxOrderIndex
+
+    // 選択順は502→501（クリック順とは逆）でも、送信されるのはルーティン内の表示順(501→502)
+    await addRoutineExercisesToScheduledWorkout(1, 10, [{ routineExerciseId: 502 }, { routineExerciseId: 501 }]);
+
+    const [, exerciseValues] = mockInsertValues.mock.calls[0];
+    expect(exerciseValues).toEqual([
+      expect.objectContaining({ scheduledWorkoutId: 1, exerciseId: 20, orderIndex: 1 }),
+      expect.objectContaining({ scheduledWorkoutId: 1, exerciseId: 21, orderIndex: 2 }),
+    ]);
+    const [, firstSetsValues] = mockInsertValues.mock.calls[1];
+    expect(firstSetsValues).toEqual([expect.objectContaining({ weight: 60, reps: 8, setNumber: 1 })]);
+    const [, secondSetsValues] = mockInsertValues.mock.calls[2];
+    expect(secondSetsValues).toEqual([expect.objectContaining({ weight: 40, reps: 12, setNumber: 1 })]);
+  });
+
+  it('ルーティンの種目に0セットのものが含まれる場合は空欄1セットにフォールバックする', async () => {
+    mockGetRoutineDetail.mockResolvedValueOnce({
+      routine: { id: 10, name: '胸トレ' },
+      reminder: null,
+      exercises: [{ id: 501, exerciseId: 20, sets: [] }],
+    });
+    mockSelectWhere.mockResolvedValueOnce([]); // getMaxOrderIndex
+
+    await addRoutineExercisesToScheduledWorkout(1, 10, [{ routineExerciseId: 501 }]);
+
+    const [, setsValues] = mockInsertValues.mock.calls[1];
+    expect(setsValues).toEqual([expect.objectContaining({ weight: null, reps: null, setNumber: 1 })]);
+  });
+
+  it('選択したidがルーティン内に1件も見つからない場合は何もしない', async () => {
+    mockGetRoutineDetail.mockResolvedValueOnce({
+      routine: { id: 10, name: '胸トレ' },
+      reminder: null,
+      exercises: [{ id: 501, exerciseId: 20, sets: [] }],
+    });
+    await addRoutineExercisesToScheduledWorkout(1, 10, [{ routineExerciseId: 999 }]);
+    expect(mockInsertValues).not.toHaveBeenCalled();
+  });
+
+  it('有効なidと無効なid(削除済み等)が混在する場合、有効な分だけ処理する(クライアントの値を信用しない)', async () => {
+    mockGetRoutineDetail.mockResolvedValueOnce({
+      routine: { id: 10, name: '胸トレ' },
+      reminder: null,
+      exercises: [{ id: 501, exerciseId: 20, sets: [] }],
+    });
+    mockSelectWhere.mockResolvedValueOnce([]); // getMaxOrderIndex
+
+    await addRoutineExercisesToScheduledWorkout(1, 10, [{ routineExerciseId: 501 }, { routineExerciseId: 999 }]);
+
+    const [, exerciseValues] = mockInsertValues.mock.calls[0];
+    expect(exerciseValues).toEqual([expect.objectContaining({ exerciseId: 20 })]);
+  });
+
+  it('種目の追加とあわせて予定のupdatedAtも更新する', async () => {
+    mockGetRoutineDetail.mockResolvedValueOnce({
+      routine: { id: 10, name: '胸トレ' },
+      reminder: null,
+      exercises: [{ id: 501, exerciseId: 20, sets: [] }],
+    });
+    mockSelectWhere.mockResolvedValueOnce([]); // getMaxOrderIndex
+
+    await addRoutineExercisesToScheduledWorkout(1, 10, [{ routineExerciseId: 501 }]);
+
+    // exerciseId更新系の他関数と同様、insert(2回) + updatedAt更新(1回)でmockUpdateWhereが呼ばれる
+    expect(mockUpdateWhere).toHaveBeenCalledTimes(1);
+  });
+
+  it('ルーティンのgetRoutineDetailが失敗した場合はエラーを握りつぶさずthrowする', async () => {
+    mockGetRoutineDetail.mockRejectedValueOnce(new Error('db error'));
+    await expect(addRoutineExercisesToScheduledWorkout(1, 10, [{ routineExerciseId: 501 }])).rejects.toThrow(
+      'db error',
+    );
+  });
+
+  it('insertが失敗した場合もエラーを握りつぶさずthrowする', async () => {
+    mockGetRoutineDetail.mockResolvedValueOnce({
+      routine: { id: 10, name: '胸トレ' },
+      reminder: null,
+      exercises: [{ id: 501, exerciseId: 20, sets: [] }],
+    });
+    mockSelectWhere.mockResolvedValueOnce([]);
+    mockReturning.mockRejectedValueOnce(new Error('insert error'));
+    await expect(addRoutineExercisesToScheduledWorkout(1, 10, [{ routineExerciseId: 501 }])).rejects.toThrow(
+      'insert error',
+    );
   });
 });
 
