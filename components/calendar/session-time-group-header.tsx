@@ -42,14 +42,17 @@ export function SessionTimeGroupHeader({ sessionStartedAt, isSchedule = false, r
       {/* ルーティン名は可変長のため、長い名前でも時刻情報側（アイコン・時刻・予定ピル）が
           押し出されて見切れないよう、ルーティン名だけflexShrinkさせ、時刻情報側は
           flexShrink:0で固定幅を維持する */}
-      {routineName != null && (
+      {routineName ? (
         <Text style={styles.routineName} numberOfLines={1}>
           {routineName}
         </Text>
-      )}
+      ) : null}
       <View style={styles.timeGroup}>
         <DesignIcon name={icon} size={17} color={color} />
-        <Text style={styles.label}>{timeLabel}</Text>
+        {/* routineNameが無いときは時刻ラベルが見出し内で唯一の主要情報のため従来通り太字/textPrimary
+            のまま。routineNameがあるときだけ一段トーンを落とし、名前を主・時刻を従にする
+            （@designer指摘: 同じウェイトだと「胸の日 朝 07:10」が1語に見えるリスクがあった） */}
+        <Text style={routineName ? styles.labelSecondary : styles.label}>{timeLabel}</Text>
         {/* テキストの太さ・色の差だけだと「夜20:00予定」と1語に読めてしまう懸念（@designer指摘）
             があるため、ピル形状の背景で実績見出しとの境界を明示する */}
         {isSchedule && (
@@ -63,10 +66,14 @@ export function SessionTimeGroupHeader({ sessionStartedAt, isSchedule = false, r
 }
 
 const styles = StyleSheet.create({
-  row: { flexDirection: 'row', alignItems: 'center', gap: 7 },
+  // ルーティン名⇔時刻グループの間はtimeGroup内部(アイコン⇔ラベル⇔ピル、gap:7)より広く取り、
+  // 2つの意味的なまとまりであることを間隔でも示す（@designer指摘）
+  row: { flexDirection: 'row', alignItems: 'center', gap: 10 },
   routineName: { ...Typography.footnote, fontWeight: '700', color: Colors.textPrimary, flexShrink: 1 },
   timeGroup: { flexDirection: 'row', alignItems: 'center', gap: 7, flexShrink: 0 },
   label: { ...Typography.footnote, fontWeight: '700', color: Colors.textPrimary },
+  // routineNameと併用するときだけ使う、時刻ラベルを従属させる控えめなスタイル（@designer指摘）
+  labelSecondary: { ...Typography.footnote, fontWeight: '600', color: Colors.textSecondary },
   scheduleTag: {
     backgroundColor: Colors.surfaceSubtle,
     borderRadius: 999,

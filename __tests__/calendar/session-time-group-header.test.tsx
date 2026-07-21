@@ -91,5 +91,24 @@ describe('SessionTimeGroupHeader', () => {
       const nameText = root.root.findAllByType(Text).find((t) => [t.props.children].flat().join('') === '胸・肩・二頭の日')!;
       expect(nameText.props.numberOfLines).toBe(1);
     });
+
+    // routineNameと時刻ラベルが同じウェイト/色だと「胸の日 朝 07:10」が1語に見えるリスクが
+    // あったため、routineNameがあるときだけ時刻ラベル側のウェイトを一段落として主従を作る
+    // （@designer指摘）
+    it('routineNameがあるとき、時刻ラベルはルーティン名より控えめなスタイル(fontWeight:600)になる', () => {
+      const root = render({ sessionStartedAt: new Date(2026, 6, 16, 7, 10).getTime(), routineName: '胸の日' });
+      const nameText = root.root.findAllByType(Text).find((t) => [t.props.children].flat().join('') === '胸の日')!;
+      const timeText = root.root.findAllByType(Text).find((t) => [t.props.children].flat().join('') === '朝 07:10')!;
+      const flattenStyle = (style: unknown) => (Array.isArray(style) ? Object.assign({}, ...style) : style);
+      expect(flattenStyle(nameText.props.style).fontWeight).toBe('700');
+      expect(flattenStyle(timeText.props.style).fontWeight).toBe('600');
+    });
+
+    it('routineNameが無いとき、時刻ラベルは従来通り太字(fontWeight:700)のまま', () => {
+      const root = render({ sessionStartedAt: new Date(2026, 6, 16, 7, 10).getTime() });
+      const timeText = root.root.findAllByType(Text).find((t) => [t.props.children].flat().join('') === '朝 07:10')!;
+      const flattenStyle = (style: unknown) => (Array.isArray(style) ? Object.assign({}, ...style) : style);
+      expect(flattenStyle(timeText.props.style).fontWeight).toBe('700');
+    });
   });
 });

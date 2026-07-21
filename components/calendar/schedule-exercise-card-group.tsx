@@ -4,7 +4,7 @@ import { DropdownMenu, type DropdownMenuItem } from '@/components/ui/dropdown-me
 import { IconSymbol } from '@/components/ui/icon-symbol';
 import { PrimaryButton } from '@/components/ui/primary-button';
 import { Colors, Typography } from '@/constants/theme';
-import { useScheduledExerciseCards } from '@/hooks/use-scheduled-exercise-cards';
+import type { ScheduledExerciseCardSet } from '@/hooks/use-scheduled-exercise-cards';
 import { memo } from 'react';
 import { StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 
@@ -17,54 +17,83 @@ function deleteMenuItems(onDelete: () => void): DropdownMenuItem[] {
   return [{ key: 'delete', label: '削除', icon: 'delete-outline', danger: true, onPress: onDelete }];
 }
 
+// 削除（取り消し不可）と差し替え（2画面遷移を伴いデータを追加する操作）は性質が異なるため、
+// 同じ1グループにまとめず別グループにしてDropdownMenu標準の区切り線で分ける
+// （routine-schedule-card.tsxと同じ方針）
+function replaceMenuItems(onReplace: () => void): DropdownMenuItem[] {
+  return [{ key: 'replace', label: '今回だけ差し替え', icon: 'swap-horiz', onPress: onReplace }];
+}
+
+export type ScheduleExerciseCardGroupCard = {
+  // scheduledWorkoutExerciseId（実体化済み）/routineExerciseId（未実体化プレビュー）と
+  // 呼び出し元ごとに識別子の種類が異なるため、Reactのkeyとして使う値を呼び出し元
+  // （scheduled-workout-exercise-group.tsx/reminder-schedule-exercise-group.tsx）に
+  // 文字列化させてここに集約する
+  key: string;
+  exerciseId: number;
+  name: string;
+  category: string;
+  source: string;
+  slug: string | null;
+  measurementType: string;
+  sets: ScheduledExerciseCardSet[];
+};
+
 type Props = {
-  scheduledWorkoutId: number;
+  // ルーティン紐付き予定（自動・手動どちらも）のときだけ呼び出し元が渡す。SessionTimeGroupHeaderの
+  // 左端に表示する（2026-07-21）。直接予定（個別種目選択）ではルーティン名に相当するものが
+  // 無いため渡さない
+  routineName?: string;
   // SessionTimeGroupHeaderにそのまま渡す時刻表示用の合成タイムスタンプ（選択日+予定のhour/minute）。
   // 今日パネルは実績セッションと同じ時系列に混ぜるためentry.sortAtをそのまま流用できる
   sessionStartedAt: number;
   title: string;
+  cards: ScheduleExerciseCardGroupCard[] | 'error' | null;
+  // 'error'状態を持たない呼び出し元（reminder-schedule-exercise-group.tsxのuseRoutinePreviewExerciseCards）
+  // はretryを持たないため、cards==='error'になり得る場合だけ呼び出し元が渡す
+  onRetryCards?: () => void;
   // 今日自身の予定にのみ渡す（デザイン案「未来日は開始ボタンなし」、routine-schedule-card.tsxと同じ）
   onPressStart?: () => void;
   onDelete: () => void;
+  // リマインダー予定（未実体化プレビュー）のときだけ呼び出し元が渡す。onDeleteと同じメニュー内に
+  // 「今回だけ差し替え」項目を追加で表示する
+  onReplace?: () => void;
   // 種目カードは1件ごとの詳細ではなく、この予定の種目一覧をまとめて編集する画面へ遷移する
   // （過去の記録の種目カードが記録編集画面(/workout/[sessionId])へ飛ぶのと同じ考え方、
   // @ユーザー指摘2026-07-20）。どの種目カードをタップしても遷移先は同じなので引数を取らない
   onPress: () => void;
 };
 
-// 「直接追加」予定（ルーティンを介さず個別に選んだ種目、2026-07-20）の選択日パネル表示。
-// ルーティン予定(RoutineScheduleCard)と違い、予定の中身（種目）を確認する手段が無いという
-// @designer指摘を受け、要約カード1枚ではなく過去の記録と同じ種目一覧カード
-// (CalendarExerciseCard)をそのまま並べる（サムネ・カテゴリ・前回のセット内容が見える、
-// @ユーザー指摘）。まだ実施していない予定のため、セット内容は目標セット（設定済みならそれ、
-// 無ければ直近の実施記録を参考値）として表示し(useScheduledExerciseCards)、前回比較
-// (comparison)は今回の実施が無いと成立しない概念のため常にnullで渡す。自己ベストバッジも
-// 同様の理由（まだ実施していないのに「ベスト」と出ると実績と誤認する、@designer指摘）で
-// 常にfalse固定にする
-//
-// 【過渡的な重複について】このコンポーネントはルーティン予定を直接予定と同じ表示に統一する
-// 改修（全7PR）のPR4時点でschedule-exercise-card-group.tsx（見た目）+
-// scheduled-workout-exercise-group.tsx（薄いコンテナ、このコンポーネントの一般化版）に
-// 分割・移植済みだが、app/(tabs)/calendar.tsxの配線切り替えは次PR（PR5）で行うため、
-// それまではこのファイルが引き続き実際に使われる。PR5でcalendar.tsxの参照先を
-// ScheduledWorkoutExerciseGroupへ切り替えた後、このファイルとテストは削除する
-export const DirectScheduleExerciseGroup = memo(function DirectScheduleExerciseGroup({
-  scheduledWorkoutId,
+// 予定（直接予定・ルーティン予定どちらも）の選択日パネル表示の見た目のみを担う共通コンポーネント
+// （2026-07-21、旧DirectScheduleExerciseGroupから分割）。データ取得（scheduledWorkoutIdからの
+// useScheduledExerciseCards、routineIdからのuseRoutinePreviewExerciseCards）は呼び出し元の
+// 薄いコンテナ（scheduled-workout-exercise-group.tsx/reminder-schedule-exercise-group.tsx）が
+// 担い、このコンポーネントはpropsで受け取ったcardsを並べるだけ。要約カード1枚
+// (旧RoutineScheduleCard)と違い、予定の中身（種目）を確認する手段が無いという@designer指摘を
+// 受け、過去の記録と同じ種目一覧カード(CalendarExerciseCard)をそのまま並べる（サムネ・カテゴリ・
+// 目標セット内容が見える）。まだ実施していない予定のため、前回比較(comparison)は今回の実施が
+// 無いと成立しない概念のため常にnullで渡す。自己ベストバッジも同様の理由（まだ実施していないのに
+// 「ベスト」と出ると実績と誤認する、@designer指摘）で常にfalse固定にする
+export const ScheduleExerciseCardGroup = memo(function ScheduleExerciseCardGroup({
+  routineName,
   sessionStartedAt,
   title,
+  cards,
+  onRetryCards,
   onPressStart,
   onDelete,
+  onReplace,
   onPress,
 }: Props) {
-  const { cards, retry } = useScheduledExerciseCards(scheduledWorkoutId);
+  const menuGroups = [...(onReplace ? [replaceMenuItems(onReplace)] : []), deleteMenuItems(onDelete)];
 
   return (
     <View style={styles.wrapper}>
       <View style={styles.header}>
-        <SessionTimeGroupHeader sessionStartedAt={sessionStartedAt} isSchedule />
+        <SessionTimeGroupHeader sessionStartedAt={sessionStartedAt} isSchedule routineName={routineName} />
         <View style={styles.menuSlot}>
           <DropdownMenu
-            groups={[deleteMenuItems(onDelete)]}
+            groups={menuGroups}
             minWidth={140}
             renderTrigger={({ open, onPress: onOpenMenu }) => (
               <TouchableOpacity
@@ -84,7 +113,7 @@ export const DirectScheduleExerciseGroup = memo(function DirectScheduleExerciseG
         <View style={styles.cardList}>
           {cards.map((card) => (
             <CalendarExerciseCard
-              key={card.scheduledWorkoutExerciseId}
+              key={card.key}
               exerciseId={card.exerciseId}
               name={card.name}
               category={card.category}
@@ -101,13 +130,13 @@ export const DirectScheduleExerciseGroup = memo(function DirectScheduleExerciseG
           ))}
         </View>
       )}
-      {cards === 'error' && (
+      {cards === 'error' && onRetryCards && (
         // useCalendarDayExercises(過去日パネル)のエラー表示・再試行ボタンと同じ体験に揃える
         <View style={styles.errorRow}>
           <IconSymbol name="exclamationmark.triangle.fill" size={18} color={Colors.danger} />
           <Text style={styles.errorText}>種目を読み込めませんでした</Text>
           <TouchableOpacity
-            onPress={retry}
+            onPress={onRetryCards}
             accessibilityRole="button"
             accessibilityLabel="再試行"
             hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
@@ -129,9 +158,8 @@ export const DirectScheduleExerciseGroup = memo(function DirectScheduleExerciseG
 });
 
 const styles = StyleSheet.create({
-  // ルーティン予定(RoutineScheduleCard)と同じsurfaceMuted+borderで軽く囲み、「1つの予定の
-  // まとまり」であることを視覚的に示す（@designer指摘: 枠が無いと隣接カードとの境界が
-  // 分かりづらい）
+  // 旧RoutineScheduleCardと同じsurfaceMuted+borderで軽く囲み、「1つの予定のまとまり」であることを
+  // 視覚的に示す（@designer指摘: 枠が無いと隣接カードとの境界が分かりづらい）
   wrapper: {
     gap: 10,
     backgroundColor: Colors.surfaceMuted,
