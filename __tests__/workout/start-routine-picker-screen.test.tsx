@@ -1,4 +1,5 @@
 const mockBack = jest.fn();
+const mockDismiss = jest.fn();
 const mockPush = jest.fn();
 const mockUseLocalSearchParams = jest.fn();
 const mockUseRoutines = jest.fn();
@@ -7,7 +8,7 @@ const mockStartPastWorkoutFromRoutine = jest.fn();
 const mockStartWorkoutFromRoutine = jest.fn();
 
 jest.mock('expo-router', () => ({
-  useRouter: () => ({ back: mockBack }),
+  useRouter: () => ({ back: mockBack, dismiss: mockDismiss }),
   useLocalSearchParams: () => mockUseLocalSearchParams(),
   Stack: {
     Screen: ({ options }: { options?: { headerTitle?: () => unknown } }) =>
@@ -92,6 +93,9 @@ describe('今日のライブ開始（pastDateKeyなし）', () => {
     expect(mockStartWorkoutFromRoutine).toHaveBeenCalledWith(10);
     expect(mockStartPastWorkoutFromRoutine).not.toHaveBeenCalled();
     expect(Alert.alert).not.toHaveBeenCalled();
+    // dismiss(2)でこの画面自身+start-chooserを閉じてからpushする（@ユーザー指摘: 単純pushだと
+    // start-chooser等がスタックに残り、/workout/{id}の「戻る」で呼び出し元まで戻れなかった）
+    expect(mockDismiss).toHaveBeenCalledWith(2);
     expect(mockPush).toHaveBeenCalledWith('/workout/42');
   });
 
@@ -117,6 +121,7 @@ describe('今日のライブ開始（pastDateKeyなし）', () => {
       resolveStart({ sessionId: 1, cards: [] });
       await Promise.resolve();
     });
+    expect(mockDismiss).toHaveBeenCalledTimes(1);
     expect(mockPush).toHaveBeenCalledTimes(1);
   });
 
@@ -134,6 +139,7 @@ describe('今日のライブ開始（pastDateKeyなし）', () => {
     });
 
     expect(Alert.alert).toHaveBeenCalledWith('エラー', 'トレーニングを開始できませんでした。');
+    expect(mockDismiss).not.toHaveBeenCalled();
     expect(mockPush).not.toHaveBeenCalled();
   });
 
@@ -150,6 +156,7 @@ describe('今日のライブ開始（pastDateKeyなし）', () => {
       await Promise.resolve();
     });
 
+    expect(mockDismiss).not.toHaveBeenCalled();
     expect(mockPush).not.toHaveBeenCalled();
   });
 });
@@ -197,6 +204,7 @@ describe('過去日の事後記録（pastDateKey付き）', () => {
     expect(calledWith.getMonth()).toBe(6);
     expect(calledWith.getDate()).toBe(25);
     expect(calledWith.getHours()).toBe(12);
+    expect(mockDismiss).toHaveBeenCalledWith(2);
     expect(mockPush).toHaveBeenCalledWith('/workout/77');
   });
 
@@ -225,6 +233,7 @@ describe('過去日の事後記録（pastDateKey付き）', () => {
       resolveStart({ sessionId: 1, cards: [] });
       await Promise.resolve();
     });
+    expect(mockDismiss).toHaveBeenCalledTimes(1);
     expect(mockPush).toHaveBeenCalledTimes(1);
   });
 
@@ -249,6 +258,7 @@ describe('過去日の事後記録（pastDateKey付き）', () => {
     });
 
     expect(mockStartPastWorkoutFromRoutine.mock.calls[0][0]).toBe(20);
+    expect(mockDismiss).toHaveBeenCalledWith(2);
     expect(mockPush).toHaveBeenCalledWith('/workout/88');
   });
 
@@ -266,6 +276,7 @@ describe('過去日の事後記録（pastDateKey付き）', () => {
     });
 
     expect(Alert.alert).toHaveBeenCalledWith('エラー', 'トレーニングを開始できませんでした。');
+    expect(mockDismiss).not.toHaveBeenCalled();
     expect(mockPush).not.toHaveBeenCalled();
   });
 
@@ -282,6 +293,7 @@ describe('過去日の事後記録（pastDateKey付き）', () => {
       await Promise.resolve();
     });
 
+    expect(mockDismiss).not.toHaveBeenCalled();
     expect(mockPush).not.toHaveBeenCalled();
   });
 

@@ -1,13 +1,14 @@
 const mockBack = jest.fn();
 const mockPush = jest.fn();
 const mockReplace = jest.fn();
+const mockDismiss = jest.fn();
 const mockUseLocalSearchParams = jest.fn();
 const mockUseExercises = jest.fn();
 const mockAddExercisesToSession = jest.fn();
 const mockUseExerciseUsageStats = jest.fn();
 
 jest.mock('expo-router', () => ({
-  useRouter: () => ({ back: mockBack, push: mockPush, replace: mockReplace }),
+  useRouter: () => ({ back: mockBack, push: mockPush, replace: mockReplace, dismiss: mockDismiss }),
   useLocalSearchParams: () => mockUseLocalSearchParams(),
   // 実際のuseFocusEffectはナビゲーションのフォーカス/ブラーイベントに紐づくが、
   // テストではeffectを即実行するだけで十分（クリーンアップの検証はここでは不要）
@@ -123,13 +124,16 @@ test('複数選択して追加を押すとaddExercisesToSessionが呼ばれ、ro
 
 // start-chooser「自分で選ぶ」から作成直後のセッションで直接この画面へ遷移してきた場合
 // （2026-07-20）。/workout/{id}を一度もpushしていないため、router.back()ではなく
-// replaceで/workout/{id}へ差し込む（そうしないと戻る操作でstart-chooserに戻ってしまう）
+// dismiss(2)（start-chooser+この画面自身を閉じる）してからpushで/workout/{id}へ遷移する
+// （2026-07-22、@ユーザー指摘: 元々はreplaceだったが、それだとstart-chooserがスタックに
+// 残ったままになり、/workout/{id}側の「戻る」ボタンを押すとカレンダー/記録タブではなく
+// start-chooserに戻ってしまう不具合があった）
 describe('newSession=1（start-chooserの「自分で選ぶ」から直接遷移してきた場合）', () => {
   beforeEach(() => {
     mockUseLocalSearchParams.mockReturnValue({ sessionId: '5', newSession: '1' });
   });
 
-  test('追加を押すとaddExercisesToSessionが呼ばれ、router.backではなくreplaceで/workout/{id}へ遷移する', async () => {
+  test('追加を押すとaddExercisesToSessionが呼ばれ、router.backではなくdismiss(2)+pushで/workout/{id}へ遷移する', async () => {
     const root = render();
     act(() => {
       root.findByProps({ accessibilityLabel: benchPressLabel }).props.onPress();
@@ -141,11 +145,13 @@ describe('newSession=1（start-chooserの「自分で選ぶ」から直接遷移
     });
 
     expect(mockAddExercisesToSession).toHaveBeenCalledWith(5, [10]);
-    expect(mockReplace).toHaveBeenCalledWith('/workout/5');
+    expect(mockDismiss).toHaveBeenCalledWith(2);
+    expect(mockPush).toHaveBeenCalledWith('/workout/5');
+    expect(mockReplace).not.toHaveBeenCalled();
     expect(mockBack).not.toHaveBeenCalled();
   });
 
-  test('追加が失敗した場合はエラーAlertを表示し、replaceもbackも呼ばれない', async () => {
+  test('追加が失敗した場合はエラーAlertを表示し、dismiss/push/replace/backいずれも呼ばれない', async () => {
     mockAddExercisesToSession.mockRejectedValueOnce(new Error('fail'));
     jest.spyOn(console, 'error').mockImplementation(() => {});
     const root = render();
@@ -159,6 +165,8 @@ describe('newSession=1（start-chooserの「自分で選ぶ」から直接遷移
     });
 
     expect(Alert.alert).toHaveBeenCalledWith('エラー', '種目を追加できませんでした。');
+    expect(mockDismiss).not.toHaveBeenCalled();
+    expect(mockPush).not.toHaveBeenCalled();
     expect(mockReplace).not.toHaveBeenCalled();
     expect(mockBack).not.toHaveBeenCalled();
   });

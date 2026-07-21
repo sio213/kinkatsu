@@ -33,8 +33,11 @@ export default function StartChooserScreen() {
   // （2026-07-20、要件確認済み）。/workout/{id}をpushしてから種目追加ピッカーをさらにpushする
   // 2段階の実装は、1タップで2回連続のスライドイン遷移が走る目に見える不具合になっていた
   // （@designer指摘）ため、/workout/{id}を経由せず直接種目追加ピッカーへ遷移し、確定後は
-  // app/workout/exercise-picker.tsxのnewSessionパラメータでreplaceして/workout/{id}へ
-  // 差し込む方式にした（router.back()だとこの画面(start-chooser)に戻ってしまうため使えない）
+  // app/workout/exercise-picker.tsxのnewSessionパラメータで、確定後にdismiss(2)
+  // （この画面(start-chooser)+exercise-picker自身を閉じる）してからpushして/workout/{id}へ
+  // 差し込む方式にした（router.back()だとこの画面に戻ってしまうため使えない。2026-07-22、
+  // @ユーザー指摘: 当初はreplaceだったが、それだとstart-chooserがスタックに残ったままになり
+  // /workout/{id}側の「戻る」ボタンで呼び出し元まで戻れない不具合があった）
   const startWorkout = useWorkoutStarter((sessionId) =>
     pushDebounced({ pathname: '/workout/exercise-picker', params: { sessionId: String(sessionId), newSession: '1' } }),
   );
