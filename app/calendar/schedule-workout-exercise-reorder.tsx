@@ -19,7 +19,7 @@ export default function ScheduleWorkoutExerciseReorderScreen() {
   const { scheduledWorkoutId: scheduledWorkoutIdParam } = useLocalSearchParams<{ scheduledWorkoutId: string }>();
   const parsedScheduledWorkoutId = Number(scheduledWorkoutIdParam);
   const scheduledWorkoutId = Number.isFinite(parsedScheduledWorkoutId) ? parsedScheduledWorkoutId : -1;
-  const exercises = useScheduledWorkoutExercises(scheduledWorkoutId);
+  const { exercises } = useScheduledWorkoutExercises(scheduledWorkoutId);
 
   // 開いた時点のスナップショットをローカルstateに固定し、以後はlive queryを描画に使わない
   // (ドラッグ中にDB更新由来の再購読が割り込むと、並び替え中の表示と競合するため)。この画面は

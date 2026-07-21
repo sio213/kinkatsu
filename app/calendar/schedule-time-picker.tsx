@@ -149,8 +149,17 @@ export default function ScheduleTimePickerScreen() {
         skippedForReplace = true;
         notificationSuppressed = result.notificationSuppressed;
       }
+      // 直接追加（自分で選ぶ）で作った予定は、種目は決めたが重量・回数（目標セット）はまだ
+      // 何も入れていない状態のため、このまま選択日パネルへ戻すと再度カードを探してタップし直す
+      // 手間が生まれる。選択日パネルで直接予定カードをタップした時の遷移先
+      // (app/(tabs)/calendar.tsxのhandleEditDirectScheduleExercises)と同じく目標セット編集画面
+      // (schedule-workout-edit.tsx)が「この予定の唯一の詳細/編集ビュー」であるため、作成直後に
+      // そのままそこへ連れて行く（@ユーザー指摘。@designer指摘: 「過去の記録から読み込むフローを
+      // 参考に」という当初の説明は、あちらが「既にいた画面へ戻る」のに対しこちらは「新しい画面へ
+      // 進む」ため厳密には性質が異なる）。ルーティン予定は編集画面自体を持たないため対象外
+      let createdScheduledWorkoutId: number | null = null;
       if (isDirectMode) {
-        await createDirectScheduledWorkout(exerciseIds, directTitle, dateKey, hour, minute);
+        createdScheduledWorkoutId = await createDirectScheduledWorkout(exerciseIds, directTitle, dateKey, hour, minute);
       } else {
         await createScheduledWorkout(routineId, routineName ?? '', dateKey, hour, minute);
       }
@@ -174,6 +183,19 @@ export default function ScheduleTimePickerScreen() {
       // handlePressReplace(app/(tabs)/calendar.tsx)がschedule-chooserを経由せず
       // schedule-routine-pickerへ直接pushするため、カレンダーからは2階層分で済む
       const dismissCount = isReplaceMode ? 2 : 3;
+      // カレンダーからの3階層（schedule-chooser/schedule-exercise-picker/この画面）をdismissで
+      // 一旦閉じてから、直接追加の場合だけ目標セット編集画面をpushし直す。dismiss/pushとも
+      // 同期的にルーターの状態へ反映されるため、この順で呼んでも遷移が競合しない
+      // (app/workout/routine-load.tsx等の既存のdismiss(N)単体パターンを拡張したもの)
+      const finishNavigation = () => {
+        router.dismiss(dismissCount);
+        if (createdScheduledWorkoutId != null) {
+          router.push({
+            pathname: '/calendar/schedule-workout-edit',
+            params: { scheduledWorkoutId: String(createdScheduledWorkoutId) },
+          });
+        }
+      };
       if (isPastTime || notificationSuppressionWarning) {
         const lines = [
           isReplaceMode
@@ -189,11 +211,11 @@ export default function ScheduleTimePickerScreen() {
         Alert.alert(
           isPastTime ? 'この時刻は過ぎています' : '差し替えました',
           lines.join('\n'),
-          [{ text: 'OK', onPress: () => router.dismiss(dismissCount) }],
+          [{ text: 'OK', onPress: finishNavigation }],
           { cancelable: false },
         );
       } else {
-        router.dismiss(dismissCount);
+        finishNavigation();
       }
     } catch (e) {
       console.error('[add scheduled workout]', e);
