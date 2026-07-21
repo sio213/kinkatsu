@@ -178,6 +178,114 @@ describe('CalendarScreen 今日・記録なしパネル', () => {
     const root = render();
     expect(root.findAllByProps({ children: 'トレーニングを開始' }).length).toBe(0);
   });
+
+  // 今日すでに完了済みの記録がある場合、一覧末尾を「予定を追加」だけにせず「トレーニングを
+  // 開始」（もう1本）も併せて表示する（@ユーザー指摘。1日複数回トレーニングする分割法・
+  // 朝晩トレユーザーの導線として、「予定を追加」（同日後刻の予定+リマインダー）は
+  // @designer指摘により残したまま併存させる方針で確定）
+  test('今日すでに完了済みの記録がある場合、一覧末尾に「トレーニングを開始」ボタンが「予定を追加」と併せて表示され、押すとstart-chooserへ遷移する', () => {
+    mockUseCalendarDayExercises.mockReturnValue({
+      cards: [
+        {
+          workoutSessionExerciseId: 1,
+          exerciseId: 1,
+          name: 'ベンチプレス',
+          category: 'chest',
+          measurementType: 'weight_reps',
+          source: 'preset',
+          slug: 'bench-press',
+          sessionId: 1,
+          sessionStartedAt: Date.now(),
+          isBest: false,
+          comparison: null,
+          sets: [{ weight: 60, reps: 8, durationSeconds: null, distanceMeters: null, completedAt: 1 }],
+        },
+      ],
+      retry: jest.fn(),
+    });
+    const root = render();
+
+    expect(root.findAllByType(TouchableOpacity).find((t) => t.props.accessibilityLabel === '予定を追加')).toBeDefined();
+    const startBtn = root
+      .findAllByType(TouchableOpacity)
+      .find((t) => t.props.accessibilityLabel === 'トレーニングを開始')!;
+    expect(startBtn).toBeDefined();
+    act(() => {
+      startBtn.props.onPress();
+    });
+    expect(mockPush).toHaveBeenCalledWith('/workout/start-chooser');
+  });
+
+  test('今日すでに完了済みの記録があっても、今日中の未実施の予定（自分自身に「開始」ボタンを持つ）が残っている間は末尾の「トレーニングを開始」ボタンを表示しない（似た見た目の開始系ボタンが2つ並ぶ紛らわしさを避ける、@designer指摘）', () => {
+    mockUseCalendarDayExercises.mockReturnValue({
+      cards: [
+        {
+          workoutSessionExerciseId: 1,
+          exerciseId: 1,
+          name: '朝の実績種目',
+          category: 'chest',
+          measurementType: 'weight_reps',
+          source: 'preset',
+          slug: 'bench-press',
+          sessionId: 1,
+          sessionStartedAt: Date.now(),
+          isBest: false,
+          comparison: null,
+          sets: [{ weight: 60, reps: 8, durationSeconds: null, distanceMeters: null, completedAt: 1 }],
+        },
+      ],
+      retry: jest.fn(),
+    });
+    mockUseCalendarDayManualSchedule.mockReturnValue([
+      { scheduledWorkoutId: 1, routineId: 20, title: '夜の予定', categories: ['leg'], exerciseCount: 3, hour: 19, minute: 30 },
+    ]);
+    const root = render();
+
+    expect(
+      root.findAllByType(TouchableOpacity).find((t) => t.props.accessibilityLabel === '「夜の予定」のトレーニングを開始'),
+    ).toBeDefined();
+    expect(root.findAllByType(TouchableOpacity).find((t) => t.props.accessibilityLabel === 'トレーニングを開始')).toBeUndefined();
+    expect(root.findAllByType(TouchableOpacity).find((t) => t.props.accessibilityLabel === '予定を追加')).toBeDefined();
+  });
+
+  test('今日すでに完了済みの記録があっても、進行中セッションがある間は「トレーニングを開始」ボタンを表示しない（ResumeWorkoutBannerと開始系CTAが並ぶ紛らわしさを避ける、@designer指摘）', () => {
+    mockUseCalendarDayExercises.mockReturnValue({
+      cards: [
+        {
+          workoutSessionExerciseId: 1,
+          exerciseId: 1,
+          name: 'ベンチプレス',
+          category: 'chest',
+          measurementType: 'weight_reps',
+          source: 'preset',
+          slug: 'bench-press',
+          sessionId: 1,
+          sessionStartedAt: Date.now(),
+          isBest: false,
+          comparison: null,
+          sets: [{ weight: 60, reps: 8, durationSeconds: null, distanceMeters: null, completedAt: 1 }],
+        },
+      ],
+      retry: jest.fn(),
+    });
+    mockUseWorkoutSessions.mockReturnValue({
+      sessions: [{ id: 9, startedAt: 0, endedAt: null }],
+      activeSession: { id: 9, startedAt: 0, endedAt: null },
+    });
+    const root = render();
+
+    expect(root.findAllByType(TouchableOpacity).find((t) => t.props.accessibilityLabel === 'トレーニングを開始')).toBeUndefined();
+  });
+
+  test('今日、完了済みの記録は無く予定だけがある場合は、従来通り「予定を追加」のみで「トレーニングを開始」は表示しない（判定がtodayTimeline全体ではなく完了記録の有無であることの確認、@reviewer指摘）', () => {
+    mockUseCalendarDayManualSchedule.mockReturnValue([
+      { scheduledWorkoutId: 1, routineId: 20, title: '脚の日', categories: ['leg'], exerciseCount: 3, hour: 19, minute: 30 },
+    ]);
+    const root = render();
+
+    expect(root.findAllByType(TouchableOpacity).find((t) => t.props.accessibilityLabel === '予定を追加')).toBeDefined();
+    expect(root.findAllByType(TouchableOpacity).find((t) => t.props.accessibilityLabel === 'トレーニングを開始')).toBeUndefined();
+  });
 });
 
 describe('CalendarScreen カテゴリフィルター', () => {

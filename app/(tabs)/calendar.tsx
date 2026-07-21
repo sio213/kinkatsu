@@ -7,6 +7,7 @@ import { SessionTimeGroupHeader } from '@/components/calendar/session-time-group
 import { SwipeableMonthView } from '@/components/calendar/swipeable-month-view';
 import { CategoryFilterChips } from '@/components/exercises/category-filter-chips';
 import { IconSymbol } from '@/components/ui/icon-symbol';
+import { PrimaryButton } from '@/components/ui/primary-button';
 import { AddExerciseButton } from '@/components/workout/add-exercise-button';
 import { ResumeWorkoutBanner } from '@/components/workout/resume-workout-banner';
 import { Colors, Typography } from '@/constants/theme';
@@ -416,6 +417,20 @@ export default function CalendarScreen() {
   const handleStartToday = useCallback(() => {
     pushDebounced('/workout/start-chooser');
   }, [pushDebounced]);
+  // 今日パネル末尾の出し分け用（@ユーザー指摘）。今日すでに完了済みの記録が1件でもあれば
+  // 「予定を追加」より「トレーニングを開始（もう1本）」を優先表示する。dayCardGroupsは
+  // selectedDateの完了済みセッション群（進行中セッション自身は含まれない）で、今日以外の
+  // 選択日でも算出され続けているため、isSelectedTodayを明示的に含めて名前と実態を一致させる
+  // （@reviewer指摘: 無いと「今日」以外のブランチでこの変数を誤って参照したときに壊れる余地が
+  // あった）。これが1件以上あれば「今日の過去記録がある」と判定できる。進行中セッション中は
+  // ResumeWorkoutBannerが唯一の開始/再開CTAであるべきため、activeSession中はこのボタンを
+  // 出さず、従来通り「予定を追加」のみ据え置く。また、今日にまだ実施していない予定
+  // （todayTimelineのkind!=='session'エントリ）が残っている場合も出さない。予定カード自体が
+  // 既に個別の「開始」ボタンを持っており、末尾にも似た見た目の開始ボタンが並ぶと役割の違いが
+  // 一目で伝わらないため（@designer指摘: 朝に1本完了済み・夜にリマインダー予定が残っている、
+  // というよくある混在ケースで実際に開始系CTAが2つ並んでしまうバグがあった）
+  const hasCompletedSessionToday =
+    isSelectedToday && dayCardGroups.length > 0 && !activeSession && !todayTimeline.some((entry) => entry.kind !== 'session');
   // 過去日パネルの「記録を追加」用（2026-07-20）。今日と同じ開始方法選択画面
   // (start-chooser)を経由させ、選んだ方法で作るセッションだけをpastDateKey付きで
   // 過去日の完了済みセッション（記録の編集モード）に切り替える（要件確認済み）
@@ -561,6 +576,19 @@ export default function CalendarScreen() {
                       </View>
                     );
                   })}
+                  {hasCompletedSessionToday && (
+                    <PrimaryButton
+                      label="トレーニングを開始"
+                      onPress={handleStartToday}
+                      // すぐ下に並ぶAddExerciseButton（paddingVertical:11）と縦幅を揃える
+                      // （@designer指摘: 全幅ボタン2つが直接隣接するのは今回が初めてで、
+                      // PrimaryButton既定のpaddingVertical:13のままだと4pt分の高さのズレが
+                      // 視認できる）
+                      style={styles.startTodayButton}
+                      // routine-card.tsxの「開始」ボタンと同じアイコンサイズ(16)に揃える
+                      icon={<IconSymbol name="play.fill" size={16} color={Colors.onAccent} />}
+                    />
+                  )}
                   <AddExerciseButton
                     onPress={handlePressAddSchedule}
                     label="予定を追加"
@@ -678,4 +706,5 @@ const styles = StyleSheet.create({
   // 時間帯グループ間の余白はデザイン案「複数18」のheight:12px相当
   dayGroupList: { gap: 12 },
   dayGroup: { gap: 8 },
+  startTodayButton: { width: '100%', paddingVertical: 11 },
 });
