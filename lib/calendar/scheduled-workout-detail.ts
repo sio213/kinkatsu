@@ -208,8 +208,10 @@ async function insertScheduledWorkoutSetsFromValues(
   }
 }
 
-// 種目カード⋮メニュー「削除」。この予定に最低1種目は残す必要があるため（addDirectScheduledWorkout
-// が0種目の予定を作れないのと同じ制約）、最後の1件は削除できないよう安全網を張る。
+// 種目カード⋮メニュー「削除」。ルーティン・過去記録と同様に0種目まで削除できる（2026-07-22、
+// @ユーザー指摘: この画面だけ最後の1件を残す安全網があったのは他画面との一貫性が無く、
+// 0件になった予定はschedule-exercise-card-group.tsx側の空状態UIで表示・再度種目を追加できる
+// ようになったため、ガードを撤廃した）。
 // scheduledWorkoutSetsはonDelete cascadeのため、この1行を消すだけで目標セットも連動して消える
 export async function removeScheduledWorkoutExercise(scheduledWorkoutExerciseId: number): Promise<void> {
   await db.transaction(async (tx) => {
@@ -218,12 +220,6 @@ export async function removeScheduledWorkoutExercise(scheduledWorkoutExerciseId:
       .from(scheduledWorkoutExercises)
       .where(eq(scheduledWorkoutExercises.id, scheduledWorkoutExerciseId));
     if (!row) return;
-
-    const siblings = await tx
-      .select({ id: scheduledWorkoutExercises.id })
-      .from(scheduledWorkoutExercises)
-      .where(eq(scheduledWorkoutExercises.scheduledWorkoutId, row.scheduledWorkoutId));
-    if (siblings.length <= 1) throw new Error('cannot remove the last exercise from a scheduled workout');
 
     await tx.delete(scheduledWorkoutExercises).where(eq(scheduledWorkoutExercises.id, scheduledWorkoutExerciseId));
     await touchScheduledWorkout(tx, row.scheduledWorkoutId, Date.now());

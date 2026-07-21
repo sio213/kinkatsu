@@ -42,9 +42,13 @@ export function buildScheduledWorkoutDeleteMessage(routineId: number | null, rou
 // 「直接追加」予定（ルーティンを介さず個別に選んだ種目、2026-07-20）の表示タイトル・通知タイトルを
 // 種目名から合成する。ルーティン名に相当するものが無いため、選んだ種目名自体をタイトルにする
 // （user-advisor方針: 「ルーティンとして保存しますか？」のような命名ステップを挟まない）。
-// exerciseNamesは選択順（orderIndex順）を想定
+// exerciseNamesは選択順（orderIndex順）を想定。0件（作成時は起こらないが、2026-07-22の
+// 「最後の1種目も削除できる」仕様変更後は、編集画面で全種目を削除すると到達する）は
+// 空文字ではなくフォールバック文言にする（@designer指摘: 空文字だとカレンダー日パネルの
+// カード見出しやaccessibilityLabelが「「」夜20:00に種目を追加」のように壊れて見える）
 export function formatDirectScheduleTitle(exerciseNames: string[]): string {
-  if (exerciseNames.length <= 1) return exerciseNames[0] ?? '';
+  if (exerciseNames.length === 0) return '種目未設定';
+  if (exerciseNames.length === 1) return exerciseNames[0];
   return `${exerciseNames[0]} 他${exerciseNames.length - 1}種目`;
 }
 

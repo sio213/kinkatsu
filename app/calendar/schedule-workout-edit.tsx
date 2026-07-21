@@ -120,7 +120,7 @@ export default function ScheduleWorkoutEditScreen() {
             await removeScheduledWorkoutExercise(scheduledWorkoutExerciseId);
           } catch (e) {
             console.error('[scheduled workout exercise delete]', e);
-            Alert.alert('エラー', 'この予定には最低1種目が必要なため削除できませんでした。');
+            Alert.alert('エラー', 'この種目を削除できませんでした。');
           }
         },
       },
@@ -273,29 +273,35 @@ export default function ScheduleWorkoutEditScreen() {
         scrollIndicatorInsets={{ bottom: keyboardInset }}
         keyboardShouldPersistTaps="handled"
       >
-        <View style={styles.list}>
-          {exercises.map((exercise, index) => (
-            <ScheduledWorkoutExerciseCard
-              key={exercise.scheduledWorkoutExerciseId}
-              exercise={exercise}
-              isFirst={index === 0}
-              isLast={index === exercises.length - 1}
-              isOnlyExercise={exercises.length === 1}
-              onSwap={() =>
-                handleSwap(
-                  exercise.scheduledWorkoutExerciseId,
-                  exercise.exerciseId,
-                  exercise.name,
-                  exercise.sets.some(hasAnyValue),
-                )
-              }
-              onDelete={() => handleDelete(exercise.scheduledWorkoutExerciseId)}
-              onMoveUp={() => handleMove(exercise.scheduledWorkoutExerciseId, 'up')}
-              onMoveDown={() => handleMove(exercise.scheduledWorkoutExerciseId, 'down')}
-            />
-          ))}
-          <RoutineAddExerciseButton variant="ghost" onPress={handleAddExercise} />
-        </View>
+        {exercises.length === 0 ? (
+          // 種目0件は、ルーティン削除等の稀なケースに加え、⋮「削除」で最後の1件を消した場合にも
+          // 到達するようになった（2026-07-22、@ユーザー指摘で安全網を撤廃）。
+          // app/routine/exercise-edit.tsxと同じvariant="empty"（破線ボックス）で明示する
+          <RoutineAddExerciseButton variant="empty" onPress={handleAddExercise} />
+        ) : (
+          <View style={styles.list}>
+            {exercises.map((exercise, index) => (
+              <ScheduledWorkoutExerciseCard
+                key={exercise.scheduledWorkoutExerciseId}
+                exercise={exercise}
+                isFirst={index === 0}
+                isLast={index === exercises.length - 1}
+                onSwap={() =>
+                  handleSwap(
+                    exercise.scheduledWorkoutExerciseId,
+                    exercise.exerciseId,
+                    exercise.name,
+                    exercise.sets.some(hasAnyValue),
+                  )
+                }
+                onDelete={() => handleDelete(exercise.scheduledWorkoutExerciseId)}
+                onMoveUp={() => handleMove(exercise.scheduledWorkoutExerciseId, 'up')}
+                onMoveDown={() => handleMove(exercise.scheduledWorkoutExerciseId, 'down')}
+              />
+            ))}
+            <RoutineAddExerciseButton variant="ghost" onPress={handleAddExercise} />
+          </View>
+        )}
       </ScrollView>
       <View style={styles.footer}>
         <PrimaryButton label="戻る" onPress={() => router.back()} />
