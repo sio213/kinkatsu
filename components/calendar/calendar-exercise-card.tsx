@@ -29,8 +29,9 @@ type Props = {
   // 比較対象が無い/変化なしならnull
   comparison: SetComparison | null;
   // 遷移先はこのカード自身では決めず、呼び出し元(app/(tabs)/calendar.tsxのDayCardList)に
-  // 委ねる。今日パネルは種目詳細、過去日パネルは記録編集画面と、同じカードでも文脈によって
-  // 遷移先が異なるため（2026-07-20）
+  // 委ねる。今日・過去日パネルは記録編集画面、直接予定の種目一覧
+  // (DirectScheduleExerciseGroup)は目標セット編集画面と、同じカードでも文脈によって
+  // 遷移先が異なるため（2026-07-21更新: 当初は今日パネルだけ種目詳細だったが記録編集画面に統一）
   onPress: () => void;
   // 遷移先の説明（例:「タップして種目の詳細を見ます」）。exercise-card.tsx/session-card.tsxは
   // accessibilityLabel自体に行き先を含めているが、このカードは種目名・カテゴリ・セット概要の

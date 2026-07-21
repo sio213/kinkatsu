@@ -1,7 +1,7 @@
-const mockUseScheduledExercisePreviewCards = jest.fn();
+const mockUseScheduledExerciseCards = jest.fn();
 
-jest.mock('@/hooks/use-scheduled-exercise-preview-cards', () => ({
-  useScheduledExercisePreviewCards: (...args: unknown[]) => mockUseScheduledExercisePreviewCards(...args),
+jest.mock('@/hooks/use-scheduled-exercise-cards', () => ({
+  useScheduledExerciseCards: (...args: unknown[]) => mockUseScheduledExerciseCards(...args),
 }));
 
 import { act, create, type ReactTestInstance } from 'react-test-renderer';
@@ -14,7 +14,7 @@ const onPressStart = jest.fn();
 
 function render(props: Partial<Parameters<typeof DirectScheduleExerciseGroup>[0]> = {}) {
   const merged = {
-    exerciseIds: [10],
+    scheduledWorkoutId: 5,
     sessionStartedAt: new Date(2026, 6, 25, 19, 30).getTime(),
     title: 'ベンチプレス 他1種目',
     onDelete,
@@ -32,7 +32,8 @@ function findByAccessibilityLabel(root: ReactTestInstance, label: string) {
   return root.findAllByType(TouchableOpacity).find((t) => t.props.accessibilityLabel === label);
 }
 
-const benchPressPreview = {
+const benchPressCard = {
+  scheduledWorkoutExerciseId: 200,
   exerciseId: 10,
   name: 'ベンチプレス',
   category: 'chest',
@@ -40,23 +41,28 @@ const benchPressPreview = {
   slug: 'bench_press',
   measurementType: 'weight_reps',
   sets: [],
-  isBest: false,
 };
 
 beforeEach(() => {
   onPress.mockClear();
   onDelete.mockClear();
   onPressStart.mockClear();
-  mockUseScheduledExercisePreviewCards.mockReturnValue({ cards: [benchPressPreview], retry: jest.fn() });
+  mockUseScheduledExerciseCards.mockReturnValue({ cards: [benchPressCard], retry: jest.fn() });
 });
 
 // カレンダーの「直接追加」予定（routineId===null）の選択日パネル表示。過去の記録と同じ
 // 種目一覧カード(CalendarExerciseCard)を並べる（@ユーザー指摘、2026-07-20）
 describe('DirectScheduleExerciseGroup', () => {
-  it('取得した種目プレビューカードを種目名付きで表示する', () => {
+  it('取得した種目カードを種目名付きで表示し、まだ実施していないため自己ベストバッジは出さない', () => {
     const root = render();
     const texts = root.root.findAllByType(Text).map((t) => t.props.children);
     expect(texts).toContain('ベンチプレス');
+    expect(texts).not.toContain('自己ベスト');
+  });
+
+  it('scheduledWorkoutIdを渡してフックを呼び出す', () => {
+    render({ scheduledWorkoutId: 42 });
+    expect(mockUseScheduledExerciseCards).toHaveBeenCalledWith(42);
   });
 
   it('種目カードをタップすると、種目idを問わずonPressが呼ばれる（この予定の種目をまとめて編集する画面へ遷移、@ユーザー指摘）', () => {
@@ -68,11 +74,11 @@ describe('DirectScheduleExerciseGroup', () => {
     expect(onPress).toHaveBeenCalledTimes(1);
   });
 
-  it('種目プレビューが複数あれば、どのカードをタップしても同じonPressが呼ばれる', () => {
-    mockUseScheduledExercisePreviewCards.mockReturnValue({
+  it('種目カードが複数あれば、どのカードをタップしても同じonPressが呼ばれる', () => {
+    mockUseScheduledExerciseCards.mockReturnValue({
       cards: [
-        benchPressPreview,
-        { ...benchPressPreview, exerciseId: 11, name: 'スクワット', category: 'leg' },
+        benchPressCard,
+        { ...benchPressCard, scheduledWorkoutExerciseId: 201, exerciseId: 11, name: 'スクワット', category: 'leg' },
       ],
       retry: jest.fn(),
     });
@@ -88,14 +94,14 @@ describe('DirectScheduleExerciseGroup', () => {
   });
 
   it('cardsがnull（読み込み中）のときは種目カードを表示しない（クラッシュしない）', () => {
-    mockUseScheduledExercisePreviewCards.mockReturnValue({ cards: null, retry: jest.fn() });
+    mockUseScheduledExerciseCards.mockReturnValue({ cards: null, retry: jest.fn() });
     const root = render();
     expect(root.root.findAllByProps({ children: 'ベンチプレス' })).toHaveLength(0);
   });
 
   it("cardsが'error'のときはエラー文言と再試行ボタンを表示し、押すとretryが呼ばれる", () => {
     const retry = jest.fn();
-    mockUseScheduledExercisePreviewCards.mockReturnValue({ cards: 'error', retry });
+    mockUseScheduledExerciseCards.mockReturnValue({ cards: 'error', retry });
     const root = render();
     expect(root.root.findByProps({ children: '種目を読み込めませんでした' })).toBeDefined();
 
@@ -106,14 +112,19 @@ describe('DirectScheduleExerciseGroup', () => {
     expect(retry).toHaveBeenCalledTimes(1);
   });
 
-  it('自己ベストの種目でも、まだ実施していない予定のためベストバッジは表示しない（@designer指摘: 実績との誤認防止、2026-07-20）', () => {
-    mockUseScheduledExercisePreviewCards.mockReturnValue({
-      cards: [{ ...benchPressPreview, isBest: true }],
+  it('目標セット（重量・回数）が設定済みならそれをそのまま表示する（フックが目標セットを優先して返す前提、@ユーザー指摘2026-07-21）', () => {
+    mockUseScheduledExerciseCards.mockReturnValue({
+      cards: [
+        {
+          ...benchPressCard,
+          sets: [{ weight: 70, reps: 6, durationSeconds: null, distanceMeters: null, completedAt: 0 }],
+        },
+      ],
       retry: jest.fn(),
     });
     const root = render();
-    const card = root.root.findAllByType(TouchableOpacity).find((t) => typeof t.props.accessibilityLabel === 'string' && t.props.accessibilityLabel.startsWith('ベンチプレス、'))!;
-    expect(card.props.accessibilityLabel).not.toContain('自己ベスト');
+    const texts = root.root.findAllByType(Text).map((t) => t.props.children);
+    expect(texts.some((c) => typeof c === 'string' && c.includes('70'))).toBe(true);
   });
 
   it('一度も実施したことが無い種目（sets空）は「実施記録なし」と表示する（@designer指摘: 「0セット」だと記録し忘れと誤読される、2026-07-20）', () => {

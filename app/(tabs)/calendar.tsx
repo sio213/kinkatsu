@@ -131,8 +131,8 @@ function ScheduleEntryCard({
 
 // 時間帯グループ表示・フラット表示のどちらでもカード列の描画は同一のため共有する
 // （CalendarExerciseCardへ渡すpropsを2箇所に重複させない）。onPressExerciseはカード全体を
-// 受け取る形にしている（今日パネル=種目詳細へ、過去日パネル=記録編集画面へ、と呼び出し元
-// によって遷移先の判断材料（exerciseId/sessionId）が異なるため、@ユーザー指摘2026-07-20）
+// 受け取る形にしている（呼び出し元によって遷移先の判断材料(sessionId)が異なるため）。
+// 今日・過去日パネルとも記録編集画面へ遷移する（2026-07-21、@ユーザー指摘で統一）
 function DayCardList({
   cards,
   onPressExercise,
@@ -282,14 +282,10 @@ export default function CalendarScreen() {
   );
 
   const pushDebounced = useDebouncedPush();
-  // 今日パネルの種目カードは種目詳細（フォーム・注意点等の閲覧用ページ）へ遷移する
-  const handlePressExercise = useCallback(
-    (card: CalendarDayCard) => pushDebounced(`/exercise/${card.exerciseId}`),
-    [pushDebounced],
-  );
-  // 過去日パネルの種目カードは、その日の記録そのものを見返す/直す用途のため、種目詳細では
-  // なくそのセッションの記録編集画面へ遷移する（2026-07-20、要件確認済み）。今日パネルの
-  // 種目カード（handlePressExercise）は変更対象外のため種目詳細のまま維持している
+  // 今日・過去日パネルの種目カードは、その日の記録そのものを見返す/直す用途のため、
+  // そのセッションの記録編集画面へ遷移する（2026-07-20、要件確認済み。当初は今日パネルを
+  // 種目詳細のまま維持していたが、未来予定の種目カードも記録編集画面に統一したため
+  // 一貫性のため今日パネルも合わせた）
   const handlePressPastRecord = useCallback(
     (card: CalendarDayCard) => pushDebounced(`/workout/${card.sessionId}`),
     [pushDebounced],
@@ -521,8 +517,8 @@ export default function CalendarScreen() {
                           {todayTimeline.length > 1 && <SessionTimeGroupHeader sessionStartedAt={entry.group.sessionStartedAt} />}
                           <DayCardList
                             cards={entry.group.cards}
-                            onPressExercise={handlePressExercise}
-                            accessibilityHint="タップして種目の詳細を見ます"
+                            onPressExercise={handlePressPastRecord}
+                            accessibilityHint="タップして記録を編集します"
                           />
                         </View>
                       );
@@ -535,11 +531,10 @@ export default function CalendarScreen() {
                     // （@ユーザー指摘）。reminderは常にルーティン紐付きのためroutineIdがnullに
                     // なることは無く、card.source==='manual'で必ずscheduledWorkoutIdが取れる
                     if (card.routineId == null && card.source === 'manual') {
-                      const exerciseIds = card.exerciseIds ?? [];
                       return (
                         <View key={entry.key} style={styles.dayGroup}>
                           <DirectScheduleExerciseGroup
-                            exerciseIds={exerciseIds}
+                            scheduledWorkoutId={card.scheduledWorkoutId}
                             sessionStartedAt={entry.sortAt}
                             title={card.title}
                             onPressStart={() => handleStartDirectSchedule(card.scheduledWorkoutId, card.title)}
@@ -595,11 +590,10 @@ export default function CalendarScreen() {
                       card.hour,
                       card.minute,
                     ).getTime();
-                    const exerciseIds = card.exerciseIds ?? [];
                     return (
                       <DirectScheduleExerciseGroup
                         key={card.key}
-                        exerciseIds={exerciseIds}
+                        scheduledWorkoutId={card.scheduledWorkoutId}
                         sessionStartedAt={sessionStartedAt}
                         title={card.title}
                         onDelete={() => handleDeleteSchedule(card.scheduledWorkoutId, card.title)}
