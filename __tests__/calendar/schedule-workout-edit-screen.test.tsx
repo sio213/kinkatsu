@@ -278,8 +278,8 @@ describe('ScheduleWorkoutEditScreen', () => {
     act(() => {
       deleteWorkoutItem.props.onPress();
     });
-    // カレンダー日パネル⋮の削除(handleDeleteDirectSchedule)と同じ文言であることを確認する
-    // （@ユーザー指摘・@reviewer指摘: 入口ごとに文言が食い違っていた問題の回帰防止）
+    // buildScheduledWorkoutDeleteMessage(lib/calendar/schedule.ts)経由で組み立てた文言であることを
+    // 確認する（@ユーザー指摘・@reviewer指摘: 入口ごとに文言が食い違っていた問題の回帰防止）
     expect(Alert.alert).toHaveBeenCalledWith(
       'この予定を削除しますか？',
       'この予定に設定した種目と目標セットもすべて削除され、通知も届かなくなります。',
@@ -294,9 +294,34 @@ describe('ScheduleWorkoutEditScreen', () => {
     expect(mockBack).toHaveBeenCalledTimes(1);
   });
 
+  // removeScheduledWorkoutが例外を投げずresolveした場合（対象行が既に無い場合等の
+  // サイレント成功仕様）、エラーAlertを出さずrouter.back()する（2026-07-22、@tester指摘:
+  // 選択日パネル側の⋮メニュー撤去により削除操作の入口がこの画面に一本化されたため、
+  // このケースを明示的に検証しておく）
+  it('removeScheduledWorkoutが例外を投げずresolveした場合、エラーAlertは出さずrouter.back()する', async () => {
+    const root = render();
+    const headerMenuTrigger = root
+      .findAllByType(TouchableOpacity)
+      .find((t) => t.props.accessibilityLabel === '種目編集のメニューを開く')!;
+    act(() => {
+      headerMenuTrigger.props.onPress();
+    });
+    const deleteWorkoutItem = findMenuItem(root, '削除')!;
+    act(() => {
+      deleteWorkoutItem.props.onPress();
+    });
+    const alertCall = (Alert.alert as jest.Mock).mock.calls[0];
+    const confirmAction = alertCall[2].find((b: { text?: string }) => b.text === '削除');
+    await act(async () => {
+      await confirmAction.onPress();
+    });
+    expect(Alert.alert).not.toHaveBeenCalledWith('エラー', expect.anything());
+    expect(mockBack).toHaveBeenCalledTimes(1);
+  });
+
   // 2026-07-21よりルーティン予定（実体化済み、scheduledWorkoutIdを持つ）もこの画面に来るように
   // なったため、削除確認文言をrouteIdの有無で出し分ける必要がある（@ユーザー指摘）
-  it('ルーティン紐付き予定（routineIdあり）の場合、ヘッダー⋮「削除」の確認文言はルーティン本体に影響しない旨になる（選択日パネルのhandleDeleteRoutineScheduleと同じ文言）', async () => {
+  it('ルーティン紐付き予定（routineIdあり）の場合、ヘッダー⋮「削除」の確認文言はルーティン本体に影響しない旨になる（選択日パネル側と統一された文言）', async () => {
     mockUseScheduledWorkoutTime.mockReturnValue({
       time: { scheduledDate: '2026-07-21', hour: 19, minute: 30, routineId: 1 },
       loaded: true,
@@ -421,8 +446,8 @@ describe('ScheduleWorkoutEditScreen', () => {
     expect(mockRemoveScheduledWorkoutExercise).toHaveBeenCalledWith(100);
   });
 
-  it('最後の1種目の削除に失敗した場合（安全網エラー）はエラーAlertを表示する', async () => {
-    mockRemoveScheduledWorkoutExercise.mockRejectedValueOnce(new Error('cannot remove the last exercise'));
+  it('種目の削除に失敗した場合はエラーAlertを表示する', async () => {
+    mockRemoveScheduledWorkoutExercise.mockRejectedValueOnce(new Error('db error'));
     jest.spyOn(console, 'error').mockImplementation(() => {});
     const root = render();
     const triggers = findMenuTriggers(root);
@@ -438,7 +463,39 @@ describe('ScheduleWorkoutEditScreen', () => {
     await act(async () => {
       await confirmAction.onPress();
     });
-    expect(Alert.alert).toHaveBeenCalledWith('エラー', 'この予定には最低1種目が必要なため削除できませんでした。');
+    expect(Alert.alert).toHaveBeenCalledWith('エラー', 'この種目を削除できませんでした。');
+  });
+
+  // ルーティン・過去記録と同様、最後の1件も⋮「削除」で消せる（2026-07-22、@ユーザー指摘で
+  // 安全網を撤廃）。種目カード自体が0件になるため、この操作自体はここでは検証できないが、
+  // 0件時にapp/routine/exercise-edit.tsxと同じ空状態(variant="empty")が表示されることを確認する
+  it('種目が0件のとき、一覧の代わりに種目追加の空状態(variant="empty")が表示される', () => {
+    mockUseScheduledWorkoutExercises.mockReturnValue({ exercises: [], loaded: true });
+    const root = render();
+    expect(root.findByProps({ children: '種目を追加' })).toBeDefined();
+    expect(root.findByProps({ children: '胸・肩・脚など自由に組み合わせ' })).toBeDefined();
+  });
+
+  // 境界値の反対側（@tester指摘: 0件との分岐点をどちらの側からも固定しておく）
+  it('種目がちょうど1件のときは空状態(variant="empty")にはならず、一覧とvariant="ghost"の追加ボタンが表示される', () => {
+    mockUseScheduledWorkoutExercises.mockReturnValue({ exercises: [benchExercise()], loaded: true });
+    const root = render();
+    expect(root.findByProps({ children: 'ベンチプレス' })).toBeDefined();
+    // variant="empty"だけが持つ補足文言が出ていないことで、ghost側であることを確認する
+    expect(() => root.findByProps({ children: '胸・肩・脚など自由に組み合わせ' })).toThrow();
+  });
+
+  it('種目が0件のとき、空状態の「種目を追加」ボタンを押すとscheduledWorkoutId付きでschedule-workout-add-exerciseへ遷移する（@tester指摘: onPress配線自体の検証）', () => {
+    mockUseScheduledWorkoutExercises.mockReturnValue({ exercises: [], loaded: true });
+    const root = render();
+    const addBtn = root.findByProps({ accessibilityLabel: '種目を追加' });
+    act(() => {
+      addBtn.props.onPress();
+    });
+    expect(mockPush).toHaveBeenCalledWith({
+      pathname: '/calendar/schedule-workout-add-exercise',
+      params: { scheduledWorkoutId: '5' },
+    });
   });
 
   it('種目カード⋮「種目を入れ替え」を押すとscheduledWorkoutExerciseId付きでschedule-workout-exercise-swapへ遷移する', () => {

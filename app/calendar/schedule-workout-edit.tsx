@@ -120,7 +120,7 @@ export default function ScheduleWorkoutEditScreen() {
             await removeScheduledWorkoutExercise(scheduledWorkoutExerciseId);
           } catch (e) {
             console.error('[scheduled workout exercise delete]', e);
-            Alert.alert('エラー', 'この予定には最低1種目が必要なため削除できませんでした。');
+            Alert.alert('エラー', 'この種目を削除できませんでした。');
           }
         },
       },
@@ -139,14 +139,12 @@ export default function ScheduleWorkoutEditScreen() {
     [scheduledWorkoutId],
   );
 
-  // 選択日パネルの⋮メニュー「削除」(app/(tabs)/calendar.tsxのhandleDeleteDirectSchedule/
-  // handleDeleteRoutineSchedule)と同じ操作をこの画面からも行えるようにする（@ユーザー指摘）。
-  // この画面自体を編集し終えてから「この予定自体をやめる」と判断するケースのため、都度
-  // カレンダーへ戻らなくて済むようにする。文言もlib/calendar/schedule.tsの
-  // buildScheduledWorkoutDeleteMessageに集約し、選択日パネル側の削除と統一する
-  // （@ユーザー指摘: 同じ予定の削除なのに入口によって確認文言が違っていた）。
-  // 2026-07-21よりルーティン予定（実体化済み）もこの画面に来るため、routineIdの有無で
-  // 文言を出し分ける必要がある
+  // 実体化済み予定（直接予定・手動ルーティン予定）の削除は、この画面のヘッダー⋮が唯一の入口
+  // （2026-07-22、@ユーザー指摘: 選択日パネル側のグルーピング解除に伴い⋮メニューを撤去し、
+  // 削除はこの画面に一本化した）。この画面自体を編集し終えてから「この予定自体をやめる」と
+  // 判断するケースのため、都度カレンダーへ戻らなくて済むようにする。文言はlib/calendar/schedule.ts
+  // のbuildScheduledWorkoutDeleteMessageに集約する。2026-07-21よりルーティン予定（実体化済み）も
+  // この画面に来るため、routineIdの有無で文言を出し分ける必要がある
   const handleDeleteWorkout = useCallback(() => {
     Alert.alert(
       'この予定を削除しますか？',
@@ -229,7 +227,6 @@ export default function ScheduleWorkoutEditScreen() {
 
   // ルーティン紐付き予定（実体化済み）のときだけ表示する。種目編集アクション群・削除とは
   // 性質が異なる「ルーティン本体への移動」のため、区切り線で分けた別グループにする
-  // （components/calendar/schedule-exercise-card-group.tsxのreplaceMenuItemsと同じ方針）
   const menuGroups: DropdownMenuItem[][] =
     scheduledTime?.routineId != null
       ? [
@@ -276,29 +273,35 @@ export default function ScheduleWorkoutEditScreen() {
         scrollIndicatorInsets={{ bottom: keyboardInset }}
         keyboardShouldPersistTaps="handled"
       >
-        <View style={styles.list}>
-          {exercises.map((exercise, index) => (
-            <ScheduledWorkoutExerciseCard
-              key={exercise.scheduledWorkoutExerciseId}
-              exercise={exercise}
-              isFirst={index === 0}
-              isLast={index === exercises.length - 1}
-              isOnlyExercise={exercises.length === 1}
-              onSwap={() =>
-                handleSwap(
-                  exercise.scheduledWorkoutExerciseId,
-                  exercise.exerciseId,
-                  exercise.name,
-                  exercise.sets.some(hasAnyValue),
-                )
-              }
-              onDelete={() => handleDelete(exercise.scheduledWorkoutExerciseId)}
-              onMoveUp={() => handleMove(exercise.scheduledWorkoutExerciseId, 'up')}
-              onMoveDown={() => handleMove(exercise.scheduledWorkoutExerciseId, 'down')}
-            />
-          ))}
-          <RoutineAddExerciseButton variant="ghost" onPress={handleAddExercise} />
-        </View>
+        {exercises.length === 0 ? (
+          // 種目0件は、ルーティン削除等の稀なケースに加え、⋮「削除」で最後の1件を消した場合にも
+          // 到達するようになった（2026-07-22、@ユーザー指摘で安全網を撤廃）。
+          // app/routine/exercise-edit.tsxと同じvariant="empty"（破線ボックス）で明示する
+          <RoutineAddExerciseButton variant="empty" onPress={handleAddExercise} />
+        ) : (
+          <View style={styles.list}>
+            {exercises.map((exercise, index) => (
+              <ScheduledWorkoutExerciseCard
+                key={exercise.scheduledWorkoutExerciseId}
+                exercise={exercise}
+                isFirst={index === 0}
+                isLast={index === exercises.length - 1}
+                onSwap={() =>
+                  handleSwap(
+                    exercise.scheduledWorkoutExerciseId,
+                    exercise.exerciseId,
+                    exercise.name,
+                    exercise.sets.some(hasAnyValue),
+                  )
+                }
+                onDelete={() => handleDelete(exercise.scheduledWorkoutExerciseId)}
+                onMoveUp={() => handleMove(exercise.scheduledWorkoutExerciseId, 'up')}
+                onMoveDown={() => handleMove(exercise.scheduledWorkoutExerciseId, 'down')}
+              />
+            ))}
+            <RoutineAddExerciseButton variant="ghost" onPress={handleAddExercise} />
+          </View>
+        )}
       </ScrollView>
       <View style={styles.footer}>
         <PrimaryButton label="戻る" onPress={() => router.back()} />

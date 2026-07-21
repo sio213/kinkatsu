@@ -9,7 +9,6 @@ import { Text, TouchableOpacity } from 'react-native';
 import { ScheduledWorkoutExerciseGroup } from '@/components/calendar/scheduled-workout-exercise-group';
 
 const onPress = jest.fn();
-const onDelete = jest.fn();
 const onPressStart = jest.fn();
 
 function render(props: Partial<Parameters<typeof ScheduledWorkoutExerciseGroup>[0]> = {}) {
@@ -17,7 +16,6 @@ function render(props: Partial<Parameters<typeof ScheduledWorkoutExerciseGroup>[
     scheduledWorkoutId: 5,
     sessionStartedAt: new Date(2026, 6, 25, 19, 30).getTime(),
     title: 'ベンチプレス 他1種目',
-    onDelete,
     onPress,
     ...props,
   };
@@ -45,7 +43,6 @@ const benchPressCard = {
 
 beforeEach(() => {
   onPress.mockClear();
-  onDelete.mockClear();
   onPressStart.mockClear();
   mockUseScheduledExerciseCards.mockReturnValue({ cards: [benchPressCard], retry: jest.fn() });
 });
@@ -92,17 +89,11 @@ describe('ScheduledWorkoutExerciseGroup', () => {
     expect(root.root.findAllByProps({ children: 'ベンチプレス' })).toHaveLength(0);
   });
 
-  it('⋮メニューの「削除」を押すとonDeleteが呼ばれる', () => {
+  // 削除は遷移先の目標セット編集画面(schedule-workout-edit.tsx)自身の⋮に一本化されたため
+  // （@ユーザー指摘、2026-07-22）、このコンポーネントは⋮メニュー自体を持たない
+  it('⋮メニューは表示されない（削除は遷移先の編集画面で行う）', () => {
     const root = render();
-    const menuTrigger = findByAccessibilityLabel(root.root, '「ベンチプレス 他1種目」夜 19:30のメニューを開く')!;
-    act(() => {
-      menuTrigger.props.onPress();
-    });
-    const deleteItem = findByAccessibilityLabel(root.root, '削除')!;
-    act(() => {
-      deleteItem.props.onPress();
-    });
-    expect(onDelete).toHaveBeenCalledTimes(1);
+    expect(findByAccessibilityLabel(root.root, '「ベンチプレス 他1種目」夜 19:30のメニューを開く')).toBeUndefined();
   });
 
   it('onPressStartを渡す場合、開始ボタンが表示されタップでonPressStartが呼ばれる', () => {

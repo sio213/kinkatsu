@@ -11,7 +11,6 @@ type Props = {
   title: string;
   // 今日自身の予定にのみ渡す
   onPressStart?: () => void;
-  onDelete: () => void;
   onPress: () => void;
 };
 
@@ -20,14 +19,15 @@ type Props = {
 // useScheduledExerciseCardsの結果をScheduleExerciseCardGroupの共通カード形に変換するだけの
 // 薄いコンテナ。実体化済みルーティン予定はこの予定インスタンス専用にコピーされた
 // scheduledWorkoutExercises/scheduledWorkoutSetsを編集するため、ルーティン本体には影響しない
-// （lib/calendar/scheduled-workouts.tsのaddScheduledWorkout、PR1で対応済み）
+// （lib/calendar/scheduled-workouts.tsのaddScheduledWorkout、PR1で対応済み）。⋮メニュー
+// （削除）は持たない（2026-07-22、@ユーザー指摘）。カードタップ先の目標セット編集画面
+// (schedule-workout-edit.tsx)自身が⋮「削除」を持つため、ここに重複して置く必要が無い
 export const ScheduledWorkoutExerciseGroup = memo(function ScheduledWorkoutExerciseGroup({
   scheduledWorkoutId,
   routineName,
   sessionStartedAt,
   title,
   onPressStart,
-  onDelete,
   onPress,
 }: Props) {
   const { cards: rawCards, retry } = useScheduledExerciseCards(scheduledWorkoutId);
@@ -50,7 +50,6 @@ export const ScheduledWorkoutExerciseGroup = memo(function ScheduledWorkoutExerc
       cards={cards}
       onRetryCards={retry}
       onPressStart={onPressStart}
-      onDelete={onDelete}
       onPress={onPress}
     />
   );

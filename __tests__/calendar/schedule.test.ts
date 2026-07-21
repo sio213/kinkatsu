@@ -67,8 +67,11 @@ describe('formatDirectScheduleTitle', () => {
     expect(formatDirectScheduleTitle(['ベンチプレス', 'スクワット', 'デッドリフト'])).toBe('ベンチプレス 他2種目');
   });
 
-  it('種目0件なら空文字（呼び出し側の安全網、実運用では起こらない想定）', () => {
-    expect(formatDirectScheduleTitle([])).toBe('');
+  // 2026-07-22、schedule-workout-edit.tsxの⋮「削除」で最後の1種目まで削除できるように
+  // なったため、作成後に到達しうる状態になった（@designer指摘: 空文字だとカレンダー日パネルの
+  // カード見出しやaccessibilityLabelが壊れて見える）
+  it('種目0件ならフォールバック文言「種目未設定」', () => {
+    expect(formatDirectScheduleTitle([])).toBe('種目未設定');
   });
 });
 

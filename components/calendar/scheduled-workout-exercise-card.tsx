@@ -20,10 +20,6 @@ type Props = {
   exercise: ScheduledWorkoutExerciseDetail;
   isFirst: boolean;
   isLast: boolean;
-  // この予定に残っている唯一の種目かどうか。trueの場合「削除」を無効化する（予定には最低1種目
-  // 必要という制約を、実行してから失敗を知らせるのではなく「上へ移動」等と同じく先回りして
-  // 伝える、@designer指摘）
-  isOnlyExercise: boolean;
   onSwap: () => void;
   onDelete: () => void;
   onMoveUp: () => void;
@@ -39,7 +35,6 @@ export const ScheduledWorkoutExerciseCard = memo(function ScheduledWorkoutExerci
   exercise,
   isFirst,
   isLast,
-  isOnlyExercise,
   onSwap,
   onDelete,
   onMoveUp,
@@ -130,8 +125,6 @@ export const ScheduledWorkoutExerciseCard = memo(function ScheduledWorkoutExerci
               onMoveUp={onMoveUp}
               onMoveDown={onMoveDown}
               onDelete={onDelete}
-              isDeleteDisabled={isOnlyExercise}
-              deleteDisabledHint={isOnlyExercise ? '予定には最低1種目が必要です' : undefined}
             />
           )}
           {!expanded && (

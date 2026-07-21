@@ -347,11 +347,11 @@ describe('scheduled_workout_setsスキーマ - 実SQLite上でのFK挙動（2026
     expect(remaining).toEqual([{ id: sweA.id }]);
   });
 
-  // removeScheduledWorkoutExercise（lib/calendar/scheduled-workout-detail.ts）の「予定には
-  // 最低1種目必要」という制約はDB制約ではなくアプリ層のみで守られている（siblings.length<=1で
-  // throw）。DBレベルでは1件だけになっても削除は拒否されないことを明示しておく
-  // （@tester指摘：アプリ層のチェックが唯一の防波堤であることの回帰防止）
-  it('最後の1種目でもDB制約自体はDELETEを拒否しない（アプリ層のremoveScheduledWorkoutExerciseが唯一の防波堤）', () => {
+  // removeScheduledWorkoutExercise（lib/calendar/scheduled-workout-detail.ts）は2026-07-22に
+  // 「予定には最低1種目必要」というアプリ層ガードを撤廃した（@ユーザー指摘、ルーティン・過去記録
+  // との一貫性のため。scheduled-workout-detail.test.tsの「最後の1件でも削除できる」と対になる）。
+  // DBレベルでも元々そのような制約は無く、1件だけになっても削除は拒否されないことを明示しておく
+  it('最後の1種目でもDB制約自体はDELETEを拒否しない（DBレベル・アプリ層いずれも0件を許容する）', () => {
     db = new Database(':memory:');
     db.pragma('foreign_keys = ON');
     applyAllMigrations(db);

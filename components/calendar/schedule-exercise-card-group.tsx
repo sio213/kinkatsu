@@ -1,6 +1,5 @@
 import { CalendarExerciseCard } from '@/components/calendar/calendar-exercise-card';
 import { SessionTimeGroupHeader } from '@/components/calendar/session-time-group-header';
-import { DropdownMenu, type DropdownMenuItem } from '@/components/ui/dropdown-menu';
 import { IconSymbol } from '@/components/ui/icon-symbol';
 import { PrimaryButton } from '@/components/ui/primary-button';
 import { Colors, Typography } from '@/constants/theme';
@@ -13,17 +12,6 @@ import { StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 // 記録し忘れた場合と同じ文言）を出すと「記録し忘れ」と誤読される（@designer指摘）ため、
 // このコンポーネント専用の文言に差し替える
 const NO_HISTORY_LABEL = '実施記録なし';
-
-function deleteMenuItems(onDelete: () => void): DropdownMenuItem[] {
-  return [{ key: 'delete', label: '削除', icon: 'delete-outline', danger: true, onPress: onDelete }];
-}
-
-// 削除（取り消し不可）と差し替え（2画面遷移を伴いデータを追加する操作）は性質が異なるため、
-// 同じ1グループにまとめず別グループにしてDropdownMenu標準の区切り線で分ける
-// （routine-schedule-card.tsxと同じ方針）
-function replaceMenuItems(onReplace: () => void): DropdownMenuItem[] {
-  return [{ key: 'replace', label: '今回だけ差し替え', icon: 'swap-horiz', onPress: onReplace }];
-}
 
 export type ScheduleExerciseCardGroupCard = {
   // scheduledWorkoutExerciseId（実体化済み）/routineExerciseId（未実体化プレビュー）と
@@ -42,8 +30,8 @@ export type ScheduleExerciseCardGroupCard = {
 
 type Props = {
   // ルーティン紐付き予定（自動・手動どちらも）のときだけ呼び出し元が渡す。SessionTimeGroupHeaderの
-  // 左端に表示する（2026-07-21）。直接予定（個別種目選択）ではルーティン名に相当するものが
-  // 無いため渡さない
+  // 右端に表示する（2026-07-21、2026-07-22にデザイン案「複数18」準拠で左端→右端へ変更）。
+  // 直接予定（個別種目選択）ではルーティン名に相当するものが無いため渡さない
   routineName?: string;
   // SessionTimeGroupHeaderにそのまま渡す時刻表示用の合成タイムスタンプ（選択日+予定のhour/minute）。
   // 今日パネルは実績セッションと同じ時系列に混ぜるためentry.sortAtをそのまま流用できる
@@ -55,10 +43,6 @@ type Props = {
   onRetryCards?: () => void;
   // 今日自身の予定にのみ渡す（デザイン案「未来日は開始ボタンなし」、routine-schedule-card.tsxと同じ）
   onPressStart?: () => void;
-  onDelete: () => void;
-  // リマインダー予定（未実体化プレビュー）のときだけ呼び出し元が渡す。onDeleteと同じメニュー内に
-  // 「今回だけ差し替え」項目を追加で表示する
-  onReplace?: () => void;
   // 種目カードは1件ごとの詳細ではなく、この予定の種目一覧をまとめて編集する画面へ遷移する
   // （過去の記録の種目カードが記録編集画面(/workout/[sessionId])へ飛ぶのと同じ考え方、
   // @ユーザー指摘2026-07-20）。どの種目カードをタップしても遷移先は同じなので引数を取らない
@@ -74,7 +58,12 @@ type Props = {
 // 受け、過去の記録と同じ種目一覧カード(CalendarExerciseCard)をそのまま並べる（サムネ・カテゴリ・
 // 目標セット内容が見える）。まだ実施していない予定のため、前回比較(comparison)は今回の実施が
 // 無いと成立しない概念のため常にnullで渡す。自己ベストバッジも同様の理由（まだ実施していないのに
-// 「ベスト」と出ると実績と誤認する、@designer指摘）で常にfalse固定にする
+// 「ベスト」と出ると実績と誤認する、@designer指摘）で常にfalse固定にする。2026-07-22に
+// 背景・枠線で囲む「グルーピング」表示をやめ、過去の記録の種目一覧（DayCardList）と同じ
+// フラット表示に統一した（@ユーザー指摘）。⋮メニュー（削除・今回だけ差し替え）は全種別で
+// 撤去した（2026-07-22、@ユーザー指摘）。削除はカードタップ先の目標セット編集画面
+// (schedule-workout-edit.tsx)の⋮「削除」に一本化し、「今回だけ差し替え」機能自体を廃止した
+// （schedule-time-picker.tsx/schedule-routine-picker.tsxのisReplaceMode関連コードも撤去済み）
 export const ScheduleExerciseCardGroup = memo(function ScheduleExerciseCardGroup({
   routineName,
   sessionStartedAt,
@@ -82,11 +71,8 @@ export const ScheduleExerciseCardGroup = memo(function ScheduleExerciseCardGroup
   cards,
   onRetryCards,
   onPressStart,
-  onDelete,
-  onReplace,
   onPress,
 }: Props) {
-  const menuGroups = [...(onReplace ? [replaceMenuItems(onReplace)] : []), deleteMenuItems(onDelete)];
   // titleだけだと、同じルーティン/種目構成を同日に複数回スケジュールした場合ラベルが重複し
   // 区別できない（routine-schedule-card.tsxの既存パターンと同じ理由、@reviewer指摘:
   // 共通化した際にこの対策が引き継がれていなかった）ため、SessionTimeGroupHeaderと同じ
@@ -96,27 +82,8 @@ export const ScheduleExerciseCardGroup = memo(function ScheduleExerciseCardGroup
 
   return (
     <View style={styles.wrapper}>
-      <View style={styles.header}>
-        <SessionTimeGroupHeader sessionStartedAt={sessionStartedAt} isSchedule routineName={routineName} />
-        <View style={styles.menuSlot}>
-          <DropdownMenu
-            groups={menuGroups}
-            minWidth={140}
-            renderTrigger={({ open, onPress: onOpenMenu }) => (
-              <TouchableOpacity
-                onPress={onOpenMenu}
-                hitSlop={{ top: 14, bottom: 14, left: 14, right: 14 }}
-                accessibilityRole="button"
-                accessibilityLabel={`「${title}」${timeLabel}のメニューを開く`}
-                accessibilityState={{ expanded: open }}
-              >
-                <IconSymbol name="ellipsis" size={20} color={open ? Colors.accent : Colors.textPlaceholder} />
-              </TouchableOpacity>
-            )}
-          />
-        </View>
-      </View>
-      {cards != null && cards !== 'error' && (
+      <SessionTimeGroupHeader sessionStartedAt={sessionStartedAt} isSchedule routineName={routineName} />
+      {cards != null && cards !== 'error' && cards.length > 0 && (
         <View style={styles.cardList}>
           {cards.map((card) => (
             <CalendarExerciseCard
@@ -136,6 +103,22 @@ export const ScheduleExerciseCardGroup = memo(function ScheduleExerciseCardGroup
             />
           ))}
         </View>
+      )}
+      {/* ルーティン削除等で種目が0件になった予定（極めて稀なレース条件、
+          lib/calendar/scheduled-workouts.tsのaddScheduledWorkoutの0件フォールバック参照）は、
+          見出しだけが残り種目カードが1枚も無い「何もタップできない」状態になっていた
+          （ユーザー報告のバグ）。見出しの下に必ずタップ可能な行を出し、編集画面へ誘導する */}
+      {cards != null && cards !== 'error' && cards.length === 0 && (
+        <TouchableOpacity
+          style={styles.emptyRow}
+          onPress={onPress}
+          accessibilityRole="button"
+          accessibilityLabel={`「${title}」${timeLabel}に種目を追加`}
+          accessibilityHint="タップして予定の種目を追加します"
+        >
+          <Text style={styles.emptyRowText}>種目がありません</Text>
+          <Text style={styles.emptyRowHint}>タップして追加</Text>
+        </TouchableOpacity>
       )}
       {cards === 'error' && onRetryCards && (
         // useCalendarDayExercises(過去日パネル)のエラー表示・再試行ボタンと同じ体験に揃える
@@ -165,19 +148,23 @@ export const ScheduleExerciseCardGroup = memo(function ScheduleExerciseCardGroup
 });
 
 const styles = StyleSheet.create({
-  // 旧RoutineScheduleCardと同じsurfaceMuted+borderで軽く囲み、「1つの予定のまとまり」であることを
-  // 視覚的に示す（@designer指摘: 枠が無いと隣接カードとの境界が分かりづらい）
-  wrapper: {
-    gap: 10,
-    backgroundColor: Colors.surfaceMuted,
-    borderWidth: 1,
-    borderColor: Colors.border,
-    borderRadius: 10,
-    padding: 13,
-  },
-  header: { flexDirection: 'row', alignItems: 'center', gap: 8 },
-  menuSlot: { marginLeft: 'auto' },
+  // 過去の記録の種目一覧（app/(tabs)/calendar.tsxのdayGroup）と同じgapのみのフラット表示
+  // （2026-07-22、@ユーザー指摘: 背景・枠線での「グルーピング」を廃止）
+  wrapper: { gap: 8 },
   cardList: { gap: 8 },
+  // CalendarExerciseCardと縦のリズムを揃えつつ、破線で「まだ何も無い」ことを示す
+  // （components/routines/routine-add-exercise-button.tsxのvariant="empty"と近い見た目）
+  emptyRow: {
+    borderWidth: 1.5,
+    borderStyle: 'dashed',
+    borderColor: Colors.borderStrong,
+    borderRadius: 10,
+    paddingVertical: 14,
+    alignItems: 'center',
+    gap: 2,
+  },
+  emptyRowText: { ...Typography.footnote, fontWeight: '600', color: Colors.textMuted },
+  emptyRowHint: { ...Typography.caption, color: Colors.accent, fontWeight: '600' },
   errorRow: { flexDirection: 'row', alignItems: 'center', gap: 8, flexWrap: 'wrap' },
   errorText: { ...Typography.body, color: Colors.danger },
   retryText: { ...Typography.bodyStrong, color: Colors.accent },

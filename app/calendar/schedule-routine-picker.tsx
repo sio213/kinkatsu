@@ -16,21 +16,13 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 // app/workout/routine-picker.tsxと同じ「一覧から1件選ぶだけ」の画面で、見た目・データ取得
 // (useRoutines/useRoutineExerciseSummaries)もそのまま流用する。日付は選択日パネルで
 // 既に確定しているため選び直させず、dateKeyをparamsで次画面へそのまま引き継ぐだけ。
-// リマインダー予定の「今回だけ差し替え」（PR10-6b）でもこの画面を再利用する。差し替え元の
-// reminderId等（replaceXxx、下記4項目はセットで渡る）が付いている場合だけ見出し・サブタイトルを
-// 差し替え用に出し分け、次画面へもそのまま引き継ぐ。描画部分（一覧・空状態）は
-// components/routines/routine-picker-list.tsxへ集約している（2026-07-20、@reviewer指摘:
-// app/workout/routine-picker.tsx・app/workout/start-routine-picker.tsxと合わせて3本目の
-// 同型ピッカーに到達したため）
+// 描画部分（一覧・空状態）はcomponents/routines/routine-picker-list.tsxへ集約している
+// （2026-07-20、@reviewer指摘: app/workout/routine-picker.tsx・
+// app/workout/start-routine-picker.tsxと合わせて3本目の同型ピッカーに到達したため）。
+// 「今回だけ差し替え」（PR10-6b）でもこの画面を再利用していたが、2026-07-22に
+// ⋮メニュー撤去と合わせて差し替え機能自体を廃止したため、その分岐は無くなった
 export default function ScheduleRoutinePickerScreen() {
-  const { dateKey, replaceReminderId, replaceRoutineName, replaceHour, replaceMinute } = useLocalSearchParams<{
-    dateKey: string;
-    replaceReminderId?: string;
-    replaceRoutineName?: string;
-    replaceHour?: string;
-    replaceMinute?: string;
-  }>();
-  const isReplaceMode = replaceReminderId !== undefined;
+  const { dateKey } = useLocalSearchParams<{ dateKey: string }>();
   const router = useRouter();
   const pushDebounced = useDebouncedPush();
   const { routines } = useRoutines();
@@ -40,15 +32,10 @@ export default function ScheduleRoutinePickerScreen() {
     (routine: Routine) => {
       pushDebounced({
         pathname: '/calendar/schedule-time-picker',
-        params: {
-          dateKey,
-          routineId: String(routine.id),
-          routineName: routine.name,
-          ...(isReplaceMode ? { replaceReminderId, replaceHour, replaceMinute } : {}),
-        },
+        params: { dateKey, routineId: String(routine.id), routineName: routine.name },
       });
     },
-    [pushDebounced, dateKey, isReplaceMode, replaceReminderId, replaceHour, replaceMinute],
+    [pushDebounced, dateKey],
   );
 
   // カレンダー画面から遷移する限り不正なdateKeyは渡らないが、不正な直リンク等への防御として
@@ -67,14 +54,7 @@ export default function ScheduleRoutinePickerScreen() {
       <Stack.Screen
         options={{
           headerTitle: () => (
-            <HeaderTitle
-              title={isReplaceMode ? '差し替えるルーティンを選択' : 'ルーティンを選択'}
-              subtitle={
-                isReplaceMode
-                  ? `${formatSessionDateGroup(parseDateKey(dateKey).getTime())}・「${replaceRoutineName}」を差し替え`
-                  : formatSessionDateGroup(parseDateKey(dateKey).getTime())
-              }
-            />
+            <HeaderTitle title="ルーティンを選択" subtitle={formatSessionDateGroup(parseDateKey(dateKey).getTime())} />
           ),
         }}
       />

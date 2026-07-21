@@ -247,8 +247,7 @@ describe('createDirectScheduledWorkout', () => {
 });
 
 // リマインダー由来の予定インスタンスを種目カードタップ時に初めてscheduledWorkouts実体として
-// 書き出す（2026-07-21）。schedule-time-picker.tsxの「今回だけ差し替え」(isReplaceMode)と
-// 同じ「skip+create」の合成
+// 書き出す（2026-07-21）。「skip+create」の合成
 describe('materializeReminderOccurrence', () => {
   it('skipReminderOccurrenceで元のリマインダー発火を止めてから、createScheduledWorkout相当でscheduledWorkoutを作り、idとnotificationSuppressedを返す', async () => {
     const callOrder: string[] = [];
@@ -269,8 +268,8 @@ describe('materializeReminderOccurrence', () => {
     expect(result).toEqual({ scheduledWorkoutId: 42, notificationSuppressed: true });
   });
 
-  // schedule-time-picker.tsxのisReplaceMode分岐と同じくskipReminderOccurrenceの結果を
-  // 呼び出し側へ透過する（@reviewer Major指摘: 破棄すると二重通知が起きても無言になる）
+  // skipReminderOccurrenceの結果を呼び出し側へ透過する（@reviewer Major指摘: 破棄すると
+  // 二重通知が起きても無言になる）
   it('skipReminderOccurrenceがnotificationSuppressed:falseを返した場合、その値をそのまま呼び出し側へ伝える', async () => {
     mockSkipReminderOccurrence.mockResolvedValueOnce({ notificationSuppressed: false });
 

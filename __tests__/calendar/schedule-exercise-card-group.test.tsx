@@ -3,9 +3,7 @@ import { Text, TouchableOpacity } from 'react-native';
 import { ScheduleExerciseCardGroup, type ScheduleExerciseCardGroupCard } from '@/components/calendar/schedule-exercise-card-group';
 
 const onPress = jest.fn();
-const onDelete = jest.fn();
 const onPressStart = jest.fn();
-const onReplace = jest.fn();
 const onRetryCards = jest.fn();
 
 const benchPressCard: ScheduleExerciseCardGroupCard = {
@@ -24,7 +22,6 @@ function render(props: Partial<Parameters<typeof ScheduleExerciseCardGroup>[0]> 
     sessionStartedAt: new Date(2026, 6, 25, 19, 30).getTime(),
     title: 'ベンチプレス 他1種目',
     cards: [benchPressCard],
-    onDelete,
     onPress,
     ...props,
   };
@@ -41,14 +38,13 @@ function findByAccessibilityLabel(root: ReactTestInstance, label: string) {
 
 beforeEach(() => {
   onPress.mockClear();
-  onDelete.mockClear();
   onPressStart.mockClear();
-  onReplace.mockClear();
   onRetryCards.mockClear();
 });
 
 // 予定（直接予定・ルーティン予定どちらも）の選択日パネル表示の見た目のみを担う共通コンポーネント
-// （2026-07-21、旧DirectScheduleExerciseGroupから分割。データ取得は呼び出し元のコンテナが担う）
+// （2026-07-21、旧DirectScheduleExerciseGroupから分割。データ取得は呼び出し元のコンテナが担う）。
+// ⋮メニュー（削除・今回だけ差し替え）は2026-07-22に全種別で撤去した（@ユーザー指摘）
 describe('ScheduleExerciseCardGroup', () => {
   it('cardsを種目名付きで表示し、まだ実施していないため自己ベストバッジは出さない', () => {
     const root = render();
@@ -71,6 +67,23 @@ describe('ScheduleExerciseCardGroup', () => {
   it('cardsがnull（読み込み中）のときは種目カードを表示しない（クラッシュしない）', () => {
     const root = render({ cards: null });
     expect(root.root.findAllByProps({ children: 'ベンチプレス' })).toHaveLength(0);
+  });
+
+  it('cardsがnull（読み込み中）のときは「種目がありません」の空状態も表示しない（読み込み中と本当に0件を混同しない）', () => {
+    const root = render({ cards: null });
+    expect(root.root.findAllByProps({ children: '種目がありません' })).toHaveLength(0);
+  });
+
+  // ルーティン削除等で種目が0件になった予定（極めて稀なレース条件）が、見出しだけ残り
+  // 何もタップできない状態になっていたバグの修正（ユーザー報告、2026-07-22）
+  it('cardsが読み込み済みで0件のときは「種目がありません」の空状態を表示し、タップするとonPressが呼ばれる', () => {
+    const root = render({ cards: [] });
+    expect(root.root.findByProps({ children: '種目がありません' })).toBeDefined();
+    const emptyRow = findByAccessibilityLabel(root.root, '「ベンチプレス 他1種目」夜 19:30に種目を追加')!;
+    act(() => {
+      emptyRow.props.onPress();
+    });
+    expect(onPress).toHaveBeenCalledTimes(1);
   });
 
   it("cardsが'error'かつonRetryCardsが渡されているときはエラー文言と再試行ボタンを表示し、押すとonRetryCardsが呼ばれる", () => {
@@ -96,39 +109,9 @@ describe('ScheduleExerciseCardGroup', () => {
     expect(texts).not.toContain('0セット');
   });
 
-  it('⋮メニューの「削除」を押すとonDeleteが呼ばれる', () => {
+  it('⋮メニューは表示されない（削除・差し替えは廃止済み）', () => {
     const root = render();
-    const menuTrigger = findByAccessibilityLabel(root.root, '「ベンチプレス 他1種目」夜 19:30のメニューを開く')!;
-    act(() => {
-      menuTrigger.props.onPress();
-    });
-    const deleteItem = findByAccessibilityLabel(root.root, '削除')!;
-    act(() => {
-      deleteItem.props.onPress();
-    });
-    expect(onDelete).toHaveBeenCalledTimes(1);
-  });
-
-  it('onReplaceを渡さない場合（直接予定・実体化済みルーティン予定）、⋮メニューに「今回だけ差し替え」は出ない', () => {
-    const root = render();
-    const menuTrigger = findByAccessibilityLabel(root.root, '「ベンチプレス 他1種目」夜 19:30のメニューを開く')!;
-    act(() => {
-      menuTrigger.props.onPress();
-    });
-    expect(findByAccessibilityLabel(root.root, '今回だけ差し替え')).toBeUndefined();
-  });
-
-  it('onReplaceを渡す場合（未実体化のリマインダー予定）、⋮メニューに「今回だけ差し替え」が出てタップでonReplaceが呼ばれる', () => {
-    const root = render({ onReplace });
-    const menuTrigger = findByAccessibilityLabel(root.root, '「ベンチプレス 他1種目」夜 19:30のメニューを開く')!;
-    act(() => {
-      menuTrigger.props.onPress();
-    });
-    const replaceItem = findByAccessibilityLabel(root.root, '今回だけ差し替え')!;
-    act(() => {
-      replaceItem.props.onPress();
-    });
-    expect(onReplace).toHaveBeenCalledTimes(1);
+    expect(findByAccessibilityLabel(root.root, '「ベンチプレス 他1種目」夜 19:30のメニューを開く')).toBeUndefined();
   });
 
   it('onPressStartを渡さない場合（未来日）、開始ボタンは表示されない', () => {

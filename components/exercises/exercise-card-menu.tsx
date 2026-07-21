@@ -16,10 +16,6 @@ type Props = {
   // onLoadFromHistory省略時は無視される
   hasHistory?: boolean;
   onDelete: () => void;
-  // カードがこの1件しか無い等、削除を実行すると不正な状態になる場合に無効化する
-  // （直接予定の種目編集画面、2026-07-20。「上へ移動」等と同じく実行前に先回りして伝える方針）
-  isDeleteDisabled?: boolean;
-  deleteDisabledHint?: string;
 };
 
 // 種目カードの「⋮」メニュー
@@ -32,8 +28,6 @@ export function ExerciseCardMenu({
   onLoadFromHistory,
   hasHistory,
   onDelete,
-  isDeleteDisabled,
-  deleteDisabledHint,
 }: Props) {
   const items: DropdownMenuItem[] = [
     { key: 'swap', label: '種目を入れ替え', icon: 'swap-horiz', onPress: onSwap },
@@ -51,15 +45,7 @@ export function ExerciseCardMenu({
           },
         ]
       : []),
-    {
-      key: 'delete',
-      label: '削除',
-      icon: 'delete-outline',
-      danger: true,
-      disabled: isDeleteDisabled,
-      hint: isDeleteDisabled ? deleteDisabledHint : undefined,
-      onPress: onDelete,
-    },
+    { key: 'delete', label: '削除', icon: 'delete-outline', danger: true, onPress: onDelete },
   ];
 
   return (

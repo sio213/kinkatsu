@@ -35,10 +35,11 @@ export type DaySchedule = {
 // ルーティン名・カテゴリ・種目数は既存のuseRoutines/useRoutineExerciseSummaries（ルーティン
 // 一覧カードと同じ集計）をそのまま流用し、reminders単体のクエリと組み合わせる
 // （以前はroutines/routineExercises/exercisesまでJOINして自前集計していたが、この流用に一本化した）。
-// 発火するが削除済み(reminderScheduleSkips。手動予定の削除と同様、取り消し不可の削除として
-// 扱う。テーブル名・内部関数名は元の「今回だけスキップ」実装から流用しており「その日の
-// このリマインダー発火は無かったことにする」マーカーとしての役割自体は変わらない)のものは
-// cardsから単純に除外する
+// 発火するがスキップ済み(reminderScheduleSkips。種目カードタップ時のmaterializeReminderOccurrence
+// が実体化と同時に書き込む。テーブル名・内部関数名は元の「今回だけスキップ」実装から流用しており
+// 「その日のこのリマインダー発火は無かったことにする」マーカーとしての役割自体は変わらない)の
+// ものはcardsから単純に除外する（実体化済みのため、手動予定側(useCalendarDayManualSchedule)に
+// 同じ内容が現れる）
 export function useCalendarDaySchedule(selectedDate: Date): DaySchedule {
   const summaries = useRoutineExerciseSummaries();
   const { routines } = useRoutines();

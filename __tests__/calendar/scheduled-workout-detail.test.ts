@@ -348,18 +348,18 @@ describe('addHistoryCardsToScheduledWorkout', () => {
 });
 
 describe('removeScheduledWorkoutExercise', () => {
-  it('2件以上ある場合は削除する', async () => {
-    mockSelectWhere
-      .mockResolvedValueOnce([{ scheduledWorkoutId: 1 }]) // 対象行のscheduledWorkoutId検索
-      .mockResolvedValueOnce([{ id: 100 }, { id: 101 }]); // siblings
+  it('削除する', async () => {
+    mockSelectWhere.mockResolvedValueOnce([{ scheduledWorkoutId: 1 }]); // 対象行のscheduledWorkoutId検索
     await removeScheduledWorkoutExercise(100);
     expect(mockDeleteWhere).toHaveBeenCalledTimes(1);
   });
 
-  it('最後の1件は削除できず例外を投げる', async () => {
-    mockSelectWhere.mockResolvedValueOnce([{ scheduledWorkoutId: 1 }]).mockResolvedValueOnce([{ id: 100 }]);
-    await expect(removeScheduledWorkoutExercise(100)).rejects.toThrow();
-    expect(mockDeleteWhere).not.toHaveBeenCalled();
+  // ルーティン・過去記録と同様、最後の1件も削除できる（2026-07-22、@ユーザー指摘で安全網を撤廃。
+  // 0件になった予定はschedule-exercise-card-group.tsx側の空状態UIで表示・再度種目を追加できる）
+  it('最後の1件でも削除できる', async () => {
+    mockSelectWhere.mockResolvedValueOnce([{ scheduledWorkoutId: 1 }]);
+    await removeScheduledWorkoutExercise(100);
+    expect(mockDeleteWhere).toHaveBeenCalledTimes(1);
   });
 
   it('対象行が既に存在しない場合は何もしない（安全網）', async () => {

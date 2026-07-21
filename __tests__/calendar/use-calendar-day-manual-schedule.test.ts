@@ -163,10 +163,25 @@ describe('useCalendarDayManualSchedule', () => {
       });
     });
 
-    it('directSummariesに対応するエントリが無い場合は結果に含まれない（安全網）', () => {
+    // 2026-07-22、schedule-workout-edit.tsxの⋮「削除」で最後の1種目まで削除できるように
+    // なったため、directSummariesにエントリが無い（0件）状態は日常的に到達しうる。ここでcontinueして
+    // カードごと消すと、選択日パネルから二度と辿り着けなくなる（@designer指摘: 実際に発生する
+    // バグだった）ため、ルーティン予定と同じく0件・カテゴリ無しにフォールバックして表示する
+    it('directSummariesに対応するエントリが無い場合（0件の直接予定）は0件・カテゴリ無しにフォールバックして表示される', () => {
       mockRows = [{ id: 1, routineId: null, scheduledDate: '2026-07-25', hour: 19, minute: 30 }];
       mockDirectSummaries = new Map();
-      expect(renderHook(new Date(2026, 6, 25)).result()).toEqual([]);
+      const result = renderHook(new Date(2026, 6, 25)).result();
+      expect(result).toEqual([
+        {
+          scheduledWorkoutId: 1,
+          routineId: null,
+          title: '種目未設定',
+          categories: [],
+          exerciseCount: 0,
+          hour: 19,
+          minute: 30,
+        },
+      ]);
     });
 
     it('ルーティン予定と直接予定が同日に混在しても両方時刻順で返る', () => {

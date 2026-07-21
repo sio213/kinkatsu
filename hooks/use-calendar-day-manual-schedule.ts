@@ -64,11 +64,14 @@ export function useCalendarDayManualSchedule(selectedDate: Date): ManualSchedule
           minute: r.minute,
         });
       } else {
-        // 直接追加はaddDirectScheduledWorkoutが種目0件を弾いており、参照する種目も
-        // onDelete:'restrict'で削除できないため通常summaryは必ず見つかるが、
-        // 安全網として見つからない場合は対象外にする
-        const summary = directSummaries.get(r.id);
-        if (summary === undefined || summary.exerciseNames.length === 0) continue;
+        // 直接追加はaddDirectScheduledWorkoutが作成時点では種目0件を弾いているが、
+        // schedule-workout-edit.tsx側の⋮「削除」で最後の1件まで削除できるようになったため
+        // （2026-07-22、@ユーザー指摘で安全網を撤廃）、後から0件に到達しうる。
+        // useCalendarDirectScheduleSummariesはinnerJoin集計のため0件の予定はキー自体が
+        // 存在しない。ここでcontinueすると、カード自体が選択日パネルから消えて二度と
+        // 辿り着けなくなる（@designer指摘: 実際に発生するバグだった）ため、ルーティン予定
+        // 側と同じく0件・カテゴリ無しにフォールバックして表示する
+        const summary = directSummaries.get(r.id) ?? { exerciseCount: 0, categories: [], exerciseNames: [] };
         cards.push({
           scheduledWorkoutId: r.id,
           routineId: null,
