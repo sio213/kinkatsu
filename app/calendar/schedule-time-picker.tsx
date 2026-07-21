@@ -152,7 +152,7 @@ export default function ScheduleTimePickerScreen() {
       // 直接追加（自分で選ぶ）で作った予定は、種目は決めたが重量・回数（目標セット）はまだ
       // 何も入れていない状態のため、このまま選択日パネルへ戻すと再度カードを探してタップし直す
       // 手間が生まれる。選択日パネルで直接予定カードをタップした時の遷移先
-      // (app/(tabs)/calendar.tsxのhandleEditDirectScheduleExercises)と同じく目標セット編集画面
+      // (app/(tabs)/calendar.tsxのhandleEditScheduledWorkoutExercises)と同じく目標セット編集画面
       // (schedule-workout-edit.tsx)が「この予定の唯一の詳細/編集ビュー」であるため、作成直後に
       // そのままそこへ連れて行く（@ユーザー指摘。@designer指摘: 「過去の記録から読み込むフローを
       // 参考に」という当初の説明は、あちらが「既にいた画面へ戻る」のに対しこちらは「新しい画面へ

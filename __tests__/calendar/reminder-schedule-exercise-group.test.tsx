@@ -77,13 +77,27 @@ describe('ReminderScheduleExerciseGroup', () => {
     expect(texts).toContain('実施記録なし');
   });
 
+  // useScheduledExerciseCards（実体化後）と同じくhasAnyValueで空セット行を除外してから表示する。
+  // フィルタが無いと、実体化前後で同じ予定の見た目が割れてしまう（@reviewer指摘）
+  it('全カラムnullの空セット行は実データが無いのと同じ扱いにし「実施記録なし」と表示する（実体化後(useScheduledExerciseCards)と同じhasAnyValueフィルタ、@reviewer指摘）', () => {
+    mockUseRoutinePreviewExerciseCards.mockReturnValue({
+      exercises: [
+        { ...benchPressExercise, sets: [{ id: 900, weight: null, reps: null, durationSeconds: null, distanceMeters: null }] },
+      ],
+      loaded: true,
+    });
+    const root = render();
+    const texts = root.root.findAllByType(Text).map((t) => t.props.children);
+    expect(texts).toContain('実施記録なし');
+  });
+
   it('loaded:falseのときは種目カードを表示しない（クラッシュしない）', () => {
     mockUseRoutinePreviewExerciseCards.mockReturnValue({ exercises: [], loaded: false });
     const root = render();
     expect(root.root.findAllByProps({ children: 'ベンチプレス' })).toHaveLength(0);
   });
 
-  it('見出しにrouteNameがルーティン名として表示される（未実体化でも常時ルーティン名を持つ）', () => {
+  it('見出しにroutineNameがルーティン名として表示される（未実体化でも常時ルーティン名を持つ）', () => {
     const root = render({ routineName: '脚の日' });
     const texts = root.root.findAllByType(Text).map((t) => t.props.children);
     expect(texts).toContain('脚の日');
@@ -102,7 +116,7 @@ describe('ReminderScheduleExerciseGroup', () => {
 
   it('⋮メニューの「削除」を押すとonDeleteが呼ばれる', () => {
     const root = render();
-    const menuTrigger = findByAccessibilityLabel(root.root, '「胸の日」のメニューを開く')!;
+    const menuTrigger = findByAccessibilityLabel(root.root, '「胸の日」夜 19:30のメニューを開く')!;
     act(() => {
       menuTrigger.props.onPress();
     });
@@ -115,7 +129,7 @@ describe('ReminderScheduleExerciseGroup', () => {
 
   it('onReplaceを渡すと⋮メニューに「今回だけ差し替え」が出てタップでonReplaceが呼ばれる', () => {
     const root = render({ onReplace });
-    const menuTrigger = findByAccessibilityLabel(root.root, '「胸の日」のメニューを開く')!;
+    const menuTrigger = findByAccessibilityLabel(root.root, '「胸の日」夜 19:30のメニューを開く')!;
     act(() => {
       menuTrigger.props.onPress();
     });
@@ -128,7 +142,7 @@ describe('ReminderScheduleExerciseGroup', () => {
 
   it('onPressStartを渡す場合、開始ボタンが表示されタップでonPressStartが呼ばれる', () => {
     const root = render({ onPressStart });
-    const startBtn = findByAccessibilityLabel(root.root, '「胸の日」のトレーニングを開始')!;
+    const startBtn = findByAccessibilityLabel(root.root, '「胸の日」夜 19:30のトレーニングを開始')!;
     act(() => {
       startBtn.props.onPress();
     });

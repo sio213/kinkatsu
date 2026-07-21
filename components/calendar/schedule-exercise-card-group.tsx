@@ -5,6 +5,7 @@ import { IconSymbol } from '@/components/ui/icon-symbol';
 import { PrimaryButton } from '@/components/ui/primary-button';
 import { Colors, Typography } from '@/constants/theme';
 import type { ScheduledExerciseCardSet } from '@/hooks/use-scheduled-exercise-cards';
+import { formatHourMinute, getTimeOfDay, getTimeOfDayLabel } from '@/lib/calendar/time-of-day';
 import { memo } from 'react';
 import { StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 
@@ -86,6 +87,12 @@ export const ScheduleExerciseCardGroup = memo(function ScheduleExerciseCardGroup
   onPress,
 }: Props) {
   const menuGroups = [...(onReplace ? [replaceMenuItems(onReplace)] : []), deleteMenuItems(onDelete)];
+  // titleだけだと、同じルーティン/種目構成を同日に複数回スケジュールした場合ラベルが重複し
+  // 区別できない（routine-schedule-card.tsxの既存パターンと同じ理由、@reviewer指摘:
+  // 共通化した際にこの対策が引き継がれていなかった）ため、SessionTimeGroupHeaderと同じ
+  // 時刻ラベルをaccessibilityLabelにも含めて一意にする
+  const timePeriod = getTimeOfDay(new Date(sessionStartedAt));
+  const timeLabel = `${getTimeOfDayLabel(timePeriod)} ${formatHourMinute(new Date(sessionStartedAt))}`;
 
   return (
     <View style={styles.wrapper}>
@@ -100,7 +107,7 @@ export const ScheduleExerciseCardGroup = memo(function ScheduleExerciseCardGroup
                 onPress={onOpenMenu}
                 hitSlop={{ top: 14, bottom: 14, left: 14, right: 14 }}
                 accessibilityRole="button"
-                accessibilityLabel={`「${title}」のメニューを開く`}
+                accessibilityLabel={`「${title}」${timeLabel}のメニューを開く`}
                 accessibilityState={{ expanded: open }}
               >
                 <IconSymbol name="ellipsis" size={20} color={open ? Colors.accent : Colors.textPlaceholder} />
@@ -150,7 +157,7 @@ export const ScheduleExerciseCardGroup = memo(function ScheduleExerciseCardGroup
           label="開始"
           icon={<IconSymbol name="play.fill" size={16} color={Colors.onAccent} />}
           onPress={onPressStart}
-          accessibilityLabel={`「${title}」のトレーニングを開始`}
+          accessibilityLabel={`「${title}」${timeLabel}のトレーニングを開始`}
         />
       )}
     </View>

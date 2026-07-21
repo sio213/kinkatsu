@@ -32,10 +32,11 @@ export type UseScheduledExerciseCardsResult = {
   retry: () => void;
 };
 
-// カレンダーの「直接追加」予定の選択日パネル表示用（DirectScheduleExerciseGroup）。種目一覧・
-// 目標セットはuseScheduledWorkoutExercisesのlive queryにそのまま乗るため、目標セットの編集は
-// 即座にこのカードへ反映される。目標セットが未設定の種目だけ、履歴（直近の実施記録）を都度
-// 取得するスナップショットとして補う（use-calendar-day-exercises.tsと同じ理由でlive query化は
+// scheduledWorkoutId実体を持つ予定（直接予定、および実体化済みルーティン予定）の選択日パネル
+// 表示用（components/calendar/scheduled-workout-exercise-group.tsx）。種目一覧・目標セットは
+// useScheduledWorkoutExercisesのlive queryにそのまま乗るため、目標セットの編集は即座にこの
+// カードへ反映される。目標セットが未設定の種目だけ、履歴（直近の実施記録）を都度取得する
+// スナップショットとして補う（use-calendar-day-exercises.tsと同じ理由でlive query化は
 // していない。実施履歴自体はこの予定の編集操作では変化しないため）
 export function useScheduledExerciseCards(scheduledWorkoutId: number): UseScheduledExerciseCardsResult {
   const { exercises } = useScheduledWorkoutExercises(scheduledWorkoutId);
