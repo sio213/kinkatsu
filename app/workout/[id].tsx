@@ -330,9 +330,15 @@ export default function WorkoutScreen() {
         />
       )}
 
-      {isActive && (
+      {isActive ? (
         <View style={styles.footer}>
           <PrimaryButton label="トレーニングを終了" onPress={handleFinish} />
+        </View>
+      ) : (
+        // 過去の記録の編集モード。app/calendar/schedule-workout-edit.tsxの「戻るのみ」の
+        // フッターと同じ体験に揃える（@ユーザー指摘）
+        <View style={styles.footer}>
+          <PrimaryButton label="戻る" onPress={() => router.back()} />
         </View>
       )}
     </SafeAreaView>
@@ -358,14 +364,17 @@ const styles = StyleSheet.create({
   emptyText: { ...Typography.footnote, color: Colors.textMuted },
 
   exerciseList: { flex: 1 },
-  // 末尾までスクロールした時に「トレーニングを終了」ボタンとAddExerciseButtonがくっついて
-  // 見えないよう、下だけ他の辺より広めに余白を取る
+  // 末尾までスクロールした時にフッターのボタン（「トレーニングを終了」/「戻る」）と
+  // AddExerciseButtonがくっついて見えないよう、下だけ他の辺より広めに余白を取る
   exerciseListContent: { padding: 16, paddingBottom: 32, gap: 10 },
   addExerciseBtnInline: { marginTop: 4 },
 
+  // app/calendar/schedule-workout-edit.tsx等、明示保存を持たない編集画面のフッターと
+  // 同じpadding値に揃える（@designer指摘）
   footer: {
-    padding: 16,
+    paddingHorizontal: 20,
     paddingTop: 8,
+    paddingBottom: 12,
     borderTopWidth: 1,
     borderTopColor: Colors.border,
   },

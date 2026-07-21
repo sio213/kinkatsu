@@ -14,6 +14,11 @@ import { useCallback } from 'react';
 import { StyleSheet } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
+// この画面はstart-chooserからのみpushされる（app/workout/exercise-picker.tsxの
+// START_CHOOSER_DISMISS_COUNTと同じ根拠）。スタックは常にcalendar/記録タブ(0)→
+// start-chooser(+1)→この画面自身(+1)の2段で固定できる
+const START_CHOOSER_DISMISS_COUNT = 2;
+
 // start-chooserの「ルーティン」カード専用の画面（2026-07-20。当初は過去日の事後記録専用
 // だったが、今日のライブ開始でも同じ「選ぶだけ」の専用ピッカーを使うよう統一した
 // （要件確認済み）: app/routine/index.tsx（フルCRUD一覧）を選択操作に使うと編集・複製・
@@ -32,8 +37,18 @@ export default function StartRoutinePickerScreen() {
   // ことを呼び出し元で保証した上で開かれる前提のため、useStartWithConfirmの
   // 進行中セッション確認ダイアログは不要（start-chooser.tsxの「自分で選ぶ」と同じ理由）。
   // navigate関数はuseCallbackで安定させ、依存するhandleSelect/RoutinePickerListの
-  // メモ化を保つ（@reviewer指摘）
-  const navigate = useCallback((sessionId: number) => pushDebounced(`/workout/${sessionId}`), [pushDebounced]);
+  // メモ化を保つ（@reviewer指摘）。
+  // dismiss(2)でこの画面自身+start-chooserをまとめて閉じてからpushする
+  // （app/workout/exercise-picker.tsxの「自分で選ぶ」経路と同じ修正、@ユーザー指摘:
+  // 単純にpushするだけだとstart-chooser/この画面がスタックに残り、/workout/{id}側の
+  // 「戻る」を押しても呼び出し元(カレンダー/記録タブ)まで一気に戻れなかった）
+  const navigate = useCallback(
+    (sessionId: number) => {
+      router.dismiss(START_CHOOSER_DISMISS_COUNT);
+      pushDebounced(`/workout/${sessionId}`);
+    },
+    [router, pushDebounced],
+  );
   const startWorkout = useWorkoutStarter(navigate);
 
   const handleSelect = useCallback(
