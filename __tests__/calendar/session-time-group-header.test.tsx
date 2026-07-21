@@ -61,29 +61,31 @@ describe('SessionTimeGroupHeader', () => {
     });
   });
 
-  // ルーティン紐付き予定の見出し左端にルーティン名を表示する（2026-07-21、@ユーザー指摘）
-  describe('routineName（ルーティン紐付き予定の見出し左端に表示）', () => {
+  // ルーティン紐付き予定の見出し右端にルーティン名を表示する
+  // （デザイン案「複数18: 時間帯アイコン（朝・夕方・夜）」＝アイコン・時刻・余白・ルーティン名の順、
+  // 2026-07-22に左端→右端へ変更）
+  describe('routineName（ルーティン紐付き予定の見出し右端に表示）', () => {
     it('routineName未指定なら何も表示しない（直接予定・実績セッション側の従来挙動を維持）', () => {
       const root = render({ sessionStartedAt: new Date(2026, 6, 16, 7, 10).getTime() });
       const texts = root.root.findAllByType(Text).map((t) => [t.props.children].flat().join(''));
       expect(texts).not.toContain('胸の日');
     });
 
-    it('routineNameを渡すと時刻ラベルより前（左端）に表示される', () => {
+    it('routineNameを渡すと時刻ラベルより後（右端）に表示される', () => {
       const root = render({ sessionStartedAt: new Date(2026, 6, 16, 7, 10).getTime(), routineName: '胸の日' });
       const texts = root.root.findAllByType(Text).map((t) => [t.props.children].flat().join(''));
       expect(texts).toContain('胸の日');
-      expect(texts.indexOf('胸の日')).toBeLessThan(texts.indexOf('朝 07:10'));
+      expect(texts.indexOf('胸の日')).toBeGreaterThan(texts.indexOf('朝 07:10'));
     });
 
-    it('routineNameを渡すとaccessibilityLabelの先頭に含まれる', () => {
+    it('routineNameを渡すとaccessibilityLabelの末尾に含まれる', () => {
       const root = render({
         sessionStartedAt: new Date(2026, 6, 16, 20, 0).getTime(),
         routineName: '胸の日',
         isSchedule: true,
       });
       const header = root.root.findAllByType(View).find((v) => v.props.accessibilityRole === 'header')!;
-      expect(header.props.accessibilityLabel).toBe('胸の日、夜 20:00、予定');
+      expect(header.props.accessibilityLabel).toBe('夜 20:00、予定、胸の日');
     });
 
     it('長いルーティン名でも1行に収まるようnumberOfLines={1}が指定される', () => {
@@ -92,23 +94,25 @@ describe('SessionTimeGroupHeader', () => {
       expect(nameText.props.numberOfLines).toBe(1);
     });
 
-    // routineNameと時刻ラベルが同じウェイト/色だと「胸の日 朝 07:10」が1語に見えるリスクが
-    // あったため、routineNameがあるときだけ時刻ラベル側のウェイトを一段落として主従を作る
-    // （@designer指摘）
-    it('routineNameがあるとき、時刻ラベルはルーティン名より控えめなスタイル(fontWeight:600)になる', () => {
-      const root = render({ sessionStartedAt: new Date(2026, 6, 16, 7, 10).getTime(), routineName: '胸の日' });
-      const nameText = root.root.findAllByType(Text).find((t) => [t.props.children].flat().join('') === '胸の日')!;
-      const timeText = root.root.findAllByType(Text).find((t) => [t.props.children].flat().join('') === '朝 07:10')!;
+    // デザイン案通り、時刻ラベルは常に主要情報として太字のまま、ルーティン名は一段控えめな
+    // トーン（caption/muted）にする（2026-07-22、routineNameの有無で時刻側のウェイトを
+    // 変える旧仕様は廃止）
+    it('routineNameの有無にかかわらず、時刻ラベルは太字(fontWeight:700)のまま', () => {
+      const withName = render({ sessionStartedAt: new Date(2026, 6, 16, 7, 10).getTime(), routineName: '胸の日' });
+      const withoutName = render({ sessionStartedAt: new Date(2026, 6, 16, 7, 10).getTime() });
       const flattenStyle = (style: unknown) => (Array.isArray(style) ? Object.assign({}, ...style) : style);
-      expect(flattenStyle(nameText.props.style).fontWeight).toBe('700');
-      expect(flattenStyle(timeText.props.style).fontWeight).toBe('600');
+      const timeTextWithName = withName.root.findAllByType(Text).find((t) => [t.props.children].flat().join('') === '朝 07:10')!;
+      const timeTextWithoutName = withoutName.root.findAllByType(Text).find((t) => [t.props.children].flat().join('') === '朝 07:10')!;
+      expect(flattenStyle(timeTextWithName.props.style).fontWeight).toBe('700');
+      expect(flattenStyle(timeTextWithoutName.props.style).fontWeight).toBe('700');
     });
 
-    it('routineNameが無いとき、時刻ラベルは従来通り太字(fontWeight:700)のまま', () => {
-      const root = render({ sessionStartedAt: new Date(2026, 6, 16, 7, 10).getTime() });
-      const timeText = root.root.findAllByType(Text).find((t) => [t.props.children].flat().join('') === '朝 07:10')!;
+    it('routineNameは時刻ラベルより控えめなスタイル(fontWeight:600、textMuted)になる', () => {
+      const root = render({ sessionStartedAt: new Date(2026, 6, 16, 7, 10).getTime(), routineName: '胸の日' });
+      const nameText = root.root.findAllByType(Text).find((t) => [t.props.children].flat().join('') === '胸の日')!;
       const flattenStyle = (style: unknown) => (Array.isArray(style) ? Object.assign({}, ...style) : style);
-      expect(flattenStyle(timeText.props.style).fontWeight).toBe('700');
+      expect(flattenStyle(nameText.props.style).fontWeight).toBe('600');
+      expect(flattenStyle(nameText.props.style).color).toBe(Colors.textMuted);
     });
   });
 });

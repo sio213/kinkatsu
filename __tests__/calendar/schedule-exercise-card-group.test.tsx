@@ -109,6 +109,30 @@ describe('ScheduleExerciseCardGroup', () => {
     expect(onDelete).toHaveBeenCalledTimes(1);
   });
 
+  // onDeleteは実体化済み予定（直接予定・手動追加ルーティン予定）のときは呼び出し元
+  // （scheduled-workout-exercise-group.tsx）が渡さないため、⋮メニュー自体が無くなる
+  // （2026-07-22、@ユーザー指摘: 削除は遷移先のschedule-workout-edit.tsxに一本化）
+  it('onDeleteを渡さない場合（実体化済み予定）、⋮メニュー自体が描画されない', () => {
+    const root = render({ onDelete: undefined });
+    expect(findByAccessibilityLabel(root.root, '「ベンチプレス 他1種目」夜 19:30のメニューを開く')).toBeUndefined();
+  });
+
+  // 呼び出し元の設計上あり得ない組み合わせだが、コンポーネント自身がonDelete優先で
+  // ガードしていること（onDelete省略時はonReplaceだけ渡っていてもメニューが出ないこと）を
+  // 保証しておく防御的テスト（@tester指摘）
+  it('onDeleteを渡さずonReplaceだけ渡した場合でも⋮メニューは描画されない', () => {
+    const root = render({ onDelete: undefined, onReplace });
+    expect(findByAccessibilityLabel(root.root, '「ベンチプレス 他1種目」夜 19:30のメニューを開く')).toBeUndefined();
+    expect(findByAccessibilityLabel(root.root, '今回だけ差し替え')).toBeUndefined();
+  });
+
+  it('onDeleteを渡さない場合でも見出し（時刻・routineName）は表示され続ける', () => {
+    const root = render({ onDelete: undefined, routineName: '胸の日' });
+    const texts = root.root.findAllByType(Text).map((t) => [t.props.children].flat().join(''));
+    expect(texts.some((t) => t.includes('19:30'))).toBe(true);
+    expect(texts).toContain('胸の日');
+  });
+
   it('onReplaceを渡さない場合（直接予定・実体化済みルーティン予定）、⋮メニューに「今回だけ差し替え」は出ない', () => {
     const root = render();
     const menuTrigger = findByAccessibilityLabel(root.root, '「ベンチプレス 他1種目」夜 19:30のメニューを開く')!;

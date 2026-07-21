@@ -278,8 +278,8 @@ describe('ScheduleWorkoutEditScreen', () => {
     act(() => {
       deleteWorkoutItem.props.onPress();
     });
-    // カレンダー日パネル⋮の削除(handleDeleteDirectSchedule)と同じ文言であることを確認する
-    // （@ユーザー指摘・@reviewer指摘: 入口ごとに文言が食い違っていた問題の回帰防止）
+    // buildScheduledWorkoutDeleteMessage(lib/calendar/schedule.ts)経由で組み立てた文言であることを
+    // 確認する（@ユーザー指摘・@reviewer指摘: 入口ごとに文言が食い違っていた問題の回帰防止）
     expect(Alert.alert).toHaveBeenCalledWith(
       'この予定を削除しますか？',
       'この予定に設定した種目と目標セットもすべて削除され、通知も届かなくなります。',
@@ -294,9 +294,34 @@ describe('ScheduleWorkoutEditScreen', () => {
     expect(mockBack).toHaveBeenCalledTimes(1);
   });
 
+  // removeScheduledWorkoutが例外を投げずresolveした場合（対象行が既に無い場合等の
+  // サイレント成功仕様）、エラーAlertを出さずrouter.back()する（2026-07-22、@tester指摘:
+  // 選択日パネル側の⋮メニュー撤去により削除操作の入口がこの画面に一本化されたため、
+  // このケースを明示的に検証しておく）
+  it('removeScheduledWorkoutが例外を投げずresolveした場合、エラーAlertは出さずrouter.back()する', async () => {
+    const root = render();
+    const headerMenuTrigger = root
+      .findAllByType(TouchableOpacity)
+      .find((t) => t.props.accessibilityLabel === '種目編集のメニューを開く')!;
+    act(() => {
+      headerMenuTrigger.props.onPress();
+    });
+    const deleteWorkoutItem = findMenuItem(root, '削除')!;
+    act(() => {
+      deleteWorkoutItem.props.onPress();
+    });
+    const alertCall = (Alert.alert as jest.Mock).mock.calls[0];
+    const confirmAction = alertCall[2].find((b: { text?: string }) => b.text === '削除');
+    await act(async () => {
+      await confirmAction.onPress();
+    });
+    expect(Alert.alert).not.toHaveBeenCalledWith('エラー', expect.anything());
+    expect(mockBack).toHaveBeenCalledTimes(1);
+  });
+
   // 2026-07-21よりルーティン予定（実体化済み、scheduledWorkoutIdを持つ）もこの画面に来るように
   // なったため、削除確認文言をrouteIdの有無で出し分ける必要がある（@ユーザー指摘）
-  it('ルーティン紐付き予定（routineIdあり）の場合、ヘッダー⋮「削除」の確認文言はルーティン本体に影響しない旨になる（選択日パネルのhandleDeleteRoutineScheduleと同じ文言）', async () => {
+  it('ルーティン紐付き予定（routineIdあり）の場合、ヘッダー⋮「削除」の確認文言はルーティン本体に影響しない旨になる（選択日パネル側と統一された文言）', async () => {
     mockUseScheduledWorkoutTime.mockReturnValue({
       time: { scheduledDate: '2026-07-21', hour: 19, minute: 30, routineId: 1 },
       loaded: true,

@@ -161,9 +161,8 @@ export async function materializeReminderOccurrence(
   }
 }
 
-// 選択日パネル手動予定カードの⋮メニュー「削除」(app/(tabs)/calendar.tsxの
-// handleDeleteRoutineSchedule/handleDeleteDirectSchedule、および直接予定の編集画面自身の
-// ヘッダー⋮「削除」であるapp/calendar/schedule-workout-edit.tsxのhandleDeleteWorkout)用。
+// 目標セット編集画面のヘッダー⋮「削除」(app/calendar/schedule-workout-edit.tsxのhandleDeleteWorkout、
+// 2026-07-22より実体化済み予定=直接予定・手動ルーティン予定の削除操作はこの画面に一本化された)用。
 // 通知キャンセルを先に行ってからDB削除する。cancelNotificationは内部でエラーを握りつぶし常に
 // 成功するため、この順序なら万一DB削除が失敗しても通知だけは確実に止められる
 export async function removeScheduledWorkout(scheduledWorkoutId: number): Promise<void> {

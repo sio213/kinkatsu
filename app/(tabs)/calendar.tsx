@@ -24,14 +24,9 @@ import { useResumeWorkoutSummary, useWorkoutSessions } from '@/hooks/use-workout
 import { addMonths, isSameDay, toDateKey } from '@/lib/calendar/date-grid';
 import { CATEGORY_ALL, EXERCISE_CATEGORIES } from '@/lib/exercises/constants';
 import { buildTodayTimeline, groupCardsBySession } from '@/lib/calendar/session-groups';
-import {
-  buildRoutineScheduleDeleteMessage,
-  DIRECT_SCHEDULE_DELETE_MESSAGE,
-  mergeScheduleCards,
-  type UnifiedScheduleCard,
-} from '@/lib/calendar/schedule';
+import { mergeScheduleCards, type UnifiedScheduleCard } from '@/lib/calendar/schedule';
 import { skipReminderOccurrence } from '@/lib/notifications/reminder-skip-scheduler';
-import { materializeReminderOccurrence, removeScheduledWorkout } from '@/lib/notifications/scheduled-workout-scheduler';
+import { materializeReminderOccurrence } from '@/lib/notifications/scheduled-workout-scheduler';
 import { startWorkoutFromRoutine, startWorkoutFromScheduledWorkout } from '@/lib/workout/session';
 import { formatElapsedClock, formatMonthGroup, formatSessionDateGroup } from '@/lib/workout/summary';
 import { Stack } from 'expo-router';
@@ -126,8 +121,6 @@ function ScheduleTimelineEntry({
   showStart,
   onEditScheduledWorkoutExercises,
   onStartScheduledWorkout,
-  onDeleteDirectSchedule,
-  onDeleteRoutineSchedule,
   onStartRoutine,
   onDeleteReminderOccurrence,
   onReplace,
@@ -138,8 +131,6 @@ function ScheduleTimelineEntry({
   showStart: boolean;
   onEditScheduledWorkoutExercises: (scheduledWorkoutId: number) => void;
   onStartScheduledWorkout: (scheduledWorkoutId: number, title: string) => void;
-  onDeleteDirectSchedule: (scheduledWorkoutId: number) => void;
-  onDeleteRoutineSchedule: (scheduledWorkoutId: number, routineName: string) => void;
   onStartRoutine: (routineId: number, title: string) => void;
   onDeleteReminderOccurrence: (reminderId: number, routineName: string) => void;
   onReplace: (reminderId: number, routineName: string, hour: number, minute: number) => void;
@@ -155,7 +146,6 @@ function ScheduleTimelineEntry({
         sessionStartedAt={sessionStartedAt}
         title={card.title}
         onPressStart={showStart ? () => onStartScheduledWorkout(card.scheduledWorkoutId, card.title) : undefined}
-        onDelete={() => onDeleteDirectSchedule(card.scheduledWorkoutId)}
         onPress={() => onEditScheduledWorkoutExercises(card.scheduledWorkoutId)}
       />
     );
@@ -174,7 +164,6 @@ function ScheduleTimelineEntry({
         sessionStartedAt={sessionStartedAt}
         title={card.title}
         onPressStart={showStart ? () => onStartScheduledWorkout(card.scheduledWorkoutId, card.title) : undefined}
-        onDelete={() => onDeleteRoutineSchedule(card.scheduledWorkoutId, card.title)}
         onPress={() => onEditScheduledWorkoutExercises(card.scheduledWorkoutId)}
       />
     );
@@ -337,59 +326,13 @@ export default function CalendarScreen() {
       }),
     [pushDebounced],
   );
-  // 手動予定カードの⋮メニュー「削除」用（PR10-3、PR10-5で通知キャンセルも合わせて行うよう変更）。
-  // app/routine/index.tsxのhandleDeleteやsession-exercise-card.tsxのhandleDeleteExerciseと同じ
-  // Alert確認→try/catch+Alert.alertパターン。削除後はuseCalendarDayManualSchedule/
-  // useCalendarMonthScheduleがuseLiveQueryで自動再購読するため、追加の状態更新は不要
-  // （LayoutAnimationは非同期のDB書き込み・再購読を挟むと配置タイミングがずれ効かないため、
-  // 他の非同期削除処理と同じくここでは使わない）。ルーティン予定・直接予定で削除される内容が
-  // 異なる（後述）ため、確認文言の組み立てだけを呼び出し側で分け、この共通部分に集約する
-  const confirmDeleteScheduledWorkout = useCallback((scheduledWorkoutId: number, message: string) => {
-    Alert.alert('この予定を削除しますか？', message, [
-      { text: 'キャンセル', style: 'cancel' },
-      {
-        text: '削除',
-        style: 'destructive',
-        onPress: async () => {
-          try {
-            await removeScheduledWorkout(scheduledWorkoutId);
-          } catch (e) {
-            console.error('[delete scheduled workout]', e);
-            Alert.alert('エラー', '予定を削除できませんでした。');
-          }
-        },
-      },
-    ]);
-  }, []);
-
-  // 手動で追加したルーティン予定用。削除されるのはこの予定枠と通知だけで、ルーティン本体は
-  // 影響を受けないため、その旨を安心材料として明記する（@ユーザー指摘: ルーティン名がカードに
-  // そのまま表示されているため、ルーティン本体まで消えるという誤解を防ぐ必要がある）。
-  // 文言はlib/calendar/schedule.tsのbuildRoutineScheduleDeleteMessageに集約し、
-  // schedule-workout-edit.tsxのhandleDeleteWorkoutと同じ文言を使う（PR6、@reviewer指摘の
-  // 再発防止: 入口ごとに文言がハードコードされていると片方だけ変更されてまた食い違う）
-  const handleDeleteRoutineSchedule = useCallback(
-    (scheduledWorkoutId: number, routineName: string) =>
-      confirmDeleteScheduledWorkout(scheduledWorkoutId, buildRoutineScheduleDeleteMessage(routineName)),
-    [confirmDeleteScheduledWorkout],
-  );
-
-  // 直接予定（個別種目選択、routineId===null）用。手動で追加したルーティン予定と違い保護すべき
-  // ルーティン本体が存在せず、この予定専用に設定した種目・目標セットも
-  // scheduledWorkoutExercises/scheduledWorkoutSetsのカスケード削除で一緒に消えるため、安心材料
-  // ではなく実際に削除される内容そのものを明記する（@ユーザー指摘）
-  const handleDeleteDirectSchedule = useCallback(
-    (scheduledWorkoutId: number) => confirmDeleteScheduledWorkout(scheduledWorkoutId, DIRECT_SCHEDULE_DELETE_MESSAGE),
-    [confirmDeleteScheduledWorkout],
-  );
-
   // リマインダー予定の⋮メニュー「削除」用（2026-07-19: 「今回だけスキップ」(取り消し可能・
   // ゴーストカードで元に戻せた)から、手動予定と同じ「削除」(取り消し不可)へ変更）。
   // 内部的にはreminderScheduleSkips/skipReminderOccurrenceの仕組みをそのまま流用する
   // （「今回だけ差し替え」機能がschedule-time-picker.tsx経由でこの同じテーブル・関数に依存して
   // いるため。テーブル名・関数名が「スキップ」のままなのはその名残で、役割自体は「その日の
   // この発火は無かったことにする」マーカーで変わらない）。取り消し不可になったため、
-  // 手動予定の削除(confirmDeleteScheduledWorkout)と同じAlert確認を挟む。タイトルは他の予定削除
+  // schedule-workout-edit.tsxのヘッダー⋮「削除」と同じAlert確認を挟む。タイトルは他の予定削除
   // （ルーティン予定・直接予定）と統一し「この予定を削除しますか？」にする（@ユーザー指摘）
   const handleDeleteReminderOccurrence = useCallback(
     (reminderId: number, routineName: string) => {
@@ -645,8 +588,6 @@ export default function CalendarScreen() {
                           showStart
                           onEditScheduledWorkoutExercises={handleEditScheduledWorkoutExercises}
                           onStartScheduledWorkout={handleStartScheduledWorkout}
-                          onDeleteDirectSchedule={handleDeleteDirectSchedule}
-                          onDeleteRoutineSchedule={handleDeleteRoutineSchedule}
                           onStartRoutine={handleStartRoutine}
                           onDeleteReminderOccurrence={handleDeleteReminderOccurrence}
                           onReplace={handlePressReplace}
@@ -685,7 +626,7 @@ export default function CalendarScreen() {
                 onPressAction={handlePressAddSchedule}
               />
             ) : (
-              <View style={styles.dayCardList}>
+              <View style={styles.dayGroupList}>
                 {mergedSchedule.map((card) => {
                   // 予定エントリはSessionTimeGroupHeaderをsessionStartedAt(選択日+予定のhour/minute
                   // で合成)から自前で組み立てる（今日パネルと同じ、2026-07-21に全予定種別で統一）
@@ -699,20 +640,19 @@ export default function CalendarScreen() {
                   // 未来日パネルは開始ボタンを持たない（デザイン案「未来日は開始ボタンなし」）
                   // ためshowStart=falseで渡す
                   return (
-                    <ScheduleTimelineEntry
-                      key={card.key}
-                      card={card}
-                      sessionStartedAt={sessionStartedAt}
-                      showStart={false}
-                      onEditScheduledWorkoutExercises={handleEditScheduledWorkoutExercises}
-                      onStartScheduledWorkout={handleStartScheduledWorkout}
-                      onDeleteDirectSchedule={handleDeleteDirectSchedule}
-                      onDeleteRoutineSchedule={handleDeleteRoutineSchedule}
-                      onStartRoutine={handleStartRoutine}
-                      onDeleteReminderOccurrence={handleDeleteReminderOccurrence}
-                      onReplace={handlePressReplace}
-                      onMaterializeAndEdit={handleMaterializeAndEditRoutineSchedule}
-                    />
+                    <View key={card.key} style={styles.dayGroup}>
+                      <ScheduleTimelineEntry
+                        card={card}
+                        sessionStartedAt={sessionStartedAt}
+                        showStart={false}
+                        onEditScheduledWorkoutExercises={handleEditScheduledWorkoutExercises}
+                        onStartScheduledWorkout={handleStartScheduledWorkout}
+                        onStartRoutine={handleStartRoutine}
+                        onDeleteReminderOccurrence={handleDeleteReminderOccurrence}
+                        onReplace={handlePressReplace}
+                        onMaterializeAndEdit={handleMaterializeAndEditRoutineSchedule}
+                      />
+                    </View>
                   );
                 })}
                 <AddExerciseButton

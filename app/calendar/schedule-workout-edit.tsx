@@ -139,14 +139,12 @@ export default function ScheduleWorkoutEditScreen() {
     [scheduledWorkoutId],
   );
 
-  // 選択日パネルの⋮メニュー「削除」(app/(tabs)/calendar.tsxのhandleDeleteDirectSchedule/
-  // handleDeleteRoutineSchedule)と同じ操作をこの画面からも行えるようにする（@ユーザー指摘）。
-  // この画面自体を編集し終えてから「この予定自体をやめる」と判断するケースのため、都度
-  // カレンダーへ戻らなくて済むようにする。文言もlib/calendar/schedule.tsの
-  // buildScheduledWorkoutDeleteMessageに集約し、選択日パネル側の削除と統一する
-  // （@ユーザー指摘: 同じ予定の削除なのに入口によって確認文言が違っていた）。
-  // 2026-07-21よりルーティン予定（実体化済み）もこの画面に来るため、routineIdの有無で
-  // 文言を出し分ける必要がある
+  // 実体化済み予定（直接予定・手動ルーティン予定）の削除は、この画面のヘッダー⋮が唯一の入口
+  // （2026-07-22、@ユーザー指摘: 選択日パネル側のグルーピング解除に伴い⋮メニューを撤去し、
+  // 削除はこの画面に一本化した）。この画面自体を編集し終えてから「この予定自体をやめる」と
+  // 判断するケースのため、都度カレンダーへ戻らなくて済むようにする。文言はlib/calendar/schedule.ts
+  // のbuildScheduledWorkoutDeleteMessageに集約する。2026-07-21よりルーティン予定（実体化済み）も
+  // この画面に来るため、routineIdの有無で文言を出し分ける必要がある
   const handleDeleteWorkout = useCallback(() => {
     Alert.alert(
       'この予定を削除しますか？',
