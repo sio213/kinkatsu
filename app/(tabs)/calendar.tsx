@@ -42,6 +42,10 @@ const CALENDAR_FILTER_CATEGORIES = [CATEGORY_ALL, ...EXERCISE_CATEGORIES] as con
 const EMPTY_SCHEDULE: DaySchedule = { cards: [] };
 const EMPTY_MANUAL_SCHEDULE: ManualScheduleCard[] = [];
 
+// 今日パネル・過去日パネル（単一/複数セッションどちらも）で共通のDayCardList呼び出しに使う。
+// 3箇所とも同じ文言のため、コピペでの食い違いを避けて1箇所に集約する（@reviewer指摘）
+const EDIT_RECORD_HINT = 'タップして記録を編集します';
+
 function MonthNavButton({
   direction,
   onPress,
@@ -77,8 +81,8 @@ function DayCardList({
 }: {
   cards: CalendarDayCard[];
   onPressExercise: (card: CalendarDayCard) => void;
-  // 遷移先の説明（今日パネル/過去日パネルで文言が変わる、@designer指摘）。カード自体は
-  // 見た目が同じままなのでVoiceOverだけでも文脈の違いが伝わるようにする
+  // 遷移先の説明。呼び出し元は現状すべてEDIT_RECORD_HINTを渡すが、将来パネルごとに
+  // 文言を変える余地を残すため引数のままにしている（@designer指摘）
   accessibilityHint: string;
 }) {
   return (
@@ -502,7 +506,7 @@ export default function CalendarScreen() {
                           <DayCardList
                             cards={entry.group.cards}
                             onPressExercise={handlePressPastRecord}
-                            accessibilityHint="タップして記録を編集します"
+                            accessibilityHint={EDIT_RECORD_HINT}
                           />
                         </View>
                       );
@@ -591,25 +595,31 @@ export default function CalendarScreen() {
             )
           ) : dayCards.length === 0 ? (
             <DayEmptyState buttonIcon="plus" actionLabel="記録を追加" onPressAction={handleAddPastRecord} />
-          ) : dayCardGroups.length > 1 ? (
-            <View style={styles.dayGroupList}>
-              {dayCardGroups.map((group) => (
-                <View key={group.sessionId} style={styles.dayGroup}>
-                  <SessionTimeGroupHeader sessionStartedAt={group.sessionStartedAt} />
-                  <DayCardList
-                    cards={group.cards}
-                    onPressExercise={handlePressPastRecord}
-                    accessibilityHint="タップして記録を編集します"
-                  />
-                </View>
-              ))}
-            </View>
           ) : (
-            <DayCardList
-              cards={dayCards}
-              onPressExercise={handlePressPastRecord}
-              accessibilityHint="タップして記録を編集します"
-            />
+            // 既に記録がある日でも「記録を追加」（2件目のセッションを追加する等）ができるよう、
+            // 一覧末尾にボタンを添える（@ユーザー指摘。予定側のAddExerciseButton「予定を追加」と
+            // 同じ「既に1件ある日でも末尾から追加できる」パターンに揃える）
+            <View style={styles.dayGroupList}>
+              {dayCardGroups.length > 1 ? (
+                dayCardGroups.map((group) => (
+                  <View key={group.sessionId} style={styles.dayGroup}>
+                    <SessionTimeGroupHeader sessionStartedAt={group.sessionStartedAt} />
+                    <DayCardList
+                      cards={group.cards}
+                      onPressExercise={handlePressPastRecord}
+                      accessibilityHint={EDIT_RECORD_HINT}
+                    />
+                  </View>
+                ))
+              ) : (
+                <DayCardList
+                  cards={dayCards}
+                  onPressExercise={handlePressPastRecord}
+                  accessibilityHint={EDIT_RECORD_HINT}
+                />
+              )}
+              <AddExerciseButton onPress={handleAddPastRecord} label="記録を追加" accessibilityLabel="記録を追加" />
+            </View>
           )}
         </View>
       </ScrollView>

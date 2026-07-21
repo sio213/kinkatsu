@@ -672,6 +672,45 @@ describe('CalendarScreen 予定（PR9-2: リマインダー由来の未来予定
     });
   });
 
+  // 既に記録がある日でも「記録を追加」（2件目のセッションを追加する等）ができるよう、一覧末尾に
+  // ボタンを添える（@ユーザー指摘: 予定側の「予定を追加」ボタンと同じパターンに揃える）
+  test('過去日に記録が1件ある場合でも、一覧末尾に「記録を追加」ボタンが表示され、押すと選択日のdateKeyでstart-chooserへ遷移する', () => {
+    const root = render();
+    const past = new Date();
+    past.setDate(past.getDate() - 5);
+    mockUseCalendarDayExercises.mockReturnValue({
+      cards: [
+        {
+          workoutSessionExerciseId: 1,
+          exerciseId: 10,
+          name: 'ベンチプレス',
+          category: 'chest',
+          measurementType: 'weight_reps',
+          source: 'preset',
+          slug: 'bench-press',
+          sessionId: 77,
+          sessionStartedAt: past.getTime(),
+          isBest: false,
+          comparison: null,
+          sets: [{ weight: 60, reps: 8, durationSeconds: null, distanceMeters: null, completedAt: 1 }],
+        },
+      ],
+      retry: jest.fn(),
+    });
+    selectDate(past);
+
+    const addBtn = root.findAllByType(TouchableOpacity).find((t) => t.props.accessibilityLabel === '記録を追加')!;
+    expect(addBtn).toBeDefined();
+    act(() => {
+      addBtn.props.onPress();
+    });
+    const expectedDateKey = `${past.getFullYear()}-${String(past.getMonth() + 1).padStart(2, '0')}-${String(past.getDate()).padStart(2, '0')}`;
+    expect(mockPush).toHaveBeenCalledWith({
+      pathname: '/workout/start-chooser',
+      params: { pastDateKey: expectedDateKey },
+    });
+  });
+
   // 過去日パネルの種目カードは種目詳細ではなく記録編集画面へ遷移する（2026-07-20、要件確認済み。
   // 今日パネルの種目カードは対象外で従来通り種目詳細（/exercise/{id}）のまま）
   test('過去日の種目カードをタップすると、種目詳細ではなくそのセッションの記録編集画面(/workout/{sessionId})へ遷移する', () => {
@@ -762,6 +801,9 @@ describe('CalendarScreen 予定（PR9-2: リマインダー由来の未来予定
       nightCard.props.onPress();
     });
     expect(mockPush).toHaveBeenCalledWith('/workout/88');
+
+    const addBtn = root.findAllByType(TouchableOpacity).find((t) => t.props.accessibilityLabel === '記録を追加');
+    expect(addBtn).toBeDefined();
   });
 
   describe('手動で追加した予定(PR10)', () => {
