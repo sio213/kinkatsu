@@ -91,6 +91,13 @@ jest.mock('@/lib/notifications/permissions', () => ({
   getPermissionState: (...args: unknown[]) => mockGetPermissionState(...args),
 }));
 
+const mockSkipReminderOccurrence = jest.fn();
+const mockUnskipReminderOccurrence = jest.fn();
+jest.mock('@/lib/notifications/reminder-skip-scheduler', () => ({
+  skipReminderOccurrence: (...args: unknown[]) => mockSkipReminderOccurrence(...args),
+  unskipReminderOccurrence: (...args: unknown[]) => mockUnskipReminderOccurrence(...args),
+}));
+
 jest.mock('@/lib/notifications/channels', () => ({ REMINDER_CHANNEL_ID: 'reminders' }));
 
 jest.mock('expo-notifications', () => ({
@@ -103,6 +110,7 @@ import {
   cancelScheduledWorkoutNotificationsForRoutine,
   createDirectScheduledWorkout,
   createScheduledWorkout,
+  materializeReminderOccurrence,
   removeScheduledWorkout,
   syncScheduledWorkoutNotifications,
 } from '@/lib/notifications/scheduled-workout-scheduler';
@@ -125,6 +133,8 @@ beforeEach(() => {
   mockGetPermissionState.mockResolvedValue('granted');
   mockScheduleNotificationAsync.mockResolvedValue('os-id-1');
   mockCancelScheduledNotificationAsync.mockResolvedValue(undefined);
+  mockSkipReminderOccurrence.mockResolvedValue({ notificationSuppressed: true });
+  mockUnskipReminderOccurrence.mockResolvedValue(undefined);
   jest.spyOn(console, 'error').mockImplementation(() => {});
 });
 
@@ -233,6 +243,95 @@ describe('createDirectScheduledWorkout', () => {
       createDirectScheduledWorkout([1], 'ベンチプレス', dateKeyOffsetDays(1), 19, 0),
     ).rejects.toThrow('db error');
     expect(mockScheduleNotificationAsync).not.toHaveBeenCalled();
+  });
+});
+
+// リマインダー由来の予定インスタンスを種目カードタップ時に初めてscheduledWorkouts実体として
+// 書き出す（2026-07-21）。schedule-time-picker.tsxの「今回だけ差し替え」(isReplaceMode)と
+// 同じ「skip+create」の合成
+describe('materializeReminderOccurrence', () => {
+  it('skipReminderOccurrenceで元のリマインダー発火を止めてから、createScheduledWorkout相当でscheduledWorkoutを作り、idとnotificationSuppressedを返す', async () => {
+    const callOrder: string[] = [];
+    mockSkipReminderOccurrence.mockImplementation(async () => {
+      callOrder.push('skip');
+      return { notificationSuppressed: true };
+    });
+    mockAddScheduledWorkout.mockImplementation(async () => {
+      callOrder.push('create');
+      return 42;
+    });
+
+    const result = await materializeReminderOccurrence(7, 10, '胸の日', dateKeyOffsetDays(1), 19, 30);
+
+    expect(mockSkipReminderOccurrence).toHaveBeenCalledWith(7, dateKeyOffsetDays(1));
+    expect(mockAddScheduledWorkout).toHaveBeenCalledWith(10, dateKeyOffsetDays(1), 19, 30);
+    expect(callOrder).toEqual(['skip', 'create']);
+    expect(result).toEqual({ scheduledWorkoutId: 42, notificationSuppressed: true });
+  });
+
+  // schedule-time-picker.tsxのisReplaceMode分岐と同じくskipReminderOccurrenceの結果を
+  // 呼び出し側へ透過する（@reviewer Major指摘: 破棄すると二重通知が起きても無言になる）
+  it('skipReminderOccurrenceがnotificationSuppressed:falseを返した場合、その値をそのまま呼び出し側へ伝える', async () => {
+    mockSkipReminderOccurrence.mockResolvedValueOnce({ notificationSuppressed: false });
+
+    const result = await materializeReminderOccurrence(7, 10, '胸の日', dateKeyOffsetDays(1), 19, 30);
+
+    expect(result).toEqual({ scheduledWorkoutId: 42, notificationSuppressed: false });
+  });
+
+  it('通知の二重登録防止のため、権限がgrantedかつ未来日時ならscheduled_workout種別の通知も登録する', async () => {
+    await materializeReminderOccurrence(7, 10, '胸の日', dateKeyOffsetDays(1), 19, 30);
+    expect(mockScheduleNotificationAsync).toHaveBeenCalledTimes(1);
+    const [request] = mockScheduleNotificationAsync.mock.calls[0];
+    expect(request.content.data).toEqual({ type: 'scheduled_workout', routineId: 10 });
+  });
+
+  it('過去日時のoccurrenceを実体化した場合、skip+createは成立するが通知登録はスキップされる（@tester指摘）', async () => {
+    const result = await materializeReminderOccurrence(7, 10, '胸の日', dateKeyOffsetDays(-1), 19, 30);
+    expect(result.scheduledWorkoutId).toBe(42);
+    expect(mockScheduleNotificationAsync).not.toHaveBeenCalled();
+  });
+
+  it('scheduledWorkoutの作成が失敗した場合、skipをロールバック(unskipReminderOccurrence)してから例外を投げる（@reviewer Major指摘と同じ、前半だけ成立して元の予定が無言で消えたままになるのを防ぐ）', async () => {
+    mockAddScheduledWorkout.mockRejectedValueOnce(new Error('db error'));
+
+    await expect(materializeReminderOccurrence(7, 10, '胸の日', dateKeyOffsetDays(1), 19, 30)).rejects.toThrow(
+      'db error',
+    );
+
+    expect(mockUnskipReminderOccurrence).toHaveBeenCalledWith(7, dateKeyOffsetDays(1));
+  });
+
+  it('ロールバック(unskipReminderOccurrence)自体が失敗しても、元のエラーはそのままthrowする(ロールバック失敗を握りつぶして元のエラーを隠さない)', async () => {
+    mockAddScheduledWorkout.mockRejectedValueOnce(new Error('db error'));
+    mockUnskipReminderOccurrence.mockRejectedValueOnce(new Error('unskip failed'));
+
+    await expect(materializeReminderOccurrence(7, 10, '胸の日', dateKeyOffsetDays(1), 19, 30)).rejects.toThrow(
+      'db error',
+    );
+  });
+
+  it('skipReminderOccurrence自体が失敗した場合はcreateScheduledWorkoutを呼ばずそのままrejectする', async () => {
+    mockSkipReminderOccurrence.mockRejectedValueOnce(new Error('skip failed'));
+
+    await expect(materializeReminderOccurrence(7, 10, '胸の日', dateKeyOffsetDays(1), 19, 30)).rejects.toThrow(
+      'skip failed',
+    );
+    expect(mockAddScheduledWorkout).not.toHaveBeenCalled();
+  });
+
+  // skipReminderOccurrence自体はreminderScheduleSkipsのUNIQUE制約で冪等だが、
+  // createScheduledWorkout(addScheduledWorkout)には冪等性が無く常に新規insertする。
+  // 呼び出し側（次PRのタップハンドラ）が多重タップガードを持つ前提を明示するため、
+  // 現状のギャップをテストとして固定しておく（@tester指摘）
+  it('同じoccurrenceに対して2回連続で呼び出すと、scheduledWorkoutsが2件作られてしまう（create側に冪等性が無いための既知のギャップ。多重タップ防止は呼び出し側の責務）', async () => {
+    mockAddScheduledWorkout.mockResolvedValueOnce(42).mockResolvedValueOnce(43);
+
+    const first = await materializeReminderOccurrence(7, 10, '胸の日', dateKeyOffsetDays(1), 19, 30);
+    const second = await materializeReminderOccurrence(7, 10, '胸の日', dateKeyOffsetDays(1), 19, 30);
+
+    expect(mockAddScheduledWorkout).toHaveBeenCalledTimes(2);
+    expect([first.scheduledWorkoutId, second.scheduledWorkoutId]).toEqual([42, 43]);
   });
 });
 
