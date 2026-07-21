@@ -75,8 +75,11 @@ function buildInitialSets(
   }));
 }
 
-async function insertWorkoutSessionRow(startedAt: number, endedAt: number | null): Promise<WorkoutSession> {
-  const now = Date.now();
+// createdAt/updatedAtは既定でDate.now()を呼ぶが、startWorkoutSessionは自分が既に取得した
+// startedAtと必ず同じ値にしたいため、nowを明示的に渡せるようにしている（渡さない
+// createPastWorkoutSessionは、過去日付のstartedAtとは別の「実際に今記録した時刻」として
+// createdAt/updatedAtを持ちたいため、これは意図通り）
+async function insertWorkoutSessionRow(startedAt: number, endedAt: number | null, now: number = Date.now()): Promise<WorkoutSession> {
   const [inserted] = await db
     .insert(workoutSessions)
     .values({ startedAt, endedAt, createdAt: now, updatedAt: now })
@@ -85,7 +88,11 @@ async function insertWorkoutSessionRow(startedAt: number, endedAt: number | null
 }
 
 export async function startWorkoutSession() {
-  return insertWorkoutSessionRow(Date.now(), null);
+  // startedAt/createdAt/updatedAtを同じDate.now()呼び出しから作る。別々に2回呼ぶと、
+  // テスト全体を回すような負荷がかかったタイミングでミリ秒がずれ、createdAt!==startedAtに
+  // なる実在のflakiness原因だった（フルテストスイート実行時のみ再現した）
+  const now = Date.now();
+  return insertWorkoutSessionRow(now, null, now);
 }
 
 // カレンダーの過去日パネル「記録を追加」用（2026-07-20）。作成直後からendedAtが入っているため、

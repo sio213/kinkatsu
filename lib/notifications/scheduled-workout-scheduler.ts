@@ -115,7 +115,9 @@ export async function createDirectScheduledWorkout(
   return id;
 }
 
-// 選択日パネル手動予定カードの⋮メニュー「削除」(app/(tabs)/calendar.tsxのhandleDeleteSchedule)用。
+// 選択日パネル手動予定カードの⋮メニュー「削除」(app/(tabs)/calendar.tsxの
+// handleDeleteRoutineSchedule/handleDeleteDirectSchedule、および直接予定の編集画面自身の
+// ヘッダー⋮「削除」であるapp/calendar/schedule-workout-edit.tsxのhandleDeleteWorkout)用。
 // 通知キャンセルを先に行ってからDB削除する。cancelNotificationは内部でエラーを握りつぶし常に
 // 成功するため、この順序なら万一DB削除が失敗しても通知だけは確実に止められる
 export async function removeScheduledWorkout(scheduledWorkoutId: number): Promise<void> {

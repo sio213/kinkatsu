@@ -11,6 +11,7 @@ import { useRoutines } from '@/hooks/use-routines';
 import { useScheduledWorkoutTime } from '@/hooks/use-scheduled-workout';
 import { useScheduledWorkoutExercises } from '@/hooks/use-scheduled-workout-exercises';
 import { parseDateKey } from '@/lib/calendar/date-grid';
+import { DIRECT_SCHEDULE_DELETE_MESSAGE } from '@/lib/calendar/schedule';
 import { formatHourMinuteParts } from '@/lib/calendar/time-of-day';
 import { moveScheduledWorkoutExercise, removeScheduledWorkoutExercise } from '@/lib/calendar/scheduled-workout-detail';
 import { removeScheduledWorkout } from '@/lib/notifications/scheduled-workout-scheduler';
@@ -130,30 +131,33 @@ export default function ScheduleWorkoutEditScreen() {
     [scheduledWorkoutId],
   );
 
-  // 選択日パネルの⋮メニュー「削除」(app/(tabs)/calendar.tsxのhandleDeleteSchedule)と同じ操作を
-  // この画面からも行えるようにする（@ユーザー指摘）。この画面自体を編集し終えてから「この予定
-  // 自体をやめる」と判断するケースのため、都度カレンダーへ戻らなくて済むようにする
+  // 選択日パネルの⋮メニュー「削除」(app/(tabs)/calendar.tsxのhandleDeleteDirectSchedule)と同じ
+  // 操作をこの画面からも行えるようにする（@ユーザー指摘）。この画面自体を編集し終えてから
+  // 「この予定自体をやめる」と判断するケースのため、都度カレンダーへ戻らなくて済むようにする。
+  // 文言もhandleDeleteDirectScheduleと統一する（@ユーザー指摘: 同じ直接予定の削除なのに入口
+  // によって確認文言が違っていた）
   const handleDeleteWorkout = useCallback(() => {
-    // Alertはヘッダーの日時表示ごと覆い隠すため、同日に複数の直接予定があるケースでも
-    // どの予定を削除しようとしているか分かるよう本文にも日時を含める（@designer指摘）
-    const target = dateLabel ? `${dateLabel}の予定` : 'この予定';
-    Alert.alert('この予定を削除しますか？', `${target}を削除します。設定していた通知も届かなくなります。`, [
-      { text: 'キャンセル', style: 'cancel' },
-      {
-        text: '削除',
-        style: 'destructive',
-        onPress: async () => {
-          try {
-            await removeScheduledWorkout(scheduledWorkoutId);
-            router.back();
-          } catch (e) {
-            console.error('[scheduled workout delete]', e);
-            Alert.alert('エラー', '予定を削除できませんでした。');
-          }
+    Alert.alert(
+      'この予定を削除しますか？',
+      DIRECT_SCHEDULE_DELETE_MESSAGE,
+      [
+        { text: 'キャンセル', style: 'cancel' },
+        {
+          text: '削除',
+          style: 'destructive',
+          onPress: async () => {
+            try {
+              await removeScheduledWorkout(scheduledWorkoutId);
+              router.back();
+            } catch (e) {
+              console.error('[scheduled workout delete]', e);
+              Alert.alert('エラー', '予定を削除できませんでした。');
+            }
+          },
         },
-      },
-    ]);
-  }, [scheduledWorkoutId, router, dateLabel]);
+      ],
+    );
+  }, [scheduledWorkoutId, router]);
 
   // app/routine/exercise-edit.tsxのhandleReorder/menuItemsと同じ方針
   // （並び替え画面は種目2件以上でしか意味を持たないため、1件以下では無効化する）

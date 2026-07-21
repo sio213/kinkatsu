@@ -24,7 +24,7 @@ import { useResumeWorkoutSummary, useWorkoutSessions } from '@/hooks/use-workout
 import { addMonths, isSameDay, toDateKey } from '@/lib/calendar/date-grid';
 import { CATEGORY_ALL, EXERCISE_CATEGORIES } from '@/lib/exercises/constants';
 import { buildTodayTimeline, groupCardsBySession } from '@/lib/calendar/session-groups';
-import { mergeScheduleCards, type UnifiedScheduleCard } from '@/lib/calendar/schedule';
+import { DIRECT_SCHEDULE_DELETE_MESSAGE, mergeScheduleCards, type UnifiedScheduleCard } from '@/lib/calendar/schedule';
 import { formatHourMinute, formatHourMinuteParts } from '@/lib/calendar/time-of-day';
 import { formatKindSummary } from '@/lib/notifications/format';
 import { skipReminderOccurrence } from '@/lib/notifications/reminder-skip-scheduler';
@@ -96,7 +96,8 @@ function ScheduleEntryCard({
   // このコンポーネントに到達する時点でcard.routineIdは必ずnumber（呼び出し側で分岐済み）
   onPress: () => void;
   onPressStart?: () => void;
-  onDeleteManual: (scheduledWorkoutId: number, title: string) => void;
+  // 直接予定は上のコメント通りこのコンポーネントに到達しないため、titleは常にルーティン名
+  onDeleteManual: (scheduledWorkoutId: number, routineName: string) => void;
   // リマインダー予定の⋮メニュー「削除」用（2026-07-19: 「今回だけスキップ」から変更、
   // 呼び出し先は確認ダイアログを挟む）。リマインダーは常にルーティン紐付きのためtitleは常に
   // ルーティン名になる
@@ -318,28 +319,43 @@ export default function CalendarScreen() {
   // Alert確認→try/catch+Alert.alertパターン。削除後はuseCalendarDayManualSchedule/
   // useCalendarMonthScheduleがuseLiveQueryで自動再購読するため、追加の状態更新は不要
   // （LayoutAnimationは非同期のDB書き込み・再購読を挟むと配置タイミングがずれ効かないため、
-  // 他の非同期削除処理と同じくここでは使わない）
-  const handleDeleteSchedule = useCallback((scheduledWorkoutId: number, title: string) => {
-    Alert.alert(
-      'この予定を削除しますか？',
-      `「${title}」の予定を削除します。ルーティン自体や記録には影響しませんが、設定していた通知も届かなくなります。`,
-      [
-        { text: 'キャンセル', style: 'cancel' },
-        {
-          text: '削除',
-          style: 'destructive',
-          onPress: async () => {
-            try {
-              await removeScheduledWorkout(scheduledWorkoutId);
-            } catch (e) {
-              console.error('[delete scheduled workout]', e);
-              Alert.alert('エラー', '予定を削除できませんでした。');
-            }
-          },
+  // 他の非同期削除処理と同じくここでは使わない）。ルーティン予定・直接予定で削除される内容が
+  // 異なる（後述）ため、確認文言の組み立てだけを呼び出し側で分け、この共通部分に集約する
+  const confirmDeleteScheduledWorkout = useCallback((scheduledWorkoutId: number, message: string) => {
+    Alert.alert('この予定を削除しますか？', message, [
+      { text: 'キャンセル', style: 'cancel' },
+      {
+        text: '削除',
+        style: 'destructive',
+        onPress: async () => {
+          try {
+            await removeScheduledWorkout(scheduledWorkoutId);
+          } catch (e) {
+            console.error('[delete scheduled workout]', e);
+            Alert.alert('エラー', '予定を削除できませんでした。');
+          }
         },
-      ],
-    );
+      },
+    ]);
   }, []);
+
+  // 手動で追加したルーティン予定用。削除されるのはこの予定枠と通知だけで、ルーティン本体は
+  // 影響を受けないため、その旨を安心材料として明記する（@ユーザー指摘: ルーティン名がカードに
+  // そのまま表示されているため、ルーティン本体まで消えるという誤解を防ぐ必要がある）
+  const handleDeleteRoutineSchedule = useCallback(
+    (scheduledWorkoutId: number, routineName: string) =>
+      confirmDeleteScheduledWorkout(scheduledWorkoutId, `「${routineName}」自体には影響しません。この予定と通知だけを削除します。`),
+    [confirmDeleteScheduledWorkout],
+  );
+
+  // 直接予定（個別種目選択、routineId===null）用。手動で追加したルーティン予定と違い保護すべき
+  // ルーティン本体が存在せず、この予定専用に設定した種目・目標セットも
+  // scheduledWorkoutExercises/scheduledWorkoutSetsのカスケード削除で一緒に消えるため、安心材料
+  // ではなく実際に削除される内容そのものを明記する（@ユーザー指摘）
+  const handleDeleteDirectSchedule = useCallback(
+    (scheduledWorkoutId: number) => confirmDeleteScheduledWorkout(scheduledWorkoutId, DIRECT_SCHEDULE_DELETE_MESSAGE),
+    [confirmDeleteScheduledWorkout],
+  );
 
   // リマインダー予定の⋮メニュー「削除」用（2026-07-19: 「今回だけスキップ」(取り消し可能・
   // ゴーストカードで元に戻せた)から、手動予定と同じ「削除」(取り消し不可)へ変更）。
@@ -347,12 +363,13 @@ export default function CalendarScreen() {
   // （「今回だけ差し替え」機能がschedule-time-picker.tsx経由でこの同じテーブル・関数に依存して
   // いるため。テーブル名・関数名が「スキップ」のままなのはその名残で、役割自体は「その日の
   // この発火は無かったことにする」マーカーで変わらない）。取り消し不可になったため、
-  // 手動予定の削除(handleDeleteSchedule)と同じAlert確認を挟む
+  // 手動予定の削除(confirmDeleteScheduledWorkout)と同じAlert確認を挟む。タイトルは他の予定削除
+  // （ルーティン予定・直接予定）と統一し「この予定を削除しますか？」にする（@ユーザー指摘）
   const handleDeleteReminderOccurrence = useCallback(
     (reminderId: number, routineName: string) => {
       Alert.alert(
-        'この回の予定を削除しますか？',
-        `「${routineName}」の今回の予定を削除します。次回以降の予定やリマインダー自体には影響しません。今回分の通知も届かなくなります。`,
+        'この予定を削除しますか？',
+        `「${routineName}」の次回以降の予定には影響しません。今回分の予定と通知だけを削除します。`,
         [
           { text: 'キャンセル', style: 'cancel' },
           {
@@ -553,7 +570,7 @@ export default function CalendarScreen() {
                             sessionStartedAt={entry.sortAt}
                             title={card.title}
                             onPressStart={() => handleStartDirectSchedule(card.scheduledWorkoutId, card.title)}
-                            onDelete={() => handleDeleteSchedule(card.scheduledWorkoutId, card.title)}
+                            onDelete={() => handleDeleteDirectSchedule(card.scheduledWorkoutId)}
                             onPress={() => handleEditDirectScheduleExercises(card.scheduledWorkoutId)}
                           />
                         </View>
@@ -569,7 +586,7 @@ export default function CalendarScreen() {
                           timeLabel={`今日 ${formatHourMinute(new Date(entry.sortAt))}`}
                           onPress={() => handlePressRoutine(routineId)}
                           onPressStart={() => handleStartRoutine(routineId, card.title)}
-                          onDeleteManual={handleDeleteSchedule}
+                          onDeleteManual={handleDeleteRoutineSchedule}
                           onDeleteReminder={handleDeleteReminderOccurrence}
                           onReplace={handlePressReplace}
                         />
@@ -624,7 +641,7 @@ export default function CalendarScreen() {
                         scheduledWorkoutId={card.scheduledWorkoutId}
                         sessionStartedAt={sessionStartedAt}
                         title={card.title}
-                        onDelete={() => handleDeleteSchedule(card.scheduledWorkoutId, card.title)}
+                        onDelete={() => handleDeleteDirectSchedule(card.scheduledWorkoutId)}
                         onPress={() => handleEditDirectScheduleExercises(card.scheduledWorkoutId)}
                       />
                     );
@@ -642,7 +659,7 @@ export default function CalendarScreen() {
                           : formatHourMinuteParts(card.hour, card.minute)
                       }
                       onPress={() => handlePressRoutine(routineId)}
-                      onDeleteManual={handleDeleteSchedule}
+                      onDeleteManual={handleDeleteRoutineSchedule}
                       onDeleteReminder={handleDeleteReminderOccurrence}
                       onReplace={handlePressReplace}
                     />
