@@ -58,6 +58,13 @@ export default function ScheduleWorkoutEditScreen() {
     });
   }, [pushDebounced, scheduledWorkoutId]);
 
+  const handleLoadFromHistory = useCallback(() => {
+    pushDebounced({
+      pathname: '/calendar/schedule-workout-history-picker',
+      params: { scheduledWorkoutId: String(scheduledWorkoutId) },
+    });
+  }, [pushDebounced, scheduledWorkoutId]);
+
   const handleSwap = useCallback(
     (scheduledWorkoutExerciseId: number, currentExerciseId: number, currentExerciseName: string, hasRecordedData: boolean) => {
       pushDebounced({
@@ -149,6 +156,18 @@ export default function ScheduleWorkoutEditScreen() {
           ? '保存済みのルーティンがありません'
           : '保存済みのルーティンを選んで種目と目標セット値をまとめて追加します',
       onPress: handleLoadFromRoutine,
+    },
+    {
+      key: 'history',
+      label: '過去の記録から読み込み',
+      icon: 'history',
+      // 「ルーティンから読み込み」のhintが「種目と目標セット値をまとめて追加します」と
+      // 数値も一緒に入ることを明言しているのに対し、こちらが種目名の追加としか読めない
+      // 文言だと同種の操作なのに説明の粒度が揃わない（@designer指摘）。実際には
+      // addHistoryCardsToScheduledWorkoutが実施した重量・回数をそのまま目標セット値として
+      // コピーするため、粒度を揃えて明記する
+      hint: '過去のトレーニングを選んで、種目と実施したセット値を目標としてまとめて追加します',
+      onPress: handleLoadFromHistory,
     },
     {
       key: 'reorder',

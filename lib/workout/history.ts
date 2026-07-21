@@ -57,6 +57,29 @@ export async function getPreviousSets(
     .orderBy(sets.setNumber);
 }
 
+// 特定の過去カード（workoutSessionExerciseId）のセット列をそのまま返す。getPreviousSets
+// （種目単位で直近の1枚を自動で特定する）と違い、こちらは「記録から読み込む」画面（種目単位・
+// セッション単位どちらも、lib/workout/session.ts）でユーザーが選んだカードそのものを対象にする。
+// lib/calendar/scheduled-workout-detail.tsのaddHistoryCardsToScheduledWorkoutからも使うため
+// （session.tsとscheduled-workout-detail.tsが互いをimportし合う循環参照を避ける）、両者から
+// 依存されて問題ない下位モジュールのこちらに置く
+export async function getPreviousSetsForCard(
+  tx: DbOrTx,
+  workoutSessionExerciseId: number,
+): Promise<PreviousSetValues[]> {
+  return tx
+    .select({
+      setNumber: sets.setNumber,
+      weight: sets.weight,
+      reps: sets.reps,
+      durationSeconds: sets.durationSeconds,
+      distanceMeters: sets.distanceMeters,
+    })
+    .from(sets)
+    .where(eq(sets.workoutSessionExerciseId, workoutSessionExerciseId))
+    .orderBy(sets.setNumber);
+}
+
 export type HistorySetValues = PreviousSetValues & { completedAt: number | null };
 
 export type HistoryEntry = {

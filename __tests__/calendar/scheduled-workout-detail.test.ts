@@ -77,9 +77,15 @@ jest.mock('@/lib/routines/db', () => ({
   getRoutineDetail: (...args: unknown[]) => mockGetRoutineDetail(...args),
 }));
 
+const mockGetPreviousSetsForCard = jest.fn();
+jest.mock('@/lib/workout/history', () => ({
+  getPreviousSetsForCard: (...args: unknown[]) => mockGetPreviousSetsForCard(...args),
+}));
+
 import { db } from '@/db/client';
 import {
   addExercisesToScheduledWorkout,
+  addHistoryCardsToScheduledWorkout,
   addRoutineExercisesToScheduledWorkout,
   addScheduledWorkoutSet,
   deleteLastScheduledWorkoutSet,
@@ -103,6 +109,7 @@ beforeEach(() => {
   mockBuildInitialRoutineSets.mockReset();
   mockBuildInitialRoutineSets.mockResolvedValue([{ weight: null, reps: null, durationSeconds: null, distanceMeters: null }]);
   mockGetRoutineDetail.mockReset();
+  mockGetPreviousSetsForCard.mockReset();
 });
 
 describe('addExercisesToScheduledWorkout', () => {
@@ -254,6 +261,89 @@ describe('addRoutineExercisesToScheduledWorkout', () => {
     await expect(addRoutineExercisesToScheduledWorkout(1, 10, [{ routineExerciseId: 501 }])).rejects.toThrow(
       'insert error',
     );
+  });
+});
+
+describe('addHistoryCardsToScheduledWorkout', () => {
+  it('selectionsが空なら何もしない', async () => {
+    await addHistoryCardsToScheduledWorkout(1, []);
+    expect(mockGetPreviousSetsForCard).not.toHaveBeenCalled();
+    expect(mockInsertValues).not.toHaveBeenCalled();
+  });
+
+  it('選んだ過去カードのセット値をそのままコピーして新規種目として追加する', async () => {
+    mockSelectWhere.mockResolvedValueOnce([{ orderIndex: 0 }]); // getMaxOrderIndex
+    mockGetPreviousSetsForCard.mockResolvedValueOnce([
+      { setNumber: 1, weight: 60, reps: 8, durationSeconds: null, distanceMeters: null },
+    ]);
+
+    await addHistoryCardsToScheduledWorkout(1, [{ exerciseId: 20, sourceWorkoutSessionExerciseId: 900 }]);
+
+    const [, exerciseValues] = mockInsertValues.mock.calls[0];
+    expect(exerciseValues).toEqual([expect.objectContaining({ scheduledWorkoutId: 1, exerciseId: 20, orderIndex: 1 })]);
+    expect(mockGetPreviousSetsForCard).toHaveBeenCalledWith(expect.anything(), 900);
+    const [, setsValues] = mockInsertValues.mock.calls[1];
+    expect(setsValues).toEqual([expect.objectContaining({ weight: 60, reps: 8, setNumber: 1 })]);
+  });
+
+  it('複数の過去カードを選んだ場合、選択順のまま新規種目として複数追加する', async () => {
+    mockSelectWhere.mockResolvedValueOnce([]); // getMaxOrderIndex
+    mockGetPreviousSetsForCard
+      .mockResolvedValueOnce([{ setNumber: 1, weight: 60, reps: 8, durationSeconds: null, distanceMeters: null }])
+      .mockResolvedValueOnce([{ setNumber: 1, weight: 40, reps: 12, durationSeconds: null, distanceMeters: null }]);
+
+    await addHistoryCardsToScheduledWorkout(1, [
+      { exerciseId: 20, sourceWorkoutSessionExerciseId: 900 },
+      { exerciseId: 21, sourceWorkoutSessionExerciseId: 901 },
+    ]);
+
+    const [, exerciseValues] = mockInsertValues.mock.calls[0];
+    expect(exerciseValues).toEqual([
+      expect.objectContaining({ exerciseId: 20, orderIndex: 0 }),
+      expect.objectContaining({ exerciseId: 21, orderIndex: 1 }),
+    ]);
+  });
+
+  it('確定セットが1件も無い(全カラムnullのみ)過去カードは空欄1セットにフォールバックする', async () => {
+    mockSelectWhere.mockResolvedValueOnce([]); // getMaxOrderIndex
+    mockGetPreviousSetsForCard.mockResolvedValueOnce([
+      { setNumber: 1, weight: null, reps: null, durationSeconds: null, distanceMeters: null },
+    ]);
+
+    await addHistoryCardsToScheduledWorkout(1, [{ exerciseId: 20, sourceWorkoutSessionExerciseId: 900 }]);
+
+    const [, setsValues] = mockInsertValues.mock.calls[1];
+    expect(setsValues).toEqual([expect.objectContaining({ weight: null, reps: null, setNumber: 1 })]);
+  });
+
+  it('値あり行と全カラムnullの行が混在する過去カードは、null行だけ除外して値あり行のみコピーする', async () => {
+    mockSelectWhere.mockResolvedValueOnce([]); // getMaxOrderIndex
+    mockGetPreviousSetsForCard.mockResolvedValueOnce([
+      { setNumber: 1, weight: 60, reps: 8, durationSeconds: null, distanceMeters: null },
+      { setNumber: 2, weight: null, reps: null, durationSeconds: null, distanceMeters: null },
+    ]);
+
+    await addHistoryCardsToScheduledWorkout(1, [{ exerciseId: 20, sourceWorkoutSessionExerciseId: 900 }]);
+
+    const [, setsValues] = mockInsertValues.mock.calls[1];
+    expect(setsValues).toEqual([expect.objectContaining({ weight: 60, reps: 8, setNumber: 1 })]);
+  });
+
+  it('種目の追加とあわせて予定のupdatedAtも更新する', async () => {
+    mockSelectWhere.mockResolvedValueOnce([]); // getMaxOrderIndex
+    mockGetPreviousSetsForCard.mockResolvedValueOnce([]);
+
+    await addHistoryCardsToScheduledWorkout(1, [{ exerciseId: 20, sourceWorkoutSessionExerciseId: 900 }]);
+
+    expect(mockUpdateWhere).toHaveBeenCalledTimes(1);
+  });
+
+  it('insertが失敗した場合はエラーを握りつぶさずthrowする', async () => {
+    mockSelectWhere.mockResolvedValueOnce([]);
+    mockReturning.mockRejectedValueOnce(new Error('insert error'));
+    await expect(
+      addHistoryCardsToScheduledWorkout(1, [{ exerciseId: 20, sourceWorkoutSessionExerciseId: 900 }]),
+    ).rejects.toThrow('insert error');
   });
 });
 

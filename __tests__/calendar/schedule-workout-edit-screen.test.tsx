@@ -186,6 +186,24 @@ describe('ScheduleWorkoutEditScreen', () => {
     expect(routineItem.props.disabled).toBe(true);
   });
 
+  it('ヘッダー⋮「過去の記録から読み込み」を押すとscheduledWorkoutId付きでschedule-workout-history-pickerへ遷移する', () => {
+    const root = render();
+    const headerMenuTrigger = root
+      .findAllByType(TouchableOpacity)
+      .find((t) => t.props.accessibilityLabel === '種目編集のメニューを開く')!;
+    act(() => {
+      headerMenuTrigger.props.onPress();
+    });
+    const historyItem = findMenuItem(root, '過去の記録から読み込み')!;
+    act(() => {
+      historyItem.props.onPress();
+    });
+    expect(mockPush).toHaveBeenCalledWith({
+      pathname: '/calendar/schedule-workout-history-picker',
+      params: { scheduledWorkoutId: '5' },
+    });
+  });
+
   it('種目が2件以上のとき、ヘッダー⋮「種目を並び替え」を押すとscheduledWorkoutId付きでschedule-workout-exercise-reorderへ遷移する', () => {
     const root = render();
     const headerMenuTrigger = root

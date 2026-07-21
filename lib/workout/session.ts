@@ -2,7 +2,7 @@ import { db, type Tx } from '@/db/client';
 import { scheduledWorkoutExercises, sets, workoutSessionExercises, workoutSessions, type WorkoutSession } from '@/db/schema';
 import { getScheduledWorkoutSetsForExercise } from '@/lib/calendar/scheduled-workout-detail';
 import { getRoutineDetail, type RoutineDetailExercise, type RoutineExerciseSelection } from '@/lib/routines/db';
-import { getPreviousSets, hasAnyValue, type PreviousSetValues } from '@/lib/workout/history';
+import { getPreviousSets, getPreviousSetsForCard, hasAnyValue, type PreviousSetValues } from '@/lib/workout/history';
 import { and, desc, eq, isNull } from 'drizzle-orm';
 
 // 種目カードが新規追加/入れ替えされたことを呼び出し側（画面）に伝える情報。
@@ -492,25 +492,5 @@ export async function loadHistoryIntoSessionExercise(
       prefilledSetIds: computePrefilledSetIds(insertedSets.map((s) => s.id), historySets),
     };
   });
-}
-
-// 特定の過去カード（workoutSessionExerciseId）のセット列をそのまま返す。getPreviousSets
-// （種目単位で直近の1枚を自動で特定する）と違い、こちらは「記録から読み込む」画面（種目単位・
-// セッション単位どちらも）でユーザーが選んだカードそのものを対象にする
-async function getPreviousSetsForCard(
-  tx: Tx,
-  workoutSessionExerciseId: number,
-): Promise<PreviousSetValues[]> {
-  return tx
-    .select({
-      setNumber: sets.setNumber,
-      weight: sets.weight,
-      reps: sets.reps,
-      durationSeconds: sets.durationSeconds,
-      distanceMeters: sets.distanceMeters,
-    })
-    .from(sets)
-    .where(eq(sets.workoutSessionExerciseId, workoutSessionExerciseId))
-    .orderBy(sets.setNumber);
 }
 
