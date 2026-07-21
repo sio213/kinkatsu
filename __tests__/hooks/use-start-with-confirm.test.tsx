@@ -9,12 +9,12 @@ import React from 'react';
 import { act, create } from 'react-test-renderer';
 import { Alert } from 'react-native';
 
-function makeHarness(
+function makeHarness<TExtra = undefined>(
   activeSession: { id: number } | null,
   navigate: (sessionId: number) => void,
-  startWorkoutFrom: (id: number) => Promise<{ sessionId: number } | null>,
+  startWorkoutFrom: (id: number, extra?: TExtra) => Promise<{ sessionId: number } | null>,
 ) {
-  let captured!: (id: number, title: string) => void;
+  let captured!: (id: number, title: string, extra?: TExtra) => void;
   function Harness() {
     captured = useStartWithConfirm(activeSession, navigate, startWorkoutFrom);
     return null;
@@ -123,5 +123,45 @@ describe('useStartWithConfirm', () => {
 
     expect(Alert.alert).toHaveBeenCalledWith('エラー', 'トレーニングを開始できませんでした。');
     expect(mockNavigate).not.toHaveBeenCalled();
+  });
+
+  // TExtra（未実体化のリマインダー予定を開始する際にmaterializeReminderOccurrenceへ渡す
+  // reminderId/hour/minute等、id/titleだけでは開始対象を特定できない呼び出し元向けの追加データ、
+  // app/(tabs)/calendar.tsxのstartWorkoutFromReminderOccurrence）の配線自体を、
+  // このフック単体でも固定しておく（@tester指摘: 従来extra無しの呼び出ししかテストされておらず、
+  // 2引数目が正しく渡る契約が守られているかフック単体では検証されていなかった）
+  test('extraを渡した場合、startWorkoutFromはid・extraの2引数で呼ばれる', async () => {
+    const mockNavigate = jest.fn();
+    const mockStartWorkoutFrom = jest.fn().mockResolvedValue({ sessionId: 77 });
+    const getHandler = makeHarness<{ reminderId: number }>(null, mockNavigate, mockStartWorkoutFrom);
+    const extra = { reminderId: 1 };
+
+    await act(async () => {
+      getHandler()(10, '胸の日', extra);
+    });
+
+    expect(mockStartWorkoutFrom).toHaveBeenCalledWith(10, extra);
+    expect(mockNavigate).toHaveBeenCalledWith(77);
+  });
+
+  test('進行中セッションがありextraも渡す場合、記録して開始→startWorkoutFrom(id, extra)の順で呼ばれる', async () => {
+    const mockNavigate = jest.fn();
+    const mockStartWorkoutFrom = jest.fn().mockResolvedValue({ sessionId: 77 });
+    mockEndWorkoutSession.mockResolvedValue(undefined);
+    const getHandler = makeHarness<{ reminderId: number }>({ id: 5 }, mockNavigate, mockStartWorkoutFrom);
+    const extra = { reminderId: 1 };
+
+    act(() => {
+      getHandler()(10, '胸の日', extra);
+    });
+    const alertCall = (Alert.alert as jest.Mock).mock.calls[0];
+    const confirmAction = alertCall[2].find((b: { text?: string }) => b.text === '記録して開始');
+    await act(async () => {
+      await confirmAction.onPress();
+    });
+
+    expect(mockEndWorkoutSession).toHaveBeenCalledWith(5);
+    expect(mockStartWorkoutFrom).toHaveBeenCalledWith(10, extra);
+    expect(mockNavigate).toHaveBeenCalledWith(77);
   });
 });
