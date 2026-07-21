@@ -26,7 +26,7 @@ import { CATEGORY_ALL, EXERCISE_CATEGORIES } from '@/lib/exercises/constants';
 import { buildTodayTimeline, groupCardsBySession } from '@/lib/calendar/session-groups';
 import { mergeScheduleCards, type UnifiedScheduleCard } from '@/lib/calendar/schedule';
 import { materializeReminderOccurrence } from '@/lib/notifications/scheduled-workout-scheduler';
-import { startWorkoutFromRoutine, startWorkoutFromScheduledWorkout } from '@/lib/workout/session';
+import { startWorkoutFromScheduledWorkout } from '@/lib/workout/session';
 import { formatElapsedClock, formatMonthGroup, formatSessionDateGroup } from '@/lib/workout/summary';
 import { Stack } from 'expo-router';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
@@ -112,6 +112,11 @@ function DayCardList({
 // 型パラメータ制約でcard.reminderへのアクセスが効かなくなる）
 type MergedScheduleCard = UnifiedScheduleCard<Reminder>;
 
+// 未実体化のリマインダー予定を「開始」する際、id/title（routineId/routineName）だけでは
+// materializeReminderOccurrenceの呼び出しに必要な情報が揃わないため、useStartWithConfirmの
+// 追加パラメータ(TExtra)として渡す
+type ReminderStartExtra = { reminderId: number; routineName: string; hour: number; minute: number };
+
 // 直接予定/実体化済みルーティン予定/未実体化リマインダー予定の3分岐ディスパッチを、今日パネル・
 // 未来日パネルの2箇所で重複させないよう共通化する（2026-07-21、@reviewer指摘: 分岐ロジックが
 // 丸ごと複製されており、将来4種類目の予定が増えた場合や分岐条件を変えた場合に片側だけ
@@ -132,7 +137,7 @@ function ScheduleTimelineEntry({
   showStart: boolean;
   onEditScheduledWorkoutExercises: (scheduledWorkoutId: number) => void;
   onStartScheduledWorkout: (scheduledWorkoutId: number, title: string) => void;
-  onStartRoutine: (routineId: number, title: string) => void;
+  onStartRoutine: (routineId: number, title: string, extra: ReminderStartExtra) => void;
   onMaterializeAndEdit: (reminderId: number, routineId: number, routineName: string, hour: number, minute: number) => void;
 }) {
   // 直接予定（routineId===null、2026-07-20）は種目一覧カード表示に切り替える（@ユーザー指摘）。
@@ -174,7 +179,17 @@ function ScheduleTimelineEntry({
       routineId={routineId}
       routineName={card.title}
       sessionStartedAt={sessionStartedAt}
-      onPressStart={showStart ? () => onStartRoutine(routineId, card.title) : undefined}
+      onPressStart={
+        showStart
+          ? () =>
+              onStartRoutine(routineId, card.title, {
+                reminderId: card.reminder.id,
+                routineName: card.title,
+                hour: card.hour,
+                minute: card.minute,
+              })
+          : undefined
+      }
       onPress={() => onMaterializeAndEdit(card.reminder.id, routineId, card.title, card.hour, card.minute)}
     />
   );
@@ -403,15 +418,34 @@ export default function CalendarScreen() {
     pushDebounced({ pathname: '/workout/start-chooser', params: { pastDateKey: toDateKey(selectedDate) } });
   }, [pushDebounced, selectedDate]);
 
-  // 今日の予定カードの「開始」ボタン用。進行中セッションがある場合の確認ダイアログを含む
-  // ロジックはuseStartWithConfirmに共通化してある（ルーティン一覧のカード
-  // 「開始」ボタンと挙動が同一のため）。まだ実体化していないリマインダー予定
-  // （card.source==='reminder'）専用——scheduledWorkoutIdを持たないため、開始時点では
-  // ルーティン本体から直接プリフィルするしかない
+  // 今日の予定カードの「開始」ボタン用。まだ実体化していないリマインダー予定
+  // （card.source==='reminder'）専用。開始する前にmaterializeReminderOccurrenceで
+  // scheduledWorkouts実体を作ってからstartWorkoutFromScheduledWorkoutで開始することで、
+  // 直接予定・実体化済みルーティン予定と同じscheduledWorkoutId経由の後始末
+  // （endWorkoutSession終了時にこの予定を削除する、lib/workout/session.ts）に統一する
+  // （2026-07-21、@ユーザー指摘「開始→終了しても予定が消えない」バグの修正）。
+  // 実体化時の通知登録失敗はmaterializeReminderOccurrence内部でconsole.errorに留め、
+  // ここでは開始の成否のみをuseWorkoutStarterのAlertに委ねる（handleMaterializeAndEditRoutineSchedule
+  // のような追加確認は「今すぐ開始する」フローでは冗長なため行わない）
+  const startWorkoutFromReminderOccurrence = useCallback(
+    async (routineId: number, extra?: ReminderStartExtra) => {
+      if (!extra) return null;
+      const { scheduledWorkoutId } = await materializeReminderOccurrence(
+        extra.reminderId,
+        routineId,
+        extra.routineName,
+        toDateKey(selectedDate),
+        extra.hour,
+        extra.minute,
+      );
+      return startWorkoutFromScheduledWorkout(scheduledWorkoutId);
+    },
+    [selectedDate],
+  );
   const handleStartRoutine = useStartWithConfirm(
     activeSession,
     (sessionId) => pushDebounced(`/workout/${sessionId}`),
-    startWorkoutFromRoutine,
+    startWorkoutFromReminderOccurrence,
   );
   // scheduledWorkoutId実体を持つ予定（直接予定、および実体化済みルーティン予定）共通の
   // 「開始」ボタン用（2026-07-20、2026-07-21に対象を拡大）。handleStartRoutineと同じ

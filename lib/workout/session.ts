@@ -1,6 +1,7 @@
 import { db, type Tx } from '@/db/client';
 import { scheduledWorkoutExercises, sets, workoutSessionExercises, workoutSessions, type WorkoutSession } from '@/db/schema';
 import { getScheduledWorkoutSetsForExercise } from '@/lib/calendar/scheduled-workout-detail';
+import { removeScheduledWorkout } from '@/lib/notifications/scheduled-workout-scheduler';
 import { getRoutineDetail, type RoutineDetailExercise, type RoutineExerciseSelection } from '@/lib/routines/db';
 import { getPreviousSets, getPreviousSetsForCard, hasAnyValue, type PreviousSetValues } from '@/lib/workout/history';
 import { and, desc, eq, isNull } from 'drizzle-orm';
@@ -103,12 +104,30 @@ export async function createPastWorkoutSession(pastDate: number): Promise<Workou
   return insertWorkoutSessionRow(pastDate, pastDate);
 }
 
+// 予定（scheduledWorkouts）から開始したセッション（scheduledWorkoutIdを持つ）を終了する際、
+// その予定を「消化済み」としてカレンダーから消す。開始時点ではなく終了時点で消す理由は、
+// 開始直後はまだ進行中セッション扱い（今日パネルの完了済み記録一覧には現れない）で、
+// ここで先に予定側だけ消してしまうと進行中の間その時間帯に何も表示されなくなるため
+// （@ユーザー指摘のバグ「開始→終了で記録は増えるが予定が消えない」の修正、2026-07-21）。
+// 通知キャンセル＋DB削除はremoveScheduledWorkout（既存の「⋮削除」と同じ処理）に委譲する。
+// この後始末はあくまで付随処理のため、失敗してもendWorkoutSession自体は失敗させない
+// （@reviewer Major指摘: ここでthrowすると、endedAtは既にコミット済み＝記録自体は終了して
+// いるのに呼び出し側(app/workout/[id].tsxのfinish)が「終了できませんでした」を表示し
+// router.back()もしない、という実態と表示が食い違う不整合になるため）
 export async function endWorkoutSession(id: number) {
   const now = Date.now();
-  await db
+  const [session] = await db
     .update(workoutSessions)
     .set({ endedAt: now, updatedAt: now })
-    .where(eq(workoutSessions.id, id));
+    .where(eq(workoutSessions.id, id))
+    .returning({ scheduledWorkoutId: workoutSessions.scheduledWorkoutId });
+  if (session?.scheduledWorkoutId != null) {
+    try {
+      await removeScheduledWorkout(session.scheduledWorkoutId);
+    } catch (e) {
+      console.error('[remove scheduled workout after session finish]', e);
+    }
+  }
 }
 
 // 進行中(endedAtがnull)のセッションを1件返す。endedAtがnullの行は高々1件のはずだが、
@@ -338,7 +357,7 @@ export async function startWorkoutFromScheduledWorkout(
   return db.transaction(async (tx) => {
     const [session] = await tx
       .insert(workoutSessions)
-      .values({ startedAt: now, endedAt: null, createdAt: now, updatedAt: now })
+      .values({ startedAt: now, endedAt: null, scheduledWorkoutId, createdAt: now, updatedAt: now })
       .returning();
 
     const cards = await insertSessionExerciseCards(tx, session.id, rows, now, 'new', async (t, spec) => {

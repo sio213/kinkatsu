@@ -108,6 +108,43 @@ describe('recording feature M1 スキーマ - 実SQLite上でのFK挙動', () =>
     expect(remaining.c).toBe(0);
   });
 
+  // 2026-07-21「開始→終了しても予定が消えない」バグ修正の中核。scheduled_workouts削除時に
+  // workout_sessions側までcascade削除されてしまうと、予定を消しただけでユーザーの実施記録
+  // ごと消える重大なデータ損失バグになるため、set nullで済んでいることを実SQLiteで確認する
+  // （モック化されたlib/workout/session.test.tsではマイグレーションSQLのタイポ自体は検出できない）
+  it('scheduled_workouts削除はworkout_sessions.scheduled_workout_idをNULLにするだけで、セッション行(記録)自体は消えない', () => {
+    db = new Database(':memory:');
+    db.pragma('foreign_keys = ON');
+    applyAllMigrations(db);
+    const now = Date.now();
+
+    db.prepare(`INSERT INTO routines (name, order_index, created_at, updated_at) VALUES ('胸の日', 0, ?, ?)`).run(now, now);
+    const routineId = (db.prepare('SELECT id FROM routines').get() as { id: number }).id;
+
+    db.prepare(
+      `INSERT INTO scheduled_workouts (routine_id, scheduled_date, hour, minute, created_at, updated_at)
+       VALUES (?, '2026-07-21', 20, 0, ?, ?)`,
+    ).run(routineId, now, now);
+    const scheduledWorkoutId = (db.prepare('SELECT id FROM scheduled_workouts').get() as { id: number }).id;
+
+    db.prepare(
+      `INSERT INTO workout_sessions (started_at, ended_at, scheduled_workout_id, created_at, updated_at)
+       VALUES (?, ?, ?, ?, ?)`,
+    ).run(now, now, scheduledWorkoutId, now, now);
+    const sessionId = (db.prepare('SELECT id FROM workout_sessions').get() as { id: number }).id;
+
+    db.prepare('DELETE FROM scheduled_workouts WHERE id = ?').run(scheduledWorkoutId);
+
+    const row = db.prepare('SELECT scheduled_workout_id FROM workout_sessions WHERE id = ?').get(sessionId) as {
+      scheduled_workout_id: number | null;
+    };
+    expect(row.scheduled_workout_id).toBeNull();
+    const remaining = db.prepare('SELECT COUNT(*) AS c FROM workout_sessions WHERE id = ?').get(sessionId) as {
+      c: number;
+    };
+    expect(remaining.c).toBe(1);
+  });
+
   it('measurementTypeのバックフィル: 0010適用前からある既存データ(アップグレード想定)を種目ごとに正しく分類する', () => {
     db = new Database(':memory:');
     db.pragma('foreign_keys = ON');

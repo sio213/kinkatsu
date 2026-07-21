@@ -1189,14 +1189,20 @@ describe('CalendarScreen 予定（PR9-2: リマインダー由来の未来予定
         .find((t) => t.props.accessibilityLabel === '「胸の日」夜 20:00のトレーニングを開始')!;
     }
 
-    test('進行中セッションが無ければAlertを出さず、そのままstartWorkoutFromRoutineでワークアウトを開始する', async () => {
+    // まだscheduledWorkouts行を持たないリマインダー予定を「開始」する際は、開始前に
+    // materializeReminderOccurrenceで実体化してからstartWorkoutFromScheduledWorkoutで
+    // 開始する（2026-07-21、直接予定・実体化済みルーティン予定と同じscheduledWorkoutId経由の
+    // 後始末に統一し、「開始→終了しても予定が消えない」バグを修正）
+    test('進行中セッションが無ければAlertを出さず、実体化してからstartWorkoutFromScheduledWorkoutでワークアウトを開始する', async () => {
       mockUseCalendarDaySchedule.mockReturnValue(daySchedule([scheduleCard()]));
+      mockMaterializeReminderOccurrence.mockResolvedValue({ scheduledWorkoutId: 55, notificationSuppressed: true });
       const root = render();
       await act(async () => {
         await findStartButton(root).props.onPress();
       });
       expect(Alert.alert).not.toHaveBeenCalled();
-      expect(mockStartWorkoutFromRoutine).toHaveBeenCalledWith(10);
+      expect(mockMaterializeReminderOccurrence).toHaveBeenCalledWith(1, 10, '胸の日', toDateKey(new Date()), 20, 0);
+      expect(mockStartWorkoutFromScheduledWorkout).toHaveBeenCalledWith(55);
       expect(mockPush).toHaveBeenCalledWith('/workout/77');
     });
 
@@ -1215,16 +1221,18 @@ describe('CalendarScreen 予定（PR9-2: リマインダー由来の未来予定
         'ここまでの記録を保存して「胸の日」を開始しますか？',
         expect.any(Array),
       );
-      expect(mockStartWorkoutFromRoutine).not.toHaveBeenCalled();
+      expect(mockMaterializeReminderOccurrence).not.toHaveBeenCalled();
+      expect(mockStartWorkoutFromScheduledWorkout).not.toHaveBeenCalled();
       expect(mockPush).not.toHaveBeenCalledWith('/workout/77');
     });
 
-    test('Alertで「記録して開始」を選ぶと、endWorkoutSession→startWorkoutFromRoutineの順に呼ばれ、そのセッションへ遷移する', async () => {
+    test('Alertで「記録して開始」を選ぶと、endWorkoutSession→実体化→startWorkoutFromScheduledWorkoutの順に呼ばれ、そのセッションへ遷移する', async () => {
       mockUseWorkoutSessions.mockReturnValue({
         sessions: [{ id: 9, startedAt: 0, endedAt: null }],
         activeSession: { id: 9, startedAt: 0, endedAt: null },
       });
       mockUseCalendarDaySchedule.mockReturnValue(daySchedule([scheduleCard()]));
+      mockMaterializeReminderOccurrence.mockResolvedValue({ scheduledWorkoutId: 55, notificationSuppressed: true });
       const root = render();
       act(() => {
         findStartButton(root).props.onPress();
@@ -1236,8 +1244,27 @@ describe('CalendarScreen 予定（PR9-2: リマインダー由来の未来予定
       });
 
       expect(mockEndWorkoutSession).toHaveBeenCalledWith(9);
-      expect(mockStartWorkoutFromRoutine).toHaveBeenCalledWith(10);
+      expect(mockMaterializeReminderOccurrence).toHaveBeenCalledWith(1, 10, '胸の日', toDateKey(new Date()), 20, 0);
+      expect(mockStartWorkoutFromScheduledWorkout).toHaveBeenCalledWith(55);
       expect(mockPush).toHaveBeenCalledWith('/workout/77');
+    });
+
+    // 実体化(materializeReminderOccurrence)自体が失敗した場合（内部でrollback済み）、
+    // useWorkoutStarterの共通catchでエラーAlertが出て、セッションは作られず遷移もしない
+    // （@tester指摘: 種目カードタップ経由(onMaterializeAndEdit)には同種のテストがあったが、
+    // 「開始」ボタン経由には無かったため追加）
+    test('実体化(materializeReminderOccurrence)が失敗した場合、エラーAlertを出しセッションを作らない', async () => {
+      mockUseCalendarDaySchedule.mockReturnValue(daySchedule([scheduleCard()]));
+      mockMaterializeReminderOccurrence.mockRejectedValueOnce(new Error('fail'));
+      const consoleErrorSpy = jest.spyOn(console, 'error').mockImplementation(() => {});
+      const root = render();
+      await act(async () => {
+        await findStartButton(root).props.onPress();
+      });
+      expect(Alert.alert).toHaveBeenCalledWith('エラー', 'トレーニングを開始できませんでした。');
+      expect(mockStartWorkoutFromScheduledWorkout).not.toHaveBeenCalled();
+      expect(mockPush).not.toHaveBeenCalledWith('/workout/77');
+      consoleErrorSpy.mockRestore();
     });
   });
 
