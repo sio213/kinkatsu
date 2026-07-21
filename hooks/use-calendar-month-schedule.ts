@@ -88,9 +88,13 @@ export function useCalendarMonthSchedule(rangeStart: number, rangeEnd: number, t
       // {exerciseCount:0, categories:[]}にフォールバックしてカードを表示するが、こちらは
       // 月グリッドのリング/ドットの「色」を決めるための集計であり、そもそも塗る色が無いため
       // フォールバックできない（意図した非対称。日パネルには出るが月グリッドには出ない）。
-      // 「直接追加」予定（routineIdがnull、2026-07-20）はdirectSummariesから同じ基準で代表カテゴリを取る
-      const category =
-        m.routineId != null ? summaries.get(m.routineId)?.categories[0] : directSummaries.get(m.id)?.categories[0];
+      // ルーティン紐付き・「直接追加」（routineIdがnull、2026-07-20）のどちらも、代表カテゴリは
+      // directSummaries（scheduledWorkoutExercises、このインスタンス自身の中身）から取る。
+      // ルーティン紐付き予定もaddScheduledWorkout時点で種目をこのテーブルへコピーしており、
+      // 以後はインスタンス単位で編集されるため、ルーティン本体(summaries)を参照すると
+      // schedule-workout-edit.tsxでの編集がドット色に反映されないバグになる
+      // （@ユーザー指摘で発覚、2026-07-21修正。use-calendar-day-manual-schedule.tsと同じ原因）
+      const category = directSummaries.get(m.id)?.categories[0];
       if (category === undefined) continue;
       fireRows.push({ dateKey: m.scheduledDate, hour: m.hour, minute: m.minute, category });
     }

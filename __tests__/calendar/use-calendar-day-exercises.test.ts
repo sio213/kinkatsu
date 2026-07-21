@@ -6,6 +6,27 @@ jest.mock('@/hooks/use-workout-session', () => ({
   useWorkoutSessions: jest.fn(),
 }));
 
+// jest.mock はホイストされるため、変数は var で定義してスコープを合わせる
+// eslint-disable-next-line no-var
+var capturedFocusEffect: (() => (() => void) | void) | null;
+
+// 実際のuseFocusEffectはナビゲーションのフォーカスイベントに紐づき、マウント時に1回だけ
+// 発火する（以後は実際にフォーカスが変わるまで再発火しない）。他画面のテストのように
+// 「呼ばれるたびに毎レンダー同期的にeffectを実行する」モック（__tests__/exercises/
+// exercises-screen.test.tsx等）を使うと、この画面のeffectはretry()でstate更新を伴うため
+// 無限レンダーループになってしまう。実際のuseEffect(dep:[])で代替し、マウント時1回だけ
+// 発火する挙動を正しく再現する。effect自体もcapturedFocusEffectに退避し、テストから
+// 「マウント後に再度フォーカスされた」を明示的に模擬できるようにする
+jest.mock('expo-router', () => {
+  const { useEffect } = jest.requireActual('react');
+  return {
+    useFocusEffect: (effect: () => (() => void) | void) => {
+      useEffect(() => effect(), []);
+      capturedFocusEffect = effect;
+    },
+  };
+});
+
 jest.mock('@/lib/workout/history', () => ({
   getSessionExerciseCards: (...args: unknown[]) => mockGetSessionExerciseCards(...args),
   getExerciseHistoryEntries: (...args: unknown[]) => mockGetExerciseHistoryEntries(...args),
@@ -21,17 +42,26 @@ import { useCalendarDayExercises, type CalendarDayCard } from '@/hooks/use-calen
 function renderHook(selectedDate: Date) {
   let result: CalendarDayCard[] | 'error' | null = null;
   let retry: (() => void) | null = null;
-  function Probe() {
-    const hookResult = useCalendarDayExercises(selectedDate);
+  function Probe({ date }: { date: Date }) {
+    const hookResult = useCalendarDayExercises(date);
     result = hookResult.cards;
     retry = hookResult.retry;
     return null;
   }
   let root!: ReturnType<typeof create>;
   act(() => {
-    root = create(React.createElement(Probe));
+    root = create(React.createElement(Probe, { date: selectedDate }));
   });
-  return { getResult: () => result, getRetry: () => retry!, root };
+  return {
+    getResult: () => result,
+    getRetry: () => retry!,
+    root,
+    rerenderWithDate: (date: Date) => {
+      act(() => {
+        root.update(React.createElement(Probe, { date }));
+      });
+    },
+  };
 }
 
 async function flush(root: ReturnType<typeof create>) {
@@ -49,6 +79,7 @@ beforeEach(() => {
   mockGetExerciseHistoryEntries.mockReset();
   mockComputePersonalBestIds.mockReset();
   (useWorkoutSessions as jest.Mock).mockReset();
+  capturedFocusEffect = null;
 });
 
 describe('useCalendarDayExercises', () => {
@@ -155,6 +186,143 @@ describe('useCalendarDayExercises', () => {
 
     expect(getResult()).toEqual([]);
     expect(mockGetSessionExerciseCards).toHaveBeenCalledTimes(2);
+  });
+
+  // 過去記録編集画面(app/workout/[id].tsx)で種目・セットを編集して「戻る」で復帰した際に
+  // 変更がすぐ反映されない、というバグの修正（@ユーザー指摘、2026-07-21）。daySessionIdsKeyは
+  // 編集では変化しないため、この画面への再フォーカス自体をトリガーに明示的な再取得が必要
+  it('マウント後に画面へ再度フォーカスすると、同じ日付を選択したままでも自動的に再取得する', async () => {
+    (useWorkoutSessions as jest.Mock).mockReturnValue({
+      sessions: [{ id: 1, startedAt: new Date(2026, 6, 16, 7, 0).getTime(), endedAt: new Date(2026, 6, 16, 8, 0).getTime() }],
+    });
+    mockGetSessionExerciseCards.mockResolvedValue([]);
+
+    const { root } = renderHook(new Date(2026, 6, 16));
+    await flush(root);
+    expect(mockGetSessionExerciseCards).toHaveBeenCalledTimes(1);
+
+    act(() => {
+      capturedFocusEffect?.();
+    });
+    await flush(root);
+
+    expect(mockGetSessionExerciseCards).toHaveBeenCalledTimes(2);
+  });
+
+  // タブ復帰のたびに一瞬スピナー(cards:null)へ差し替わってからカードが出直す、という
+  // チラつきの回帰テスト（@reviewer Major指摘、2026-07-21修正）。同じ日付のまま裏で
+  // 再取得する場合は、取得が完了するまで直前の表示内容を保持し続けるべき
+  it('画面再フォーカスでの再取得中も、完了するまでは直前の表示内容を保持し、nullには戻らない', async () => {
+    const startedAt = new Date(2026, 6, 16, 7, 0).getTime();
+    (useWorkoutSessions as jest.Mock).mockReturnValue({
+      sessions: [{ id: 1, startedAt, endedAt: new Date(2026, 6, 16, 8, 0).getTime() }],
+    });
+    const card = {
+      workoutSessionExerciseId: 100,
+      exerciseId: 1,
+      name: 'ベンチプレス',
+      category: 'chest',
+      measurementType: 'weight_reps',
+      source: 'preset',
+      slug: 'bench-press',
+      sets: [],
+    };
+    mockGetSessionExerciseCards.mockResolvedValueOnce([card]);
+    mockGetExerciseHistoryEntries.mockResolvedValue([]);
+    mockComputePersonalBestIds.mockReturnValue(new Set());
+
+    const { getResult, root } = renderHook(new Date(2026, 6, 16));
+    await flush(root);
+    const firstResult = getResult();
+    expect(firstResult).not.toBeNull();
+    expect(firstResult).not.toBe('error');
+
+    // 2回目の取得はまだ解決しない状態にしておき、取得中の表示内容を確認する
+    mockGetSessionExerciseCards.mockImplementationOnce(() => new Promise(() => {}));
+    act(() => {
+      capturedFocusEffect?.();
+    });
+
+    // 取得完了前の時点でも、nullやerrorに戻らず直前の結果を保持したままであるべき
+    expect(getResult()).toEqual(firstResult);
+  });
+
+  it('初回マウント時のフォーカスでは二重取得しない', async () => {
+    (useWorkoutSessions as jest.Mock).mockReturnValue({
+      sessions: [{ id: 1, startedAt: new Date(2026, 6, 16, 7, 0).getTime(), endedAt: new Date(2026, 6, 16, 8, 0).getTime() }],
+    });
+    mockGetSessionExerciseCards.mockResolvedValue([]);
+
+    const { root } = renderHook(new Date(2026, 6, 16));
+    await flush(root);
+
+    expect(mockGetSessionExerciseCards).toHaveBeenCalledTimes(1);
+  });
+
+  it('選択日を変えた直後は、日付変更後の新しいdaySessionIdsKeyにより自動でローディング状態(null)を経由する（前日のカードが一瞬でも混入しない）', async () => {
+    const day16 = new Date(2026, 6, 16, 7, 0).getTime();
+    const day17 = new Date(2026, 6, 17, 7, 0).getTime();
+    (useWorkoutSessions as jest.Mock).mockReturnValue({
+      sessions: [
+        { id: 1, startedAt: day16, endedAt: day16 + 1000 },
+        { id: 2, startedAt: day17, endedAt: day17 + 1000 },
+      ],
+    });
+    mockGetSessionExerciseCards.mockImplementation((sessionId: number) =>
+      Promise.resolve(
+        sessionId === 1
+          ? [{ workoutSessionExerciseId: 100, exerciseId: 1, name: 'A', category: 'chest', measurementType: 'weight_reps', source: 'preset', slug: 'a', sets: [] }]
+          : [{ workoutSessionExerciseId: 200, exerciseId: 2, name: 'B', category: 'leg', measurementType: 'weight_reps', source: 'preset', slug: 'b', sets: [] }],
+      ),
+    );
+    mockGetExerciseHistoryEntries.mockResolvedValue([]);
+    mockComputePersonalBestIds.mockReturnValue(new Set());
+
+    const { getResult, root, rerenderWithDate } = renderHook(new Date(2026, 6, 16));
+    await flush(root);
+    expect((getResult() as CalendarDayCard[]).map((c) => c.workoutSessionExerciseId)).toEqual([100]);
+
+    rerenderWithDate(new Date(2026, 6, 17));
+    await flush(root);
+
+    const ids = (getResult() as CalendarDayCard[]).map((c) => c.workoutSessionExerciseId);
+    expect(ids).toEqual([200]);
+  });
+
+  it('前回の取得が未解決のまま再フォーカスされても、後発の取得結果だけが反映される（先発が遅れて解決しても上書きしない）', async () => {
+    (useWorkoutSessions as jest.Mock).mockReturnValue({
+      sessions: [{ id: 1, startedAt: new Date(2026, 6, 16, 7, 0).getTime(), endedAt: new Date(2026, 6, 16, 8, 0).getTime() }],
+    });
+    let resolveFirst!: (v: unknown[]) => void;
+    const firstPromise = new Promise<unknown[]>((r) => {
+      resolveFirst = r;
+    });
+    mockGetSessionExerciseCards.mockImplementationOnce(() => firstPromise).mockImplementationOnce(() => Promise.resolve([]));
+    mockGetExerciseHistoryEntries.mockResolvedValue([]);
+    mockComputePersonalBestIds.mockReturnValue(new Set());
+
+    const { getResult, root } = renderHook(new Date(2026, 6, 16));
+    // 初回取得を未解決のまま止める
+    await act(async () => {
+      await Promise.resolve();
+    });
+
+    act(() => {
+      capturedFocusEffect?.();
+    });
+    await flush(root);
+    // 2回目（後発）の取得が先に解決し、結果は空配列になる
+    expect(getResult()).toEqual([]);
+
+    await act(async () => {
+      resolveFirst([{ workoutSessionExerciseId: 999, exerciseId: 9, name: 'C', category: 'chest', measurementType: 'weight_reps', source: 'preset', slug: 'c', sets: [] }]);
+      await Promise.resolve();
+      await Promise.resolve();
+    });
+    await flush(root);
+
+    // 先発（1回目）が遅れて解決しても、cancelledガードにより結果を上書きしない
+    expect(getResult()).toEqual([]);
   });
 
   it('同じ日に複数セッションがあれば両方の種目カードを合算して返す', async () => {

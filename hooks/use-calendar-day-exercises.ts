@@ -8,7 +8,8 @@ import {
   NO_SESSION_TO_EXCLUDE,
   type SessionHistoryCard,
 } from '@/lib/workout/history';
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useFocusEffect } from 'expo-router';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useWorkoutSessions } from './use-workout-session';
 
 export type CalendarDayCard = SessionHistoryCard & {
@@ -23,8 +24,9 @@ export type CalendarDayCard = SessionHistoryCard & {
 
 export type UseCalendarDayExercisesResult = {
   cards: CalendarDayCard[] | 'error' | null;
-  // 取得失敗時にユーザー操作で再取得するための関数（同じ日付を選択したままでは
-  // daySessionIdsKeyが変化せず自動では再実行されないため、明示的な再実行手段が要る）
+  // 取得失敗時に「再試行」ボタンから明示的に再取得するための関数（同じ日付を選択したままでは
+  // daySessionIdsKeyが変化せず自動では再実行されないため）。フックの内部でも画面再フォーカス時に
+  // 同じ仕組みで呼ばれる
   retry: () => void;
 };
 
@@ -35,8 +37,14 @@ export type UseCalendarDayExercisesResult = {
 // 'error'=取得失敗、配列=取得成功（0件含む）（session-history-load-view.tsxと同じ三値管理）。
 // 対象日のセッション自体はuseWorkoutSessions()のlive queryから絞り込むため一覧の増減に追従するが、
 // 各カードの中身（種目・セット・自己ベスト・前回比較）はgetSessionExerciseCards等の一括取得を
-// 都度実行する一時点のスナップショットで、live query化はしていない（カレンダーで過去日を見ている間に
-// 裏でその日の記録が編集される状況は通常発生しないため）
+// 都度実行する一時点のスナップショットで、live query化はしていない（bestCardIds算出のために
+// 種目ごとの全履歴取得まで要る複雑な非同期集計のため、単純なuseLiveQueryのクエリ購読には
+// 素直に落とし込めない）。その代わり、この画面自身が再フォーカスされたタイミング
+// （下のuseFocusEffect）で明示的に再取得する。過去記録編集画面(app/workout/[id].tsx)から
+// 「戻る」で復帰した際に編集内容がすぐ反映されない、というバグの原因だった
+// （@ユーザー指摘、2026-07-21修正。このアプリはローカルDBのみで外部からの書き込みが
+// 発生しないため、「編集→この画面に戻る」という画面遷移そのものが唯一のデータ変化点であり、
+// 再フォーカス時の再取得で正しく（かつライブ購読よりずっと安価に）実運用上のケースを網羅できる）
 export function useCalendarDayExercises(selectedDate: Date): UseCalendarDayExercisesResult {
   const { sessions } = useWorkoutSessions();
   const daySessions = useMemo(
@@ -50,14 +58,34 @@ export function useCalendarDayExercises(selectedDate: Date): UseCalendarDayExerc
   // このkeyをeffectの依存にすることで中身が変わらない限り再実行されないようにする
   // （daySessions自体はeffect内でそのまま参照する。exhaustive-depsはkeyで代替しているため無効化する）
   const daySessionIdsKey = daySessions.map((s) => s.id).join(',');
-  // retryToken: ユーザーが「再試行」を押した時だけインクリメントし、daySessionIdsKeyが
-  // 同じ（＝同じ日付を選んだまま）でもeffectを再実行させるためのトリガー
+  // retryToken: 「再試行」ボタン押下、または画面再フォーカス（下のuseFocusEffect）のたびに
+  // インクリメントし、daySessionIdsKeyが同じ（＝同じ日付を選んだまま）でもeffectを
+  // 再実行させるためのトリガー
   const [retryToken, setRetryToken] = useState(0);
   const retry = useCallback(() => setRetryToken((t) => t + 1), []);
 
+  // 初回マウント時のフォーカスは下のeffect（daySessionIdsKey依存）が既に取得を担うため、
+  // 二重取得を避けて最初の1回だけスキップする
+  const isFirstFocusRef = useRef(true);
+  useFocusEffect(
+    useCallback(() => {
+      if (isFirstFocusRef.current) {
+        isFirstFocusRef.current = false;
+        return;
+      }
+      retry();
+    }, [retry]),
+  );
+
   const [result, setResult] = useState<CalendarDayCard[] | 'error' | null>(null);
+  // daySessionIdsKeyが実際に変わった（＝別の日付/セッション集合を見ている）かどうかを
+  // 判定するためだけの直前値。初回マウント時はnullなので必ずkeyChanged=trueになる
+  const previousDaySessionIdsKeyRef = useRef<string | null>(null);
 
   useEffect(() => {
+    const keyChanged = previousDaySessionIdsKeyRef.current !== daySessionIdsKey;
+    previousDaySessionIdsKeyRef.current = daySessionIdsKey;
+
     // 対象セッションが無い日は取得処理そのものが不要なので、ローディング状態を経由せず
     // 同期的に空配列を確定する（一瞬スピナーが出てすぐ消えるちらつきを防ぐ）
     if (daySessions.length === 0) {
@@ -66,7 +94,14 @@ export function useCalendarDayExercises(selectedDate: Date): UseCalendarDayExerc
     }
 
     let cancelled = false;
-    setResult(null);
+    // 日付が変わった／まだ一度も取得できていない（null・error）場合はローディング状態
+    // (setResult(null))を経由する。既に表示中のカードがある状態での再取得（画面再フォーカス、
+    // 2026-07-21追加）でも無条件にnullへ戻すと、カレンダータブに戻るたびに一瞬スピナーへ
+    // 差し替わってからカードが出直す、というチラつきになる（@reviewer Major指摘）ため、
+    // 同じ日付のまま裏で再取得する場合は前回の結果を表示したまま保持し、取得完了時に差し替える
+    if (keyChanged || result === null || result === 'error') {
+      setResult(null);
+    }
 
     (async () => {
       try {

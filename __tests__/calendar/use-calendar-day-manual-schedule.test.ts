@@ -1,7 +1,6 @@
 // jest.mock はホイストされるため、変数は var で定義してスコープを合わせる
 /* eslint-disable no-var */
 var mockRows: unknown[] | undefined;
-var mockSummaries: Map<number, { exerciseCount: number; categories: string[] }>;
 var mockRoutines: { id: number; name: string }[];
 var mockDirectSummaries: Map<
   number,
@@ -23,7 +22,6 @@ jest.mock('drizzle-orm/expo-sqlite', () => ({
 }));
 
 jest.mock('@/hooks/use-routines', () => ({
-  useRoutineExerciseSummaries: () => mockSummaries,
   useRoutines: () => ({ routines: mockRoutines }),
 }));
 
@@ -57,7 +55,6 @@ function renderHook(selectedDate: Date) {
 
 beforeEach(() => {
   mockRows = undefined;
-  mockSummaries = new Map();
   mockRoutines = [];
   mockDirectSummaries = new Map();
 });
@@ -67,9 +64,14 @@ describe('useCalendarDayManualSchedule', () => {
     expect(renderHook(new Date(2026, 6, 25)).result()).toEqual([]);
   });
 
-  it('選択日の手動予定を、ルーティン名・カテゴリ・種目数付きで返す', () => {
+  // カテゴリ・種目数は、ルーティン紐付き予定でもルーティン本体(routineId)ではなく、この予定
+  // インスタンス自身(scheduledWorkoutId)のscheduledWorkoutExercisesから取る。ルーティン紐付き
+  // 予定もaddScheduledWorkout時点で種目をこのテーブルへコピーしており、以後は
+  // schedule-workout-edit.tsxでインスタンス単位に編集されるため（2026-07-21統一）、
+  // ルーティン本体を参照すると編集内容が反映されないバグになる（@ユーザー指摘、2026-07-21修正）
+  it('選択日の手動予定を、ルーティン名・カテゴリ・種目数付きで返す（カテゴリ・種目数は予定インスタンス自身から）', () => {
     mockRows = [{ id: 1, routineId: 10, scheduledDate: '2026-07-25', hour: 19, minute: 30 }];
-    mockSummaries = new Map([[10, { exerciseCount: 3, categories: ['chest', 'shoulder'] }]]);
+    mockDirectSummaries = new Map([[1, { exerciseCount: 3, categories: ['chest', 'shoulder'], exerciseNames: [] }]]);
     mockRoutines = [{ id: 10, name: '胸の日' }];
     const result = renderHook(new Date(2026, 6, 25)).result();
     expect(result).toHaveLength(1);
@@ -84,9 +86,19 @@ describe('useCalendarDayManualSchedule', () => {
     });
   });
 
-  it('summariesに代表カテゴリが無いルーティン(種目0件)の予定は、0種目・カテゴリ無しとして結果に含まれる（schedule-routine-picker.tsxでは0種目のルーティンも選択できるため、除外すると選んだのに二度と表示されない予定が生まれてしまう。PRレビュー指摘対応）', () => {
+  it('ルーティン予定でも編集(schedule-workout-edit.tsx)で種目・カテゴリを変更していれば、その内容がそのまま反映される（ルーティン本体の現在の中身とは異なっていてよい）', () => {
     mockRows = [{ id: 1, routineId: 10, scheduledDate: '2026-07-25', hour: 19, minute: 30 }];
-    mockSummaries = new Map();
+    // ルーティン本体は「胸の日」のままだが、この予定インスタンスだけ脚種目に差し替え済み、
+    // という乖離状態を再現する
+    mockDirectSummaries = new Map([[1, { exerciseCount: 1, categories: ['leg'], exerciseNames: ['スクワット'] }]]);
+    mockRoutines = [{ id: 10, name: '胸の日' }];
+    const result = renderHook(new Date(2026, 6, 25)).result();
+    expect(result[0]).toMatchObject({ title: '胸の日', categories: ['leg'], exerciseCount: 1 });
+  });
+
+  it('directSummariesに代表カテゴリが無い予定(種目0件)は、0種目・カテゴリ無しとして結果に含まれる（schedule-routine-picker.tsxでは0種目のルーティンも選択できるため、除外すると選んだのに二度と表示されない予定が生まれてしまう。PRレビュー指摘対応）', () => {
+    mockRows = [{ id: 1, routineId: 10, scheduledDate: '2026-07-25', hour: 19, minute: 30 }];
+    mockDirectSummaries = new Map();
     mockRoutines = [{ id: 10, name: '胸の日' }];
     const result = renderHook(new Date(2026, 6, 25)).result();
     expect(result).toHaveLength(1);
@@ -95,7 +107,7 @@ describe('useCalendarDayManualSchedule', () => {
 
   it('routinesにルーティン名が無い(削除済み等)場合、予定は結果に含まれない', () => {
     mockRows = [{ id: 1, routineId: 10, scheduledDate: '2026-07-25', hour: 19, minute: 30 }];
-    mockSummaries = new Map([[10, { exerciseCount: 1, categories: ['chest'] }]]);
+    mockDirectSummaries = new Map([[1, { exerciseCount: 1, categories: ['chest'], exerciseNames: [] }]]);
     mockRoutines = [];
     expect(renderHook(new Date(2026, 6, 25)).result()).toEqual([]);
   });
@@ -105,9 +117,9 @@ describe('useCalendarDayManualSchedule', () => {
       { id: 1, routineId: 10, scheduledDate: '2026-07-25', hour: 19, minute: 0 },
       { id: 2, routineId: 20, scheduledDate: '2026-07-25', hour: 7, minute: 0 },
     ];
-    mockSummaries = new Map([
-      [10, { exerciseCount: 1, categories: ['leg'] }],
-      [20, { exerciseCount: 1, categories: ['chest'] }],
+    mockDirectSummaries = new Map([
+      [1, { exerciseCount: 1, categories: ['leg'], exerciseNames: [] }],
+      [2, { exerciseCount: 1, categories: ['chest'], exerciseNames: [] }],
     ]);
     mockRoutines = [
       { id: 10, name: '夜の予定' },
@@ -119,7 +131,7 @@ describe('useCalendarDayManualSchedule', () => {
 
   it('他の日付の手動予定は結果に含まれない（SQL側でなくJS側で日付を絞り込む）', () => {
     mockRows = [{ id: 1, routineId: 10, scheduledDate: '2026-07-26', hour: 19, minute: 30 }];
-    mockSummaries = new Map([[10, { exerciseCount: 1, categories: ['chest'] }]]);
+    mockDirectSummaries = new Map([[1, { exerciseCount: 1, categories: ['chest'], exerciseNames: [] }]]);
     mockRoutines = [{ id: 10, name: '胸の日' }];
     expect(renderHook(new Date(2026, 6, 25)).result()).toEqual([]);
   });
@@ -129,9 +141,9 @@ describe('useCalendarDayManualSchedule', () => {
       { id: 1, routineId: 10, scheduledDate: '2026-07-25', hour: 7, minute: 0 },
       { id: 2, routineId: 20, scheduledDate: '2026-07-26', hour: 19, minute: 0 },
     ];
-    mockSummaries = new Map([
-      [10, { exerciseCount: 1, categories: ['chest'] }],
-      [20, { exerciseCount: 1, categories: ['leg'] }],
+    mockDirectSummaries = new Map([
+      [1, { exerciseCount: 1, categories: ['chest'], exerciseNames: [] }],
+      [2, { exerciseCount: 1, categories: ['leg'], exerciseNames: [] }],
     ]);
     mockRoutines = [
       { id: 10, name: '胸の日' },
@@ -189,11 +201,11 @@ describe('useCalendarDayManualSchedule', () => {
         { id: 1, routineId: 10, scheduledDate: '2026-07-25', hour: 19, minute: 0 },
         { id: 2, routineId: null, scheduledDate: '2026-07-25', hour: 7, minute: 0 },
       ];
-      mockSummaries = new Map([[10, { exerciseCount: 1, categories: ['leg'] }]]);
-      mockRoutines = [{ id: 10, name: '夜の予定' }];
       mockDirectSummaries = new Map([
+        [1, { exerciseCount: 1, categories: ['leg'], exerciseNames: [] }],
         [2, { exerciseCount: 1, categories: ['chest'], exerciseNames: ['ベンチプレス'] }],
       ]);
+      mockRoutines = [{ id: 10, name: '夜の予定' }];
       const result = renderHook(new Date(2026, 6, 25)).result();
       expect(result.map((c) => c.title)).toEqual(['ベンチプレス', '夜の予定']);
     });
