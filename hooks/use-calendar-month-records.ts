@@ -2,9 +2,14 @@ import { db } from '@/db/client';
 import { exercises, sets, workoutSessionExercises, workoutSessions } from '@/db/schema';
 import { aggregateDailyCategorySet, aggregateDailyPrimaryCategory, type DailyCategoryRow } from '@/lib/calendar/day-category';
 import { toDateKey } from '@/lib/calendar/date-grid';
-import { and, asc, eq, gte, isNotNull, lt } from 'drizzle-orm';
+import { and, asc, eq, gte, isNotNull, lt, notExists, or, sql } from 'drizzle-orm';
+import { alias } from 'drizzle-orm/sqlite-core';
 import { useLiveQuery } from 'drizzle-orm/expo-sqlite';
 import { useMemo } from 'react';
+
+// 同一セッション内に確定(✓)セットが1件でも有るかを判定する相関サブクエリ用のエイリアス。
+// メインクエリのsetsとは別名で参照する必要がある
+const confirmedSetsInSession = alias(sets, 'confirmed_sets_in_session');
 
 export type CalendarMonthRecords = {
   // 日付キー(YYYY-MM-DD)→代表カテゴリ（月グリッドのセル塗りつぶし色に使う。実績がある日だけキーを持つ）
@@ -15,9 +20,13 @@ export type CalendarMonthRecords = {
 };
 
 // カレンダーの日別マーカー・カテゴリフィルター用。[startMs, endMs)の範囲に開始した実績
-// （✓確定セットを持つ完了済みセッション）を日付ごとに集計する。startMs/endMsは表示中の月グリッド
+// （終了済みセッション）を日付ごとに集計する。集計対象は「確定(✓)セット」を基本としつつ、
+// セッション内に確定セットが1件も無い（すべて未確定のまま終了した）場合だけ、そのセッションの
+// 未確定セットで補完する（完了0件セッションもマーカー表示されるようにしつつ、確定セットが
+// 一部でもある通常の日の代表カテゴリ・カテゴリ集合が未確定セットの混入で変わらないようにするため）。
+// startMs/endMsは表示中の月グリッド
 // （前月/当月/翌月をまたぐ場合はそれを含む範囲）をカバーする呼び出し側の責務とする。sets単位で
-// JOINし、完了済みセット1件につき1行取得することで「セット数が最も多いカテゴリ」の集計に
+// JOINし、集計対象セット1件につき1行取得することで「セット数が最も多いカテゴリ」の集計に
 // そのまま使える形にしている
 export function useCalendarMonthRecords(startMs: number, endMs: number): CalendarMonthRecords {
   // useLiveQueryはクエリのfrom()に指定したテーブル（このクエリではsets）の変更しか自動購読しない
@@ -51,7 +60,20 @@ export function useCalendarMonthRecords(startMs: number, endMs: number): Calenda
           gte(workoutSessions.startedAt, startMs),
           lt(workoutSessions.startedAt, endMs),
           isNotNull(workoutSessions.endedAt),
-          isNotNull(sets.completedAt),
+          or(
+            isNotNull(sets.completedAt),
+            notExists(
+              db
+                .select({ one: sql`1` })
+                .from(confirmedSetsInSession)
+                .where(
+                  and(
+                    eq(confirmedSetsInSession.sessionId, sets.sessionId),
+                    isNotNull(confirmedSetsInSession.completedAt),
+                  ),
+                ),
+            ),
+          ),
         ),
       )
       // 集計側(aggregateDailyPrimaryCategory)が「先頭に見つかった行=先にやった種目」という

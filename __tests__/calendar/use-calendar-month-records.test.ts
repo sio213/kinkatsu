@@ -27,10 +27,19 @@ jest.mock('@/db/schema', () => ({
 jest.mock('drizzle-orm', () => ({
   eq: jest.fn((col, val) => ({ col, val })),
   and: jest.fn((...conds) => ({ conds })),
+  or: jest.fn((...conds) => ({ conds, op: 'or' })),
   gte: jest.fn((col, val) => ({ col, val, op: 'gte' })),
   lt: jest.fn((col, val) => ({ col, val, op: 'lt' })),
   isNotNull: jest.fn((col) => ({ col, op: 'isNotNull' })),
+  notExists: jest.fn((subquery) => ({ subquery, op: 'notExists' })),
+  sql: jest.fn((strings: TemplateStringsArray) => ({ strings, op: 'sql' })),
   asc: jest.fn((col) => ({ col, dir: 'asc' })),
+}));
+
+// aliasは「同じテーブルを別名で参照する」というただの目印オブジェクトを作るだけなので、
+// 元のsetsモックをスプレッドしてそのまま返すダミーで十分（実クエリ生成はしていないテストのため）
+jest.mock('drizzle-orm/sqlite-core', () => ({
+  alias: jest.fn((table: object) => ({ ...table })),
 }));
 
 // フック内でuseLiveQueryが2回呼ばれる（①workoutSessionsだけの軽量な購読=session変更検知用、

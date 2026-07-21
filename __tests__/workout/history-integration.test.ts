@@ -747,6 +747,7 @@ describe('getPastTrainingSessions（実SQLite）', () => {
 function getSessionExerciseCardsSql(
   db: Database.Database,
   sessionId: number,
+  options?: { includeUnconfirmedCards?: boolean },
 ): {
   workoutSessionExerciseId: number;
   exerciseId: number;
@@ -816,19 +817,19 @@ function getSessionExerciseCardsSql(
     }
   }
 
-  return cards
-    .map((c) => ({
-      ...c,
-      sets: (setsByCard.get(c.workoutSessionExerciseId) ?? []).map((s) => ({
-        setNumber: s.setNumber,
-        weight: s.weight,
-        reps: s.reps,
-        durationSeconds: s.durationSeconds,
-        distanceMeters: s.distanceMeters,
-        completedAt: s.completedAt,
-      })),
-    }))
-    .filter((card) => card.sets.some((s) => s.completedAt != null));
+  const cardsWithSets = cards.map((c) => ({
+    ...c,
+    sets: (setsByCard.get(c.workoutSessionExerciseId) ?? []).map((s) => ({
+      setNumber: s.setNumber,
+      weight: s.weight,
+      reps: s.reps,
+      durationSeconds: s.durationSeconds,
+      distanceMeters: s.distanceMeters,
+      completedAt: s.completedAt,
+    })),
+  }));
+  if (options?.includeUnconfirmedCards) return cardsWithSets;
+  return cardsWithSets.filter((card) => card.sets.some((s) => s.completedAt != null));
 }
 
 describe('getSessionExerciseCards（実SQLite）', () => {
@@ -864,6 +865,21 @@ describe('getSessionExerciseCards（実SQLite）', () => {
     insertSet(db, session, exerciseId, card, 1, 60, 10, false); // ✓未確定のまま
 
     expect(getSessionExerciseCardsSql(db, session)).toEqual([]);
+  });
+
+  it('includeUnconfirmedCards:trueを渡すと、✓確定セットが1件も無いカードも含めて返す（カレンダー日別詳細用）', () => {
+    const exerciseId = insertExercise(db, 'ベンチプレス');
+    const session = insertSession(db, 1000);
+    const card = insertCard(db, session, exerciseId, 0);
+    insertSet(db, session, exerciseId, card, 1, 60, 10, false); // ✓未確定のまま
+
+    const result = getSessionExerciseCardsSql(db, session, { includeUnconfirmedCards: true });
+    expect(result).toEqual([
+      expect.objectContaining({
+        workoutSessionExerciseId: card,
+        sets: [{ setNumber: 1, weight: 60, reps: 10, durationSeconds: null, distanceMeters: null, completedAt: null }],
+      }),
+    ]);
   });
 
   it('セット行が1件も無いカード（追加しただけの空カード）も除外する', () => {

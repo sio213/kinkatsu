@@ -93,7 +93,7 @@ describe('useCalendarDayExercises', () => {
     const { getResult, root } = renderHook(new Date(2026, 6, 16));
     await flush(root);
 
-    expect(mockGetSessionExerciseCards).toHaveBeenCalledWith(1);
+    expect(mockGetSessionExerciseCards).toHaveBeenCalledWith(1, { includeUnconfirmedCards: true });
     expect(mockGetExerciseHistoryEntries).toHaveBeenCalledWith(1, -1);
     expect(getResult()).toEqual([
       { ...card, sessionId: 1, sessionStartedAt: startedAt, isBest: true, comparison: null },
@@ -215,7 +215,7 @@ describe('useCalendarDayExercises', () => {
     await flush(root);
 
     expect(mockGetSessionExerciseCards).toHaveBeenCalledTimes(1);
-    expect(mockGetSessionExerciseCards).toHaveBeenCalledWith(2);
+    expect(mockGetSessionExerciseCards).toHaveBeenCalledWith(2, { includeUnconfirmedCards: true });
   });
 
   it('同じ種目が複数セッションにまたがる場合でも履歴取得は種目ごとに1回だけ呼ばれる', async () => {
