@@ -1,5 +1,8 @@
 import {
   aggregateSchedulePrimaryCategoryByDay,
+  buildRoutineScheduleDeleteMessage,
+  buildScheduledWorkoutDeleteMessage,
+  DIRECT_SCHEDULE_DELETE_MESSAGE,
   formatDirectScheduleTitle,
   groupExerciseNamesByScheduleId,
   mergeScheduleCards,
@@ -66,6 +69,34 @@ describe('formatDirectScheduleTitle', () => {
 
   it('種目0件なら空文字（呼び出し側の安全網、実運用では起こらない想定）', () => {
     expect(formatDirectScheduleTitle([])).toBe('');
+  });
+});
+
+describe('buildRoutineScheduleDeleteMessage', () => {
+  it('ルーティン名を含み、ルーティン本体には影響しない旨を明記する', () => {
+    expect(buildRoutineScheduleDeleteMessage('胸トレ')).toBe(
+      '「胸トレ」自体には影響しません。この予定と通知だけを削除します。',
+    );
+  });
+});
+
+// app/calendar/schedule-workout-edit.tsxのhandleDeleteWorkout用（2026-07-21、PR6）。
+// 単一の削除ハンドラが直接予定・ルーティン予定どちらも扱うため、routineIdの有無で
+// 自己判定する必要がある（@reviewer指摘: 4象限の組み合わせを直接検証しておく）
+describe('buildScheduledWorkoutDeleteMessage', () => {
+  it('routineId!=null かつ routineName!=null（ルーティン予定）なら、ルーティン向けの文言を返す', () => {
+    expect(buildScheduledWorkoutDeleteMessage(10, '胸トレ')).toBe(
+      '「胸トレ」自体には影響しません。この予定と通知だけを削除します。',
+    );
+  });
+
+  it('routineId===null（直接予定）なら、routineNameの有無に関わらずDIRECT_SCHEDULE_DELETE_MESSAGEを返す', () => {
+    expect(buildScheduledWorkoutDeleteMessage(null, undefined)).toBe(DIRECT_SCHEDULE_DELETE_MESSAGE);
+    expect(buildScheduledWorkoutDeleteMessage(null, '胸トレ')).toBe(DIRECT_SCHEDULE_DELETE_MESSAGE);
+  });
+
+  it('routineId!=null だがroutineName===undefined（理論上の孤児ケース: routines一覧に該当ルーティンが見つからない）なら、DIRECT_SCHEDULE_DELETE_MESSAGEにフォールバックする', () => {
+    expect(buildScheduledWorkoutDeleteMessage(10, undefined)).toBe(DIRECT_SCHEDULE_DELETE_MESSAGE);
   });
 });
 

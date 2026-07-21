@@ -12,14 +12,23 @@ const mockUpdateScheduledWorkoutSetValues = jest.fn();
 const mockRemoveScheduledWorkout = jest.fn();
 const mockUseRoutines = jest.fn();
 
-jest.mock('expo-router', () => ({
-  useRouter: () => ({ back: mockBack, push: mockPush }),
-  useLocalSearchParams: () => mockUseLocalSearchParams(),
-  Stack: {
-    Screen: ({ options }: { options?: { headerRight?: () => unknown } }) =>
-      options?.headerRight ? options.headerRight() : null,
-  },
-}));
+jest.mock('expo-router', () => {
+  const ReactActual = require('react');
+  const { Fragment } = ReactActual;
+  return {
+    useRouter: () => ({ back: mockBack, push: mockPush }),
+    useLocalSearchParams: () => mockUseLocalSearchParams(),
+    Stack: {
+      Screen: ({ options }: { options?: { headerTitle?: () => unknown; headerRight?: () => unknown } }) =>
+        ReactActual.createElement(
+          Fragment,
+          null,
+          options?.headerTitle ? options.headerTitle() : null,
+          options?.headerRight ? options.headerRight() : null,
+        ),
+    },
+  };
+});
 
 jest.mock('@/hooks/use-debounced-push', () => ({
   useDebouncedPush: () => mockPush,
@@ -122,6 +131,27 @@ describe('ScheduleWorkoutEditScreen', () => {
     const root = render();
     expect(root.findByProps({ children: 'ベンチプレス' })).toBeDefined();
     expect(root.findByProps({ children: 'スクワット' })).toBeDefined();
+  });
+
+  // 2026-07-21、@designer指摘: この画面はルーティン名がどこにも表示されず、選択日パネルとの
+  // 文脈が途切れる（また⋮「ルーティンを編集」が指す先も分かりにくい）ため、ヘッダーの
+  // サブタイトルに日時と合わせて表示する
+  it('ルーティン紐付き予定（routineIdあり）の場合、ヘッダーのサブタイトルにルーティン名と日時が両方表示される', () => {
+    mockUseScheduledWorkoutTime.mockReturnValue({
+      time: { scheduledDate: '2026-07-21', hour: 19, minute: 30, routineId: 1 },
+      loaded: true,
+    });
+    const root = render();
+    const subtitle = root.findAllByType(Text).map((t) => t.props.children).find((c) => typeof c === 'string' && c.includes('胸トレ'));
+    expect(subtitle).toContain('胸トレ');
+    expect(subtitle).toContain('19:30');
+  });
+
+  it('直接予定（routineIdなし）の場合、ヘッダーのサブタイトルは従来通り日時のみ（ルーティン名は含まれない）', () => {
+    const root = render();
+    const texts = root.findAllByType(Text).map((t) => t.props.children);
+    expect(texts.some((c) => typeof c === 'string' && c.includes('19:30'))).toBe(true);
+    expect(texts.some((c) => typeof c === 'string' && c.includes('胸トレ'))).toBe(false);
   });
 
   it('完了ボタンは無く、フッターは「戻る」のみで押すとrouter.back()する', () => {
@@ -262,6 +292,61 @@ describe('ScheduleWorkoutEditScreen', () => {
     });
     expect(mockRemoveScheduledWorkout).toHaveBeenCalledWith(5);
     expect(mockBack).toHaveBeenCalledTimes(1);
+  });
+
+  // 2026-07-21よりルーティン予定（実体化済み、scheduledWorkoutIdを持つ）もこの画面に来るように
+  // なったため、削除確認文言をrouteIdの有無で出し分ける必要がある（@ユーザー指摘）
+  it('ルーティン紐付き予定（routineIdあり）の場合、ヘッダー⋮「削除」の確認文言はルーティン本体に影響しない旨になる（選択日パネルのhandleDeleteRoutineScheduleと同じ文言）', async () => {
+    mockUseScheduledWorkoutTime.mockReturnValue({
+      time: { scheduledDate: '2026-07-21', hour: 19, minute: 30, routineId: 1 },
+      loaded: true,
+    });
+    const root = render();
+    const headerMenuTrigger = root
+      .findAllByType(TouchableOpacity)
+      .find((t) => t.props.accessibilityLabel === '種目編集のメニューを開く')!;
+    act(() => {
+      headerMenuTrigger.props.onPress();
+    });
+    const deleteWorkoutItem = findMenuItem(root, '削除')!;
+    act(() => {
+      deleteWorkoutItem.props.onPress();
+    });
+    expect(Alert.alert).toHaveBeenCalledWith(
+      'この予定を削除しますか？',
+      '「胸トレ」自体には影響しません。この予定と通知だけを削除します。',
+      expect.any(Array),
+    );
+  });
+
+  it('ヘッダー⋮「ルーティンを編集」はルーティン紐付き予定（routineIdあり）のときだけ表示され、押すとルーティン編集画面へ遷移する', () => {
+    mockUseScheduledWorkoutTime.mockReturnValue({
+      time: { scheduledDate: '2026-07-21', hour: 19, minute: 30, routineId: 1 },
+      loaded: true,
+    });
+    const root = render();
+    const headerMenuTrigger = root
+      .findAllByType(TouchableOpacity)
+      .find((t) => t.props.accessibilityLabel === '種目編集のメニューを開く')!;
+    act(() => {
+      headerMenuTrigger.props.onPress();
+    });
+    const editRoutineItem = findMenuItem(root, 'ルーティンを編集')!;
+    act(() => {
+      editRoutineItem.props.onPress();
+    });
+    expect(mockPush).toHaveBeenCalledWith('/routine/edit/1');
+  });
+
+  it('直接予定（routineIdなし）の場合、ヘッダー⋮に「ルーティンを編集」は表示されない', () => {
+    const root = render();
+    const headerMenuTrigger = root
+      .findAllByType(TouchableOpacity)
+      .find((t) => t.props.accessibilityLabel === '種目編集のメニューを開く')!;
+    act(() => {
+      headerMenuTrigger.props.onPress();
+    });
+    expect(findMenuItem(root, 'ルーティンを編集')).toBeUndefined();
   });
 
   it('ヘッダー⋮「削除」の確認Alertで「キャンセル」を押してもremoveScheduledWorkoutは呼ばれない', () => {
