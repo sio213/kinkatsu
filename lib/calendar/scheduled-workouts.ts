@@ -1,6 +1,10 @@
 import { db } from '@/db/client';
 import { scheduledWorkoutExercises, scheduledWorkouts } from '@/db/schema';
-import { insertInitialScheduledWorkoutSets } from '@/lib/calendar/scheduled-workout-detail';
+import {
+  insertInitialScheduledWorkoutSets,
+  insertRoutineExerciseRowsIntoScheduledWorkout,
+} from '@/lib/calendar/scheduled-workout-detail';
+import { getRoutineDetail } from '@/lib/routines/db';
 import { eq } from 'drizzle-orm';
 
 function assertValidTime(hour: number, minute: number): void {
@@ -13,7 +17,11 @@ function assertValidTime(hour: number, minute: number): void {
 
 // カレンダーで手動追加する予定（リマインダーとは無関係、PR10確定仕様）。呼び出し側
 // （画面）でtry/catch + Alert.alertするルール（CLAUDE.md実装ルール）のため、ここでは
-// エラーハンドリングをせず素直にthrowする
+// エラーハンドリングをせず素直にthrowする。ルーティン予定も直接予定(addDirectScheduledWorkout)と
+// 同じくscheduledWorkoutExercises/scheduledWorkoutSetsにその予定インスタンス専用の種目・目標
+// セットを持たせる（2026-07-21、@ユーザー指摘）。目標セットは「ルーティン本体の実際の値」を
+// そのままコピーし、以後はこの予定インスタンス側の値だけを編集する（ルーティン本体の変更は
+// 過去に作成済みの予定には遡って反映されない、addRoutineExercisesToScheduledWorkoutと同じ方針）
 export async function addScheduledWorkout(
   routineId: number,
   scheduledDate: string,
@@ -22,12 +30,22 @@ export async function addScheduledWorkout(
 ): Promise<number> {
   assertValidTime(hour, minute);
 
+  // getRoutineDetailはaddDirectScheduledWorkoutと同じくdb.transactionの外側、書き込みより先に読む
+  // （dbとtxを同一トランザクション内で混在させない規約、lib/workout/session.tsのcreateRoutineSession
+  // と同じ）。ルーティンが削除済み、または0種目の場合は空配列にフォールバックする
+  // （useCalendarDayManualScheduleが0種目ルーティンの手動予定を許容している既存仕様を踏襲）
+  const detail = await getRoutineDetail(routineId);
+  const exercisesToCopy = detail?.exercises ?? [];
+
   const now = Date.now();
-  const [inserted] = await db
-    .insert(scheduledWorkouts)
-    .values({ routineId, scheduledDate, hour, minute, createdAt: now, updatedAt: now })
-    .returning();
-  return inserted.id;
+  return db.transaction(async (tx) => {
+    const [inserted] = await tx
+      .insert(scheduledWorkouts)
+      .values({ routineId, scheduledDate, hour, minute, createdAt: now, updatedAt: now })
+      .returning();
+    await insertRoutineExerciseRowsIntoScheduledWorkout(tx, inserted.id, exercisesToCopy, 0, now);
+    return inserted.id;
+  });
 }
 
 // 「直接追加」（ルーティンを介さず個別に選んだ種目で予定を作る、2026-07-20）用。routineIdは

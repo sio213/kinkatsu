@@ -1,5 +1,5 @@
 import { db, type DbOrTx, type Tx } from '@/db/client';
-import { scheduledWorkoutExercises, scheduledWorkoutSets, scheduledWorkouts } from '@/db/schema';
+import { scheduledWorkoutExercises, scheduledWorkoutSets, scheduledWorkouts, type RoutineSet } from '@/db/schema';
 import { buildInitialRoutineSets, getRoutineDetail, type RoutineExerciseSelection } from '@/lib/routines/db';
 import { getPreviousSetsForCard } from '@/lib/workout/history';
 import { hasAnyValue, type PreviousSetValues } from '@/lib/workout/set-values';
@@ -74,13 +74,47 @@ export async function addExercisesToScheduledWorkout(scheduledWorkoutId: number,
   });
 }
 
+// selectedExercisesをscheduledWorkoutExercises/scheduledWorkoutSetsへ書き込むコア処理。
+// 「そのルーティンの実際の値」をそのままコピーする（addExercisesToScheduledWorkout/
+// insertInitialScheduledWorkoutSetsが「直近の実績」をプリフィルするのとは異なる経路）。
+// txを既に開いている呼び出し元（同ファイルのaddRoutineExercisesToScheduledWorkout: 既存予定への
+// 追加、lib/calendar/scheduled-workouts.tsのaddScheduledWorkout: 予定の新規作成）の両方から
+// 呼べるよう、トランザクションの開始・終了はここでは行わない
+export async function insertRoutineExerciseRowsIntoScheduledWorkout(
+  tx: Tx,
+  scheduledWorkoutId: number,
+  selectedExercises: { exerciseId: number; sets: RoutineSet[] }[],
+  startIndex: number,
+  now: number,
+): Promise<void> {
+  if (selectedExercises.length === 0) return;
+  const inserted = await tx
+    .insert(scheduledWorkoutExercises)
+    .values(
+      selectedExercises.map((e, i) => ({
+        scheduledWorkoutId,
+        exerciseId: e.exerciseId,
+        orderIndex: startIndex + i,
+        createdAt: now,
+      })),
+    )
+    .returning();
+
+  // 単一のINSERT...RETURNINGは挿入した値の順序で行を返す（lib/workout/session.tsの
+  // insertSessionExerciseCardsと同じSQLite/expo-sqliteの実際の挙動への依存）ため、
+  // inserted[i]とselectedExercises[i]は対応する
+  await insertScheduledWorkoutSetsFromValues(
+    tx,
+    inserted.map((row, i) => ({ scheduledWorkoutExerciseId: row.id, values: selectedExercises[i].sets })),
+    now,
+  );
+}
+
 // ヘッダー⋮「ルーティンから読み込み」(app/calendar/schedule-workout-routine-load.tsx)用。
 // lib/workout/session.tsのinsertRoutineCardsIntoSession/addRoutineExercisesToSessionと同じ方針で、
-// 選んだルーティンの種目を新規追加し、目標セットは「そのルーティンの実際の値」をそのままコピーする
-// （addExercisesToScheduledWorkoutが種目追加ピッカー用に「直近の実績」をプリフィルするのとは
-// 異なり、こちらは画面上で確認した値と入る値を一致させるため、ユーザーが見たルーティンの値を
-// そのまま使う）。ルーティンに0セットの種目が含まれる場合は空欄1セットにフォールバックする
-// （lib/workout/session.tsのbuildInitialSetsと同じ挙動）
+// 選んだルーティンの種目を新規追加し、目標セットは「そのルーティンの実際の値」をそのままコピーする。
+// ルーティンに0セットの種目が含まれる場合は空欄1セットにフォールバックする
+// （lib/workout/session.tsのbuildInitialSetsと同じ挙動、insertScheduledWorkoutSetsFromValues内で処理）
 export async function addRoutineExercisesToScheduledWorkout(
   scheduledWorkoutId: number,
   routineId: number,
@@ -99,26 +133,7 @@ export async function addRoutineExercisesToScheduledWorkout(
   const startIndex = (await getMaxOrderIndex(scheduledWorkoutId)) + 1;
 
   await db.transaction(async (tx) => {
-    const inserted = await tx
-      .insert(scheduledWorkoutExercises)
-      .values(
-        selectedExercises.map((e, i) => ({
-          scheduledWorkoutId,
-          exerciseId: e.exerciseId,
-          orderIndex: startIndex + i,
-          createdAt: now,
-        })),
-      )
-      .returning();
-
-    // 単一のINSERT...RETURNINGは挿入した値の順序で行を返す（lib/workout/session.tsの
-    // insertSessionExerciseCardsと同じSQLite/expo-sqliteの実際の挙動への依存）ため、
-    // inserted[i]とselectedExercises[i]は対応する
-    await insertScheduledWorkoutSetsFromValues(
-      tx,
-      inserted.map((row, i) => ({ scheduledWorkoutExerciseId: row.id, values: selectedExercises[i].sets })),
-      now,
-    );
+    await insertRoutineExerciseRowsIntoScheduledWorkout(tx, scheduledWorkoutId, selectedExercises, startIndex, now);
     await touchScheduledWorkout(tx, scheduledWorkoutId, now);
   });
 }
