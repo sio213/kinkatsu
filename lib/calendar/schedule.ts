@@ -20,6 +20,27 @@ export type ScheduleFireRow = {
 export const DIRECT_SCHEDULE_DELETE_MESSAGE =
   'この予定に設定した種目と目標セットもすべて削除され、通知も届かなくなります。';
 
+// 手動で追加したルーティン予定の削除確認Alertの本文。削除されるのはこの予定枠と通知だけで、
+// ルーティン本体は影響を受けないため、その旨を安心材料として明記する（@ユーザー指摘:
+// ルーティン名がカードにそのまま表示されているため、ルーティン本体まで消えるという誤解を
+// 防ぐ必要がある）。app/(tabs)/calendar.tsxのhandleDeleteRoutineSchedule（呼び出し元が既に
+// ルーティン予定と分かっている分岐）から直接呼ぶほか、下のbuildScheduledWorkoutDeleteMessage
+// （routineIdの有無で出し分けが必要な呼び出し元向け）からも使う
+export function buildRoutineScheduleDeleteMessage(routineName: string): string {
+  return `「${routineName}」自体には影響しません。この予定と通知だけを削除します。`;
+}
+
+// 予定削除確認Alertの本文をrouteIdの有無で出し分ける共通ビルダー（2026-07-21）。
+// app/calendar/schedule-workout-edit.tsxのhandleDeleteWorkout（実体化済みルーティン予定・
+// 直接予定どちらもこの画面に来るようになった、PR5、単一の削除ハンドラがどちらの種別かを
+// 自分で判定する必要がある）から呼ぶ。routineNameはroutineId!=nullのときだけ意味を持つため、
+// 呼び出し側はその場合だけ渡せばよい（routineId==nullなのにroutineNameを渡しても無視される）
+export function buildScheduledWorkoutDeleteMessage(routineId: number | null, routineName: string | undefined): string {
+  return routineId != null && routineName != null
+    ? buildRoutineScheduleDeleteMessage(routineName)
+    : DIRECT_SCHEDULE_DELETE_MESSAGE;
+}
+
 // 「直接追加」予定（ルーティンを介さず個別に選んだ種目、2026-07-20）の表示タイトル・通知タイトルを
 // 種目名から合成する。ルーティン名に相当するものが無いため、選んだ種目名自体をタイトルにする
 // （user-advisor方針: 「ルーティンとして保存しますか？」のような命名ステップを挟まない）。

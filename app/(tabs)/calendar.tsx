@@ -24,7 +24,12 @@ import { useResumeWorkoutSummary, useWorkoutSessions } from '@/hooks/use-workout
 import { addMonths, isSameDay, toDateKey } from '@/lib/calendar/date-grid';
 import { CATEGORY_ALL, EXERCISE_CATEGORIES } from '@/lib/exercises/constants';
 import { buildTodayTimeline, groupCardsBySession } from '@/lib/calendar/session-groups';
-import { DIRECT_SCHEDULE_DELETE_MESSAGE, mergeScheduleCards, type UnifiedScheduleCard } from '@/lib/calendar/schedule';
+import {
+  buildRoutineScheduleDeleteMessage,
+  DIRECT_SCHEDULE_DELETE_MESSAGE,
+  mergeScheduleCards,
+  type UnifiedScheduleCard,
+} from '@/lib/calendar/schedule';
 import { skipReminderOccurrence } from '@/lib/notifications/reminder-skip-scheduler';
 import { materializeReminderOccurrence, removeScheduledWorkout } from '@/lib/notifications/scheduled-workout-scheduler';
 import { startWorkoutFromRoutine, startWorkoutFromScheduledWorkout } from '@/lib/workout/session';
@@ -359,10 +364,13 @@ export default function CalendarScreen() {
 
   // 手動で追加したルーティン予定用。削除されるのはこの予定枠と通知だけで、ルーティン本体は
   // 影響を受けないため、その旨を安心材料として明記する（@ユーザー指摘: ルーティン名がカードに
-  // そのまま表示されているため、ルーティン本体まで消えるという誤解を防ぐ必要がある）
+  // そのまま表示されているため、ルーティン本体まで消えるという誤解を防ぐ必要がある）。
+  // 文言はlib/calendar/schedule.tsのbuildRoutineScheduleDeleteMessageに集約し、
+  // schedule-workout-edit.tsxのhandleDeleteWorkoutと同じ文言を使う（PR6、@reviewer指摘の
+  // 再発防止: 入口ごとに文言がハードコードされていると片方だけ変更されてまた食い違う）
   const handleDeleteRoutineSchedule = useCallback(
     (scheduledWorkoutId: number, routineName: string) =>
-      confirmDeleteScheduledWorkout(scheduledWorkoutId, `「${routineName}」自体には影響しません。この予定と通知だけを削除します。`),
+      confirmDeleteScheduledWorkout(scheduledWorkoutId, buildRoutineScheduleDeleteMessage(routineName)),
     [confirmDeleteScheduledWorkout],
   );
 
