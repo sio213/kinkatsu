@@ -1,4 +1,4 @@
-import { formatHourMinute, getTimeOfDay, getTimeOfDayLabel } from '@/lib/calendar/time-of-day';
+import { formatHourMinute, formatTimeOfDayLabel, getTimeOfDay, getTimeOfDayLabel } from '@/lib/calendar/time-of-day';
 
 describe('getTimeOfDay', () => {
   it('4:00〜10:59は朝(morning)', () => {
@@ -48,5 +48,15 @@ describe('formatHourMinute', () => {
 
   it('0時0分は"00:00"', () => {
     expect(formatHourMinute(new Date(2026, 6, 16, 0, 0))).toBe('00:00');
+  });
+});
+
+// SessionTimeGroupHeaderの表示ラベルと、呼び出し元(schedule-exercise-card-group.tsx)が
+// 開始ボタンのaccessibilityLabelに埋め込む時刻表記が食い違わないよう1本化した組み立て関数
+// （@reviewer指摘）
+describe('formatTimeOfDayLabel', () => {
+  it('時間帯ラベルと"HH:MM"を半角スペースで結合する', () => {
+    expect(formatTimeOfDayLabel(new Date(2026, 6, 16, 7, 5).getTime())).toBe('朝 07:05');
+    expect(formatTimeOfDayLabel(new Date(2026, 6, 16, 21, 30).getTime())).toBe('夜 21:30');
   });
 });

@@ -2,10 +2,9 @@ import { CalendarExerciseCard } from '@/components/calendar/calendar-exercise-ca
 import { SessionTimeGroupHeader } from '@/components/calendar/session-time-group-header';
 import { RoutineAddExerciseButton } from '@/components/routines/routine-add-exercise-button';
 import { IconSymbol } from '@/components/ui/icon-symbol';
-import { PrimaryButton } from '@/components/ui/primary-button';
 import { Colors, Typography } from '@/constants/theme';
 import type { ScheduledExerciseCardSet } from '@/hooks/use-scheduled-exercise-cards';
-import { formatHourMinute, getTimeOfDay, getTimeOfDayLabel } from '@/lib/calendar/time-of-day';
+import { formatTimeOfDayLabel } from '@/lib/calendar/time-of-day';
 import { memo } from 'react';
 import { StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 
@@ -31,7 +30,8 @@ export type ScheduleExerciseCardGroupCard = {
 
 type Props = {
   // ルーティン紐付き予定（自動・手動どちらも）のときだけ呼び出し元が渡す。SessionTimeGroupHeaderの
-  // 右端に表示する（2026-07-21、2026-07-22にデザイン案「複数18」準拠で左端→右端へ変更）。
+  // 「予定」タグの右横に表示する（2026-07-21、2026-07-22にデザイン案「複数18」準拠で左端→右端へ、
+  // 2026-07-23にデザイン案「今日01」準拠でタグの右横へ変更）。
   // 直接予定（個別種目選択）ではルーティン名に相当するものが無いため渡さない
   routineName?: string;
   // SessionTimeGroupHeaderにそのまま渡す時刻表示用の合成タイムスタンプ（選択日+予定のhour/minute）。
@@ -42,7 +42,9 @@ type Props = {
   // 'error'状態を持たない呼び出し元（reminder-schedule-exercise-group.tsxのuseRoutinePreviewExerciseCards）
   // はretryを持たないため、cards==='error'になり得る場合だけ呼び出し元が渡す
   onRetryCards?: () => void;
-  // 今日自身の予定にのみ渡す（デザイン案「未来日は開始ボタンなし」、routine-schedule-card.tsxと同じ）
+  // 今日自身の予定にのみ渡す（デザイン案「未来日は開始ボタンなし」、routine-schedule-card.tsxと同じ）。
+  // SessionTimeGroupHeaderにそのまま橋渡しし、見出し右端に表示する
+  // （2026-07-23、デザイン案「今日01」準拠で種目一覧の下から見出し内へ移動）
   onPressStart?: () => void;
   // 種目カードは1件ごとの詳細ではなく、この予定の種目一覧をまとめて編集する画面へ遷移する
   // （過去の記録の種目カードが記録編集画面(/workout/[sessionId])へ飛ぶのと同じ考え方、
@@ -77,13 +79,19 @@ export const ScheduleExerciseCardGroup = memo(function ScheduleExerciseCardGroup
   // titleだけだと、同じルーティン/種目構成を同日に複数回スケジュールした場合ラベルが重複し
   // 区別できない（routine-schedule-card.tsxの既存パターンと同じ理由、@reviewer指摘:
   // 共通化した際にこの対策が引き継がれていなかった）ため、SessionTimeGroupHeaderと同じ
-  // 時刻ラベルをaccessibilityLabelにも含めて一意にする
-  const timePeriod = getTimeOfDay(new Date(sessionStartedAt));
-  const timeLabel = `${getTimeOfDayLabel(timePeriod)} ${formatHourMinute(new Date(sessionStartedAt))}`;
+  // 時刻ラベルをaccessibilityLabelにも含めて一意にする。表示側と組み立て式が食い違わないよう
+  // formatTimeOfDayLabelに1本化する（@reviewer指摘）
+  const timeLabel = formatTimeOfDayLabel(sessionStartedAt);
 
   return (
     <View style={styles.wrapper}>
-      <SessionTimeGroupHeader sessionStartedAt={sessionStartedAt} isSchedule routineName={routineName} />
+      <SessionTimeGroupHeader
+        sessionStartedAt={sessionStartedAt}
+        isSchedule
+        routineName={routineName}
+        onPressStart={onPressStart}
+        startAccessibilityLabel={`「${title}」${timeLabel}のトレーニングを開始`}
+      />
       {cards != null && cards !== 'error' && cards.length > 0 && (
         <View style={styles.cardList}>
           {cards.map((card) => (
@@ -134,14 +142,6 @@ export const ScheduleExerciseCardGroup = memo(function ScheduleExerciseCardGroup
             <Text style={styles.retryText}>再試行</Text>
           </TouchableOpacity>
         </View>
-      )}
-      {onPressStart && (
-        <PrimaryButton
-          label="開始"
-          icon={<IconSymbol name="play.fill" size={16} color={Colors.onAccent} />}
-          onPress={onPressStart}
-          accessibilityLabel={`「${title}」${timeLabel}のトレーニングを開始`}
-        />
       )}
     </View>
   );

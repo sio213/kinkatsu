@@ -1,5 +1,5 @@
 import { act, create } from 'react-test-renderer';
-import { Text, View } from 'react-native';
+import { Text, TouchableOpacity, View } from 'react-native';
 import { SessionTimeGroupHeader } from '@/components/calendar/session-time-group-header';
 import { Colors } from '@/constants/theme';
 
@@ -113,6 +113,86 @@ describe('SessionTimeGroupHeader', () => {
       const flattenStyle = (style: unknown) => (Array.isArray(style) ? Object.assign({}, ...style) : style);
       expect(flattenStyle(nameText.props.style).fontWeight).toBe('600');
       expect(flattenStyle(nameText.props.style).color).toBe(Colors.textMuted);
+    });
+  });
+
+  // 今日自身の予定にのみ呼び出し元(schedule-exercise-card-group.tsx)が渡す「開始」ボタン。
+  // 種目一覧の下ではなく見出し右端に表示する（2026-07-23、デザイン案「今日01」準拠）
+  describe('onPressStart（見出し右端の「開始」ボタン）', () => {
+    it('onPressStart未指定（未来日の予定）なら「開始」ボタンを表示しない', () => {
+      const root = render({ sessionStartedAt: new Date(2026, 6, 16, 7, 10).getTime() });
+      const texts = root.root.findAllByType(Text).map((t) => [t.props.children].flat().join(''));
+      expect(texts).not.toContain('開始');
+    });
+
+    it('onPressStartを渡す（今日自身の予定）と「開始」ボタンを表示し、タップでonPressStartが呼ばれる', () => {
+      const onPressStart = jest.fn();
+      const root = render({
+        sessionStartedAt: new Date(2026, 6, 16, 7, 10).getTime(),
+        onPressStart,
+        startAccessibilityLabel: '「ベンチプレス 他1種目」朝 07:10のトレーニングを開始',
+      });
+      const texts = root.root.findAllByType(Text).map((t) => [t.props.children].flat().join(''));
+      expect(texts).toContain('開始');
+      const button = root.root
+        .findAllByType(TouchableOpacity)
+        .find((t) => t.props.accessibilityLabel === '「ベンチプレス 他1種目」朝 07:10のトレーニングを開始')!;
+      expect(button).toBeDefined();
+      act(() => {
+        button.props.onPress();
+      });
+      expect(onPressStart).toHaveBeenCalledTimes(1);
+    });
+
+    it('routineNameとonPressStartを両方渡すと、ルーティン名は開始ボタンより前（時刻情報側）に表示される', () => {
+      const root = render({
+        sessionStartedAt: new Date(2026, 6, 16, 7, 10).getTime(),
+        routineName: '胸の日',
+        onPressStart: jest.fn(),
+      });
+      const texts = root.root.findAllByType(Text).map((t) => [t.props.children].flat().join(''));
+      expect(texts.indexOf('胸の日')).toBeLessThan(texts.indexOf('開始'));
+    });
+
+    // 今日パネルの実運用（schedule-exercise-card-group.tsx）はisSchedule/routineName/onPressStartを
+    // 常に同時に渡すため、その組み合わせでもaccessibilityLabelが正しく組み立つことを確認する
+    // （@tester指摘: 個々のprop単体のテストだけでは実際の呼び出しパターンを網羅できていなかった）
+    it('isSchedule・routineName・onPressStartを同時に渡す（実運用と同じ組み合わせ）と、見出しのaccessibilityLabelにすべて含まれる', () => {
+      const root = render({
+        sessionStartedAt: new Date(2026, 6, 16, 20, 0).getTime(),
+        isSchedule: true,
+        routineName: '胸の日',
+        onPressStart: jest.fn(),
+        startAccessibilityLabel: '「胸の日」夜 20:00のトレーニングを開始',
+      });
+      const header = root.root.findAllByType(View).find((v) => v.props.accessibilityRole === 'header')!;
+      expect(header.props.accessibilityLabel).toBe('夜 20:00、予定、胸の日');
+    });
+
+    // アクセシビリティ構造の核心：開始ボタンはaccessible=trueの見出しView配下に無く、兄弟要素として
+    // 独立していなければならない（そうでないとVoiceOver/TalkBackがボタンを個別要素として読み上げ・
+    // 操作できなくなる）。findAllByTypeによるツリー全体探索のテストだけでは、開始ボタンを誤って
+    // header配下に戻す退行を検知できないため、構造そのものを検証する（@tester指摘）
+    it('開始ボタンはaccessible=trueの見出しView配下に含まれない（VoiceOver/TalkBackで個別要素として操作できるようにするため）', () => {
+      const root = render({
+        sessionStartedAt: new Date(2026, 6, 16, 7, 10).getTime(),
+        onPressStart: jest.fn(),
+      });
+      const header = root.root.findAllByType(View).find((v) => v.props.accessibilityRole === 'header')!;
+      expect(header.findAllByType(TouchableOpacity)).toHaveLength(0);
+    });
+
+    // 開始ボタン自身のaccessibilityLabelが見出し側のaccessibilityLabelに混入していないことを確認する。
+    // 混入していると、見出し全体をVoiceOverで読み上げたときに「開始」の情報が二重に読まれたり、
+    // ボタンのラベルが親に吸収されて見出しの読み上げ内容が意図と変わってしまう（@tester指摘）
+    it('開始ボタンのaccessibilityLabelは見出し(header)側のaccessibilityLabelに混入しない', () => {
+      const root = render({
+        sessionStartedAt: new Date(2026, 6, 16, 7, 10).getTime(),
+        onPressStart: jest.fn(),
+        startAccessibilityLabel: '「胸の日」朝 07:10のトレーニングを開始',
+      });
+      const header = root.root.findAllByType(View).find((v) => v.props.accessibilityRole === 'header')!;
+      expect(header.props.accessibilityLabel).not.toContain('開始');
     });
   });
 });
