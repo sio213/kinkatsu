@@ -49,6 +49,14 @@ export const workoutSessions = sqliteTable(
     // restrictではなくset nullにする（references()はroutinesがこのファイルの後方で定義されているが、
     // コールバック経由の遅延評価のため forward reference として問題なく解決される）
     routineId: integer('routine_id').references(() => routines.id, { onDelete: 'set null' }),
+    // 予定（scheduledWorkouts）から開始した場合のみ設定（startWorkoutFromScheduledWorkout）。
+    // endWorkoutSession完了時に、この予定を「消化済み」としてscheduledWorkouts側から削除する
+    // ために使う（直接予定・実体化済みルーティン予定・実体化直後のリマインダー予定のいずれも
+    // このFK経由で統一的に扱える、2026-07-21）。スケジュール側が別経路で先に削除されても
+    // セッションの記録自体は残す必要があるため、set nullにする（routineIdと同じ方針）
+    scheduledWorkoutId: integer('scheduled_workout_id').references(() => scheduledWorkouts.id, {
+      onDelete: 'set null',
+    }),
     note: text('note'),
     createdAt: integer('created_at').notNull(),
     updatedAt: integer('updated_at').notNull(),

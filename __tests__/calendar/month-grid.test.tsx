@@ -328,7 +328,10 @@ describe('MonthGrid', () => {
       );
     });
 
-    it('実績と予定が両方ある日は実績（塗りつぶし）が優先され、予定ドットは出ない', () => {
+    it('フィルター無しで実績と予定が両方ある日は実績（塗りつぶし）が優先され、予定ドットは出ない', () => {
+      // フィルターが効いているケースは下の「実績と予定が併存する日のフィルター挙動」を参照。
+      // このケース（activeFilter無し）では実績優先の表示は変わらないが、フィルターありだと
+      // 実績が非該当なら予定側で該当扱いになりドットが出るケースがある点に注意
       const root = render({
         selectedDate: new Date(2026, 6, 18),
         primaryCategoryByDay: new Map([['2026-07-05', 'chest']]),
@@ -382,6 +385,141 @@ describe('MonthGrid', () => {
         categorySetByScheduleDay: new Map(),
       });
       expect(findTouchableForDay(root, '7月5日').props.accessibilityLabel).not.toContain('絞り込み対象外');
+    });
+  });
+
+  // 「実績があってもフィルター非該当なら、同じ日の予定が別カテゴリでフィルター該当していれば
+  // ドットで見つけられるようにしたい」という要望に対応した排他解消ロジックのクロスケース。
+  // 実績単体・予定単体のケースは上のdescribeで既にカバー済みのため、ここでは
+  // 「実績と予定が同じ日に両方あり、かつフィルターがかかっている」組み合わせのみを扱う
+  describe('実績と予定が併存する日のフィルター挙動', () => {
+    it('実績がフィルター該当のときは、予定が別カテゴリで存在してもドットを一切出さない（塗りつぶし最優先）', () => {
+      const root = render({
+        selectedDate: new Date(2026, 6, 18),
+        activeFilter: 'chest',
+        primaryCategoryByDay: new Map([['2026-07-05', 'chest']]),
+        categorySetByDay: new Map([['2026-07-05', new Set(['chest'])]]),
+        primaryCategoryByScheduleDay: new Map([['2026-07-05', 'leg']]),
+        categorySetByScheduleDay: new Map([['2026-07-05', new Set(['leg'])]]),
+      });
+      const cellView = findTouchableForDay(root, '7月5日').findAllByType(View)[0];
+      expect(cellView.props.style).toEqual(
+        expect.arrayContaining([expect.objectContaining({ backgroundColor: getCalendarCategoryColor('chest') })]),
+      );
+      const anyDot = cellView.findAllByType(View).find((v) => {
+        const style = [v.props.style].flat();
+        return style.some((s) => s && (s.backgroundColor === Colors.borderStrong || s.backgroundColor === getCalendarCategoryColor('leg')));
+      });
+      expect(anyDot).toBeUndefined();
+    });
+
+    it('★実績がフィルター非該当、同じ日の予定が別カテゴリでフィルター該当なら、ドットが予定のカテゴリ色になる（グレーにならない）', () => {
+      const root = render({
+        selectedDate: new Date(2026, 6, 18),
+        activeFilter: 'chest',
+        primaryCategoryByDay: new Map([['2026-07-05', 'leg']]),
+        categorySetByDay: new Map([['2026-07-05', new Set(['leg'])]]),
+        primaryCategoryByScheduleDay: new Map([['2026-07-05', 'chest']]),
+        categorySetByScheduleDay: new Map([['2026-07-05', new Set(['chest'])]]),
+      });
+      const cellView = findTouchableForDay(root, '7月5日').findAllByType(View)[0];
+      // 実績(leg)はフィルター非該当なので塗りつぶされない
+      expect(cellView.props.style).not.toEqual(
+        expect.arrayContaining([expect.objectContaining({ backgroundColor: expect.anything() })]),
+      );
+      // filterDotの基本スタイル自体は常にColors.borderStrongを内包している（配列の後ろの
+      // 要素で上書きされる仕組みのため）ので、「borderStrongを持つViewが無いこと」ではなく
+      // 「カテゴリ色のドットが1つだけ存在すること」を確認する
+      const dotsWithColor = cellView.findAllByType(View).filter((v) => {
+        const style = [v.props.style].flat();
+        return style.some((s) => s && s.backgroundColor === getCalendarCategoryColor('chest'));
+      });
+      expect(dotsWithColor).toHaveLength(1);
+    });
+
+    it('実績がフィルター非該当、同じ日の予定も別カテゴリでフィルター非該当なら、従来通りグレードットのまま', () => {
+      const root = render({
+        selectedDate: new Date(2026, 6, 18),
+        activeFilter: 'chest',
+        primaryCategoryByDay: new Map([['2026-07-05', 'leg']]),
+        categorySetByDay: new Map([['2026-07-05', new Set(['leg'])]]),
+        primaryCategoryByScheduleDay: new Map([['2026-07-05', 'arm']]),
+        categorySetByScheduleDay: new Map([['2026-07-05', new Set(['arm'])]]),
+      });
+      const cellView = findTouchableForDay(root, '7月5日').findAllByType(View)[0];
+      const grayDot = cellView.findAllByType(View).find((v) => {
+        const style = [v.props.style].flat();
+        return style.some((s) => s && s.backgroundColor === Colors.borderStrong);
+      });
+      expect(grayDot).toBeDefined();
+      const armDot = cellView.findAllByType(View).find((v) => {
+        const style = [v.props.style].flat();
+        return style.some((s) => s && s.backgroundColor === getCalendarCategoryColor('arm'));
+      });
+      expect(armDot).toBeUndefined();
+    });
+
+    it('選択中の日は、実績非該当・予定該当の組み合わせでもドットが一切出ない（枠線は実績カテゴリ色のまま）', () => {
+      const root = render({
+        selectedDate: new Date(2026, 6, 5),
+        activeFilter: 'chest',
+        primaryCategoryByDay: new Map([['2026-07-05', 'leg']]),
+        categorySetByDay: new Map([['2026-07-05', new Set(['leg'])]]),
+        primaryCategoryByScheduleDay: new Map([['2026-07-05', 'chest']]),
+        categorySetByScheduleDay: new Map([['2026-07-05', new Set(['chest'])]]),
+      });
+      const cellView = findTouchableForDay(root, '7月5日').findAllByType(View)[0];
+      expect(cellView.props.style).toEqual(
+        expect.arrayContaining([expect.objectContaining({ borderColor: getCalendarCategoryColor('leg') })]),
+      );
+      const anyDot = cellView.findAllByType(View).find((v) => {
+        const style = [v.props.style].flat();
+        return style.some((s) => s && (s.backgroundColor === Colors.borderStrong || s.backgroundColor === getCalendarCategoryColor('chest')));
+      });
+      expect(anyDot).toBeUndefined();
+    });
+
+    it('実績がフィルター非該当・予定が該当する日のaccessibilityLabelは「絞り込み対象外」を含まない（予定側で見つかるため）', () => {
+      const root = render({
+        activeFilter: 'chest',
+        primaryCategoryByDay: new Map([['2026-07-05', 'leg']]),
+        categorySetByDay: new Map([['2026-07-05', new Set(['leg'])]]),
+        primaryCategoryByScheduleDay: new Map([['2026-07-05', 'chest']]),
+        categorySetByScheduleDay: new Map([['2026-07-05', new Set(['chest'])]]),
+      });
+      const label = findTouchableForDay(root, '7月5日').props.accessibilityLabel as string;
+      expect(label).toContain('実施日、脚');
+      expect(label).toContain('予定あり、胸');
+      expect(label).not.toContain('絞り込み対象外');
+    });
+
+    it('実績が該当する日のaccessibilityLabelは、同じ日の予定が非該当でも「絞り込み対象外」を含まない', () => {
+      const root = render({
+        activeFilter: 'chest',
+        primaryCategoryByDay: new Map([['2026-07-05', 'chest']]),
+        categorySetByDay: new Map([['2026-07-05', new Set(['chest'])]]),
+        primaryCategoryByScheduleDay: new Map([['2026-07-05', 'leg']]),
+        categorySetByScheduleDay: new Map([['2026-07-05', new Set(['leg'])]]),
+      });
+      const label = findTouchableForDay(root, '7月5日').props.accessibilityLabel as string;
+      expect(label).not.toContain('絞り込み対象外');
+    });
+
+    it('★今日×実績がフィルター非該当×予定が該当する日は、数字・下線バーが予定のカテゴリ色になる（黒に落とさない）', () => {
+      const root = render({
+        today: new Date(2026, 6, 5),
+        selectedDate: new Date(2026, 6, 18),
+        activeFilter: 'chest',
+        primaryCategoryByDay: new Map([['2026-07-05', 'leg']]),
+        categorySetByDay: new Map([['2026-07-05', new Set(['leg'])]]),
+        primaryCategoryByScheduleDay: new Map([['2026-07-05', 'chest']]),
+        categorySetByScheduleDay: new Map([['2026-07-05', new Set(['chest'])]]),
+      });
+      const views = findTouchableForDay(root, '7月5日').findAllByType(View);
+      const underlineBar = views[views.length - 1];
+      expect(underlineBar.props.style).toEqual(
+        expect.arrayContaining([expect.objectContaining({ backgroundColor: getCalendarCategoryColor('chest') })]),
+      );
     });
   });
 });
