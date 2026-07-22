@@ -1,4 +1,4 @@
-import { PermissionBanner } from '@/components/reminders/permission-banner';
+import { ScheduleNotifyToggle } from '@/components/calendar/schedule-notify-toggle';
 import { FormField } from '@/components/ui/form-field';
 import { HeaderTitle } from '@/components/ui/header-title';
 import { NotFoundState } from '@/components/ui/not-found-state';
@@ -72,6 +72,9 @@ export default function ScheduleTimePickerScreen() {
   const [showAndroidTimePicker, setShowAndroidTimePicker] = useState(false);
   const [hour, setHour] = useState(18);
   const [minute, setMinute] = useState(0);
+  // うっかりOFFのまま通知が来ない事故を避けるため、デフォルトは必ずON
+  // （@pm/@user-advisorレビュー指摘）
+  const [notifyEnabled, setNotifyEnabled] = useState(true);
   // isSubmittingRefは連打防止用の同期ガード、こちらはボタンの見た目のフィードバック用
   // (ensurePermission()がOSネイティブの許可ダイアログ応答待ちで数秒ブロックしうるため、
   // 押した直後に何も反応が無く見えるのを防ぐ、@designerレビュー指摘)
@@ -99,10 +102,16 @@ export default function ScheduleTimePickerScreen() {
     isSubmittingRef.current = true;
     setIsSubmitting(true);
     try {
-      try {
-        setPermState(await ensurePermission());
-      } catch (e) {
-        console.error('[ensure permission]', e);
+      // 通知トグルがOFFならこの予定は通知しないため、権限リクエスト自体をスキップする。
+      // 特にiOSは初回のネイティブ許可ダイアログを一度使うと以後は設定アプリ誘導しか
+      // 出せなくなるため、通知する気の無い操作でこの一度きりの機会を消費してしまうのを防ぐ
+      // (@reviewer/@tester/@designer全員が独立して指摘した最重要ポイント)
+      if (notifyEnabled) {
+        try {
+          setPermState(await ensurePermission());
+        } catch (e) {
+          console.error('[ensure permission]', e);
+        }
       }
       // 作った予定は、種目は決めたが重量・回数（目標セット）はまだ何も入れていない状態
       // （ルーティン予定も、addScheduledWorkoutがルーティン本体の目標セットをこの予定インスタンス
@@ -116,9 +125,23 @@ export default function ScheduleTimePickerScreen() {
       // （PR7、ユーザー確認済み）
       let createdScheduledWorkoutId: number | null = null;
       if (isDirectMode) {
-        createdScheduledWorkoutId = await createDirectScheduledWorkout(exerciseIds, directTitle, dateKey, hour, minute);
+        createdScheduledWorkoutId = await createDirectScheduledWorkout(
+          exerciseIds,
+          directTitle,
+          dateKey,
+          hour,
+          minute,
+          notifyEnabled,
+        );
       } else {
-        createdScheduledWorkoutId = await createScheduledWorkout(routineId, routineName ?? '', dateKey, hour, minute);
+        createdScheduledWorkoutId = await createScheduledWorkout(
+          routineId,
+          routineName ?? '',
+          dateKey,
+          hour,
+          minute,
+          notifyEnabled,
+        );
       }
       // カレンダーからの3階層（schedule-chooser/schedule-routine-picker or
       // schedule-exercise-picker/この画面）をまとめて閉じる必要がある(app/workout/routine-load.tsxの
@@ -143,7 +166,19 @@ export default function ScheduleTimePickerScreen() {
       isSubmittingRef.current = false;
       setIsSubmitting(false);
     }
-  }, [isDirectMode, exerciseIds, directTitle, routineId, routineName, dateKey, hour, minute, router, setPermState]);
+  }, [
+    isDirectMode,
+    exerciseIds,
+    directTitle,
+    routineId,
+    routineName,
+    dateKey,
+    hour,
+    minute,
+    notifyEnabled,
+    router,
+    setPermState,
+  ]);
 
   const handleRequestPermission = useCallback(async () => {
     setPermState(await ensurePermission());
@@ -176,9 +211,13 @@ export default function ScheduleTimePickerScreen() {
         }}
       />
       <View style={styles.content}>
-        {permState && permState !== 'granted' && (
-          <PermissionBanner state={permState} onRequest={handleRequestPermission} />
-        )}
+        {/* 通知トグル→時刻の順（2026-07-22、@ユーザー指摘でこの並びに変更） */}
+        <ScheduleNotifyToggle
+          enabled={notifyEnabled}
+          onToggleEnabled={setNotifyEnabled}
+          permState={permState}
+          onRequestPermission={handleRequestPermission}
+        />
         <FormField label="時刻">
           <View style={styles.timePickerWrapper}>
             {Platform.OS === 'android' && (

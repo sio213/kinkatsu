@@ -65,6 +65,7 @@ jest.mock('@/db/schema', () => ({
     id: 'scheduledWorkouts.id',
     routineId: 'scheduledWorkouts.routineId',
     scheduledDate: 'scheduledWorkouts.scheduledDate',
+    notifyEnabled: 'scheduledWorkouts.notifyEnabled',
   },
   routines: { id: 'routines.id', name: 'routines.name' },
   scheduledWorkoutExercises: {
@@ -79,6 +80,7 @@ jest.mock('drizzle-orm', () => ({
   eq: jest.fn((col, val) => ({ op: 'eq', col, val })),
   gte: jest.fn((col, val) => ({ op: 'gte', col, val })),
   inArray: jest.fn((col, vals) => ({ op: 'inArray', col, vals })),
+  and: jest.fn((...conditions) => ({ op: 'and', conditions })),
 }));
 
 jest.mock('@/lib/calendar/scheduled-workouts', () => ({
@@ -140,13 +142,13 @@ beforeEach(() => {
 
 describe('createScheduledWorkout', () => {
   it('addScheduledWorkoutで予定を保存し、挿入行のidを返す', async () => {
-    const id = await createScheduledWorkout(10, '胸の日', dateKeyOffsetDays(1), 19, 0);
-    expect(mockAddScheduledWorkout).toHaveBeenCalledWith(10, dateKeyOffsetDays(1), 19, 0);
+    const id = await createScheduledWorkout(10, '胸の日', dateKeyOffsetDays(1), 19, 0, true);
+    expect(mockAddScheduledWorkout).toHaveBeenCalledWith(10, dateKeyOffsetDays(1), 19, 0, true);
     expect(id).toBe(42);
   });
 
   it('権限がgrantedかつ未来日時なら、決定論的identifierでDATEトリガーの通知を登録する', async () => {
-    await createScheduledWorkout(10, '胸の日', dateKeyOffsetDays(1), 19, 30);
+    await createScheduledWorkout(10, '胸の日', dateKeyOffsetDays(1), 19, 30, true);
     expect(mockScheduleNotificationAsync).toHaveBeenCalledTimes(1);
     const [request] = mockScheduleNotificationAsync.mock.calls[0];
     expect(request.identifier).toBe('scheduled-workout-42');
@@ -166,38 +168,47 @@ describe('createScheduledWorkout', () => {
   });
 
   it('通知本文はリマインダーと同じ定型文(DEFAULT_REMINDER_BODY)を使う', async () => {
-    await createScheduledWorkout(10, '胸の日', dateKeyOffsetDays(1), 19, 0);
+    await createScheduledWorkout(10, '胸の日', dateKeyOffsetDays(1), 19, 0, true);
     const [request] = mockScheduleNotificationAsync.mock.calls[0];
     expect(request.content.body).toBe('後でじゃなく、今やる。');
   });
 
   it('権限がdeniedの場合は通知登録をスキップするが、予定自体は保存される', async () => {
     mockGetPermissionState.mockResolvedValue('denied');
-    const id = await createScheduledWorkout(10, '胸の日', dateKeyOffsetDays(1), 19, 0);
+    const id = await createScheduledWorkout(10, '胸の日', dateKeyOffsetDays(1), 19, 0, true);
     expect(id).toBe(42);
     expect(mockScheduleNotificationAsync).not.toHaveBeenCalled();
   });
 
   it('権限がundeterminedの場合も通知登録をスキップする', async () => {
     mockGetPermissionState.mockResolvedValue('undetermined');
-    await createScheduledWorkout(10, '胸の日', dateKeyOffsetDays(1), 19, 0);
+    await createScheduledWorkout(10, '胸の日', dateKeyOffsetDays(1), 19, 0, true);
     expect(mockScheduleNotificationAsync).not.toHaveBeenCalled();
   });
 
   it('過去日時の場合は権限があっても通知登録をスキップする', async () => {
-    await createScheduledWorkout(10, '胸の日', dateKeyOffsetDays(-1), 19, 0);
+    await createScheduledWorkout(10, '胸の日', dateKeyOffsetDays(-1), 19, 0, true);
+    expect(mockScheduleNotificationAsync).not.toHaveBeenCalled();
+  });
+
+  // 予定単位の通知トグルOFF（2026-07-22、@ユーザー指摘機能）。権限grantedかつ未来日時でも、
+  // このフラグがfalseなら通知登録自体を行わない
+  it('notifyEnabled=falseの場合は権限がgrantedかつ未来日時でも通知登録をスキップするが、予定自体は保存される', async () => {
+    const id = await createScheduledWorkout(10, '胸の日', dateKeyOffsetDays(1), 19, 0, false);
+    expect(id).toBe(42);
+    expect(mockAddScheduledWorkout).toHaveBeenCalledWith(10, dateKeyOffsetDays(1), 19, 0, false);
     expect(mockScheduleNotificationAsync).not.toHaveBeenCalled();
   });
 
   it('通知登録が失敗しても例外を投げず、予定作成のidはそのまま返す(通知が無くても予定は残す方針)', async () => {
     mockScheduleNotificationAsync.mockRejectedValueOnce(new Error('schedule failed'));
-    await expect(createScheduledWorkout(10, '胸の日', dateKeyOffsetDays(1), 19, 0)).resolves.toBe(42);
+    await expect(createScheduledWorkout(10, '胸の日', dateKeyOffsetDays(1), 19, 0, true)).resolves.toBe(42);
     expect(mockAddScheduledWorkout).toHaveBeenCalledTimes(1);
   });
 
   it('addScheduledWorkout自体が失敗した場合は握りつぶさずそのままrejectする(通知登録は行われない)', async () => {
     mockAddScheduledWorkout.mockRejectedValueOnce(new Error('db error'));
-    await expect(createScheduledWorkout(10, '胸の日', dateKeyOffsetDays(1), 19, 0)).rejects.toThrow('db error');
+    await expect(createScheduledWorkout(10, '胸の日', dateKeyOffsetDays(1), 19, 0, true)).rejects.toThrow('db error');
     expect(mockScheduleNotificationAsync).not.toHaveBeenCalled();
   });
 });
@@ -206,13 +217,13 @@ describe('createScheduledWorkout', () => {
 // 同じ流れだが、addDirectScheduledWorkoutを使い通知データのtypeがscheduled_workout_directになる
 describe('createDirectScheduledWorkout', () => {
   it('addDirectScheduledWorkoutで予定を保存し、挿入行のidを返す', async () => {
-    const id = await createDirectScheduledWorkout([1, 2], 'ベンチプレス 他1種目', dateKeyOffsetDays(1), 19, 0);
-    expect(mockAddDirectScheduledWorkout).toHaveBeenCalledWith([1, 2], dateKeyOffsetDays(1), 19, 0);
+    const id = await createDirectScheduledWorkout([1, 2], 'ベンチプレス 他1種目', dateKeyOffsetDays(1), 19, 0, true);
+    expect(mockAddDirectScheduledWorkout).toHaveBeenCalledWith([1, 2], dateKeyOffsetDays(1), 19, 0, true);
     expect(id).toBe(42);
   });
 
   it('権限がgrantedかつ未来日時なら、渡されたタイトルでscheduled_workout_direct種別の通知を登録する', async () => {
-    await createDirectScheduledWorkout([1, 2], 'ベンチプレス 他1種目', dateKeyOffsetDays(1), 19, 30);
+    await createDirectScheduledWorkout([1, 2], 'ベンチプレス 他1種目', dateKeyOffsetDays(1), 19, 30, true);
     expect(mockScheduleNotificationAsync).toHaveBeenCalledTimes(1);
     const [request] = mockScheduleNotificationAsync.mock.calls[0];
     expect(request.identifier).toBe('scheduled-workout-42');
@@ -225,7 +236,13 @@ describe('createDirectScheduledWorkout', () => {
 
   it('権限がdeniedの場合は通知登録をスキップするが、予定自体は保存される', async () => {
     mockGetPermissionState.mockResolvedValue('denied');
-    const id = await createDirectScheduledWorkout([1], 'ベンチプレス', dateKeyOffsetDays(1), 19, 0);
+    const id = await createDirectScheduledWorkout([1], 'ベンチプレス', dateKeyOffsetDays(1), 19, 0, true);
+    expect(id).toBe(42);
+    expect(mockScheduleNotificationAsync).not.toHaveBeenCalled();
+  });
+
+  it('notifyEnabled=falseの場合は権限がgrantedかつ未来日時でも通知登録をスキップするが、予定自体は保存される', async () => {
+    const id = await createDirectScheduledWorkout([1], 'ベンチプレス', dateKeyOffsetDays(1), 19, 0, false);
     expect(id).toBe(42);
     expect(mockScheduleNotificationAsync).not.toHaveBeenCalled();
   });
@@ -233,14 +250,14 @@ describe('createDirectScheduledWorkout', () => {
   it('通知登録が失敗しても例外を投げず、予定作成のidはそのまま返す', async () => {
     mockScheduleNotificationAsync.mockRejectedValueOnce(new Error('schedule failed'));
     await expect(
-      createDirectScheduledWorkout([1], 'ベンチプレス', dateKeyOffsetDays(1), 19, 0),
+      createDirectScheduledWorkout([1], 'ベンチプレス', dateKeyOffsetDays(1), 19, 0, true),
     ).resolves.toBe(42);
   });
 
   it('addDirectScheduledWorkout自体が失敗した場合は握りつぶさずそのままrejectする(通知登録は行われない)', async () => {
     mockAddDirectScheduledWorkout.mockRejectedValueOnce(new Error('db error'));
     await expect(
-      createDirectScheduledWorkout([1], 'ベンチプレス', dateKeyOffsetDays(1), 19, 0),
+      createDirectScheduledWorkout([1], 'ベンチプレス', dateKeyOffsetDays(1), 19, 0, true),
     ).rejects.toThrow('db error');
     expect(mockScheduleNotificationAsync).not.toHaveBeenCalled();
   });
@@ -263,7 +280,7 @@ describe('materializeReminderOccurrence', () => {
     const result = await materializeReminderOccurrence(7, 10, '胸の日', dateKeyOffsetDays(1), 19, 30);
 
     expect(mockSkipReminderOccurrence).toHaveBeenCalledWith(7, dateKeyOffsetDays(1));
-    expect(mockAddScheduledWorkout).toHaveBeenCalledWith(10, dateKeyOffsetDays(1), 19, 30);
+    expect(mockAddScheduledWorkout).toHaveBeenCalledWith(10, dateKeyOffsetDays(1), 19, 30, true);
     expect(callOrder).toEqual(['skip', 'create']);
     expect(result).toEqual({ scheduledWorkoutId: 42, notificationSuppressed: true });
   });
@@ -364,10 +381,16 @@ describe('removeScheduledWorkout', () => {
 });
 
 describe('syncScheduledWorkoutNotifications', () => {
-  it('scheduledDateが当日以降のものだけをSQL側で絞り込む(自動レビュー指摘: 全件取得だと蓄積で肥大化するため)', async () => {
+  it('scheduledDateが当日以降、かつnotifyEnabled=trueのものだけをSQL側で絞り込む(自動レビュー指摘: 全件取得だと蓄積で肥大化するため。notifyEnabled条件は@planner指摘: ここを漏らすとOFFにした予定が再起動のたびに通知復活してしまう)', async () => {
     mockScheduledWorkoutRows = [];
     await syncScheduledWorkoutNotifications();
-    expect(mockWhere).toHaveBeenCalledWith({ op: 'gte', col: 'scheduledWorkouts.scheduledDate', val: toDateKey(new Date()) });
+    expect(mockWhere).toHaveBeenCalledWith({
+      op: 'and',
+      conditions: [
+        { op: 'gte', col: 'scheduledWorkouts.scheduledDate', val: toDateKey(new Date()) },
+        { op: 'eq', col: 'scheduledWorkouts.notifyEnabled', val: true },
+      ],
+    });
   });
 
   it('手動予定が0件ならroutinesを引かず、通知登録も行わない', async () => {
@@ -575,17 +598,17 @@ describe('同日境界(今日の中で時刻だけが過去/未来)', () => {
   });
 
   it('今日の予定でも、指定時刻が現在時刻より未来なら通知登録される', async () => {
-    await createScheduledWorkout(10, '胸の日', toDateKey(new Date(2026, 6, 19)), 20, 0);
+    await createScheduledWorkout(10, '胸の日', toDateKey(new Date(2026, 6, 19)), 20, 0, true);
     expect(mockScheduleNotificationAsync).toHaveBeenCalledTimes(1);
   });
 
   it('今日の予定で、指定時刻が既に現在時刻より過去なら通知登録されない', async () => {
-    await createScheduledWorkout(10, '胸の日', toDateKey(new Date(2026, 6, 19)), 9, 0);
+    await createScheduledWorkout(10, '胸の日', toDateKey(new Date(2026, 6, 19)), 9, 0, true);
     expect(mockScheduleNotificationAsync).not.toHaveBeenCalled();
   });
 
   it('ちょうど現在時刻と一致する場合はスキップされる(<=境界)', async () => {
-    await createScheduledWorkout(10, '胸の日', toDateKey(new Date(2026, 6, 19)), 12, 0);
+    await createScheduledWorkout(10, '胸の日', toDateKey(new Date(2026, 6, 19)), 12, 0, true);
     expect(mockScheduleNotificationAsync).not.toHaveBeenCalled();
   });
 });

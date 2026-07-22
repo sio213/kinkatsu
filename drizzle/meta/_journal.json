@@ -148,6 +148,13 @@
       "when": 1784332800000,
       "tag": "0020_workout_sessions_scheduled_workout_id",
       "breakpoints": true
+    },
+    {
+      "idx": 21,
+      "version": "6",
+      "when": 1784419200000,
+      "tag": "0021_scheduled_workouts_notify_enabled",
+      "breakpoints": true
     }
   ]
 }

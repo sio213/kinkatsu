@@ -3,7 +3,7 @@ import { exercises, routines, scheduledWorkoutExercises, scheduledWorkouts } fro
 import { formatDirectScheduleTitle, groupExerciseNamesByScheduleId } from '@/lib/calendar/schedule';
 import { parseDateKey, toDateKey } from '@/lib/calendar/date-grid';
 import { addDirectScheduledWorkout, addScheduledWorkout, deleteScheduledWorkout } from '@/lib/calendar/scheduled-workouts';
-import { eq, gte, inArray } from 'drizzle-orm';
+import { and, eq, gte, inArray } from 'drizzle-orm';
 import * as Notifications from 'expo-notifications';
 import { REMINDER_CHANNEL_ID } from './channels';
 import { DEFAULT_REMINDER_BODY } from './messages';
@@ -38,6 +38,7 @@ type ScheduledWorkoutLike = {
   scheduledDate: string;
   hour: number;
   minute: number;
+  notifyEnabled: boolean;
 };
 
 // 権限確認・過去日時判定を済ませた前提で通知を登録する内部関数。権限チェックは呼び出し元の
@@ -61,10 +62,11 @@ async function scheduleNotificationCore(sw: ScheduledWorkoutLike, title: string,
   });
 }
 
-// 権限が無い場合・過去日時の場合は無言でスキップする(呼び出し画面側でensurePermission()＋
-// PermissionBannerにより案内済みのため、ここで重ねてAlertは出さない設計、PR10-5計画フェーズの
-// @designer方針)
+// 権限が無い場合・過去日時の場合・この予定の通知トグルがOFFの場合は無言でスキップする
+// (呼び出し画面側でensurePermission()＋PermissionBannerにより案内済みのため、ここで重ねて
+// Alertは出さない設計、PR10-5計画フェーズの@designer方針)
 async function scheduleNotification(sw: ScheduledWorkoutLike, title: string): Promise<void> {
+  if (!sw.notifyEnabled) return;
   const fireDate = buildScheduledWorkoutFireDate(sw.scheduledDate, sw.hour, sw.minute);
   if (fireDate.getTime() <= Date.now()) return;
   if ((await getPermissionState()) !== 'granted') return;
@@ -85,10 +87,11 @@ export async function createScheduledWorkout(
   scheduledDate: string,
   hour: number,
   minute: number,
+  notifyEnabled: boolean,
 ): Promise<number> {
-  const id = await addScheduledWorkout(routineId, scheduledDate, hour, minute);
+  const id = await addScheduledWorkout(routineId, scheduledDate, hour, minute, notifyEnabled);
   try {
-    await scheduleNotification({ id, routineId, scheduledDate, hour, minute }, routineName);
+    await scheduleNotification({ id, routineId, scheduledDate, hour, minute, notifyEnabled }, routineName);
   } catch (e) {
     console.error('[schedule scheduled-workout notification]', e);
   }
@@ -105,10 +108,11 @@ export async function createDirectScheduledWorkout(
   scheduledDate: string,
   hour: number,
   minute: number,
+  notifyEnabled: boolean,
 ): Promise<number> {
-  const id = await addDirectScheduledWorkout(exerciseIds, scheduledDate, hour, minute);
+  const id = await addDirectScheduledWorkout(exerciseIds, scheduledDate, hour, minute, notifyEnabled);
   try {
-    await scheduleNotification({ id, routineId: null, scheduledDate, hour, minute }, title);
+    await scheduleNotification({ id, routineId: null, scheduledDate, hour, minute, notifyEnabled }, title);
   } catch (e) {
     console.error('[schedule direct scheduled-workout notification]', e);
   }
@@ -143,7 +147,9 @@ export async function materializeReminderOccurrence(
 ): Promise<MaterializeReminderOccurrenceResult> {
   const { notificationSuppressed } = await skipReminderOccurrence(reminderId, scheduledDate);
   try {
-    const scheduledWorkoutId = await createScheduledWorkout(routineId, routineName, scheduledDate, hour, minute);
+    // リマインダー由来の実体化は常に通知ONだった元の予定を引き継ぐため、notifyEnabledは固定true
+    // （このフローに通知トグルUIは無く、常にリマインダーの通知設定を尊重する）
+    const scheduledWorkoutId = await createScheduledWorkout(routineId, routineName, scheduledDate, hour, minute, true);
     return { scheduledWorkoutId, notificationSuppressed };
   } catch (e) {
     // 前半のskipだけ成立して元の予定が無言で消えたままになるのを防ぐロールバック
@@ -189,10 +195,12 @@ export async function syncScheduledWorkoutNotifications(): Promise<void> {
   // 増加し続ける(自動レビュー指摘)。scheduledDateはtoDateKeyと同じ'YYYY-MM-DD'形式で
   // 文字列比較が日付順と一致するため、SQL側で当日以降だけに絞り込む(時刻(hour/minute)まではSQLで
   // 絞れないため、当日中の過ぎた時刻は従来通りJS側のfireDate判定で除外する)
+  // notifyEnabled=falseの予定を含めてしまうと、この関数が対象を無条件に再スケジュールする
+  // 性質上、OFFにしたはずの予定がアプリ再起動のたびに通知復活してしまう(@planner指摘の最重要リスク)
   const rows = await db
     .select()
     .from(scheduledWorkouts)
-    .where(gte(scheduledWorkouts.scheduledDate, toDateKey(new Date())));
+    .where(and(gte(scheduledWorkouts.scheduledDate, toDateKey(new Date())), eq(scheduledWorkouts.notifyEnabled, true)));
   if (rows.length === 0) return;
   // 権限チェックはネイティブ呼び出しのため、行ごとではなくここで1回だけ行う
   if ((await getPermissionState()) !== 'granted') return;

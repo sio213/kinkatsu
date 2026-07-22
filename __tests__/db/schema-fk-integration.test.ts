@@ -315,4 +315,54 @@ describe('recording feature M1 スキーマ - 実SQLite上でのFK挙動', () =>
     expect(rows[0].nth_weekdays).toBe('[1]'); // 単一値1がJSON配列文字列に変換される
     expect(rows[1].nth_weekdays).toBeNull(); // NULLはNULLのまま
   });
+
+  // 予定単位の通知トグル（2026-07-22）。単体テスト(lib/notifications/scheduled-workout-scheduler.test.ts)の
+  // dbモックはwhere()に渡された引数の"形"しか検証できず、実SQLiteでnotify_enabled(integer 0/1)に対する
+  // eq(col, true)相当のWHEREが本当にOFFの行を除外できるかは別に確認する必要がある
+  // （@tester指摘: ここがsyncScheduledWorkoutNotificationsの唯一の防波堤のため）
+  it('notify_enabledカラム: 0020適用前の既存データ(アップグレード想定)は、カラム追加時のDEFAULT trueで1にバックフィルされる', () => {
+    db = new Database(':memory:');
+    db.pragma('foreign_keys = ON');
+
+    const files = migrationFiles();
+    const migration0021 = files.find((f) => f.startsWith('0021_'))!;
+    const upToPrevious = files.filter((f) => f < migration0021);
+    for (const file of upToPrevious) applyMigration(db, file);
+
+    const now = Date.now();
+    // 0021適用前はnotify_enabledカラム自体が存在しないため、それを含まないINSERTで
+    // 「アップグレード前からある既存の予定」を再現する
+    db.prepare(
+      `INSERT INTO scheduled_workouts (routine_id, scheduled_date, hour, minute, created_at, updated_at)
+       VALUES (NULL, '2026-08-01', 19, 0, ?, ?)`,
+    ).run(now, now);
+
+    applyMigration(db, migration0021);
+
+    const row = db.prepare('SELECT notify_enabled FROM scheduled_workouts').get() as {
+      notify_enabled: number;
+    };
+    expect(row.notify_enabled).toBe(1);
+  });
+
+  it('notify_enabledによるWHERE絞り込み: OFF(0)の行を除外し、ON(1)の行だけを返す（syncScheduledWorkoutNotificationsの実クエリを模した回帰テスト）', () => {
+    db = new Database(':memory:');
+    db.pragma('foreign_keys = ON');
+    applyAllMigrations(db);
+    const now = Date.now();
+
+    const insert = db.prepare(
+      `INSERT INTO scheduled_workouts (routine_id, scheduled_date, hour, minute, notify_enabled, created_at, updated_at)
+       VALUES (NULL, '2026-08-01', ?, 0, ?, ?, ?)`,
+    );
+    insert.run(19, 1, now, now); // ON
+    insert.run(20, 0, now, now); // OFF
+
+    const rows = db
+      .prepare('SELECT hour FROM scheduled_workouts WHERE notify_enabled = 1')
+      .all() as { hour: number }[];
+
+    expect(rows).toHaveLength(1);
+    expect(rows[0].hour).toBe(19);
+  });
 });

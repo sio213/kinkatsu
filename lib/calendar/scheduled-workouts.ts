@@ -27,6 +27,7 @@ export async function addScheduledWorkout(
   scheduledDate: string,
   hour: number,
   minute: number,
+  notifyEnabled: boolean,
 ): Promise<number> {
   assertValidTime(hour, minute);
 
@@ -41,7 +42,7 @@ export async function addScheduledWorkout(
   return db.transaction(async (tx) => {
     const [inserted] = await tx
       .insert(scheduledWorkouts)
-      .values({ routineId, scheduledDate, hour, minute, createdAt: now, updatedAt: now })
+      .values({ routineId, scheduledDate, hour, minute, notifyEnabled, createdAt: now, updatedAt: now })
       .returning();
     await insertRoutineExerciseRowsIntoScheduledWorkout(tx, inserted.id, exercisesToCopy, 0, now);
     return inserted.id;
@@ -58,6 +59,7 @@ export async function addDirectScheduledWorkout(
   scheduledDate: string,
   hour: number,
   minute: number,
+  notifyEnabled: boolean,
 ): Promise<number> {
   assertValidTime(hour, minute);
   if (exerciseIds.length === 0) throw new Error('exerciseIds must not be empty');
@@ -66,7 +68,7 @@ export async function addDirectScheduledWorkout(
   return db.transaction(async (tx) => {
     const [inserted] = await tx
       .insert(scheduledWorkouts)
-      .values({ routineId: null, scheduledDate, hour, minute, createdAt: now, updatedAt: now })
+      .values({ routineId: null, scheduledDate, hour, minute, notifyEnabled, createdAt: now, updatedAt: now })
       .returning();
     const exerciseRows = await tx
       .insert(scheduledWorkoutExercises)
