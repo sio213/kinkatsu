@@ -25,6 +25,7 @@ const Palette = {
 
   blue50: '#EFF6FF',
   blue600: '#2563EB',
+  sky500: '#0EA5E9',
 
   green300: '#86EFAC',
 
@@ -94,13 +95,15 @@ export const Colors = {
   shadow: Palette.slate900,
 
   // カレンダー機能の日別マーカー・凡例用。既存10カテゴリを7グループに圧縮した色
-  // （lib/calendar/category-color.ts）。脚・お尻は一時teal600に変更していたが、
-  // accentとの衝突を承知の上でデザイン案指定のblue600に統一（2026-07-19確定）。
+  // （lib/calendar/category-color.ts）。脚・お尻は一時teal600→2026-07-19にaccentとの
+  // 衝突を承知の上でblue600へ統一していたが、フィルター機能で「実績はaccent同色のため
+  // 予定と見分けがつかない」実害が判明したため、2026-07-22にL01スカイブルー(#0EA5E9)へ
+  // 再確定した（全確定デザインの凡例スウォッチ・脚の予定ドットに反映）。
   // shoulder/cardioOtherもfavorite/textPlaceholderと値が同じだが、画面上の文脈が異なり
   // 実害が薄いためデザイン案の指定通り据え置いている
   categoryChest: Palette.red500,
   categoryBack: Palette.purple600,
-  categoryLegGlute: Palette.blue600,
+  categoryLegGlute: Palette.sky500,
   categoryAbsCore: Palette.green600,
   categoryShoulder: Palette.amber500,
   categoryArm: Palette.pink500,
