@@ -211,6 +211,13 @@ export default function ScheduleTimePickerScreen() {
         }}
       />
       <View style={styles.content}>
+        {/* 通知トグル→時刻の順（2026-07-22、@ユーザー指摘でこの並びに変更） */}
+        <ScheduleNotifyToggle
+          enabled={notifyEnabled}
+          onToggleEnabled={setNotifyEnabled}
+          permState={permState}
+          onRequestPermission={handleRequestPermission}
+        />
         <FormField label="時刻">
           <View style={styles.timePickerWrapper}>
             {Platform.OS === 'android' && (
@@ -234,12 +241,6 @@ export default function ScheduleTimePickerScreen() {
             )}
           </View>
         </FormField>
-        <ScheduleNotifyToggle
-          enabled={notifyEnabled}
-          onToggleEnabled={setNotifyEnabled}
-          permState={permState}
-          onRequestPermission={handleRequestPermission}
-        />
       </View>
       <View style={styles.footer}>
         <PrimaryButton label="この時刻で予定を追加" onPress={handleConfirm} disabled={isSubmitting} />
