@@ -1,5 +1,6 @@
 import { CalendarExerciseCard } from '@/components/calendar/calendar-exercise-card';
 import { SessionTimeGroupHeader } from '@/components/calendar/session-time-group-header';
+import { RoutineAddExerciseButton } from '@/components/routines/routine-add-exercise-button';
 import { IconSymbol } from '@/components/ui/icon-symbol';
 import { PrimaryButton } from '@/components/ui/primary-button';
 import { Colors, Typography } from '@/constants/theme';
@@ -107,18 +108,17 @@ export const ScheduleExerciseCardGroup = memo(function ScheduleExerciseCardGroup
       {/* ルーティン削除等で種目が0件になった予定（極めて稀なレース条件、
           lib/calendar/scheduled-workouts.tsのaddScheduledWorkoutの0件フォールバック参照）は、
           見出しだけが残り種目カードが1枚も無い「何もタップできない」状態になっていた
-          （ユーザー報告のバグ）。見出しの下に必ずタップ可能な行を出し、編集画面へ誘導する */}
+          （ユーザー報告のバグ）。見出しの下に必ずタップ可能な行を出し、編集画面へ誘導する。
+          ルーティン編集フォーム等の種目0件時と同じ破線ボックスのデザイン（デザイン案
+          「未来（予定）／種目0件」）をRoutineAddExerciseButtonのcompact variantで共有する
+          （2026-07-22、@ユーザー指摘で独自スタイルの空状態から統一） */}
       {cards != null && cards !== 'error' && cards.length === 0 && (
-        <TouchableOpacity
-          style={styles.emptyRow}
+        <RoutineAddExerciseButton
+          variant="compact"
           onPress={onPress}
-          accessibilityRole="button"
           accessibilityLabel={`「${title}」${timeLabel}に種目を追加`}
           accessibilityHint="タップして予定の種目を追加します"
-        >
-          <Text style={styles.emptyRowText}>種目がありません</Text>
-          <Text style={styles.emptyRowHint}>タップして追加</Text>
-        </TouchableOpacity>
+        />
       )}
       {cards === 'error' && onRetryCards && (
         // useCalendarDayExercises(過去日パネル)のエラー表示・再試行ボタンと同じ体験に揃える
@@ -152,19 +152,6 @@ const styles = StyleSheet.create({
   // （2026-07-22、@ユーザー指摘: 背景・枠線での「グルーピング」を廃止）
   wrapper: { gap: 8 },
   cardList: { gap: 8 },
-  // CalendarExerciseCardと縦のリズムを揃えつつ、破線で「まだ何も無い」ことを示す
-  // （components/routines/routine-add-exercise-button.tsxのvariant="empty"と近い見た目）
-  emptyRow: {
-    borderWidth: 1.5,
-    borderStyle: 'dashed',
-    borderColor: Colors.borderStrong,
-    borderRadius: 10,
-    paddingVertical: 14,
-    alignItems: 'center',
-    gap: 2,
-  },
-  emptyRowText: { ...Typography.footnote, fontWeight: '600', color: Colors.textMuted },
-  emptyRowHint: { ...Typography.caption, color: Colors.accent, fontWeight: '600' },
   errorRow: { flexDirection: 'row', alignItems: 'center', gap: 8, flexWrap: 'wrap' },
   errorText: { ...Typography.body, color: Colors.danger },
   retryText: { ...Typography.bodyStrong, color: Colors.accent },

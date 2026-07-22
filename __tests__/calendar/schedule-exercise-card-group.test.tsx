@@ -69,16 +69,18 @@ describe('ScheduleExerciseCardGroup', () => {
     expect(root.root.findAllByProps({ children: 'ベンチプレス' })).toHaveLength(0);
   });
 
-  it('cardsがnull（読み込み中）のときは「種目がありません」の空状態も表示しない（読み込み中と本当に0件を混同しない）', () => {
+  it('cardsがnull（読み込み中）のときは「種目を追加」の空状態も表示しない（読み込み中と本当に0件を混同しない）', () => {
     const root = render({ cards: null });
-    expect(root.root.findAllByProps({ children: '種目がありません' })).toHaveLength(0);
+    expect(root.root.findAllByProps({ children: '種目を追加' })).toHaveLength(0);
   });
 
   // ルーティン削除等で種目が0件になった予定（極めて稀なレース条件）が、見出しだけ残り
-  // 何もタップできない状態になっていたバグの修正（ユーザー報告、2026-07-22）
-  it('cardsが読み込み済みで0件のときは「種目がありません」の空状態を表示し、タップするとonPressが呼ばれる', () => {
+  // 何もタップできない状態になっていたバグの修正（ユーザー報告、2026-07-22）。空状態の見た目は
+  // ルーティン編集フォーム等と同じRoutineAddExerciseButton(variant="compact")を共有する
+  // （2026-07-22、デザイン案「未来（予定）／種目0件」準拠に@ユーザー指摘で統一）
+  it('cardsが読み込み済みで0件のときは「種目を追加」の空状態を表示し、タップするとonPressが呼ばれる', () => {
     const root = render({ cards: [] });
-    expect(root.root.findByProps({ children: '種目がありません' })).toBeDefined();
+    expect(root.root.findByProps({ children: '種目を追加' })).toBeDefined();
     const emptyRow = findByAccessibilityLabel(root.root, '「ベンチプレス 他1種目」夜 19:30に種目を追加')!;
     act(() => {
       emptyRow.props.onPress();
