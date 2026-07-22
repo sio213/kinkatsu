@@ -413,7 +413,7 @@ describe('MonthGrid', () => {
       expect(anyDot).toBeUndefined();
     });
 
-    it('★実績がフィルター非該当、同じ日の予定が別カテゴリでフィルター該当なら、ドットが予定のカテゴリ色になる（グレーにならない）', () => {
+    it('★実績がフィルター非該当、同じ日の予定が別カテゴリでフィルター該当なら、ドットはグレーにならないが、色は予定側ではなくメインカテゴリ（実績側）の色になる', () => {
       const root = render({
         selectedDate: new Date(2026, 6, 18),
         activeFilter: 'chest',
@@ -429,12 +429,18 @@ describe('MonthGrid', () => {
       );
       // filterDotの基本スタイル自体は常にColors.borderStrongを内包している（配列の後ろの
       // 要素で上書きされる仕組みのため）ので、「borderStrongを持つViewが無いこと」ではなく
-      // 「カテゴリ色のドットが1つだけ存在すること」を確認する
+      // 「メインカテゴリ(leg)色のドットが1つだけ存在すること」を確認する。予定(chest)の
+      // 色には飛び火しない
       const dotsWithColor = cellView.findAllByType(View).filter((v) => {
+        const style = [v.props.style].flat();
+        return style.some((s) => s && s.backgroundColor === getCalendarCategoryColor('leg'));
+      });
+      expect(dotsWithColor).toHaveLength(1);
+      const chestColoredDot = cellView.findAllByType(View).find((v) => {
         const style = [v.props.style].flat();
         return style.some((s) => s && s.backgroundColor === getCalendarCategoryColor('chest'));
       });
-      expect(dotsWithColor).toHaveLength(1);
+      expect(chestColoredDot).toBeUndefined();
     });
 
     it('実績がフィルター非該当、同じ日の予定も別カテゴリでフィルター非該当なら、従来通りグレードットのまま', () => {
@@ -505,7 +511,7 @@ describe('MonthGrid', () => {
       expect(label).not.toContain('絞り込み対象外');
     });
 
-    it('★今日×実績がフィルター非該当×予定が該当する日は、数字・下線バーが予定のカテゴリ色になる（黒に落とさない）', () => {
+    it('★今日×実績がフィルター非該当×予定が該当する日は、数字・下線バーはメインカテゴリ（実績側）の色のままになり、予定側の色には飛び火しない', () => {
       const root = render({
         today: new Date(2026, 6, 5),
         selectedDate: new Date(2026, 6, 18),
@@ -515,10 +521,18 @@ describe('MonthGrid', () => {
         primaryCategoryByScheduleDay: new Map([['2026-07-05', 'chest']]),
         categorySetByScheduleDay: new Map([['2026-07-05', new Set(['chest'])]]),
       });
+      // このケースは実績非該当・予定該当でドットも同時に表示されるため、単純に
+      // 「最後に見つかったView」だと予定ドットを拾ってしまう。下線バー(height:2)と
+      // ドット(height:5)はサイズが異なるので、それで区別する
       const views = findTouchableForDay(root, '7月5日').findAllByType(View);
-      const underlineBar = views[views.length - 1];
+      const underlineBar = views.find((v) => [v.props.style].flat().some((s) => s && s.height === 2))!;
+      // 黒には落とさない（予定側がフィルターに該当しているため）
+      expect(underlineBar.props.style).not.toEqual(
+        expect.arrayContaining([expect.objectContaining({ backgroundColor: Colors.textBody })]),
+      );
+      // ただし色は実績(leg)のまま。予定(chest)の色にはならない
       expect(underlineBar.props.style).toEqual(
-        expect.arrayContaining([expect.objectContaining({ backgroundColor: getCalendarCategoryColor('chest') })]),
+        expect.arrayContaining([expect.objectContaining({ backgroundColor: getCalendarCategoryColor('leg') })]),
       );
     });
   });
