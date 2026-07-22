@@ -161,8 +161,6 @@ export default function ScheduleTimePickerScreen() {
     );
   }
 
-  const targetName = isDirectMode ? directTitle : routineName;
-
   return (
     <SafeAreaView style={styles.safeArea} edges={['bottom']}>
       <Stack.Screen
@@ -170,9 +168,8 @@ export default function ScheduleTimePickerScreen() {
           // 画面1(schedule-routine-picker.tsx/schedule-exercise-picker.tsx)はタイトル=アクション名
           // （「ルーティンを選択」等）・サブタイトル=日付という情報階層のため、こちらも合わせて
           // タイトルをアクション名にし、日付はサブタイトル側にまとめる（デザイン指摘:
-          // 隣接画面で主従が逆転していると視線移動が不自然になるため）。予定名はサブタイトルから
-          // 外し本文側の対象表示に移した（下記targetLabel参照、@designer指摘: 直接追加モードだと
-          // 次画面までヘッダー上に種目名が一切出なくなるため）
+          // 隣接画面で主従が逆転していると視線移動が不自然になるため）。予定名（ルーティン名/種目名）は
+          // 前画面で選んだばかりで直後の画面表示は不要と判断し出さない（@ユーザー指摘）
           headerTitle: () => (
             <HeaderTitle title="時刻を設定" subtitle={formatSessionDateGroup(parseDateKey(dateKey).getTime())} />
           ),
@@ -182,11 +179,6 @@ export default function ScheduleTimePickerScreen() {
         {permState && permState !== 'granted' && (
           <PermissionBanner state={permState} onRequest={handleRequestPermission} />
         )}
-        {targetName ? (
-          <Text style={styles.targetLabel} numberOfLines={2}>
-            対象：{targetName}
-          </Text>
-        ) : null}
         <FormField label="時刻">
           <View style={styles.timePickerWrapper}>
             {Platform.OS === 'android' && (
@@ -221,7 +213,6 @@ export default function ScheduleTimePickerScreen() {
 const styles = StyleSheet.create({
   safeArea: { flex: 1, backgroundColor: Colors.background },
   content: { flex: 1, padding: 16, gap: 16 },
-  targetLabel: { ...Typography.footnote, color: Colors.textMuted },
   // 時刻ピッカーが左寄りに見えていた問題の修正（@ユーザー指摘）。iOSのspinnerは意図幅で
   // 描画され親の全幅に伸びないため、このwrapperのalignItems:centerで水平中央に寄せる
   timePickerWrapper: { alignItems: 'center' },
