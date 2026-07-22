@@ -5,8 +5,8 @@ import { IconSymbol } from '@/components/ui/icon-symbol';
 import { ListErrorBoundary } from '@/components/ui/list-error-boundary';
 import { NotFoundState } from '@/components/ui/not-found-state';
 import { PrimaryButton } from '@/components/ui/primary-button';
-import { RoutineAddExerciseButton } from '@/components/routines/routine-add-exercise-button';
 import { AddExerciseButton } from '@/components/workout/add-exercise-button';
+import { ExerciseEmptyState } from '@/components/workout/exercise-empty-state';
 import { SessionExerciseCard, type SessionExerciseCardHandle } from '@/components/workout/session-exercise-card';
 import { Colors, Typography } from '@/constants/theme';
 import { useAutoCollapseCompletedExercises } from '@/hooks/use-auto-collapse-completed-exercises';
@@ -283,13 +283,7 @@ export default function WorkoutScreen() {
       )}
 
       {sessionExercises.length === 0 ? (
-        // 予定の目標セット編集画面(app/calendar/schedule-workout-edit.tsx)・ルーティンの
-        // テンプレートセット編集画面(app/routine/exercise-edit.tsx)と同じ破線ボックス
-        // (RoutineAddExerciseButtonのvariant="empty")に統一する（2026-07-22、@ユーザー指摘。
-        // 従来は独自の中央寄せテキスト+AddExerciseButtonだった）
-        <View style={styles.emptyBody}>
-          <RoutineAddExerciseButton variant="empty" onPress={handleAddExercise} />
-        </View>
+        <ExerciseEmptyState onPress={handleAddExercise} />
       ) : (
         <FlatList
           style={styles.exerciseList}
@@ -363,13 +357,6 @@ const styles = StyleSheet.create({
   },
   // デザイン案のタイマーチップはfontWeight 700（セット入力欄の600より太い）
   timerText: { ...Typography.metric, fontWeight: '700', color: Colors.textPrimary },
-
-  // 予定・ルーティンテンプレートの編集画面と同じく、画面中央寄せではなく上寄せに表示する
-  // （RoutineAddExerciseButton自体が破線ボックスの視覚的な重みを持つため）。padding値自体は
-  // それらの画面のcontent paddingとは揃えず、この画面の種目ありリスト(exerciseListContent)の
-  // paddingと一致させている（@designer指摘: 「同じ余白」という記述が他画面のpadding値との
-  // 一致であるかのように読めていたため誤解の無いよう明記）
-  emptyBody: { padding: 16 },
 
   exerciseList: { flex: 1 },
   // 末尾までスクロールした時にフッターのボタン（「トレーニングを終了」/「戻る」）と
