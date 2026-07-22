@@ -120,12 +120,17 @@ export const MonthGrid = memo(function MonthGrid({
         // 選択中は枠線表現に切り替わり、フィルターで非該当の日は塗りつぶさずドットに切り替わる
         const showFill = recordMatches && !isSelected;
         // ドットが必要なのは「実績で塗りつぶされていない日」＝実績が無い、または実績があっても
-        // フィルターで非該当になった日。そのときだけ、同じ日の予定がフィルターに該当するかを見て
-        // 色を決める（該当ならそのカテゴリ色、非該当/予定なしならグレー）。実績がフィルター該当で
-        // 塗りつぶされている日は、別カテゴリの予定があってもドットは追加しない（要望の範囲外まで
-        // 情報を足さないため。実績＝塗りつぶしが最優先という既存の階層をそのまま維持する）
+        // フィルターで非該当になった日。実績がフィルター該当で塗りつぶされている日は、別カテゴリの
+        // 予定があってもドットは追加しない（要望の範囲外まで情報を足さないため。実績＝塗りつぶしが
+        // 最優先という既存の階層をそのまま維持する）
         const showDot = !isSelected && !showFill && (hasRecord || hasSchedule);
-        const isDotColored = scheduleMatches;
+        // ドットの色もaccentOrCategoryColorと同じ考え方に揃える。「その日のメインカテゴリ
+        // （実績があれば実績側、無ければ予定側）」の色を、実績・予定のどちらかがフィルターに
+        // 該当していれば出す。ヒットしたのが予定側でも、色は予定側のカテゴリ色には飛び火させず
+        // メインカテゴリの色のまま（showDotに来る時点でrecordMatchesは常にfalseだが、
+        // 将来の変更で前提が崩れても壊れないよう明示的にrecordMatches||scheduleMatchesで書く）
+        const dotCategory = hasRecord ? category : scheduleCategory;
+        const isDotColored = recordMatches || scheduleMatches;
 
         return (
           // 押下中のopacityフィードバック(activeOpacity相当)はあえて付けない。react-native-gesture-handler
@@ -184,11 +189,15 @@ export const MonthGrid = memo(function MonthGrid({
               {/* ドットはcellDigitWrapperの外（cell自体）に置き、bottomで絶対配置する。
                   親cellのalignItems:'center'はabsolute配置の子にも効くため、
                   left/transformを指定しなくても水平中央に来る（RN/Yogaの挙動）。
-                  色は「同じ日の予定がフィルターに該当していればそのカテゴリ色、それ以外
-                  （予定なし、または予定も非該当）はグレー」で決める。実績側の該当/非該当は
-                  showFillで表現済み（該当なら塗りつぶし）なので、ここでは見ない */}
+                  色はdotCategory（メインカテゴリ）を使い、実績・予定のどちらかがフィルターに
+                  該当していれば出す。どちらも非該当ならグレー。dotCategoryは
+                  hasRecord||hasSchedule（showDotの条件）が真である限り必ずどちらか一方が
+                  定義されるが、TSはrecordMatches||scheduleMatchesのOR越しにそこまで
+                  絞り込めないため、ここでは非nullアサーションを使う */}
               {showDot && (
-                <View style={[styles.filterDot, isDotColored && { backgroundColor: getCalendarCategoryColor(scheduleCategory) }]} />
+                <View
+                  style={[styles.filterDot, isDotColored && { backgroundColor: getCalendarCategoryColor(dotCategory!) }]}
+                />
               )}
             </View>
           </Pressable>

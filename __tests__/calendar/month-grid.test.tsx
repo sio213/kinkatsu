@@ -413,7 +413,7 @@ describe('MonthGrid', () => {
       expect(anyDot).toBeUndefined();
     });
 
-    it('★実績がフィルター非該当、同じ日の予定が別カテゴリでフィルター該当なら、ドットが予定のカテゴリ色になる（グレーにならない）', () => {
+    it('★実績がフィルター非該当、同じ日の予定が別カテゴリでフィルター該当なら、ドットはグレーにならないが、色は予定側ではなくメインカテゴリ（実績側）の色になる', () => {
       const root = render({
         selectedDate: new Date(2026, 6, 18),
         activeFilter: 'chest',
@@ -429,12 +429,18 @@ describe('MonthGrid', () => {
       );
       // filterDotの基本スタイル自体は常にColors.borderStrongを内包している（配列の後ろの
       // 要素で上書きされる仕組みのため）ので、「borderStrongを持つViewが無いこと」ではなく
-      // 「カテゴリ色のドットが1つだけ存在すること」を確認する
+      // 「メインカテゴリ(leg)色のドットが1つだけ存在すること」を確認する。予定(chest)の
+      // 色には飛び火しない
       const dotsWithColor = cellView.findAllByType(View).filter((v) => {
+        const style = [v.props.style].flat();
+        return style.some((s) => s && s.backgroundColor === getCalendarCategoryColor('leg'));
+      });
+      expect(dotsWithColor).toHaveLength(1);
+      const chestColoredDot = cellView.findAllByType(View).find((v) => {
         const style = [v.props.style].flat();
         return style.some((s) => s && s.backgroundColor === getCalendarCategoryColor('chest'));
       });
-      expect(dotsWithColor).toHaveLength(1);
+      expect(chestColoredDot).toBeUndefined();
     });
 
     it('実績がフィルター非該当、同じ日の予定も別カテゴリでフィルター非該当なら、従来通りグレードットのまま', () => {
