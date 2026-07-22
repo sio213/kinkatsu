@@ -34,6 +34,14 @@ export function formatHourMinuteParts(hour: number, minute: number): string {
   return `${String(hour).padStart(2, '0')}:${String(minute).padStart(2, '0')}`;
 }
 
+// 「朝 07:00」のような時間帯ラベル+時刻の表示文字列を組み立てる。SessionTimeGroupHeaderの
+// 表示ラベルと、呼び出し元(schedule-exercise-card-group.tsx)が開始ボタンのaccessibilityLabelに
+// 埋め込む時刻表記は一致している必要があるため、この組み立て式を1本化する（@reviewer指摘）
+export function formatTimeOfDayLabel(sessionStartedAt: number): string {
+  const date = new Date(sessionStartedAt);
+  return `${getTimeOfDayLabel(getTimeOfDay(date))} ${formatHourMinute(date)}`;
+}
+
 // hour/minuteを「その日の0時からのオフセットms」に変換する。予定の時刻順ソートキー計算で
 // app/(tabs)/calendar.tsx内に複製されていた式(hour*3_600_000+minute*60_000)を1本化する
 // (@reviewer指摘)
