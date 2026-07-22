@@ -20,9 +20,10 @@ type Props = {
 
 // ルーティンフォーム(components/routines/routine-form.tsx)・テンプレートセット編集画面
 // (app/routine/exercise-edit.tsx)・予定の目標セット編集画面(app/calendar/schedule-workout-edit.tsx)・
-// カレンダー選択日パネルの予定カード(components/calendar/schedule-exercise-card-group.tsx)で
-// 共通の「種目を追加」ボタン。見た目が完全に同じため一箇所にまとめる（workout/add-exercise-button.tsx
-// はセッション中の見た目が異なるため流用しない）
+// カレンダー選択日パネルの予定カード(components/calendar/schedule-exercise-card-group.tsx)・
+// トレーニング中/記録編集画面(app/workout/[id].tsx、種目0件のvariant="empty"のみ、2026-07-22)で
+// 共通の「種目を追加」ボタン。見た目が完全に同じため一箇所にまとめる。workout/add-exercise-button.tsx
+// （種目が既にある状態の一覧末尾ボタン）は今回のスコープ外のため据え置き、統合は将来の検討課題
 export function RoutineAddExerciseButton({ onPress, variant, accessibilityLabel = '種目を追加', accessibilityHint }: Props) {
   if (variant === 'empty') {
     return (
