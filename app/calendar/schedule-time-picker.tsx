@@ -21,9 +21,11 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 // カレンダー選択日パネル「予定を追加」フローの画面2（PR10、PR10-5で通知登録を追加、
 // 2026-07-20に「直接追加」対応）。時刻はデザイン未確定だったため、
 // components/reminders/reminder-form.tsxの時刻入力（iOSは常時インラインspinner、Androidは
-// ボタン+モーダル、スタイルも同一に揃える）をそのまま踏襲する。デフォルト18:00も
+// ボタン+モーダル）をベースに踏襲する。デフォルト18:00も
 // reminder-form.tsxの新規リマインダーのデフォルトと揃え、アプリ内での「トレーニングの標準時刻」感を
-// 一貫させる
+// 一貫させる。ただし水平位置は揃えていない: この画面は時刻ピッカーが唯一の入力項目のため
+// 中央寄せにしているが、reminder-form.tsxは他フィールドと縦に並ぶ左寄せ基調のフォームのため
+// 左寄せのまま（2026-07-22、@reviewer/@designer指摘でこの差分の理由を明記）
 function isPositiveInteger(n: number): boolean {
   return Number.isInteger(n) && n > 0;
 }
@@ -153,11 +155,13 @@ export default function ScheduleTimePickerScreen() {
   if ((!isRoutineMode && !isDirectMode) || !isValidDateKey(dateKey)) {
     return (
       <SafeAreaView style={styles.safeArea} edges={['bottom']}>
-        <Stack.Screen options={{ title: '時刻を選択' }} />
+        <Stack.Screen options={{ title: '時刻を設定' }} />
         <NotFoundState message="ルーティンが見つかりません" actionLabel="戻る" onPressAction={() => router.back()} />
       </SafeAreaView>
     );
   }
+
+  const targetName = isDirectMode ? directTitle : routineName;
 
   return (
     <SafeAreaView style={styles.safeArea} edges={['bottom']}>
@@ -165,13 +169,12 @@ export default function ScheduleTimePickerScreen() {
         options={{
           // 画面1(schedule-routine-picker.tsx/schedule-exercise-picker.tsx)はタイトル=アクション名
           // （「ルーティンを選択」等）・サブタイトル=日付という情報階層のため、こちらも合わせて
-          // タイトルをアクション名にし、日付・予定名はサブタイトル側にまとめる（デザイン指摘:
-          // 隣接画面で主従が逆転していると視線移動が不自然になるため）
+          // タイトルをアクション名にし、日付はサブタイトル側にまとめる（デザイン指摘:
+          // 隣接画面で主従が逆転していると視線移動が不自然になるため）。予定名はサブタイトルから
+          // 外し本文側の対象表示に移した（下記targetLabel参照、@designer指摘: 直接追加モードだと
+          // 次画面までヘッダー上に種目名が一切出なくなるため）
           headerTitle: () => (
-            <HeaderTitle
-              title="時刻を選択"
-              subtitle={`${formatSessionDateGroup(parseDateKey(dateKey).getTime())}・${isDirectMode ? directTitle : routineName}`}
-            />
+            <HeaderTitle title="時刻を設定" subtitle={formatSessionDateGroup(parseDateKey(dateKey).getTime())} />
           ),
         }}
       />
@@ -179,26 +182,33 @@ export default function ScheduleTimePickerScreen() {
         {permState && permState !== 'granted' && (
           <PermissionBanner state={permState} onRequest={handleRequestPermission} />
         )}
+        {targetName ? (
+          <Text style={styles.targetLabel} numberOfLines={2}>
+            対象：{targetName}
+          </Text>
+        ) : null}
         <FormField label="時刻">
-          {Platform.OS === 'android' && (
-            <TouchableOpacity
-              style={styles.timeButton}
-              onPress={() => setShowAndroidTimePicker(true)}
-              accessibilityRole="button"
-              accessibilityLabel="時刻を変更"
-            >
-              <Text style={styles.timeButtonText}>{timeLabel}</Text>
-            </TouchableOpacity>
-          )}
-          {showTimePicker && (
-            <DateTimePicker
-              value={timeDate}
-              mode="time"
-              is24Hour
-              display={Platform.OS === 'ios' ? 'spinner' : 'default'}
-              onChange={handleTimeChange}
-            />
-          )}
+          <View style={styles.timePickerWrapper}>
+            {Platform.OS === 'android' && (
+              <TouchableOpacity
+                style={styles.timeButton}
+                onPress={() => setShowAndroidTimePicker(true)}
+                accessibilityRole="button"
+                accessibilityLabel="時刻を変更"
+              >
+                <Text style={styles.timeButtonText}>{timeLabel}</Text>
+              </TouchableOpacity>
+            )}
+            {showTimePicker && (
+              <DateTimePicker
+                value={timeDate}
+                mode="time"
+                is24Hour
+                display={Platform.OS === 'ios' ? 'spinner' : 'default'}
+                onChange={handleTimeChange}
+              />
+            )}
+          </View>
         </FormField>
       </View>
       <View style={styles.footer}>
@@ -211,6 +221,10 @@ export default function ScheduleTimePickerScreen() {
 const styles = StyleSheet.create({
   safeArea: { flex: 1, backgroundColor: Colors.background },
   content: { flex: 1, padding: 16, gap: 16 },
+  targetLabel: { ...Typography.footnote, color: Colors.textMuted },
+  // 時刻ピッカーが左寄りに見えていた問題の修正（@ユーザー指摘）。iOSのspinnerは意図幅で
+  // 描画され親の全幅に伸びないため、このwrapperのalignItems:centerで水平中央に寄せる
+  timePickerWrapper: { alignItems: 'center' },
   timeButton: {
     backgroundColor: Colors.surface,
     borderWidth: 1,
@@ -218,7 +232,6 @@ const styles = StyleSheet.create({
     borderRadius: 8,
     paddingHorizontal: 16,
     paddingVertical: 12,
-    alignSelf: 'flex-start',
   },
   timeButtonText: { ...Typography.timeDisplay, color: Colors.textPrimary },
   footer: {
