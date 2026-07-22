@@ -24,7 +24,7 @@ import { useResumeWorkoutSummary, useWorkoutSessions } from '@/hooks/use-workout
 import { addMonths, isSameDay, toDateKey } from '@/lib/calendar/date-grid';
 import { CATEGORY_ALL, EXERCISE_CATEGORIES } from '@/lib/exercises/constants';
 import { buildTodayTimeline, groupCardsBySession } from '@/lib/calendar/session-groups';
-import { mergeScheduleCards, type UnifiedScheduleCard } from '@/lib/calendar/schedule';
+import { excludeActiveScheduledCard, mergeScheduleCards, type UnifiedScheduleCard } from '@/lib/calendar/schedule';
 import { materializeReminderOccurrence } from '@/lib/notifications/scheduled-workout-scheduler';
 import { startWorkoutFromScheduledWorkout } from '@/lib/workout/session';
 import { formatElapsedClock, formatMonthGroup, formatSessionDateGroup } from '@/lib/workout/summary';
@@ -291,6 +291,11 @@ export default function CalendarScreen() {
     [dayCards],
   );
 
+  // todayTimelineのフィルタ（下記）で使うため、resumeバナー関連のuseWorkoutSessions呼び出しより
+  // 前にactiveSessionだけ先出しする（2026-07-23、@ユーザー指摘: 予定を開始すると再開バナーに
+  // 加えてその予定のカード自体も今日パネルに残ってしまうバグの修正）
+  const { activeSession } = useWorkoutSessions();
+
   const isSelectedToday = isSameDay(selectedDate, today);
   const selectedDayStart = useMemo(
     () => new Date(selectedDate.getFullYear(), selectedDate.getMonth(), selectedDate.getDate()).getTime(),
@@ -320,12 +325,19 @@ export default function CalendarScreen() {
     () => mergeScheduleCards(daySchedule.cards, manualSchedule),
     [daySchedule, manualSchedule],
   );
+  // 今日パネル専用。開始済みの予定カードが再開バナーと重複表示されるバグの修正
+  // （excludeActiveScheduledCard、lib/calendar/schedule.ts参照）。mergedSchedule自体は
+  // 未来日パネルでもそのまま使うため素の状態を保つ
+  const todayScheduleCards = useMemo(
+    () => excludeActiveScheduledCard(mergedSchedule, activeSession?.scheduledWorkoutId ?? null),
+    [mergedSchedule, activeSession],
+  );
   const todayTimeline = useMemo(
     () =>
       isSelectedToday
-        ? buildTodayTimeline(dayCardGroups, mergedSchedule, selectedDayStart)
+        ? buildTodayTimeline(dayCardGroups, todayScheduleCards, selectedDayStart)
         : [],
-    [isSelectedToday, dayCardGroups, mergedSchedule, selectedDayStart],
+    [isSelectedToday, dayCardGroups, todayScheduleCards, selectedDayStart],
   );
 
   const pushDebounced = useDebouncedPush();
@@ -401,7 +413,6 @@ export default function CalendarScreen() {
     [pushDebounced, selectedDate],
   );
 
-  const { activeSession } = useWorkoutSessions();
   const resumeSummary = useResumeWorkoutSummary(activeSession);
   const resumeNow = useTickingNow(activeSession != null);
   // 今日の空状態は進行中セッション(endedAtがnull)のendedAtがnullなためuseCalendarDayExercises
