@@ -204,7 +204,7 @@ export default function ScheduleTimePickerScreen() {
         </FormField>
       </View>
       <View style={styles.footer}>
-        <PrimaryButton label="この時刻で追加" onPress={handleConfirm} disabled={isSubmitting} />
+        <PrimaryButton label="この時刻で予定を追加" onPress={handleConfirm} disabled={isSubmitting} />
       </View>
     </SafeAreaView>
   );
