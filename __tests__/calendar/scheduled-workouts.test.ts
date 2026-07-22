@@ -89,17 +89,23 @@ beforeEach(() => {
 });
 
 describe('addScheduledWorkout', () => {
-  it('routineId/scheduledDate/hour/minuteをvaluesに渡してinsertし、挿入行のidを返す（ルーティンに種目が無ければscheduledWorkouts行のみinsertする）', async () => {
-    const id = await addScheduledWorkout(10, '2026-07-25', 19, 30);
+  it('routineId/scheduledDate/hour/minute/notifyEnabledをvaluesに渡してinsertし、挿入行のidを返す（ルーティンに種目が無ければscheduledWorkouts行のみinsertする）', async () => {
+    const id = await addScheduledWorkout(10, '2026-07-25', 19, 30, true);
     expect(mockInsertValues).toHaveBeenCalledTimes(1);
     const [, values] = mockInsertValues.mock.calls[0];
-    expect(values).toMatchObject({ routineId: 10, scheduledDate: '2026-07-25', hour: 19, minute: 30 });
+    expect(values).toMatchObject({ routineId: 10, scheduledDate: '2026-07-25', hour: 19, minute: 30, notifyEnabled: true });
     expect(id).toBe(42);
   });
 
+  it('notifyEnabled=falseで呼んだ場合はfalseのままvaluesに渡す（通知トグルOFF、@ユーザー指摘機能）', async () => {
+    await addScheduledWorkout(10, '2026-07-25', 19, 30, false);
+    const [, values] = mockInsertValues.mock.calls[0];
+    expect(values).toMatchObject({ notifyEnabled: false });
+  });
+
   it('hour/minuteの境界値(0, 23, 59)はinsertされる', async () => {
-    await addScheduledWorkout(10, '2026-07-25', 0, 0);
-    await addScheduledWorkout(10, '2026-07-25', 23, 59);
+    await addScheduledWorkout(10, '2026-07-25', 0, 0, true);
+    await addScheduledWorkout(10, '2026-07-25', 23, 59, true);
     expect(mockInsertValues).toHaveBeenCalledTimes(2);
   });
 
@@ -109,7 +115,7 @@ describe('addScheduledWorkout', () => {
     ['minute=60(範囲外)', 19, 60],
     ['minute=-1(範囲外)', 19, -1],
   ])('%s はinsertを呼ばず例外を投げる（getRoutineDetailも呼ばれない、無駄な読み取り防止、@tester指摘）', async (_label, hour, minute) => {
-    await expect(addScheduledWorkout(10, '2026-07-25', hour, minute)).rejects.toThrow();
+    await expect(addScheduledWorkout(10, '2026-07-25', hour, minute, true)).rejects.toThrow();
     expect(mockInsertValues).not.toHaveBeenCalled();
     expect(mockGetRoutineDetail).not.toHaveBeenCalled();
   });
@@ -127,7 +133,7 @@ describe('addScheduledWorkout', () => {
       ],
     });
 
-    const id = await addScheduledWorkout(10, '2026-07-25', 19, 30);
+    const id = await addScheduledWorkout(10, '2026-07-25', 19, 30, true);
 
     expect(mockGetRoutineDetail).toHaveBeenCalledWith(10);
     // scheduledWorkouts 1回 + scheduledWorkoutExercises 1回（2件まとめて）+ scheduledWorkoutSets 2回（種目ごと）
@@ -166,7 +172,7 @@ describe('addScheduledWorkout', () => {
       ],
     });
 
-    await addScheduledWorkout(10, '2026-07-25', 19, 30);
+    await addScheduledWorkout(10, '2026-07-25', 19, 30, true);
 
     const [, setValues] = mockInsertValues.mock.calls[2];
     expect(setValues).toEqual([
@@ -192,7 +198,7 @@ describe('addScheduledWorkout', () => {
       ],
     });
 
-    await addScheduledWorkout(10, '2026-07-25', 19, 30);
+    await addScheduledWorkout(10, '2026-07-25', 19, 30, true);
 
     const [, setValues] = mockInsertValues.mock.calls[2];
     expect(setValues).toEqual([
@@ -202,7 +208,7 @@ describe('addScheduledWorkout', () => {
 
   it('ルーティンが削除済み(getRoutineDetailがnullを返す)場合はscheduledWorkouts行のみinsertする', async () => {
     mockGetRoutineDetail.mockResolvedValue(null);
-    const id = await addScheduledWorkout(10, '2026-07-25', 19, 30);
+    const id = await addScheduledWorkout(10, '2026-07-25', 19, 30, true);
     expect(mockInsertValues).toHaveBeenCalledTimes(1);
     expect(id).toBe(42);
   });
@@ -211,7 +217,7 @@ describe('addScheduledWorkout', () => {
   // 実装コメントが両方明示している以上テストも両方揃える、@reviewer・@tester指摘）
   it('ルーティンは存在するが種目が0件の場合もscheduledWorkouts行のみinsertする', async () => {
     mockGetRoutineDetail.mockResolvedValue({ routine: { id: 10, name: '空ルーティン' }, reminder: null, exercises: [] });
-    const id = await addScheduledWorkout(10, '2026-07-25', 19, 30);
+    const id = await addScheduledWorkout(10, '2026-07-25', 19, 30, true);
     expect(mockInsertValues).toHaveBeenCalledTimes(1);
     expect(id).toBe(42);
   });
@@ -220,7 +226,7 @@ describe('addScheduledWorkout', () => {
 // 「直接追加」（ルーティンを介さず個別に選んだ種目で予定を作る、2026-07-20）
 describe('addDirectScheduledWorkout', () => {
   it('routineId:nullでscheduledWorkoutsをinsertし、返ったidで各exerciseIdをorderIndex付きでscheduledWorkoutExercisesへinsertし、各種目の目標セットもinsertする', async () => {
-    const id = await addDirectScheduledWorkout([5, 8, 3], '2026-07-25', 19, 30);
+    const id = await addDirectScheduledWorkout([5, 8, 3], '2026-07-25', 19, 30, true);
 
     // scheduledWorkouts 1回 + scheduledWorkoutExercises 1回（3件まとめて）+ scheduledWorkoutSets 3回（種目ごと）
     expect(mockInsertValues).toHaveBeenCalledTimes(5);
@@ -230,6 +236,7 @@ describe('addDirectScheduledWorkout', () => {
       scheduledDate: '2026-07-25',
       hour: 19,
       minute: 30,
+      notifyEnabled: true,
     });
 
     const [, exerciseValues] = mockInsertValues.mock.calls[1];
@@ -243,7 +250,7 @@ describe('addDirectScheduledWorkout', () => {
   });
 
   it('exerciseIdsが空の場合はinsertを呼ばず例外を投げる', async () => {
-    await expect(addDirectScheduledWorkout([], '2026-07-25', 19, 30)).rejects.toThrow();
+    await expect(addDirectScheduledWorkout([], '2026-07-25', 19, 30, true)).rejects.toThrow();
     expect(mockInsertValues).not.toHaveBeenCalled();
   });
 
@@ -251,7 +258,7 @@ describe('addDirectScheduledWorkout', () => {
     ['hour=24(範囲外)', 24, 0],
     ['minute=60(範囲外)', 19, 60],
   ])('%s はinsertを呼ばず例外を投げる', async (_label, hour, minute) => {
-    await expect(addDirectScheduledWorkout([1], '2026-07-25', hour, minute)).rejects.toThrow();
+    await expect(addDirectScheduledWorkout([1], '2026-07-25', hour, minute, true)).rejects.toThrow();
     expect(mockInsertValues).not.toHaveBeenCalled();
   });
 });

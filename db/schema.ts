@@ -267,6 +267,9 @@ export const scheduledWorkouts = sqliteTable(
     scheduledDate: text('scheduled_date').notNull(),
     hour: integer('hour').notNull(),
     minute: integer('minute').notNull(),
+    // この予定単体の通知ON/OFF（2026-07-22）。デフォルトtrueで既存行も後方互換的に通知され続ける。
+    // reminders.enabledと違い繰り返し設定は無く「作成時に選んだ1回の通知を送るかどうか」だけを持つ
+    notifyEnabled: integer('notify_enabled', { mode: 'boolean' }).notNull().default(true),
     createdAt: integer('created_at').notNull(),
     updatedAt: integer('updated_at').notNull(),
   },
