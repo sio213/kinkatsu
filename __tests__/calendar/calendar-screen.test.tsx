@@ -373,14 +373,14 @@ describe('CalendarScreen 時間帯グループ', () => {
     };
   }
 
-  test('セッションが1件だけの日は時間帯見出しを表示しない（従来通りのフラット表示）', () => {
+  test('セッションが1件だけの日でも時間帯見出しを表示する（複数セッション時と一貫させる、2026-07-22）', () => {
     mockUseCalendarDayExercises.mockReturnValue({
       cards: [card({ sessionId: 1, sessionStartedAt: new Date(2026, 6, 16, 7, 10).getTime() })],
       retry: jest.fn(),
     });
     const root = render();
 
-    expect(findTextByJoinedChildren(root, '朝 07:10')).toBeUndefined();
+    expect(findTextByJoinedChildren(root, '朝 07:10')).toBeDefined();
     expect(root.findByProps({ children: 'ベンチプレス' })).toBeDefined();
   });
 
