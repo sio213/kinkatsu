@@ -1141,16 +1141,40 @@ describe('CalendarScreen 予定（PR9-2: リマインダー由来の未来予定
         expect(idx('夜の手動予定')).toBeGreaterThan(idx('昼の実績種目'));
       });
 
-      test('今日、進行中セッションがあり手動予定のみある場合（リマインダー予定なし）、再開バナーと手動予定カードの両方が表示される（PR10-4）', () => {
+      test('今日、進行中セッションがあり、そのセッションと紐づかない手動予定がある場合（リマインダー予定なし）、再開バナーと手動予定カードの両方が表示される（PR10-4）', () => {
         mockUseWorkoutSessions.mockReturnValue({
-          sessions: [{ id: 9, startedAt: 0, endedAt: null }],
-          activeSession: { id: 9, startedAt: 0, endedAt: null },
+          sessions: [{ id: 9, startedAt: 0, endedAt: null, scheduledWorkoutId: null }],
+          activeSession: { id: 9, startedAt: 0, endedAt: null, scheduledWorkoutId: null },
         });
-        mockUseCalendarDayManualSchedule.mockReturnValue([manualCard({ title: '進行中と併存する脚の日' })]);
+        mockUseCalendarDayManualSchedule.mockReturnValue([
+          manualCard({ scheduledWorkoutId: 1, title: '進行中と併存する脚の日' }),
+        ]);
         const root = render();
 
         expect(findResumeBanner(root)).toBeDefined();
         expect(root.findByProps({ children: '進行中と併存する脚の日' })).toBeDefined();
+      });
+
+      // 2026-07-23、@ユーザー指摘: 予定A/B/Cのうち予定Cを開始すると、再開バナー+A+B+Cの
+      // 4項目になってしまっていた（本来は再開バナー+A+Bの3項目）。開始済みのCはscheduledWorkoutId
+      // 経由でactiveSessionに紐づいたままscheduledWorkouts側に残り続けるため、その予定だけを
+      // 今日パネルから除外できているかを検証する
+      test('今日、進行中セッションが手動予定に紐づく（その予定を開始した）場合、その予定カードだけが今日パネルから消え、他の予定と再開バナーは残る', () => {
+        mockUseWorkoutSessions.mockReturnValue({
+          sessions: [{ id: 9, startedAt: 0, endedAt: null, scheduledWorkoutId: 3 }],
+          activeSession: { id: 9, startedAt: 0, endedAt: null, scheduledWorkoutId: 3 },
+        });
+        mockUseCalendarDayManualSchedule.mockReturnValue([
+          manualCard({ scheduledWorkoutId: 1, title: '予定A', hour: 7, minute: 0 }),
+          manualCard({ scheduledWorkoutId: 2, title: '予定B', hour: 12, minute: 0 }),
+          manualCard({ scheduledWorkoutId: 3, title: '予定C', hour: 19, minute: 0 }),
+        ]);
+        const root = render();
+
+        expect(findResumeBanner(root)).toBeDefined();
+        expect(root.findByProps({ children: '予定A' })).toBeDefined();
+        expect(root.findByProps({ children: '予定B' })).toBeDefined();
+        expect(() => root.findByProps({ children: '予定C' })).toThrow();
       });
 
       test('未来日で手動予定を表示した状態から選択日を今日に戻しても、手動予定が消えない（選択日が今日になった瞬間に消えていたバグの回帰、PR10-4の本来の目的）', () => {

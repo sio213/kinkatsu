@@ -3,6 +3,7 @@ import {
   buildRoutineScheduleDeleteMessage,
   buildScheduledWorkoutDeleteMessage,
   DIRECT_SCHEDULE_DELETE_MESSAGE,
+  excludeActiveScheduledCard,
   formatDirectScheduleTitle,
   groupExerciseNamesByScheduleId,
   mergeScheduleCards,
@@ -205,5 +206,33 @@ describe('mergeScheduleCards', () => {
     );
     expect(merged).toHaveLength(2);
     expect(merged.map((c) => c.key)).toEqual(['manual-1', 'manual-2']);
+  });
+});
+
+// 今日パネルで、開始済み（進行中セッションに紐づいた）予定が再開バナーと重複表示される
+// バグの修正用（2026-07-23、@ユーザー指摘）
+describe('excludeActiveScheduledCard', () => {
+  it('activeScheduledWorkoutIdと一致するmanualカードを除外する', () => {
+    const merged = mergeScheduleCards(
+      [],
+      [manualCard({ scheduledWorkoutId: 1, hour: 7 }), manualCard({ scheduledWorkoutId: 2, hour: 19 })],
+    );
+    const result = excludeActiveScheduledCard(merged, 2);
+    expect(result.map((c) => (c.source === 'manual' ? c.scheduledWorkoutId : null))).toEqual([1]);
+  });
+
+  it('activeScheduledWorkoutIdがnull（ルーティン開始・自分で選ぶ等、予定に紐づかない開始）なら何も除外しない', () => {
+    const merged = mergeScheduleCards([], [manualCard({ scheduledWorkoutId: 1 })]);
+    expect(excludeActiveScheduledCard(merged, null)).toEqual(merged);
+  });
+
+  it('reminder由来のカードはscheduledWorkoutIdを持たないため、idの値が偶然一致していても除外されない', () => {
+    const merged = mergeScheduleCards([reminderCard({ reminderId: 1, routineId: 10 })], []);
+    expect(excludeActiveScheduledCard(merged, 1)).toEqual(merged);
+  });
+
+  it('一致するカードが無ければ何も除外しない', () => {
+    const merged = mergeScheduleCards([], [manualCard({ scheduledWorkoutId: 1 })]);
+    expect(excludeActiveScheduledCard(merged, 999)).toEqual(merged);
   });
 });

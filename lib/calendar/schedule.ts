@@ -161,3 +161,17 @@ export function mergeScheduleCards<
   }));
   return [...reminderEntries, ...manualEntries].sort((a, b) => a.hour - b.hour || a.minute - b.minute);
 }
+
+// 今日パネル専用。開始済み（進行中セッションに紐づいた）予定はscheduledWorkoutId経由で
+// activeSessionに紐づいたままscheduledWorkoutsテーブルに残り続ける（終了時に初めて削除される、
+// db/schema.tsのworkoutSessions.scheduledWorkoutIdコメント参照）ため、mergeScheduleCardsの
+// 出力にはまだ含まれてしまう。再開バナーが唯一の開始/再開CTAであるべき今日パネルで、開始済みの
+// 予定カード自身まで並ぶ重複表示（2026-07-23、@ユーザー指摘）を防ぐため、呼び出し側で除外する。
+// reminder由来のカードはscheduledWorkoutIdを持たない（実体化前は開始できないため対象外）
+export function excludeActiveScheduledCard<TReminder>(
+  cards: UnifiedScheduleCard<TReminder>[],
+  activeScheduledWorkoutId: number | null,
+): UnifiedScheduleCard<TReminder>[] {
+  if (activeScheduledWorkoutId == null) return cards;
+  return cards.filter((card) => !(card.source === 'manual' && card.scheduledWorkoutId === activeScheduledWorkoutId));
+}
