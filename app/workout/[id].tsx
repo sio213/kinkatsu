@@ -6,6 +6,7 @@ import { ListErrorBoundary } from '@/components/ui/list-error-boundary';
 import { NotFoundState } from '@/components/ui/not-found-state';
 import { PrimaryButton } from '@/components/ui/primary-button';
 import { AddExerciseButton } from '@/components/workout/add-exercise-button';
+import { ExerciseEmptyState } from '@/components/workout/exercise-empty-state';
 import { SessionExerciseCard, type SessionExerciseCardHandle } from '@/components/workout/session-exercise-card';
 import { Colors, Typography } from '@/constants/theme';
 import { useAutoCollapseCompletedExercises } from '@/hooks/use-auto-collapse-completed-exercises';
@@ -282,10 +283,7 @@ export default function WorkoutScreen() {
       )}
 
       {sessionExercises.length === 0 ? (
-        <View style={styles.body}>
-          <Text style={styles.emptyText}>まだ種目がありません</Text>
-          <AddExerciseButton onPress={handleAddExercise} />
-        </View>
+        <ExerciseEmptyState onPress={handleAddExercise} />
       ) : (
         <FlatList
           style={styles.exerciseList}
@@ -359,9 +357,6 @@ const styles = StyleSheet.create({
   },
   // デザイン案のタイマーチップはfontWeight 700（セット入力欄の600より太い）
   timerText: { ...Typography.metric, fontWeight: '700', color: Colors.textPrimary },
-
-  body: { flex: 1, alignItems: 'center', justifyContent: 'center', gap: 16, paddingHorizontal: 16 },
-  emptyText: { ...Typography.footnote, color: Colors.textMuted },
 
   exerciseList: { flex: 1 },
   // 末尾までスクロールした時にフッターのボタン（「トレーニングを終了」/「戻る」）と

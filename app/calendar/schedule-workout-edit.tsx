@@ -4,6 +4,7 @@ import { HeaderMenu, type DropdownMenuItem } from '@/components/ui/dropdown-menu
 import { HeaderTitle } from '@/components/ui/header-title';
 import { NotFoundState } from '@/components/ui/not-found-state';
 import { PrimaryButton } from '@/components/ui/primary-button';
+import { ExerciseEmptyState } from '@/components/workout/exercise-empty-state';
 import { Colors } from '@/constants/theme';
 import { useDebouncedPush } from '@/hooks/use-debounced-push';
 import { useKeyboardInset } from '@/hooks/use-keyboard-inset';
@@ -268,16 +269,19 @@ export default function ScheduleWorkoutEditScreen() {
       />
       <ScrollView
         ref={scrollRef}
-        contentContainerStyle={styles.content}
+        style={styles.scroll}
+        contentContainerStyle={exercises.length === 0 ? styles.contentEmpty : styles.content}
         contentInset={{ bottom: keyboardInset }}
         scrollIndicatorInsets={{ bottom: keyboardInset }}
         keyboardShouldPersistTaps="handled"
       >
         {exercises.length === 0 ? (
           // 種目0件は、ルーティン削除等の稀なケースに加え、⋮「削除」で最後の1件を消した場合にも
-          // 到達するようになった（2026-07-22、@ユーザー指摘で安全網を撤廃）。
-          // app/routine/exercise-edit.tsxと同じvariant="empty"（破線ボックス）で明示する
-          <RoutineAddExerciseButton variant="empty" onPress={handleAddExercise} />
+          // 到達するようになった（2026-07-22、@ユーザー指摘で安全網を撤廃）。トレーニング画面
+          // (app/workout/[id].tsx)と同じ空状態デザインに統一する（2026-07-22、@ユーザー指摘。
+          // 一度RoutineAddExerciseButtonのvariant="empty"（破線ボックス）へ寄せてしまったのを
+          // 逆方向に修正した）
+          <ExerciseEmptyState onPress={handleAddExercise} />
         ) : (
           <View style={styles.list}>
             {exercises.map((exercise, index) => (
@@ -312,7 +316,11 @@ export default function ScheduleWorkoutEditScreen() {
 
 const styles = StyleSheet.create({
   safe: { flex: 1, backgroundColor: Colors.background },
+  scroll: { flex: 1 },
   content: { paddingHorizontal: 20, paddingTop: 12, paddingBottom: 24 },
+  // ExerciseEmptyStateはトレーニング画面と同じ画面中央寄せのため、ScrollViewの
+  // コンテンツ自体をflexGrow:1にして高さを確保する（contentのpadding指定は空状態自身が持つため不要）
+  contentEmpty: { flexGrow: 1 },
   list: { gap: 10 },
   footer: {
     paddingHorizontal: 20,

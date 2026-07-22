@@ -5,6 +5,7 @@ import {
 } from '@/components/routines/routine-template-exercise-card';
 import { HeaderMenu, type DropdownMenuItem } from '@/components/ui/dropdown-menu';
 import { PrimaryButton } from '@/components/ui/primary-button';
+import { ExerciseEmptyState } from '@/components/workout/exercise-empty-state';
 import { Colors } from '@/constants/theme';
 import { useKeyboardInset } from '@/hooks/use-keyboard-inset';
 import { useExercisesWithHistory } from '@/hooks/use-workout-session';
@@ -182,13 +183,17 @@ export default function RoutineExerciseEditScreen() {
       />
       <ScrollView
         ref={scrollRef}
-        contentContainerStyle={styles.content}
+        style={styles.scroll}
+        contentContainerStyle={exercises.length === 0 ? styles.contentEmpty : styles.content}
         contentInset={{ bottom: keyboardInset }}
         scrollIndicatorInsets={{ bottom: keyboardInset }}
         keyboardShouldPersistTaps="handled"
       >
         {exercises.length === 0 ? (
-          <RoutineAddExerciseButton variant="empty" onPress={handleAddExercise} />
+          // トレーニング画面(app/workout/[id].tsx)と同じ空状態デザインに統一する（2026-07-22、
+          // @ユーザー指摘。一度RoutineAddExerciseButtonのvariant="empty"（破線ボックス）へ
+          // 寄せてしまったのを逆方向に修正した）
+          <ExerciseEmptyState onPress={handleAddExercise} />
         ) : (
           <View testID="exercise-list" style={styles.list} onLayout={handleListLayout}>
             {exercises.map((exercise, index) => (
@@ -223,7 +228,11 @@ export default function RoutineExerciseEditScreen() {
 
 const styles = StyleSheet.create({
   safe: { flex: 1, backgroundColor: Colors.background },
+  scroll: { flex: 1 },
   content: { paddingHorizontal: 20, paddingTop: 12, paddingBottom: 24 },
+  // ExerciseEmptyStateはトレーニング画面と同じ画面中央寄せのため、ScrollViewの
+  // コンテンツ自体をflexGrow:1にして高さを確保する（contentのpadding指定は空状態自身が持つため不要）
+  contentEmpty: { flexGrow: 1 },
 
   list: { gap: 10 },
 

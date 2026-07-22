@@ -468,21 +468,22 @@ describe('ScheduleWorkoutEditScreen', () => {
 
   // ルーティン・過去記録と同様、最後の1件も⋮「削除」で消せる（2026-07-22、@ユーザー指摘で
   // 安全網を撤廃）。種目カード自体が0件になるため、この操作自体はここでは検証できないが、
-  // 0件時にapp/routine/exercise-edit.tsxと同じ空状態(variant="empty")が表示されることを確認する
-  it('種目が0件のとき、一覧の代わりに種目追加の空状態(variant="empty")が表示される', () => {
+  // 0件時にトレーニング画面(app/workout/[id].tsx)と同じ空状態(ExerciseEmptyState)が
+  // 表示されることを確認する（2026-07-22、@ユーザー指摘で破線ボックスから統一し直した）
+  it('種目が0件のとき、一覧の代わりに種目追加の空状態(ExerciseEmptyState)が表示される', () => {
     mockUseScheduledWorkoutExercises.mockReturnValue({ exercises: [], loaded: true });
     const root = render();
     expect(root.findByProps({ children: '種目を追加' })).toBeDefined();
-    expect(root.findByProps({ children: '胸・肩・脚など自由に組み合わせ' })).toBeDefined();
+    expect(root.findByProps({ children: 'まだ種目がありません' })).toBeDefined();
   });
 
   // 境界値の反対側（@tester指摘: 0件との分岐点をどちらの側からも固定しておく）
-  it('種目がちょうど1件のときは空状態(variant="empty")にはならず、一覧とvariant="ghost"の追加ボタンが表示される', () => {
+  it('種目がちょうど1件のときは空状態(ExerciseEmptyState)にはならず、一覧とvariant="ghost"の追加ボタンが表示される', () => {
     mockUseScheduledWorkoutExercises.mockReturnValue({ exercises: [benchExercise()], loaded: true });
     const root = render();
     expect(root.findByProps({ children: 'ベンチプレス' })).toBeDefined();
-    // variant="empty"だけが持つ補足文言が出ていないことで、ghost側であることを確認する
-    expect(() => root.findByProps({ children: '胸・肩・脚など自由に組み合わせ' })).toThrow();
+    // ExerciseEmptyStateだけが持つ文言が出ていないことで、ghost側であることを確認する
+    expect(() => root.findByProps({ children: 'まだ種目がありません' })).toThrow();
   });
 
   it('種目が0件のとき、空状態の「種目を追加」ボタンを押すとscheduledWorkoutId付きでschedule-workout-add-exerciseへ遷移する（@tester指摘: onPress配線自体の検証）', () => {
