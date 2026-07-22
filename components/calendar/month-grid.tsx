@@ -18,8 +18,8 @@ type Props = {
   primaryCategoryByDay: Map<string, string>;
   // 日付キー→その日実施した全カテゴリの集合。カテゴリフィルター中の判定にのみ使う
   categorySetByDay: Map<string, Set<string>>;
-  // 日付キー→予定の代表カテゴリ（ルーティン紐付きリマインダー由来）。実績がある日は
-  // hasRecordが優先されるため参照しない
+  // 日付キー→予定の代表カテゴリ（ルーティン紐付きリマインダー由来）。実績がある日でも
+  // 参照する（表示上は実績優先だが、フィルターでは予定側も独立して該当判定する）
   primaryCategoryByScheduleDay: Map<string, string>;
   // 日付キー→その日に予定がある全カテゴリの集合。カテゴリフィルター中の判定にのみ使う
   categorySetByScheduleDay: Map<string, Set<string>>;
@@ -72,33 +72,61 @@ export const MonthGrid = memo(function MonthGrid({
         const dateKey = toDateKey(date);
         const category = primaryCategoryByDay.get(dateKey);
         const hasRecord = category != null;
-        // 予定（ルーティン紐付きリマインダー由来）は実績が無い日だけ意味を持つ
-        // （実績がある日は「実施済み」を優先し、予定リング/ドットは出さない）
-        const scheduleCategory = hasRecord ? undefined : primaryCategoryByScheduleDay.get(dateKey);
+        // 予定（ルーティン紐付きリマインダー由来）は実績の有無に関わらず取得する。以前は
+        // 実績がある日は予定を握りつぶしていたが、「実績はフィルター非該当でも、同じ日の
+        // 予定が別カテゴリでフィルター該当なら見つけられるようにしたい」という要望があり、
+        // 独立して扱うようにした（実績優先の表示自体は下のshowFill/showDotで維持する）
+        const scheduleCategory = primaryCategoryByScheduleDay.get(dateKey);
         const hasSchedule = scheduleCategory != null;
-        // 実績が無い日はアクセント色、実績がある日はその代表カテゴリ、予定のみある日は
-        // 予定の代表カテゴリの色を「今日/選択中」の枠線・下線・強調文字色として使う
-        // （塗りつぶしが無いときの既定色がアクセント。実績は塗りつぶし、予定は輪郭のみで
-        // 区別する仕様のため、選択中の枠線色はどちらでも同じ仕組みを使い分けなく共有できる）
-        const accentOrCategoryColor = hasRecord
-          ? getCalendarCategoryColor(category)
-          : hasSchedule
-            ? getCalendarCategoryColor(scheduleCategory)
-            : Colors.accent;
-        // フィルター中、該当カテゴリを実施していない日は「非該当」扱い（デザイン案
+        // フィルター中、該当カテゴリを実施/予定していない日は「非該当」扱い（デザイン案
         // 「確定：カテゴリフィルタ適用」の凡例通り、過去/未来問わずグレーの点のみで
         // 塗りつぶさない。完全に消すと「その日は何もしていない」ように見えるため、
-        // 実施の有無自体はグレードットで残す）
+        // 実施/予定の有無自体はグレードットで残す）
         const isFilteredOut = activeFilter != null && !(categorySetByDay.get(dateKey)?.has(activeFilter) ?? false);
         const isScheduleFilteredOut =
           activeFilter != null && !(categorySetByScheduleDay.get(dateKey)?.has(activeFilter) ?? false);
+        // 「実績/予定がフィルターに該当している」を肯定形でひとまとめにしておく。
+        // showFill・ドットの色・accessibilityLabelの3箇所で同じ「該当」判定を使い回すため、
+        // !isFilteredOutのような二重否定がその都度発生するのを避ける
+        const recordMatches = hasRecord && !isFilteredOut;
+        const scheduleMatches = hasSchedule && !isScheduleFilteredOut;
+        // 実績が無い日はアクセント色、実績がある日はその代表カテゴリ、予定のみある日は
+        // 予定の代表カテゴリの色を「今日/選択中」の枠線・下線・強調文字色として使う
+        // （塗りつぶしが無いときの既定色がアクセント。実績は塗りつぶし、予定は輪郭のみで
+        // 区別する仕様のため、選択中の枠線色はどちらでも同じ仕組みを使い分けなく共有できる）。
+        // フィルターで対象外の実績/予定は、他の非強調日と同じくColors.textBody（黒）に
+        // 落とす。ただし選択中(isSelected)は対象外にせず常にカテゴリ色を出す。選択は
+        // ユーザーが明示的にその日をタップした結果であり、フィルターの当落に関わらず
+        // 「実際は何のカテゴリか」を見せる情報の方を優先するため。実績も予定も無い今日も、
+        // フィルター中は「該当なし」の他の日と同じ扱いにしたいので、その場合はアクセント色
+        // ではなくColors.textBody（黒）にする（フィルター無し、または選択中は従来通り青）。
+        // 実績はあるがフィルター非該当（recordMatchesがfalse）でも、同じ日の予定が該当していれば
+        // （scheduleMatches）、黒に落とさず予定側のカテゴリ色を見せる。ドット側は既に予定色に
+        // なっているので、数字・下線バーもそれに揃えることで「この日は予定側で該当している」
+        // ことがより伝わりやすくなる
+        const accentOrCategoryColor = hasRecord
+          ? isSelected || recordMatches
+            ? getCalendarCategoryColor(category)
+            : scheduleMatches
+              ? getCalendarCategoryColor(scheduleCategory)
+              : Colors.textBody
+          : hasSchedule
+            ? isSelected || scheduleMatches
+              ? getCalendarCategoryColor(scheduleCategory)
+              : Colors.textBody
+            : activeFilter != null && !isSelected
+              ? Colors.textBody
+              : Colors.accent;
         // 塗りつぶしは「実施日 かつ 選択中でない かつ フィルター対象内（非該当でない）」場合のみ。
-        // 選択中は枠線表現に切り替わり、フィルターで非該当の日は塗りつぶさずグレードットに切り替わる
-        const showFill = hasRecord && !isSelected && !isFilteredOut;
-        const showGrayDot = hasRecord && !isSelected && isFilteredOut;
-        // 予定は実績と違い塗りつぶさず、選択中でなければ小さいドットのみで示す
-        // （デザイン案「確定：未来の日付を選択（19日＝予定・カテゴリ色枠）」で確認済みの仕様）
-        const showScheduleDot = hasSchedule && !isSelected;
+        // 選択中は枠線表現に切り替わり、フィルターで非該当の日は塗りつぶさずドットに切り替わる
+        const showFill = recordMatches && !isSelected;
+        // ドットが必要なのは「実績で塗りつぶされていない日」＝実績が無い、または実績があっても
+        // フィルターで非該当になった日。そのときだけ、同じ日の予定がフィルターに該当するかを見て
+        // 色を決める（該当ならそのカテゴリ色、非該当/予定なしならグレー）。実績がフィルター該当で
+        // 塗りつぶされている日は、別カテゴリの予定があってもドットは追加しない（要望の範囲外まで
+        // 情報を足さないため。実績＝塗りつぶしが最優先という既存の階層をそのまま維持する）
+        const showDot = !isSelected && !showFill && (hasRecord || hasSchedule);
+        const isDotColored = scheduleMatches;
 
         return (
           // 押下中のopacityフィードバック(activeOpacity相当)はあえて付けない。react-native-gesture-handler
@@ -114,7 +142,12 @@ export const MonthGrid = memo(function MonthGrid({
             style={styles.cellTouchable}
             hitSlop={{ top: 4, bottom: 4, left: 4, right: 4 }}
             accessibilityRole="button"
-            accessibilityLabel={`${date.getMonth() + 1}月${date.getDate()}日${isToday ? '、今日' : ''}${hasRecord ? `、実施日、${getCategoryLabel(category)}` : ''}${hasSchedule ? `、予定あり、${getCategoryLabel(scheduleCategory)}` : ''}${(hasRecord && isFilteredOut) || (hasSchedule && isScheduleFilteredOut) ? '、絞り込み対象外' : ''}`}
+            accessibilityLabel={`${date.getMonth() + 1}月${date.getDate()}日${isToday ? '、今日' : ''}${hasRecord ? `、実施日、${getCategoryLabel(category)}` : ''}${hasSchedule ? `、予定あり、${getCategoryLabel(scheduleCategory)}` : ''}${
+              // 「絞り込み対象外」は実績・予定のどちらもフィルターに該当しないときだけ読み上げる。
+              // 実績は非該当でも予定が該当していれば(またはその逆)、その日はフィルター上「見つかる」
+              // 対象なので対象外とは言えない
+              (hasRecord || hasSchedule) && !recordMatches && !scheduleMatches ? '、絞り込み対象外' : ''
+            }`}
             accessibilityState={{ selected: isSelected }}
             onPress={() => onSelectDate(date)}
           >
@@ -149,19 +182,14 @@ export const MonthGrid = memo(function MonthGrid({
                   />
                 )}
               </View>
-              {/* グレードットはcellDigitWrapperの外（cell自体）に置き、bottomで絶対配置する。
+              {/* ドットはcellDigitWrapperの外（cell自体）に置き、bottomで絶対配置する。
                   親cellのalignItems:'center'はabsolute配置の子にも効くため、
-                  left/transformを指定しなくても水平中央に来る（RN/Yogaの挙動） */}
-              {showGrayDot && <View style={styles.filterDot} />}
-              {/* 予定ドットはfilterDotと同じ位置・サイズを共有し、色だけカテゴリ色/グレーで
-                  出し分ける（フィルターで非該当の予定はグレー、それ以外はカテゴリ色） */}
-              {showScheduleDot && (
-                <View
-                  style={[
-                    styles.filterDot,
-                    !isScheduleFilteredOut && { backgroundColor: getCalendarCategoryColor(scheduleCategory) },
-                  ]}
-                />
+                  left/transformを指定しなくても水平中央に来る（RN/Yogaの挙動）。
+                  色は「同じ日の予定がフィルターに該当していればそのカテゴリ色、それ以外
+                  （予定なし、または予定も非該当）はグレー」で決める。実績側の該当/非該当は
+                  showFillで表現済み（該当なら塗りつぶし）なので、ここでは見ない */}
+              {showDot && (
+                <View style={[styles.filterDot, isDotColored && { backgroundColor: getCalendarCategoryColor(scheduleCategory) }]} />
               )}
             </View>
           </Pressable>
@@ -204,6 +232,13 @@ const styles = StyleSheet.create({
   // デザイン案は下線をセルの枠(border-bottom)ではなく日付の数字自体の
   // text-decorationとして描画しており、text-underline-offsetで数字との間に
   // 隙間を空けている。RNのTextはtextDecorationLineにoffsetを指定できないため、
-  // 数字の下に間隔を空けた専用バーを敷いて同じ見た目を再現する
-  cellTodayUnderlineBar: { alignSelf: 'stretch', height: 2, marginTop: 3, borderRadius: 1 },
+  // 数字の下に間隔を空けた専用バーを敷いて同じ見た目を再現する。position:absoluteに
+  // しているのは、通常のレイアウト（marginTop）だとバーの分だけcellDigitWrapperの
+  // 高さが伸び、それを内包するcellの中央揃え計算に含まれてしまい、今日の数字だけ
+  // 他の日付より数pt上にずれて見えてしまうため。絶対配置にしてwrapperの高さ計算から
+  // 除外することで、数字の縦位置を他の日付と揃える。
+  // bottom:-3(数字との間隔1 + バー高さ2)は、フィルター対象外の予定/実績で今日にも
+  // グレードットが出るケース（絞り込み時）でバーとドットが近接して見えるのを避けるため、
+  // 元の間隔3から1まで詰めてドット側との余白を広げたもの
+  cellTodayUnderlineBar: { position: 'absolute', left: 0, right: 0, bottom: -3, height: 2, borderRadius: 1 },
 });
