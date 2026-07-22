@@ -24,9 +24,8 @@ function notificationIdFor(scheduledWorkoutId: number): string {
   return `scheduled-workout-${scheduledWorkoutId}`;
 }
 
-// app/calendar/schedule-time-picker.tsxの「今日の過ぎた時刻」判定でも同じ計算が必要なため、
-// UI層とのロジック重複を避けてここから公開する
-export function buildScheduledWorkoutFireDate(scheduledDate: string, hour: number, minute: number): Date {
+// 通知登録(scheduleNotification)・キャンセル判定(下記)で共有する発火時刻の組み立て
+function buildScheduledWorkoutFireDate(scheduledDate: string, hour: number, minute: number): Date {
   const date = parseDateKey(scheduledDate);
   date.setHours(hour, minute, 0, 0);
   return date;

@@ -10,11 +10,7 @@ import { formatDirectScheduleTitle } from '@/lib/calendar/schedule';
 import { isValidDateKey, parseDateKey } from '@/lib/calendar/date-grid';
 import { formatHourMinuteParts } from '@/lib/calendar/time-of-day';
 import { ensurePermission } from '@/lib/notifications/permissions';
-import {
-  buildScheduledWorkoutFireDate,
-  createDirectScheduledWorkout,
-  createScheduledWorkout,
-} from '@/lib/notifications/scheduled-workout-scheduler';
+import { createDirectScheduledWorkout, createScheduledWorkout } from '@/lib/notifications/scheduled-workout-scheduler';
 import { formatSessionDateGroup } from '@/lib/workout/summary';
 import DateTimePicker from '@react-native-community/datetimepicker';
 import { Stack, useLocalSearchParams, useRouter } from 'expo-router';
@@ -122,13 +118,6 @@ export default function ScheduleTimePickerScreen() {
       } else {
         createdScheduledWorkoutId = await createScheduledWorkout(routineId, routineName ?? '', dateKey, hour, minute);
       }
-      // 選択した時刻が既に過去(今日の過ぎた時刻を選んだ場合)は、
-      // scheduled-workout-scheduler.tsのscheduleNotificationが通知登録を無言でスキップするため、
-      // ここで一言伝えてからカレンダーへ戻る(@designerレビュー指摘: サイレントな機能欠落の防止)。
-      // 判定式自体はscheduleNotification内部と同じものを使う必要があるため、
-      // scheduled-workout-scheduler.tsから公開されたbuildScheduledWorkoutFireDateを再利用する
-      const fireDate = buildScheduledWorkoutFireDate(dateKey, hour, minute);
-      const isPastTime = fireDate.getTime() <= Date.now();
       // カレンダーからの3階層（schedule-chooser/schedule-routine-picker or
       // schedule-exercise-picker/この画面）をまとめて閉じる必要がある(app/workout/routine-load.tsxの
       // router.dismiss(2)と同じ考え方だが、schedule-chooserが1枚増えた分+1)
@@ -138,27 +127,12 @@ export default function ScheduleTimePickerScreen() {
       // (app/workout/routine-load.tsx等の既存のdismiss(N)単体パターンを拡張したもの)。
       // createdScheduledWorkoutIdはこの時点で必ず非nullだが、型（number | null）に忠実に
       // ガードを残している
-      const finishNavigation = () => {
-        router.dismiss(dismissCount);
-        if (createdScheduledWorkoutId != null) {
-          router.push({
-            pathname: '/calendar/schedule-workout-edit',
-            params: { scheduledWorkoutId: String(createdScheduledWorkoutId) },
-          });
-        }
-      };
-      if (isPastTime) {
-        // cancelable:falseが無いと、Android物理戻るボタンでこのAlertを無視できてしまう。isSubmitting系は
-        // Alert表示前(finally節)で既に解除済みのため、その場合ボタンが再度押せる状態のまま画面に残り、
-        // 同じ予定を重複作成できてしまう(自動レビュー指摘: Major)
-        Alert.alert(
-          'この時刻は過ぎています',
-          '通知は届きませんが、予定は追加されました。',
-          [{ text: 'OK', onPress: finishNavigation }],
-          { cancelable: false },
-        );
-      } else {
-        finishNavigation();
+      router.dismiss(dismissCount);
+      if (createdScheduledWorkoutId != null) {
+        router.push({
+          pathname: '/calendar/schedule-workout-edit',
+          params: { scheduledWorkoutId: String(createdScheduledWorkoutId) },
+        });
       }
     } catch (e) {
       console.error('[add scheduled workout]', e);
