@@ -107,6 +107,24 @@ function DayCardList({
   );
 }
 
+// 1セッション分の時間帯見出し+カード列。今日パネル・過去日パネルの両方で同じ
+// 「SessionTimeGroupHeader + DayCardList」の組が完全一致するようになったため
+// （2026-07-22、常時見出し表示化で条件分岐が消えた際に重複が発生。@reviewer指摘）共通化する
+function SessionRecordGroup({
+  group,
+  onPressExercise,
+}: {
+  group: { sessionId: number; sessionStartedAt: number; cards: CalendarDayCard[] };
+  onPressExercise: (card: CalendarDayCard) => void;
+}) {
+  return (
+    <View style={styles.dayGroup}>
+      <SessionTimeGroupHeader sessionStartedAt={group.sessionStartedAt} />
+      <DayCardList cards={group.cards} onPressExercise={onPressExercise} accessibilityHint={EDIT_RECORD_HINT} />
+    </View>
+  );
+}
+
 // mergeScheduleCards（lib/calendar/schedule.ts）出力をUnifiedScheduleCard<Reminder>で具体化して
 // 参照する（旧ScheduleEntryCardのコメントと同じ理由: ReturnType<typeof mergeScheduleCards>だと
 // 型パラメータ制約でcard.reminderへのアクセスが効かなくなる）
@@ -265,9 +283,9 @@ export default function CalendarScreen() {
   // カテゴリフィルターは月グリッドのマーカー表示だけに作用する（デザイン案「確定：カテゴリ
   // フィルタ適用」の仕様通り）。選択日パネルはフィルターの影響を受けず常に全記録を表示する
   const { cards: dayCards, retry: retryDayCards } = useCalendarDayExercises(selectedDate);
-  // 同日に複数セッションがある場合だけ、セッション単位（時刻の早い順）でグルーピングして
-  // 時間帯見出しを表示する（デザイン案「複数18」）。1セッションのみの日は見出しを出さず
-  // 従来通りのフラットな一覧のままにする（1件しかないのに時刻見出しを出す価値が薄いため）
+  // セッション単位（時刻の早い順）でグルーピングし、時間帯見出しを表示する（デザイン案
+  // 「複数18」）。1セッションのみの日でも時刻が分かるよう、常に見出しを出して一貫性を保つ
+  // （2026-07-22、複数セッション時とだけ見出しを出し分けていたのをやめた。@ユーザー指摘）
   const dayCardGroups = useMemo(
     () => (Array.isArray(dayCards) ? groupCardsBySession(dayCards) : []),
     [dayCards],
@@ -535,14 +553,7 @@ export default function CalendarScreen() {
                   {todayTimeline.map((entry) => {
                     if (entry.kind === 'session') {
                       return (
-                        <View key={entry.key} style={styles.dayGroup}>
-                          {todayTimeline.length > 1 && <SessionTimeGroupHeader sessionStartedAt={entry.group.sessionStartedAt} />}
-                          <DayCardList
-                            cards={entry.group.cards}
-                            onPressExercise={handlePressPastRecord}
-                            accessibilityHint={EDIT_RECORD_HINT}
-                          />
-                        </View>
+                        <SessionRecordGroup key={entry.key} group={entry.group} onPressExercise={handlePressPastRecord} />
                       );
                     }
                     // 予定エントリは常にentry1件=カード1枚（グルーピングされない）で、
@@ -634,24 +645,9 @@ export default function CalendarScreen() {
             // 一覧末尾にボタンを添える（@ユーザー指摘。予定側のAddExerciseButton「予定を追加」と
             // 同じ「既に1件ある日でも末尾から追加できる」パターンに揃える）
             <View style={styles.dayGroupList}>
-              {dayCardGroups.length > 1 ? (
-                dayCardGroups.map((group) => (
-                  <View key={group.sessionId} style={styles.dayGroup}>
-                    <SessionTimeGroupHeader sessionStartedAt={group.sessionStartedAt} />
-                    <DayCardList
-                      cards={group.cards}
-                      onPressExercise={handlePressPastRecord}
-                      accessibilityHint={EDIT_RECORD_HINT}
-                    />
-                  </View>
-                ))
-              ) : (
-                <DayCardList
-                  cards={dayCards}
-                  onPressExercise={handlePressPastRecord}
-                  accessibilityHint={EDIT_RECORD_HINT}
-                />
-              )}
+              {dayCardGroups.map((group) => (
+                <SessionRecordGroup key={group.sessionId} group={group} onPressExercise={handlePressPastRecord} />
+              ))}
               <AddExerciseButton onPress={handleAddPastRecord} label="記録を追加" accessibilityLabel="記録を追加" />
             </View>
           )}
