@@ -101,15 +101,14 @@ export const MonthGrid = memo(function MonthGrid({
         // フィルター中は「該当なし」の他の日と同じ扱いにしたいので、その場合はアクセント色
         // ではなくColors.textBody（黒）にする（フィルター無し、または選択中は従来通り青）。
         // 実績はあるがフィルター非該当（recordMatchesがfalse）でも、同じ日の予定が該当していれば
-        // （scheduleMatches）、黒に落とさず予定側のカテゴリ色を見せる。ドット側は既に予定色に
-        // なっているので、数字・下線バーもそれに揃えることで「この日は予定側で該当している」
-        // ことがより伝わりやすくなる
+        // （scheduleMatches）、黒には落とさない。ただし色は予定のカテゴリ色ではなく、あくまで
+        // その日のメインカテゴリ＝実績側の色のまま（例: 今日「肩5セットの実績」＋「腕1セットの
+        // 予定」で腕フィルター中は、ヒットしているのは腕の予定だが、その日のメインカテゴリは
+        // 肩なので数字・下線バーは肩の色になる。ヒットした側の色に飛び火させない）
         const accentOrCategoryColor = hasRecord
-          ? isSelected || recordMatches
+          ? isSelected || recordMatches || scheduleMatches
             ? getCalendarCategoryColor(category)
-            : scheduleMatches
-              ? getCalendarCategoryColor(scheduleCategory)
-              : Colors.textBody
+            : Colors.textBody
           : hasSchedule
             ? isSelected || scheduleMatches
               ? getCalendarCategoryColor(scheduleCategory)
