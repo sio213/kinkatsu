@@ -9,9 +9,31 @@ jest.mock('@/hooks/use-debounced-push', () => ({
   useDebouncedPush: () => mockPush,
 }));
 
-jest.mock('expo-router', () => ({
-  Stack: { Screen: () => null },
-}));
+// jest.mock はホイストされるため、変数は var で定義してスコープを合わせる
+// eslint-disable-next-line no-var
+var capturedTabPressListener: (() => void) | null;
+
+// タブバーの「カレンダー」ボタンを実際に押したときだけ発火するtabPressイベントを模擬する。
+// useFocusEffectだと、この画面がpushする詳細/編集画面（workout/[id]等、ルートStackで
+// (tabs)と兄弟のため画面遷移だけで(tabs)全体がblur/focusし直す）から戻ってきたときも
+// 同じく発火してしまい、「未来日に予定を追加して戻ったら選択日が今日に飛ぶ」等の退行を
+// 起こす（@reviewer指摘）。navigation.addListener('tabPress', ...)を捕捉し、テストから
+// 「タブバーのカレンダーボタンを押した」ことを明示的に模擬できるようにする
+jest.mock('expo-router', () => {
+  const navigation = {
+    addListener: (event: string, callback: () => void) => {
+      if (event !== 'tabPress') return () => {};
+      capturedTabPressListener = callback;
+      return () => {
+        capturedTabPressListener = null;
+      };
+    },
+  };
+  return {
+    Stack: { Screen: () => null },
+    useNavigation: () => navigation,
+  };
+});
 
 jest.mock('@/hooks/use-workout-session', () => ({
   useWorkoutSessions: () => mockUseWorkoutSessions(),
@@ -127,6 +149,7 @@ function selectDate(date: Date) {
 
 beforeEach(() => {
   jest.clearAllMocks();
+  capturedTabPressListener = null;
   mockUseCalendarDayExercises.mockReturnValue({ cards: [], retry: jest.fn() });
   mockUseCalendarDaySchedule.mockReturnValue({ cards: [] });
   mockUseCalendarDayManualSchedule.mockReturnValue([]);
@@ -1458,5 +1481,110 @@ describe('CalendarScreen 予定（PR9-2: リマインダー由来の未来予定
         .find((t) => typeof t.props.accessibilityLabel === 'string' && t.props.accessibilityLabel === '「胸の日」夜 20:00のトレーニングを開始');
       expect(startBtn).toBeDefined();
     });
+  });
+});
+
+// タブ画面はexpo-router/React Navigationのデフォルト挙動でアンマウントされずに保持されるため、
+// 他タブへ行って戻ってきても選択日・表示月が古いままだったバグの修正（@ユーザー指摘）。
+// 「他タブへ行って戻ってきた」はタブバーの「カレンダー」ボタン押下(tabPress)として模擬する
+// （capturedTabPressListener）。useFocusEffectだとこの画面がpushする詳細/編集画面から戻った
+// だけでも同じく発火し、選択日を巻き戻してしまう退行があったため、tabPressに切り替えた
+// （@reviewer指摘、下の「詳細/編集画面から戻った場合」テストで固定する）
+describe('CalendarScreen 他タブから戻ってきたときの選択日・表示月リセット', () => {
+  function lastSwipeableMonthViewProps() {
+    return mockSwipeableMonthView.mock.calls[mockSwipeableMonthView.mock.calls.length - 1][0] as {
+      year: number;
+      month: number;
+      selectedDate: Date;
+      today: Date;
+    };
+  }
+
+  test('別日を選択した状態でタブにフォーカスが戻ると、選択日が今日にリセットされる', () => {
+    render();
+    const notToday = new Date(2020, 0, 15);
+    selectDate(notToday);
+    expect(toDateKey(lastSwipeableMonthViewProps().selectedDate)).toBe(toDateKey(notToday));
+
+    act(() => {
+      capturedTabPressListener?.();
+    });
+
+    expect(toDateKey(lastSwipeableMonthViewProps().selectedDate)).toBe(toDateKey(new Date()));
+  });
+
+  test('別日を選択して表示月も動いた状態でタブにフォーカスが戻ると、表示月も今日の月にリセットされる', () => {
+    render();
+    const notToday = new Date(2020, 0, 15);
+    selectDate(notToday);
+    const onChangeMonth = mockSwipeableMonthView.mock.calls[mockSwipeableMonthView.mock.calls.length - 1][0]
+      .onChangeMonth as (delta: number) => void;
+    act(() => {
+      onChangeMonth(-3);
+    });
+    const now = new Date();
+    expect(lastSwipeableMonthViewProps().year === now.getFullYear() && lastSwipeableMonthViewProps().month === now.getMonth()).toBe(
+      false,
+    );
+
+    act(() => {
+      capturedTabPressListener?.();
+    });
+
+    expect(lastSwipeableMonthViewProps().year).toBe(now.getFullYear());
+    expect(lastSwipeableMonthViewProps().month).toBe(now.getMonth());
+  });
+
+  // useFocusEffectベースの旧実装では、カレンダーからpushする詳細/編集画面（workout/[id]、
+  // calendar/schedule-chooser等）から戻ってきただけでも同じイベントが発火し、選択日を今日へ
+  // 巻き戻してしまっていた（未来日に予定を追加して戻ると追加した予定が見えなくなる等の退行、
+  // @reviewer指摘）。tabPressはタブバーのボタンを実際に押したときしか発火しないため、
+  // そのような画面遷移（＝tabPressを発火させない）ではリセットが起きないことを固定する
+  test('詳細/編集画面から戻ってきた場合（タブバーを経由しないため、tabPressは発火しない）は選択日がリセットされない', () => {
+    render();
+    const notToday = new Date(2020, 0, 15);
+    selectDate(notToday);
+
+    // tabPressを発火させていない（=タブバーを経由しない画面遷移からの復帰を模擬）
+    expect(toDateKey(lastSwipeableMonthViewProps().selectedDate)).toBe(toDateKey(notToday));
+  });
+
+  // 同日中の再フォーカス（他タブを覗いてすぐ戻ってきた等）でtodayの参照が変わると、
+  // それに依存するuseMemo（todayStart等）が無駄に再計算されてしまう。isSameDayで
+  // 同日と判定できる間はsetToday(prev => prev)で参照を保つ最適化が効いていることを、
+  // SwipeableMonthViewへ渡るtoday propの参照一致(toBe)で直接検証する（@tester指摘）
+  test('同日中にフォーカスが戻ってもtodayの参照は変わらない（同日ならuseState更新をスキップする最適化）', () => {
+    render();
+    const todayBeforeRefocus = lastSwipeableMonthViewProps().today;
+
+    act(() => {
+      capturedTabPressListener?.();
+    });
+
+    expect(lastSwipeableMonthViewProps().today).toBe(todayBeforeRefocus);
+  });
+
+  // 日付をまたいで開きっぱなしにしていた場合（例: 深夜0時をまたいでアプリをバックグラウンドに
+  // 置いたまま他タブから戻ってきた）、固定で持っている「今日」自体が古いままだと
+  // isSelectedToday判定やtodayStart（予定の絞り込み基準）がずれてしまう。フォーカス復帰時に
+  // todayも実際の現在日へ更新されることを確認する（@tester指摘: 既存3件は同日再発火のみで
+  // この分岐を一度も通っていなかった）
+  test('日付をまたいで開きっぱなしにしていた場合、フォーカスが戻るとtodayも実際の現在日に更新される', () => {
+    jest.useFakeTimers();
+    jest.setSystemTime(new Date(2026, 6, 16, 23, 0));
+    try {
+      render();
+      expect(toDateKey(lastSwipeableMonthViewProps().today)).toBe(toDateKey(new Date(2026, 6, 16)));
+
+      jest.setSystemTime(new Date(2026, 6, 17, 0, 30));
+      act(() => {
+        capturedTabPressListener?.();
+      });
+
+      expect(toDateKey(lastSwipeableMonthViewProps().today)).toBe(toDateKey(new Date(2026, 6, 17)));
+      expect(toDateKey(lastSwipeableMonthViewProps().selectedDate)).toBe(toDateKey(new Date(2026, 6, 17)));
+    } finally {
+      jest.useRealTimers();
+    }
   });
 });
