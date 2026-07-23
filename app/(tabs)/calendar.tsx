@@ -28,7 +28,9 @@ import { excludeActiveScheduledCard, mergeScheduleCards, type UnifiedScheduleCar
 import { materializeReminderOccurrence } from '@/lib/notifications/scheduled-workout-scheduler';
 import { startWorkoutFromScheduledWorkout } from '@/lib/workout/session';
 import { formatElapsedClock, formatMonthGroup, formatSessionDateGroup } from '@/lib/workout/summary';
-import { Stack } from 'expo-router';
+import type { BottomTabNavigationProp } from '@react-navigation/bottom-tabs';
+import type { ParamListBase } from '@react-navigation/native';
+import { Stack, useNavigation } from 'expo-router';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { ActivityIndicator, Alert, ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
@@ -216,12 +218,31 @@ function ScheduleTimelineEntry({
 export default function CalendarScreen() {
   // 「今日」は選択日(selectedDate、タップで変わる)とは別に固定で持つ。MonthGridへ
   // props経由で渡すことで、今日の判定基準を画面全体で1箇所（ここ）に集約する
-  const [today] = useState(() => new Date());
+  const [today, setToday] = useState(() => new Date());
   // year/monthを1つのstateにまとめ、年またぎの月送り（12月→翌年1月等）を
   // addMonthsの結果でアトミックに更新する（year/monthを別state・別setterにすると
   // 更新タイミングがズレて年またぎ計算が崩れるため）
   const [viewed, setViewed] = useState({ year: today.getFullYear(), month: today.getMonth() });
   const [selectedDate, setSelectedDate] = useState(today);
+
+  // タブ画面はexpo-router/React Navigationのデフォルト挙動でアンマウントされずに
+  // 保持されるため、他のタブへ行って戻ってきても選択日・表示月が古いまま残ってしまう
+  // （@ユーザー指摘）。useFocusEffectだとこの画面が押した詳細/編集画面（workout/[id]、
+  // calendar/schedule-chooser等。app/_layout.tsxのルートStackで(tabs)と兄弟のため、
+  // pushするだけで(tabs)全体がblur/focusし直す）から戻ってきたときも同じく発火してしまい、
+  // 「未来日に予定を追加して戻ったら選択日が今日に飛んで追加した予定が見えない」
+  // 「過去の記録を編集して戻ったら選択日が今日に飛ぶ」という退行を起こす（@reviewer指摘）。
+  // タブバーの「カレンダー」ボタンを実際に押したときだけ発火するtabPressで代替し、
+  // 詳細/編集画面からの戻り（＝タブバーを経由しない遷移）とを区別する
+  const navigation = useNavigation<BottomTabNavigationProp<ParamListBase>>();
+  useEffect(() => {
+    return navigation.addListener('tabPress', () => {
+      const now = new Date();
+      setToday((prev) => (isSameDay(prev, now) ? prev : now));
+      setViewed({ year: now.getFullYear(), month: now.getMonth() });
+      setSelectedDate(now);
+    });
+  }, [navigation]);
 
   const goToMonth = useCallback((delta: number) => {
     setViewed((prev) => addMonths(prev.year, prev.month, delta));
