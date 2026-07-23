@@ -104,16 +104,27 @@ export async function createPastWorkoutSession(pastDate: number): Promise<Workou
   return insertWorkoutSessionRow(pastDate, pastDate);
 }
 
+// 予定（scheduledWorkouts）から開始したセッションの後始末（終了/削除どちらでも）で、その予定を
+// カレンダーから消す共通処理。あくまで付随処理のため、失敗しても呼び出し元（endWorkoutSession/
+// deleteSession）は失敗させない（@reviewer Major指摘: セッション側の更新/削除は既にコミット済み
+// なのに、ここでthrowすると呼び出し側が「失敗しました」を表示し実態と食い違う不整合になるため）。
+// 握りつぶした場合、予定行はDBに残ったままになる（＝カレンダーの表示フィルタが外れた瞬間に
+// 予定が復活して見える）が、通知キャンセル＋DB削除自体が稀にしか失敗しない付随処理である
+// トレードオフとして許容している
+async function cleanupScheduledWorkoutAfter(scheduledWorkoutId: number | null, logContext: string) {
+  if (scheduledWorkoutId == null) return;
+  try {
+    await removeScheduledWorkout(scheduledWorkoutId);
+  } catch (e) {
+    console.error(`[remove scheduled workout ${logContext}]`, e);
+  }
+}
+
 // 予定（scheduledWorkouts）から開始したセッション（scheduledWorkoutIdを持つ）を終了する際、
 // その予定を「消化済み」としてカレンダーから消す。開始時点ではなく終了時点で消す理由は、
 // 開始直後はまだ進行中セッション扱い（今日パネルの完了済み記録一覧には現れない）で、
 // ここで先に予定側だけ消してしまうと進行中の間その時間帯に何も表示されなくなるため
 // （@ユーザー指摘のバグ「開始→終了で記録は増えるが予定が消えない」の修正、2026-07-21）。
-// 通知キャンセル＋DB削除はremoveScheduledWorkout（既存の「⋮削除」と同じ処理）に委譲する。
-// この後始末はあくまで付随処理のため、失敗してもendWorkoutSession自体は失敗させない
-// （@reviewer Major指摘: ここでthrowすると、endedAtは既にコミット済み＝記録自体は終了して
-// いるのに呼び出し側(app/workout/[id].tsxのfinish)が「終了できませんでした」を表示し
-// router.back()もしない、という実態と表示が食い違う不整合になるため）
 export async function endWorkoutSession(id: number) {
   const now = Date.now();
   const [session] = await db
@@ -121,13 +132,7 @@ export async function endWorkoutSession(id: number) {
     .set({ endedAt: now, updatedAt: now })
     .where(eq(workoutSessions.id, id))
     .returning({ scheduledWorkoutId: workoutSessions.scheduledWorkoutId });
-  if (session?.scheduledWorkoutId != null) {
-    try {
-      await removeScheduledWorkout(session.scheduledWorkoutId);
-    } catch (e) {
-      console.error('[remove scheduled workout after session finish]', e);
-    }
-  }
+  await cleanupScheduledWorkoutAfter(session?.scheduledWorkoutId ?? null, 'after session finish');
 }
 
 // 進行中(endedAtがnull)のセッションを1件返す。endedAtがnullの行は高々1件のはずだが、
@@ -397,11 +402,19 @@ export async function removeExerciseFromSession(sessionExerciseId: number) {
   await db.delete(workoutSessionExercises).where(eq(workoutSessionExercises.id, sessionExerciseId));
 }
 
-// 記録編集画面「⋮」メニューの「削除」。workoutSessionExercises/setsとも
-// sessionIdにonDelete cascadeが張られているため、このセッション行を消せば
-// 種目・セットもすべて連動して消える
+// 記録編集画面「⋮」メニューの「削除」／トレーニング中画面の「削除」。workoutSessionExercises/setsとも
+// sessionIdにonDelete cascadeが張られているため、このセッション行を消せば種目・セットもすべて連動して消える。
+// 予定（scheduledWorkouts）から開始した進行中セッションを削除するケースでは、endWorkoutSessionの
+// 「消化済みとして予定を消す」処理が呼ばれないまま終わるため、ここでも同様に予定側を片付ける
+// （そうしないと、予定を表示側で隠していたフィルタ(activeSession基準)が外れて予定が復活したように
+// 見えてしまう。2026-07-23指摘）。既に完了済みのセッション（endWorkoutSession経由でscheduledWorkoutIdは
+// onDelete:'set null'によりnull化済み）を記録編集画面から削除する場合はここに来ない
 export async function deleteSession(sessionId: number) {
-  await db.delete(workoutSessions).where(eq(workoutSessions.id, sessionId));
+  const [session] = await db
+    .delete(workoutSessions)
+    .where(eq(workoutSessions.id, sessionId))
+    .returning({ scheduledWorkoutId: workoutSessions.scheduledWorkoutId });
+  await cleanupScheduledWorkoutAfter(session?.scheduledWorkoutId ?? null, 'after session delete');
 }
 
 // 種目カードの「⋮」メニューの「上へ移動」「下へ移動」。orderIndexにユニーク制約は無いため、

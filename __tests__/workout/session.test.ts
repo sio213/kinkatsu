@@ -7,6 +7,7 @@ var mockUpdateSet: jest.Mock;
 var mockUpdateWhere: jest.Mock;
 var mockUpdateReturning: jest.Mock;
 var mockDeleteWhere: jest.Mock;
+var mockDeleteReturning: jest.Mock;
 var mockReturning: jest.Mock;
 var mockSelectWhere: jest.Mock;
 
@@ -35,6 +36,14 @@ jest.mock('@/db/client', () => {
   }
   mockUpdateSet = jest.fn().mockReturnValue({ where: (...args: unknown[]) => updateWhere(...args) });
   mockDeleteWhere = jest.fn().mockResolvedValue(undefined);
+  // deleteSessionは.where(...).returning(...)まで連鎖するが、replaceSessionExercise等は
+  // .where(...)を直接awaitするだけのため、updateWhereと同じく両方の呼び方に対応させる
+  mockDeleteReturning = jest.fn().mockResolvedValue([{ scheduledWorkoutId: null }]);
+  function deleteWhere(...args: unknown[]) {
+    const result = mockDeleteWhere(...args) as Promise<unknown> & { returning?: (...a: unknown[]) => unknown };
+    result.returning = (...rArgs: unknown[]) => result.then(() => mockDeleteReturning(...rArgs));
+    return result;
+  }
   mockSelectWhere = jest.fn().mockResolvedValue([]);
 
   // getActiveSessionは.where().orderBy().limit()とチェーンして最後にawaitする一方、
@@ -70,6 +79,7 @@ jest.mock('@/db/client', () => {
     db: {
       insert: jest.fn().mockReturnValue({ values: (...args: unknown[]) => mockInsertValues(...args) }),
       update: jest.fn().mockReturnValue({ set: (...args: unknown[]) => mockUpdateSet(...args) }),
+      delete: jest.fn().mockReturnValue({ where: (...args: unknown[]) => deleteWhere(...args) }),
       select: jest.fn().mockReturnValue({
         from: jest.fn().mockReturnValue({ where: (...args: unknown[]) => selectWhere(...args) }),
       }),
@@ -148,6 +158,7 @@ import {
   addExercisesToSession,
   addRoutineExercisesToSession,
   createPastWorkoutSession,
+  deleteSession,
   endWorkoutSession,
   getActiveSession,
   replaceSessionExercise,
@@ -166,6 +177,7 @@ beforeEach(() => {
   mockUpdateWhere.mockResolvedValue(undefined);
   mockUpdateReturning.mockResolvedValue([{ scheduledWorkoutId: null }]);
   mockDeleteWhere.mockResolvedValue(undefined);
+  mockDeleteReturning.mockResolvedValue([{ scheduledWorkoutId: null }]);
   mockSelectWhere.mockResolvedValue([]);
   // 既定は「前回の記録なし」。プリフィルを検証するテストだけ個別にmockResolvedValueOnceで上書きする
   mockGetPreviousSets.mockResolvedValue([]);
@@ -262,6 +274,40 @@ describe('endWorkoutSession', () => {
     mockUpdateReturning.mockResolvedValueOnce([{ scheduledWorkoutId: 42 }]);
     mockRemoveScheduledWorkout.mockRejectedValueOnce(new Error('remove failed'));
     await expect(endWorkoutSession(5)).resolves.toBeUndefined();
+  });
+});
+
+// 記録編集画面「⋮」削除／トレーニング中画面の削除の両方から呼ばれる。予定（scheduledWorkouts）から
+// 開始した進行中セッションを削除すると、endWorkoutSessionの「消化済みとして予定を消す」処理が
+// 呼ばれないまま終わり、予定が残り続けて表示フィルタが外れた瞬間にカレンダーへ復活して見えていた
+// バグの修正（@ユーザー指摘、2026-07-23）。endWorkoutSessionと同じ後始末ロジックを踏襲する
+describe('deleteSession', () => {
+  it('対象のidでセッションを削除する', async () => {
+    await deleteSession(5);
+    expect(mockDeleteWhere).toHaveBeenCalledWith({ col: 'id', val: 5 });
+  });
+
+  it('削除が失敗した場合はエラーを握りつぶさずthrowする（呼び出し側でAlertを出すため）', async () => {
+    mockDeleteWhere.mockRejectedValueOnce(new Error('db error'));
+    await expect(deleteSession(1)).rejects.toThrow('db error');
+  });
+
+  it('scheduledWorkoutId有りのセッションを削除すると、その予定をremoveScheduledWorkoutで消す', async () => {
+    mockDeleteReturning.mockResolvedValueOnce([{ scheduledWorkoutId: 42 }]);
+    await deleteSession(5);
+    expect(mockRemoveScheduledWorkout).toHaveBeenCalledWith(42);
+  });
+
+  it('scheduledWorkoutIdが無い（手動開始の）セッションを削除しても、removeScheduledWorkoutは呼ばない', async () => {
+    mockDeleteReturning.mockResolvedValueOnce([{ scheduledWorkoutId: null }]);
+    await deleteSession(5);
+    expect(mockRemoveScheduledWorkout).not.toHaveBeenCalled();
+  });
+
+  it('removeScheduledWorkoutが失敗してもdeleteSession自体は失敗させない（セッション削除は既に確定しているため）', async () => {
+    mockDeleteReturning.mockResolvedValueOnce([{ scheduledWorkoutId: 42 }]);
+    mockRemoveScheduledWorkout.mockRejectedValueOnce(new Error('remove failed'));
+    await expect(deleteSession(5)).resolves.toBeUndefined();
   });
 });
 
