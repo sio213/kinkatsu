@@ -134,8 +134,7 @@ describe('ScheduleWorkoutEditScreen', () => {
   });
 
   // 2026-07-21、@designer指摘: この画面はルーティン名がどこにも表示されず、選択日パネルとの
-  // 文脈が途切れる（また⋮「ルーティンを編集」が指す先も分かりにくい）ため、ヘッダーの
-  // サブタイトルに日時と合わせて表示する
+  // 文脈が途切れるため、ヘッダーのサブタイトルに日時と合わせて表示する
   it('ルーティン紐付き予定（routineIdあり）の場合、ヘッダーのサブタイトルにルーティン名と日時が両方表示される', () => {
     mockUseScheduledWorkoutTime.mockReturnValue({
       time: { scheduledDate: '2026-07-21', hour: 19, minute: 30, routineId: 1 },
@@ -344,7 +343,11 @@ describe('ScheduleWorkoutEditScreen', () => {
     );
   });
 
-  it('ヘッダー⋮「ルーティンを編集」はルーティン紐付き予定（routineIdあり）のときだけ表示され、押すとルーティン編集画面へ遷移する', () => {
+  // 「ルーティンを編集」削除（2026-07-23、@ユーザー指摘: 編集してもこの予定インスタンスには
+  // 反映されず混乱を招くため撤去）に伴い、ヘッダー⋮のメニュー構成はrouteIdの有無に関わらず
+  // 常に同じ5項目になった。将来再びrouteId依存の項目が足された場合に検知できるよう、
+  // ルーティン紐付き予定でも直接予定と同じメニュー構成であることを固定する（@reviewer指摘）
+  it('ルーティン紐付き予定（routineIdあり）でも、ヘッダー⋮のメニュー構成は直接予定と同じ5項目のみ（ルーティンを編集は表示されない）', () => {
     mockUseScheduledWorkoutTime.mockReturnValue({
       time: { scheduledDate: '2026-07-21', hour: 19, minute: 30, routineId: 1 },
       loaded: true,
@@ -356,21 +359,11 @@ describe('ScheduleWorkoutEditScreen', () => {
     act(() => {
       headerMenuTrigger.props.onPress();
     });
-    const editRoutineItem = findMenuItem(root, 'ルーティンを編集')!;
-    act(() => {
-      editRoutineItem.props.onPress();
-    });
-    expect(mockPush).toHaveBeenCalledWith('/routine/edit/1');
-  });
-
-  it('直接予定（routineIdなし）の場合、ヘッダー⋮に「ルーティンを編集」は表示されない', () => {
-    const root = render();
-    const headerMenuTrigger = root
-      .findAllByType(TouchableOpacity)
-      .find((t) => t.props.accessibilityLabel === '種目編集のメニューを開く')!;
-    act(() => {
-      headerMenuTrigger.props.onPress();
-    });
+    expect(findMenuItem(root, '種目を追加')).toBeDefined();
+    expect(findMenuItem(root, 'ルーティンから読み込み')).toBeDefined();
+    expect(findMenuItem(root, '過去の記録から読み込み')).toBeDefined();
+    expect(findMenuItem(root, '種目を並び替え')).toBeDefined();
+    expect(findMenuItem(root, '削除')).toBeDefined();
     expect(findMenuItem(root, 'ルーティンを編集')).toBeUndefined();
   });
 
