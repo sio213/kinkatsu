@@ -69,9 +69,8 @@ export default function ScheduleWorkoutEditScreen() {
   // （routineId===nullのため、routines一覧から一致するものが見つからない）
   const routineName = routines.find((r) => r.id === scheduledTime?.routineId)?.name;
   // ルーティン名をヘッダーに表示する（2026-07-21、@designer指摘: この画面は日パネルで見えていた
-  // ルーティン名がどこにも表示されず、選択日パネルとの文脈が途切れる。また⋮「ルーティンを編集」
-  // が「今見ているこの予定ではなく、その元になっているルーティン本体」を指すことも、ルーティン名が
-  // 画面上に見えていて初めて自然に伝わる）。dateLabelと同じ控えめなsubtitle行に含める
+  // ルーティン名がどこにも表示されず、選択日パネルとの文脈が途切れる）。dateLabelと同じ
+  // 控えめなsubtitle行に含める
   const headerSubtitle = [routineName, dateLabel].filter(Boolean).join(' ・ ');
 
   const handleAddExercise = useCallback(() => {
@@ -169,15 +168,6 @@ export default function ScheduleWorkoutEditScreen() {
     );
   }, [scheduledWorkoutId, router, scheduledTime?.routineId, routineName]);
 
-  // ルーティン紐付き予定（実体化済み）の種目カード一覧はこの予定インスタンス専用のコピーで
-  // あり、ルーティン本体はこの画面から編集できない。ルーティン本体を編集したい場合の明示的な
-  // 導線として、ヘッダー⋮に用意する（2026-07-21、PR5でカレンダー日パネルの予定カードタップが
-  // ルーティン本体編集(/routine/edit/{routineId})からこの画面へ切り替わったことに伴う代替導線）
-  const handleEditRoutine = useCallback(() => {
-    if (scheduledTime?.routineId == null) return;
-    pushDebounced(`/routine/edit/${scheduledTime.routineId}`);
-  }, [pushDebounced, scheduledTime?.routineId]);
-
   // app/routine/exercise-edit.tsxのhandleReorder/menuItemsと同じ方針
   // （並び替え画面は種目2件以上でしか意味を持たないため、1件以下では無効化する）
   const handleReorder = useCallback(() => {
@@ -226,26 +216,6 @@ export default function ScheduleWorkoutEditScreen() {
     { key: 'delete', label: '削除', icon: 'delete-outline', danger: true, onPress: handleDeleteWorkout },
   ];
 
-  // ルーティン紐付き予定（実体化済み）のときだけ表示する。種目編集アクション群・削除とは
-  // 性質が異なる「ルーティン本体への移動」のため、区切り線で分けた別グループにする
-  const menuGroups: DropdownMenuItem[][] =
-    scheduledTime?.routineId != null
-      ? [
-          [
-            {
-              key: 'edit-routine',
-              label: 'ルーティンを編集',
-              icon: 'edit',
-              // ここで編集した内容はルーティン本体（今後の全予定）に反映され、今見ているこの
-              // 予定インスタンスの目標セットには反映されないことを補足する（@designer指摘）
-              hint: 'この予定ではなくルーティン本体を編集します。今見ている目標セットには反映されません',
-              onPress: handleEditRoutine,
-            },
-          ],
-          menuItems,
-        ]
-      : [menuItems];
-
   // 「この予定を削除」実行後、DBの削除完了からrouter.back()による画面遷移までの間にlive query
   // が再購読され、この画面が一瞬「種目0件の空リスト」としてフラッシュ表示されてしまう
   // （@designer指摘）。app/workout/[id].tsxが自分自身のセッション削除後に同じ構図でNotFoundState
@@ -264,7 +234,7 @@ export default function ScheduleWorkoutEditScreen() {
       <Stack.Screen
         options={{
           headerTitle: () => <HeaderTitle title="種目を編集" subtitle={headerSubtitle} />,
-          headerRight: () => <HeaderMenu groups={menuGroups} accessibilityLabel="種目編集のメニューを開く" />,
+          headerRight: () => <HeaderMenu groups={[menuItems]} accessibilityLabel="種目編集のメニューを開く" />,
         }}
       />
       <ScrollView
