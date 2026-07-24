@@ -1,6 +1,6 @@
 import { ExerciseCard } from '@/components/exercises/exercise-card';
 import { ExerciseFilterHeader } from '@/components/exercises/exercise-filter-header';
-import { HeaderActionButton } from '@/components/ui/header-action-button';
+import { HeaderAddButton } from '@/components/ui/header-add-button';
 import { ListErrorBoundary } from '@/components/ui/list-error-boundary';
 import { Colors, Typography } from '@/constants/theme';
 import type { Exercise } from '@/db/schema';
@@ -93,12 +93,7 @@ export default function ExercisesScreen() {
       <Stack.Screen
         options={{
           headerRight: () => (
-            <HeaderActionButton
-              icon="plus"
-              label="追加"
-              onPress={() => openCreate()}
-              accessibilityLabel="種目を追加"
-            />
+            <HeaderAddButton onPress={() => openCreate()} accessibilityLabel="種目を追加" />
           ),
         }}
       />
