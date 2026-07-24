@@ -1,5 +1,5 @@
 import { RoutineCard } from '@/components/routines/routine-card';
-import { HeaderActionButton } from '@/components/ui/header-action-button';
+import { HeaderAddButton } from '@/components/ui/header-add-button';
 import { ListErrorBoundary } from '@/components/ui/list-error-boundary';
 import { PrimaryButton } from '@/components/ui/primary-button';
 import { Colors, Typography } from '@/constants/theme';
@@ -148,12 +148,7 @@ export default function RoutineListScreen() {
       <Stack.Screen
         options={{
           headerRight: () => (
-            <HeaderActionButton
-              icon="plus"
-              label="新規"
-              onPress={handleCreate}
-              accessibilityLabel="ルーティンを作成"
-            />
+            <HeaderAddButton onPress={handleCreate} accessibilityLabel="ルーティンを作成" />
           ),
         }}
       />

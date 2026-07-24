@@ -2,7 +2,7 @@ import { PermissionBanner } from '@/components/reminders/permission-banner';
 import { ReminderCard } from '@/components/reminders/reminder-card';
 import { ReminderForm } from '@/components/reminders/reminder-form';
 import { FormScrollProvider } from '@/components/ui/form-scroll-context';
-import { HeaderActionButton } from '@/components/ui/header-action-button';
+import { HeaderAddButton } from '@/components/ui/header-add-button';
 import { ListErrorBoundary } from '@/components/ui/list-error-boundary';
 import { Colors, Typography } from '@/constants/theme';
 import { useDebouncedPush } from '@/hooks/use-debounced-push';
@@ -119,12 +119,7 @@ export default function RemindersScreen() {
         options={{
           headerRight: () =>
             !showForm ? (
-              <HeaderActionButton
-                icon="plus"
-                label="追加"
-                onPress={openCreate}
-                accessibilityLabel="リマインダーを追加"
-              />
+              <HeaderAddButton onPress={openCreate} accessibilityLabel="リマインダーを追加" />
             ) : null,
         }}
       />

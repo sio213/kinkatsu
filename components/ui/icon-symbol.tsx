@@ -28,6 +28,7 @@ const MAPPING = {
   'xmark.circle.fill': 'cancel',
   timer: 'timer',
   plus: 'add',
+  'plus.circle.fill': 'add-circle',
   'play.fill': 'play-arrow',
   'info.circle': 'info',
   checkmark: 'check',
