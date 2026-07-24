@@ -27,6 +27,13 @@ test('初期値がセルに表示される', () => {
   expect(inputs[1].props.value).toBe('8');
 });
 
+test('数値欄はタップ時に全選択される（selectTextOnFocus）。記録セット行（set-row.tsx）と挙動を揃える', () => {
+  const root = render({ values: { weight: 60, reps: 8, durationSeconds: null, distanceMeters: null } });
+  const inputs = root.findAllByType(TextInput);
+  expect(inputs).toHaveLength(2);
+  inputs.forEach((input) => expect(input.props.selectTextOnFocus).toBe(true));
+});
+
 test('入力するたびにonChangeへパース済みの値が渡る（✓確定ステップ無し）', () => {
   const onChange = jest.fn();
   const root = render({ onChange });

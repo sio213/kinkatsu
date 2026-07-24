@@ -1,14 +1,21 @@
 import { Colors } from '@/constants/theme';
-import { forwardRef } from 'react';
+import { forwardRef, useRef, type ForwardedRef } from 'react';
 import {
+  Pressable,
   StyleSheet,
   TextInput,
-  View,
   type StyleProp,
   type TextInputProps,
   type TextStyle,
   type ViewStyle,
 } from 'react-native';
+
+// forwardRefで受け取った外向きのrefと、箱タップ時のフォーカス用に持つ内部refの両方へ
+// 同じTextInputノードを流す。呼び出し側は今まで通り実TextInputのref（focus等）を得られる
+function assignRef(ref: ForwardedRef<TextInput>, node: TextInput | null) {
+  if (typeof ref === 'function') ref(node);
+  else if (ref) ref.current = node;
+}
 
 type Props = TextInputProps & {
   height: number;
@@ -41,14 +48,33 @@ export const BoxedTextInput = forwardRef<TextInput, Props>(function BoxedTextInp
   { height, boxStyle, bare, style, ...rest }: Props,
   ref,
 ) {
+  const innerRef = useRef<TextInput | null>(null);
   return (
-    <View style={[bare ? styles.bareBox : styles.box, { height }, boxStyle]}>
+    // 箱をPressableにして、文字が無い余白部分（左右padding・上下の空き）をタップしても
+    // 入力欄にフォーカスできるようにする。TextInput自身は文字の自然高さ・幅ぶんしか当たり判定を
+    // 持たない（縦はIMEのベースラインずれ対策で箱の高さをTextInputに持たせず中央寄せしている。
+    // 上のコメント参照）ため、それだけだと箱の端が反応しない。箱全体で拾って実TextInputへ委譲する
+    <Pressable
+      // 箱自体はスクリーンリーダーの独立要素にせず、中のTextInput（accessibilityLabel付き）を
+      // そのまま読み上げ対象にする。箱タップはあくまでフォーカス補助
+      accessible={false}
+      style={[bare ? styles.bareBox : styles.box, { height }, boxStyle]}
+      // すでにフォーカス済みのときは何もしない。無条件にfocus()するとselectTextOnFocusが
+      // タップのたびに再発火して全選択し直してしまい、「1回目=全選択・2回目以降=カーソル」という
+      // TextInput本来の挙動（重量・回数欄と同じ）にならなくなるため
+      onPress={() => {
+        if (!innerRef.current?.isFocused()) innerRef.current?.focus();
+      }}
+    >
       <TextInput
-        ref={ref}
+        ref={(node) => {
+          innerRef.current = node;
+          assignRef(ref, node);
+        }}
         style={[styles.text, style as StyleProp<TextStyle>, styles.forced]}
         {...rest}
       />
-    </View>
+    </Pressable>
   );
 });
 
