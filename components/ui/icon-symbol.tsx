@@ -23,6 +23,7 @@ const MAPPING = {
   'dumbbell.fill': 'fitness-center',
   'list.bullet.clipboard': 'assignment',
   'bell.fill': 'notifications',
+  'gearshape.fill': 'settings',
   magnifyingglass: 'search',
   'xmark.circle.fill': 'cancel',
   timer: 'timer',
