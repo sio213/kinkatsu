@@ -1,7 +1,6 @@
 import { Tabs } from 'expo-router';
 import React from 'react';
 
-import { HapticTab } from '@/components/haptic-tab';
 import { DesignIcon } from '@/components/ui/design-icon';
 import { IconSymbol } from '@/components/ui/icon-symbol';
 import { Colors, tabHeaderOptions } from '@/constants/theme';
@@ -12,7 +11,6 @@ export default function TabLayout() {
       initialRouteName="index"
       screenOptions={{
         tabBarActiveTintColor: Colors.tint,
-        tabBarButton: HapticTab,
         ...tabHeaderOptions,
       }}
     >
@@ -20,9 +18,7 @@ export default function TabLayout() {
         name="index"
         options={{
           title: '記録',
-          tabBarIcon: ({ color }) => (
-            <IconSymbol size={28} name="list.bullet.clipboard" color={color} />
-          ),
+          tabBarIcon: ({ color }) => <DesignIcon name="assignment" size={28} color={color} />,
         }}
       />
       <Tabs.Screen
@@ -48,10 +44,10 @@ export default function TabLayout() {
       <Tabs.Screen
         name="reminders"
         options={{
-          tabBarLabel: 'リマインダー',
-          headerTitle: '筋トレリマインダー',
+          tabBarLabel: '設定',
+          headerTitle: '設定',
           tabBarIcon: ({ color }) => (
-            <IconSymbol size={28} name="bell.fill" color={color} />
+            <IconSymbol size={28} name="gearshape.fill" color={color} />
           ),
         }}
       />
