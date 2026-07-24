@@ -1,3 +1,4 @@
+import { HeaderBackButton } from '@/components/ui/header-back-button';
 import { Colors, headerOptions, Typography } from '@/constants/theme';
 import { db, expoDb } from '@/db/client';
 import { seed } from '@/db/seed';
@@ -145,7 +146,12 @@ export default function RootLayout() {
     // 依存するため、アプリ全体をGestureHandlerRootViewで包む必要がある(無いとAndroidでドラッグが反応しない)
     <GestureHandlerRootView style={styles.gestureRoot}>
       <ThemeProvider value={colorScheme === 'dark' ? DarkTheme : DefaultTheme}>
-        <Stack screenOptions={headerOptions}>
+        <Stack
+          screenOptions={{
+            ...headerOptions,
+            headerLeft: ({ tintColor }) => <HeaderBackButton tintColor={tintColor} />,
+          }}
+        >
           <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
           <Stack.Screen name="exercise/[id]" options={{ title: '' }} />
           <Stack.Screen
