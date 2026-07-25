@@ -1,35 +1,44 @@
 import { CategoryChip } from '@/components/exercises/category-chip';
 import { DesignIcon } from '@/components/ui/design-icon';
 import { Colors, Typography } from '@/constants/theme';
+import type { Exercise } from '@/db/schema';
+import { getExerciseImages } from '@/lib/exercises/images';
 import { Image } from 'expo-image';
 import { memo } from 'react';
 import { Pressable, StyleSheet, Text, View, type AccessibilityActionEvent } from 'react-native';
 import { useIsActive, useReorderableDrag } from 'react-native-reorderable-list';
 
-type Props = {
-  thumbnail: number;
+// 並び替え画面の行が表示に必要とする最小限の形。ルーティンの下書き(DraftExercise)・
+// トレーニング中セッション(SessionExercise)・カレンダーの予定(ScheduledWorkoutExerciseDetail)は
+// どれもこの形を満たすため、行側はどのドメインのデータかを知らずに描画できる
+export type ReorderableExercise = Pick<Exercise, 'source' | 'slug'> & {
   name: string;
   category: string;
-  metaText: string;
+};
+
+type Props = {
+  exercise: ReorderableExercise;
+  setCount: number;
   isFirst: boolean;
   isLast: boolean;
   onMoveUp: () => void;
   onMoveDown: () => void;
 };
 
-// ルーティン(routine-reorder-exercise-card.tsx)・トレーニング(session-reorder-exercise-card.tsx)の
-// 両方の「種目まとめて並び替え」画面で使う共通の行。呼び出し側が下書き(DraftExercise)かDB実データ
-// (SessionExercise)かに関わらず、表示に必要な値だけをプリミティブなpropsとして渡してもらう
+// 「種目まとめて並び替え」画面(ルーティン/トレーニング中/カレンダーの予定)で使う共通の行。
+// 通常の種目カード(RoutineTemplateExerciseCard・SessionExerciseCard等)はセット編集や⋮メニューを
+// 含み、そのまま使うと不要な状態を巻き込むため、ドラッグ表示に必要な情報(サムネイル・名前・
+// カテゴリ・セット数)だけを描画する専用の行にしている
 export const ReorderableExerciseRow = memo(function ReorderableExerciseRow({
-  thumbnail,
-  name,
-  category,
-  metaText,
+  exercise,
+  setCount,
   isFirst,
   isLast,
   onMoveUp,
   onMoveDown,
 }: Props) {
+  const { name, category } = exercise;
+  const { thumbnail } = getExerciseImages(exercise);
   const drag = useReorderableDrag();
   const isActive = useIsActive();
 
@@ -66,7 +75,8 @@ export const ReorderableExerciseRow = memo(function ReorderableExerciseRow({
         </Text>
         <View style={styles.meta}>
           <CategoryChip category={category} />
-          <Text style={styles.setCount}>{metaText}</Text>
+          {/* 数値と文字列に分けて渡すとchildrenが配列になるため、1つの文字列として組み立てる */}
+          <Text style={styles.setCount}>{`${setCount}セット`}</Text>
         </View>
       </View>
     </Pressable>
