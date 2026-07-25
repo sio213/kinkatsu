@@ -6,6 +6,7 @@ const mockUseLocalSearchParams = jest.fn();
 const mockUseExercises = jest.fn();
 const mockAddExercisesToSession = jest.fn();
 const mockUseExerciseUsageStats = jest.fn();
+const mockCreateStartChooserSession = jest.fn();
 
 jest.mock('expo-router', () => ({
   useRouter: () => ({ back: mockBack, push: mockPush, replace: mockReplace, dismiss: mockDismiss }),
@@ -31,6 +32,10 @@ jest.mock('@/hooks/use-exercise-usage-stats', () => ({
 
 jest.mock('@/lib/workout/session', () => ({
   addExercisesToSession: (...args: unknown[]) => mockAddExercisesToSession(...args),
+}));
+
+jest.mock('@/lib/workout/start-chooser-session', () => ({
+  createStartChooserSession: (...args: unknown[]) => mockCreateStartChooserSession(...args),
 }));
 
 import React from 'react';
@@ -65,6 +70,7 @@ beforeEach(() => {
   mockUseLocalSearchParams.mockReturnValue({ sessionId: '5' });
   mockUseExercises.mockReturnValue({ exercises: [benchPress, squat] });
   mockAddExercisesToSession.mockResolvedValue([]);
+  mockCreateStartChooserSession.mockResolvedValue(42);
   mockUseExerciseUsageStats.mockReturnValue(new Map());
   jest.spyOn(Alert, 'alert').mockImplementation(() => {});
   // zustandのstoreはモジュールシングルトンでテスト間を跨いで共有されるため、
@@ -120,20 +126,29 @@ test('複数選択して追加を押すとaddExercisesToSessionが呼ばれ、ro
   expect(mockAddExercisesToSession).toHaveBeenCalledWith(5, [10, 11]);
   expect(mockBack).toHaveBeenCalled();
   expect(mockReplace).not.toHaveBeenCalled();
+  // 通常経路（トレーニング画面から開く）は既存セッションに追加するだけで、新しく作らない
+  expect(mockCreateStartChooserSession).not.toHaveBeenCalled();
 });
 
-// start-chooser「自分で選ぶ」から作成直後のセッションで直接この画面へ遷移してきた場合
-// （2026-07-20）。/workout/{id}を一度もpushしていないため、router.back()ではなく
-// dismiss(2)（start-chooser+この画面自身を閉じる）してからpushで/workout/{id}へ遷移する
-// （2026-07-22、@ユーザー指摘: 元々はreplaceだったが、それだとstart-chooserがスタックに
-// 残ったままになり、/workout/{id}側の「戻る」ボタンを押すとカレンダー/記録タブではなく
-// start-chooserに戻ってしまう不具合があった）
-describe('newSession=1（start-chooserの「自分で選ぶ」から直接遷移してきた場合）', () => {
+// start-chooser「種目を追加」から直接この画面へ遷移してきた場合（2026-07-20）。
+// この経路ではsessionIdが渡らず、セッションは「追加」を押した時点で初めて作られる
+// （2026-07-25、@ユーザー指摘: 以前はstart-chooserのタップ直後に作っていたため、ここで
+// 戻ると空の記録が残ってしまっていた）。/workout/{id}を一度もpushしていないため、
+// router.back()ではなくdismiss(2)（start-chooser+この画面自身を閉じる）してからpushで
+// /workout/{id}へ遷移する（2026-07-22、@ユーザー指摘: 元々はreplaceだったが、それだと
+// start-chooserがスタックに残ったままになり、/workout/{id}側の「戻る」ボタンを押すと
+// カレンダー/記録タブではなくstart-chooserに戻ってしまう不具合があった）
+describe('newSession=1（start-chooserの「種目を追加」から直接遷移してきた場合）', () => {
   beforeEach(() => {
-    mockUseLocalSearchParams.mockReturnValue({ sessionId: '5', newSession: '1' });
+    mockUseLocalSearchParams.mockReturnValue({ newSession: '1' });
   });
 
-  test('追加を押すとaddExercisesToSessionが呼ばれ、router.backではなくdismiss(2)+pushで/workout/{id}へ遷移する', async () => {
+  test('画面を開いただけではセッションを作らない（戻っても空の記録が残らない）', () => {
+    render();
+    expect(mockCreateStartChooserSession).not.toHaveBeenCalled();
+  });
+
+  test('追加を押した時点でセッションを作り、そのidでaddExercisesToSession→dismiss(2)+pushする', async () => {
     const root = render();
     act(() => {
       root.findByProps({ accessibilityLabel: benchPressLabel }).props.onPress();
@@ -144,11 +159,44 @@ describe('newSession=1（start-chooserの「自分で選ぶ」から直接遷移
       addBtn.props.onPress();
     });
 
-    expect(mockAddExercisesToSession).toHaveBeenCalledWith(5, [10]);
+    expect(mockCreateStartChooserSession).toHaveBeenCalledWith(undefined);
+    expect(mockAddExercisesToSession).toHaveBeenCalledWith(42, [10]);
     expect(mockDismiss).toHaveBeenCalledWith(2);
-    expect(mockPush).toHaveBeenCalledWith('/workout/5');
+    expect(mockPush).toHaveBeenCalledWith('/workout/42');
     expect(mockReplace).not.toHaveBeenCalled();
     expect(mockBack).not.toHaveBeenCalled();
+  });
+
+  test('pastDateKey付きならそのままcreateStartChooserSessionへ渡す（過去日の完了済みセッションを作るため）', async () => {
+    mockUseLocalSearchParams.mockReturnValue({ newSession: '1', pastDateKey: '2026-07-25' });
+    const root = render();
+    act(() => {
+      root.findByProps({ accessibilityLabel: benchPressLabel }).props.onPress();
+    });
+
+    await act(async () => {
+      findButtonByLabel(root, '1件を追加')!.props.onPress();
+    });
+
+    expect(mockCreateStartChooserSession).toHaveBeenCalledWith('2026-07-25');
+  });
+
+  test('セッション作成に失敗した場合はエラーAlertを表示し、種目追加も遷移も行わない', async () => {
+    mockCreateStartChooserSession.mockRejectedValueOnce(new Error('fail'));
+    jest.spyOn(console, 'error').mockImplementation(() => {});
+    const root = render();
+    act(() => {
+      root.findByProps({ accessibilityLabel: benchPressLabel }).props.onPress();
+    });
+
+    await act(async () => {
+      findButtonByLabel(root, '1件を追加')!.props.onPress();
+    });
+
+    expect(Alert.alert).toHaveBeenCalledWith('エラー', '種目を追加できませんでした。');
+    expect(mockAddExercisesToSession).not.toHaveBeenCalled();
+    expect(mockDismiss).not.toHaveBeenCalled();
+    expect(mockPush).not.toHaveBeenCalled();
   });
 
   test('追加が失敗した場合はエラーAlertを表示し、dismiss/push/replace/backいずれも呼ばれない', async () => {
@@ -169,6 +217,11 @@ describe('newSession=1（start-chooserの「自分で選ぶ」から直接遷移
     expect(mockPush).not.toHaveBeenCalled();
     expect(mockReplace).not.toHaveBeenCalled();
     expect(mockBack).not.toHaveBeenCalled();
+  });
+
+  test('まだセッションが無いためuseExerciseUsageStatsにはexcludeSessionIdを渡さない', () => {
+    render();
+    expect(mockUseExerciseUsageStats).toHaveBeenCalledWith(undefined);
   });
 });
 

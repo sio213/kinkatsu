@@ -202,7 +202,10 @@ export default function RootLayout() {
           {/* ヘッダーは選んだルーティン名を動的に表示するため、画面側でStack.Screen optionsを
               上書きする（workout/session-history-loadと同じ方針） */}
           <Stack.Screen name="workout/routine-load" options={{ title: '' }} />
-          <Stack.Screen name="workout/start-chooser" options={{ title: 'どう始める？' }} />
+          {/* デザイン案「トレーニング開始選択画面」の見出し文言に合わせる（2026-07-25、
+              旧「どう始める？」から変更）。過去日の事後記録モードでは画面側で
+              「どう記録する？」＋対象日サブタイトルに上書きする */}
+          <Stack.Screen name="workout/start-chooser" options={{ title: 'トレーニングを開始' }} />
           {/* 過去日モード（pastDateKey付き）のときだけ選択中の日付をサブタイトルに動的表示
               するため、その場合のみ画面側でStack.Screen optionsを上書きする */}
           <Stack.Screen name="workout/start-routine-picker" options={{ title: 'ルーティンを選択' }} />

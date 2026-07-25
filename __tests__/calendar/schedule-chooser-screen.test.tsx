@@ -17,7 +17,7 @@ jest.mock('expo-router', () => ({
 
 import React from 'react';
 import { act, create, type ReactTestInstance } from 'react-test-renderer';
-import { Text, TouchableOpacity } from 'react-native';
+import { TouchableOpacity } from 'react-native';
 import ScheduleChooserScreen from '@/app/calendar/schedule-chooser';
 
 function findCardByLabel(root: ReactTestInstance, label: string) {
@@ -37,20 +37,21 @@ beforeEach(() => {
   mockUseLocalSearchParams.mockReturnValue({ dateKey: '2026-07-25' });
 });
 
-test('4択のカードを全て表示する', () => {
+// 2026-07-25、@ユーザー指示: トレーニング開始選択画面のデザイン確定に合わせて縦リストへ変更し、
+// 未実装のプレースホルダー（おすすめメニュー・履歴から）を廃止した
+test('実装済みの2択を説明文つきで表示する', () => {
   const root = render();
-  expect(root.findByProps({ children: 'おすすめメニュー' })).toBeDefined();
-  expect(root.findByProps({ children: '履歴から' })).toBeDefined();
-  expect(root.findByProps({ children: '直接追加' })).toBeDefined();
+  expect(root.findByProps({ children: '種目を追加' })).toBeDefined();
+  expect(root.findByProps({ children: '好きな種目を選んで予定にする' })).toBeDefined();
   expect(root.findByProps({ children: 'ルーティン' })).toBeDefined();
+  expect(root.findByProps({ children: '登録したメニューを予定にする' })).toBeDefined();
 });
 
-test('未実装(おすすめメニュー・履歴から)はdisabledで「準備中」バッジを表示する', () => {
+test('未実装のプレースホルダー（おすすめメニュー・履歴から）は表示しない', () => {
   const root = render();
-  const badgeTexts = root.findAllByType(Text).filter((t) => t.props.children === '準備中');
-  expect(badgeTexts.length).toBe(2);
-  expect(findCardByLabel(root, 'おすすめメニュー')!.props.accessibilityState).toEqual({ disabled: true });
-  expect(findCardByLabel(root, '履歴から')!.props.accessibilityState).toEqual({ disabled: true });
+  expect(() => root.findByProps({ children: 'おすすめメニュー' })).toThrow();
+  expect(() => root.findByProps({ children: '履歴から' })).toThrow();
+  expect(() => root.findByProps({ children: '準備中' })).toThrow();
 });
 
 test('タイトル「どう予定する？」と対象日をサブタイトルで表示する', () => {
@@ -59,10 +60,10 @@ test('タイトル「どう予定する？」と対象日をサブタイトル�
   expect(root.findByProps({ children: '7月25日（土）' })).toBeDefined();
 });
 
-test('「直接追加」をタップするとdateKey付きでschedule-exercise-pickerへ遷移する（DBには触れない）', () => {
+test('「種目を追加」をタップするとdateKey付きでschedule-exercise-pickerへ遷移する（DBには触れない）', () => {
   const root = render();
   act(() => {
-    findCardByLabel(root, '直接追加')!.props.onPress();
+    findCardByLabel(root, '種目を追加')!.props.onPress();
   });
   expect(mockPush).toHaveBeenCalledWith({
     pathname: '/calendar/schedule-exercise-picker',
@@ -81,9 +82,11 @@ test('「ルーティン」をタップするとdateKey付きでschedule-routine
   });
 });
 
-test('disabledなカードはonPressを持たない（タップしても何も起きない）', () => {
+test('各行のVoiceOverヒントに対象日を補う', () => {
   const root = render();
-  expect(findCardByLabel(root, 'おすすめメニュー')!.props.onPress).toBeUndefined();
+  expect(findCardByLabel(root, '種目を追加')!.props.accessibilityHint).toBe(
+    '好きな種目を選んで予定にする。7月25日（土）の予定として種目を選びます',
+  );
 });
 
 test('不正なdateKeyの場合は日付が見つからない旨のエラー状態を表示する', () => {

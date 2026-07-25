@@ -1,8 +1,18 @@
 const mockBack = jest.fn();
 const mockDismiss = jest.fn();
+const mockPush = jest.fn();
 const mockUseLocalSearchParams = jest.fn();
 const mockAddHistoryCardsToSession = jest.fn();
 const mockNotifyPrefilled = jest.fn();
+const mockCreateStartChooserSession = jest.fn();
+
+jest.mock('@/lib/workout/start-chooser-session', () => ({
+  createStartChooserSession: (...args: unknown[]) => mockCreateStartChooserSession(...args),
+}));
+
+jest.mock('@/hooks/use-debounced-push', () => ({
+  useDebouncedPush: () => mockPush,
+}));
 
 jest.mock('expo-router', () => ({
   useRouter: () => ({ back: mockBack, dismiss: mockDismiss }),
@@ -121,6 +131,7 @@ beforeEach(() => {
     sourceStartedAt: String(new Date(2026, 6, 3, 10, 0).getTime()),
   });
   mockAddHistoryCardsToSession.mockResolvedValue([]);
+  mockCreateStartChooserSession.mockResolvedValue(42);
   jest.spyOn(Alert, 'alert').mockImplementation(() => {});
   jest.spyOn(console, 'error').mockImplementation(() => {});
 });
@@ -247,6 +258,75 @@ test('送信するとaddHistoryCardsToSessionに選択した種目を渡し、�
     { sessionId: 1, exerciseId: 10, sessionExerciseId: 900, kind: 'new', prefilledSetIds: [] },
   ]);
   expect(mockDismiss).toHaveBeenCalledWith(2);
+  expect(mockPush).not.toHaveBeenCalled();
+});
+
+// start-chooser「過去の記録」経由（2026-07-25）。この経路ではsessionIdが渡らず、
+// 「読み込む」を押した時点で初めてセッションを作る（@ユーザー指摘: 手前の画面で作ると
+// 戻ったときに空の記録が残るため）。トレーニング画面もまだスタックに無いため、
+// start-chooserごと閉じてから/workout/{id}をpushで差し込む
+describe('newSession=1（start-chooserの「過去の記録」経由）', () => {
+  beforeEach(() => {
+    mockUseLocalSearchParams.mockReturnValue({
+      sourceSessionId: '99',
+      sourceStartedAt: String(new Date(2026, 6, 3, 10, 0).getTime()),
+      newSession: '1',
+    });
+  });
+
+  test('画面を開いただけではセッションを作らない（戻っても空の記録が残らない）', async () => {
+    await renderResolved([benchCard]);
+    expect(mockCreateStartChooserSession).not.toHaveBeenCalled();
+  });
+
+  test('送信時にセッションを作り、そのidで読み込んでdismiss(3)+pushする', async () => {
+    const root = await renderResolved([benchCard]);
+    const submitBtn = findSubmitButton(root)!;
+    await act(async () => {
+      submitBtn.props.onPress();
+      await Promise.resolve();
+      await Promise.resolve();
+    });
+
+    expect(mockCreateStartChooserSession).toHaveBeenCalledWith(undefined);
+    expect(mockAddHistoryCardsToSession).toHaveBeenCalledWith(42, [
+      { exerciseId: 10, sourceWorkoutSessionExerciseId: 500 },
+    ]);
+    expect(mockDismiss).toHaveBeenCalledWith(3);
+    expect(mockPush).toHaveBeenCalledWith('/workout/42');
+  });
+
+  test('pastDateKey付きならそのままcreateStartChooserSessionへ渡す', async () => {
+    mockUseLocalSearchParams.mockReturnValue({
+      sourceSessionId: '99',
+      sourceStartedAt: String(new Date(2026, 6, 3, 10, 0).getTime()),
+      newSession: '1',
+      pastDateKey: '2026-07-25',
+    });
+    const root = await renderResolved([benchCard]);
+    await act(async () => {
+      findSubmitButton(root)!.props.onPress();
+      await Promise.resolve();
+      await Promise.resolve();
+    });
+
+    expect(mockCreateStartChooserSession).toHaveBeenCalledWith('2026-07-25');
+  });
+
+  test('セッション作成に失敗した場合はエラーAlertを表示し、読み込みも遷移も行わない', async () => {
+    mockCreateStartChooserSession.mockRejectedValueOnce(new Error('fail'));
+    const root = await renderResolved([benchCard]);
+    await act(async () => {
+      findSubmitButton(root)!.props.onPress();
+      await Promise.resolve();
+      await Promise.resolve();
+    });
+
+    expect(Alert.alert).toHaveBeenCalledWith('エラー', '種目を読み込めませんでした。');
+    expect(mockAddHistoryCardsToSession).not.toHaveBeenCalled();
+    expect(mockDismiss).not.toHaveBeenCalled();
+    expect(mockPush).not.toHaveBeenCalled();
+  });
 });
 
 test('notifyPrefilledはrouter.dismissより先に呼ばれる（コード上の呼び出し順を固定する）', async () => {
