@@ -1,15 +1,12 @@
 import { HeaderTitle } from '@/components/ui/header-title';
-import { NotFoundState } from '@/components/ui/not-found-state';
+import { NotFoundScreen } from '@/components/ui/not-found-screen';
 import { SessionHistoryPickerView } from '@/components/workout/session-history-picker-view';
-import { Colors } from '@/constants/theme';
 import { useDebouncedPush } from '@/hooks/use-debounced-push';
 import { isValidDateKey, parseDateKey } from '@/lib/calendar/date-grid';
 import { NO_SESSION_TO_EXCLUDE, type PastTrainingSession } from '@/lib/workout/history';
 import { formatSessionDateGroup } from '@/lib/workout/summary';
 import { Stack, useLocalSearchParams, useRouter } from 'expo-router';
 import { useCallback } from 'react';
-import { StyleSheet } from 'react-native';
-import { SafeAreaView } from 'react-native-safe-area-context';
 
 // 「過去の記録から読み込む」フローの画面2。app/workout/session-history-picker.tsxの
 // カレンダー版（2026-07-21新設）。予定には「進行中セッション」の概念が無いため、除外対象は
@@ -48,9 +45,7 @@ export default function ScheduleWorkoutHistoryPickerScreen() {
 
   if (!isNewSchedule && !Number.isFinite(scheduledWorkoutId)) {
     return (
-      <SafeAreaView style={styles.safeArea} edges={['bottom']}>
-        <NotFoundState message="予定が見つかりません" actionLabel="戻る" onPressAction={() => router.back()} />
-      </SafeAreaView>
+      <NotFoundScreen message="予定が見つかりません" onPressBack={() => router.back()} />
     );
   }
 
@@ -72,7 +67,3 @@ export default function ScheduleWorkoutHistoryPickerScreen() {
     </>
   );
 }
-
-const styles = StyleSheet.create({
-  safeArea: { flex: 1, backgroundColor: Colors.background },
-});

@@ -1,24 +1,19 @@
 import { RoutineCreateHeaderButton } from '@/components/routines/routine-create-header-button';
 import { RoutinePickerList } from '@/components/routines/routine-picker-list';
 import { HeaderTitle } from '@/components/ui/header-title';
-import { NotFoundState } from '@/components/ui/not-found-state';
-import { Colors } from '@/constants/theme';
+import { NotFoundScreen } from '@/components/ui/not-found-screen';
+import { ScreenStyles } from '@/constants/theme';
 import type { Routine } from '@/db/schema';
 import { useDebouncedPush } from '@/hooks/use-debounced-push';
 import { useRoutineExerciseSummaries, useRoutines } from '@/hooks/use-routines';
 import { useWorkoutStarter } from '@/hooks/use-workout-starter';
 import { dateKeyToNoonMs, isValidDateKey } from '@/lib/calendar/date-grid';
 import { startPastWorkoutFromRoutine, startWorkoutFromRoutine } from '@/lib/workout/session';
+import { START_CHOOSER_DISMISS_COUNT } from '@/lib/workout/start-chooser-navigation';
 import { formatSessionDateGroup } from '@/lib/workout/summary';
 import { Stack, useLocalSearchParams, useRouter } from 'expo-router';
 import { useCallback } from 'react';
-import { StyleSheet } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-
-// この画面はstart-chooserからのみpushされる（app/workout/exercise-picker.tsxの
-// START_CHOOSER_DISMISS_COUNTと同じ根拠）。スタックは常にcalendar/記録タブ(0)→
-// start-chooser(+1)→この画面自身(+1)の2段で固定できる
-const START_CHOOSER_DISMISS_COUNT = 2;
 
 // start-chooserの「ルーティン」カード専用の画面（2026-07-20。当初は過去日の事後記録専用
 // だったが、今日のライブ開始でも同じ「選ぶだけ」の専用ピッカーを使うよう統一した
@@ -45,7 +40,7 @@ export default function StartRoutinePickerScreen() {
   // 「戻る」を押しても呼び出し元(カレンダー/記録タブ)まで一気に戻れなかった）
   const navigate = useCallback(
     (sessionId: number) => {
-      router.dismiss(START_CHOOSER_DISMISS_COUNT);
+      router.dismiss(START_CHOOSER_DISMISS_COUNT.fromChild);
       pushDebounced(`/workout/${sessionId}`);
     },
     [router, pushDebounced],
@@ -69,15 +64,12 @@ export default function StartRoutinePickerScreen() {
   // 明示的にガードする（schedule-routine-picker.tsxと同じ方針）
   if (pastDateKey !== undefined && !isPastMode) {
     return (
-      <SafeAreaView style={styles.safeArea} edges={['bottom']}>
-        <Stack.Screen options={{ title: 'ルーティンを選択' }} />
-        <NotFoundState message="日付が見つかりません" actionLabel="戻る" onPressAction={() => router.back()} />
-      </SafeAreaView>
+      <NotFoundScreen message="日付が見つかりません" onPressBack={() => router.back()} />
     );
   }
 
   return (
-    <SafeAreaView style={styles.safeArea} edges={['bottom']}>
+    <SafeAreaView style={ScreenStyles.safeArea} edges={['bottom']}>
       <Stack.Screen
         options={{
           // 過去日モードのときだけ対象日をサブタイトルに出す。今日のライブ開始では
@@ -111,7 +103,3 @@ export default function StartRoutinePickerScreen() {
     </SafeAreaView>
   );
 }
-
-const styles = StyleSheet.create({
-  safeArea: { flex: 1, backgroundColor: Colors.background },
-});

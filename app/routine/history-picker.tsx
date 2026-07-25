@@ -1,13 +1,10 @@
-import { NotFoundState } from '@/components/ui/not-found-state';
+import { NotFoundScreen } from '@/components/ui/not-found-screen';
 import { ExerciseHistoryPickerView } from '@/components/workout/exercise-history-picker-view';
-import { Colors } from '@/constants/theme';
 import { useRoutineDraftStore } from '@/lib/routines/draft-store';
 import { historySetsToDraftSets } from '@/lib/routines/validation';
 import { NO_SESSION_TO_EXCLUDE, type HistoryEntry } from '@/lib/workout/history';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { useCallback } from 'react';
-import { StyleSheet } from 'react-native';
-import { SafeAreaView } from 'react-native-safe-area-context';
 
 // app/workout/history-picker.tsxのルーティン版。一覧・自己ベスト判定・確認ダイアログの実体は
 // components/workout/exercise-history-picker-view.tsx（workout版と共通）にあり、ここでは
@@ -47,9 +44,7 @@ export default function RoutineHistoryPickerScreen() {
 
   if (!Number.isFinite(index) || !Number.isFinite(exerciseId)) {
     return (
-      <SafeAreaView style={styles.safeArea} edges={['bottom']}>
-        <NotFoundState message="種目が見つかりません" actionLabel="戻る" onPressAction={() => router.back()} />
-      </SafeAreaView>
+      <NotFoundScreen message="種目が見つかりません" onPressBack={() => router.back()} />
     );
   }
 
@@ -67,7 +62,3 @@ export default function RoutineHistoryPickerScreen() {
     />
   );
 }
-
-const styles = StyleSheet.create({
-  safeArea: { flex: 1, backgroundColor: Colors.background },
-});

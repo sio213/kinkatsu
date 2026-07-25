@@ -3,7 +3,7 @@ import { HeaderTitle } from '@/components/ui/header-title';
 import { LoadSubmitFooter } from '@/components/ui/load-submit-footer';
 import { NotFoundState } from '@/components/ui/not-found-state';
 import { HistoryLoadExerciseCard } from '@/components/workout/history-load-exercise-card';
-import { Colors } from '@/constants/theme';
+import { Colors, ScreenStyles } from '@/constants/theme';
 import { useCheckboxSelection } from '@/hooks/use-checkbox-selection';
 import { getSessionExerciseCards, type SessionHistoryCard } from '@/lib/workout/history';
 import { formatSessionDateGroup } from '@/lib/workout/summary';
@@ -76,7 +76,7 @@ export function SessionHistoryLoadView({ sourceSessionId, sourceStartedAt, onSub
   const hasCards = Array.isArray(cards) && cards.length > 0;
 
   return (
-    <SafeAreaView style={styles.safeArea} edges={['bottom']}>
+    <SafeAreaView style={ScreenStyles.safeArea} edges={['bottom']}>
       <Stack.Screen options={{ headerTitle: () => <HeaderTitle title="この記録から読み込み" subtitle={dateLabel} /> }} />
 
       {hasCards && (
@@ -129,8 +129,6 @@ export function SessionHistoryLoadView({ sourceSessionId, sourceStartedAt, onSub
 }
 
 const styles = StyleSheet.create({
-  safeArea: { flex: 1, backgroundColor: Colors.background },
-
   loading: { flex: 1, alignItems: 'center', justifyContent: 'center' },
 
   list: { flex: 1 },

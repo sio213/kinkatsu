@@ -1,12 +1,11 @@
 import { ExerciseFormScreen } from '@/components/exercises/exercise-form-screen';
-import { Colors, Typography } from '@/constants/theme';
+import { NotFoundScreen } from '@/components/ui/not-found-screen';
 import { useExercise, useExercises } from '@/hooks/use-exercises';
 import { parseFormPoints } from '@/lib/exercises/form-points';
 import type { ExerciseFormValues } from '@/lib/exercises/validation';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { useCallback } from 'react';
-import { Alert, StyleSheet, Text, View } from 'react-native';
-import { SafeAreaView } from 'react-native-safe-area-context';
+import { Alert } from 'react-native';
 
 export default function ExerciseEditScreen() {
   const { id } = useLocalSearchParams<{ id: string }>();
@@ -30,13 +29,9 @@ export default function ExerciseEditScreen() {
   if (!loaded) return null;
 
   if (!exercise) {
-    return (
-      <SafeAreaView style={styles.safe} edges={['bottom']}>
-        <View style={styles.notFound}>
-          <Text style={styles.notFoundText}>種目が見つかりません</Text>
-        </View>
-      </SafeAreaView>
-    );
+    // 以前はNotFoundStateも使わず手書きで、他24画面と違い戻る導線が無かった
+    // （@reviewer指摘）。ヘッダーのタイトルはapp/_layout.tsxの静的title「種目を編集」に任せる
+    return <NotFoundScreen message="種目が見つかりません" onPressBack={() => router.back()} />;
   }
 
   return (
@@ -53,9 +48,3 @@ export default function ExerciseEditScreen() {
     />
   );
 }
-
-const styles = StyleSheet.create({
-  safe: { flex: 1, backgroundColor: Colors.background },
-  notFound: { flex: 1, alignItems: 'center', justifyContent: 'center', paddingHorizontal: 24 },
-  notFoundText: { ...Typography.body, color: Colors.textMuted },
-});

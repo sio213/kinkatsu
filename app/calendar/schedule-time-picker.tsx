@@ -1,13 +1,13 @@
 import { ScheduleNotifyToggle } from '@/components/calendar/schedule-notify-toggle';
 import { FormField } from '@/components/ui/form-field';
 import { HeaderTitle } from '@/components/ui/header-title';
-import { NotFoundState } from '@/components/ui/not-found-state';
+import { NotFoundScreen } from '@/components/ui/not-found-screen';
 import { PrimaryButton } from '@/components/ui/primary-button';
-import { Colors, Typography } from '@/constants/theme';
+import { Colors, ScreenStyles, Typography } from '@/constants/theme';
 import { useExercises } from '@/hooks/use-exercises';
 import { usePermissionState } from '@/hooks/use-permission-state';
-import { formatDirectScheduleTitle, parseHistorySelectionsParam } from '@/lib/calendar/schedule';
 import { isValidDateKey, parseDateKey } from '@/lib/calendar/date-grid';
+import { formatDirectScheduleTitle, parseHistorySelectionsParam } from '@/lib/calendar/schedule';
 import { formatHourMinuteParts } from '@/lib/calendar/time-of-day';
 import { ensurePermission } from '@/lib/notifications/permissions';
 import {
@@ -219,15 +219,12 @@ export default function ScheduleTimePickerScreen() {
   // （dateKeyが不正なままparseDateKeyに渡るとクラッシュするため）
   if ((!isRoutineMode && !isDirectMode && !isHistoryMode) || !isValidDateKey(dateKey)) {
     return (
-      <SafeAreaView style={styles.safeArea} edges={['bottom']}>
-        <Stack.Screen options={{ title: '時刻を設定' }} />
-        <NotFoundState message="ルーティンが見つかりません" actionLabel="戻る" onPressAction={() => router.back()} />
-      </SafeAreaView>
+      <NotFoundScreen message="ルーティンが見つかりません" title="時刻を設定" onPressBack={() => router.back()} />
     );
   }
 
   return (
-    <SafeAreaView style={styles.safeArea} edges={['bottom']}>
+    <SafeAreaView style={ScreenStyles.safeArea} edges={['bottom']}>
       <Stack.Screen
         options={{
           // 画面1(schedule-routine-picker.tsx/schedule-exercise-picker.tsx)はタイトル=アクション名
@@ -280,7 +277,6 @@ export default function ScheduleTimePickerScreen() {
 }
 
 const styles = StyleSheet.create({
-  safeArea: { flex: 1, backgroundColor: Colors.background },
   content: { flex: 1, padding: 16, gap: 16 },
   // 時刻ピッカーが左寄りに見えていた問題の修正（@ユーザー指摘）。iOSのspinnerは意図幅で
   // 描画され親の全幅に伸びないため、このwrapperのalignItems:centerで水平中央に寄せる

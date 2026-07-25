@@ -1,20 +1,20 @@
-import { RoutineAddExerciseButton } from '@/components/routines/routine-add-exercise-button';
 import { ScheduledWorkoutExerciseCard } from '@/components/calendar/scheduled-workout-exercise-card';
+import { RoutineAddExerciseButton } from '@/components/routines/routine-add-exercise-button';
 import { HeaderMenu, type DropdownMenuItem } from '@/components/ui/dropdown-menu';
 import { HeaderTitle } from '@/components/ui/header-title';
 import { KeyboardAvoidingScreen } from '@/components/ui/keyboard-avoiding-screen';
-import { NotFoundState } from '@/components/ui/not-found-state';
+import { NotFoundScreen } from '@/components/ui/not-found-screen';
 import { PrimaryButton } from '@/components/ui/primary-button';
 import { ExerciseEmptyState } from '@/components/workout/exercise-empty-state';
-import { Colors } from '@/constants/theme';
+import { Colors, ScreenStyles } from '@/constants/theme';
 import { useDebouncedPush } from '@/hooks/use-debounced-push';
 import { useRoutines } from '@/hooks/use-routines';
 import { useScheduledWorkoutTime } from '@/hooks/use-scheduled-workout';
 import { useScheduledWorkoutExercises } from '@/hooks/use-scheduled-workout-exercises';
 import { parseDateKey } from '@/lib/calendar/date-grid';
 import { buildScheduledWorkoutDeleteMessage } from '@/lib/calendar/schedule';
-import { formatHourMinuteParts } from '@/lib/calendar/time-of-day';
 import { moveScheduledWorkoutExercise, removeScheduledWorkoutExercise } from '@/lib/calendar/scheduled-workout-detail';
+import { formatHourMinuteParts } from '@/lib/calendar/time-of-day';
 import { removeScheduledWorkout } from '@/lib/notifications/scheduled-workout-scheduler';
 import { hasAnyValue } from '@/lib/workout/set-values';
 import { formatSessionDateGroup } from '@/lib/workout/summary';
@@ -223,15 +223,12 @@ export default function ScheduleWorkoutEditScreen() {
   // へ切り替えるのと同じガードをここにも入れ、空リストではなく空状態を出す
   if (scheduledTimeLoaded && scheduledTime == null) {
     return (
-      <SafeAreaView style={styles.safe} edges={['bottom']}>
-        <Stack.Screen options={{ title: '予定' }} />
-        <NotFoundState message="予定が見つかりません" actionLabel="戻る" onPressAction={() => router.back()} />
-      </SafeAreaView>
+      <NotFoundScreen message="予定が見つかりません" title="予定" onPressBack={() => router.back()} />
     );
   }
 
   return (
-    <SafeAreaView style={styles.safe} edges={['bottom']}>
+    <SafeAreaView style={ScreenStyles.safeArea} edges={['bottom']}>
       <Stack.Screen
         options={{
           headerTitle: () => <HeaderTitle title="種目を編集" subtitle={headerSubtitle} />,
@@ -286,7 +283,6 @@ export default function ScheduleWorkoutEditScreen() {
 }
 
 const styles = StyleSheet.create({
-  safe: { flex: 1, backgroundColor: Colors.background },
   scroll: { flex: 1 },
   content: { paddingHorizontal: 20, paddingTop: 12, paddingBottom: 24 },
   // ExerciseEmptyStateはトレーニング画面と同じ画面中央寄せのため、ScrollViewの

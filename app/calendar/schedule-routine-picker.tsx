@@ -1,8 +1,8 @@
 import { RoutineCreateHeaderButton } from '@/components/routines/routine-create-header-button';
 import { RoutinePickerList } from '@/components/routines/routine-picker-list';
 import { HeaderTitle } from '@/components/ui/header-title';
-import { NotFoundState } from '@/components/ui/not-found-state';
-import { Colors } from '@/constants/theme';
+import { NotFoundScreen } from '@/components/ui/not-found-screen';
+import { ScreenStyles } from '@/constants/theme';
 import type { Routine } from '@/db/schema';
 import { useDebouncedPush } from '@/hooks/use-debounced-push';
 import { useRoutineExerciseSummaries, useRoutines } from '@/hooks/use-routines';
@@ -10,7 +10,6 @@ import { isValidDateKey, parseDateKey } from '@/lib/calendar/date-grid';
 import { formatSessionDateGroup } from '@/lib/workout/summary';
 import { Stack, useLocalSearchParams, useRouter } from 'expo-router';
 import { useCallback } from 'react';
-import { StyleSheet } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 // カレンダー選択日パネル「予定を追加」フローの画面1（PR10、手動での予定追加）。
@@ -43,15 +42,12 @@ export default function ScheduleRoutinePickerScreen() {
   // 明示的にガードする（dateKeyが不正なままparseDateKeyに渡るとクラッシュするため）
   if (!isValidDateKey(dateKey)) {
     return (
-      <SafeAreaView style={styles.safeArea} edges={['bottom']}>
-        <Stack.Screen options={{ title: 'ルーティンを選択' }} />
-        <NotFoundState message="日付が見つかりません" actionLabel="戻る" onPressAction={() => router.back()} />
-      </SafeAreaView>
+      <NotFoundScreen message="日付が見つかりません" title="ルーティンを選択" onPressBack={() => router.back()} />
     );
   }
 
   return (
-    <SafeAreaView style={styles.safeArea} edges={['bottom']}>
+    <SafeAreaView style={ScreenStyles.safeArea} edges={['bottom']}>
       <Stack.Screen
         options={{
           headerTitle: () => (
@@ -70,7 +66,3 @@ export default function ScheduleRoutinePickerScreen() {
     </SafeAreaView>
   );
 }
-
-const styles = StyleSheet.create({
-  safeArea: { flex: 1, backgroundColor: Colors.background },
-});

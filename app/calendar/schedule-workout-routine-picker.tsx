@@ -1,13 +1,12 @@
 import { RoutineCreateHeaderButton } from '@/components/routines/routine-create-header-button';
 import { RoutinePickerList } from '@/components/routines/routine-picker-list';
-import { NotFoundState } from '@/components/ui/not-found-state';
-import { Colors } from '@/constants/theme';
+import { NotFoundScreen } from '@/components/ui/not-found-screen';
+import { ScreenStyles } from '@/constants/theme';
+import type { Routine } from '@/db/schema';
 import { useDebouncedPush } from '@/hooks/use-debounced-push';
 import { useRoutineExerciseSummaries, useRoutines } from '@/hooks/use-routines';
-import type { Routine } from '@/db/schema';
 import { Stack, useLocalSearchParams, useRouter } from 'expo-router';
 import { useCallback } from 'react';
-import { StyleSheet } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 // ヘッダー⋮「ルーティンから読み込む」フローの画面2。app/workout/routine-picker.tsxのカレンダー版
@@ -39,14 +38,12 @@ export default function ScheduleWorkoutRoutinePickerScreen() {
 
   if (!Number.isFinite(scheduledWorkoutId)) {
     return (
-      <SafeAreaView style={styles.safeArea} edges={['bottom']}>
-        <NotFoundState message="予定が見つかりません" actionLabel="戻る" onPressAction={() => router.back()} />
-      </SafeAreaView>
+      <NotFoundScreen message="予定が見つかりません" onPressBack={() => router.back()} />
     );
   }
 
   return (
-    <SafeAreaView style={styles.safeArea} edges={['bottom']}>
+    <SafeAreaView style={ScreenStyles.safeArea} edges={['bottom']}>
       <Stack.Screen options={{ headerRight: () => <RoutineCreateHeaderButton /> }} />
       <RoutinePickerList
         routines={routines}
@@ -58,7 +55,3 @@ export default function ScheduleWorkoutRoutinePickerScreen() {
     </SafeAreaView>
   );
 }
-
-const styles = StyleSheet.create({
-  safeArea: { flex: 1, backgroundColor: Colors.background },
-});

@@ -1,12 +1,10 @@
 import { RoutineLoadView } from '@/components/routines/routine-load-view';
-import { NotFoundState } from '@/components/ui/not-found-state';
-import { Colors } from '@/constants/theme';
+import { NotFoundScreen } from '@/components/ui/not-found-screen';
 import { addRoutineExercisesToScheduledWorkout } from '@/lib/calendar/scheduled-workout-detail';
 import type { RoutineExerciseSelection } from '@/lib/routines/db';
-import { Stack, useLocalSearchParams, useRouter } from 'expo-router';
+import { useLocalSearchParams, useRouter } from 'expo-router';
 import { useCallback } from 'react';
-import { Alert, StyleSheet } from 'react-native';
-import { SafeAreaView } from 'react-native-safe-area-context';
+import { Alert } from 'react-native';
 
 // ヘッダー⋮「ルーティンから読み込む」フローの画面3。選択UIの実体は
 // components/routines/routine-load-view.tsx（app/workout/routine-load.tsxと共通）にあり、
@@ -38,16 +36,9 @@ export default function ScheduleWorkoutRoutineLoadScreen() {
 
   if (!Number.isFinite(scheduledWorkoutId) || !Number.isFinite(routineId)) {
     return (
-      <SafeAreaView style={styles.safeArea} edges={['bottom']}>
-        <Stack.Screen options={{ title: 'ルーティン' }} />
-        <NotFoundState message="予定が見つかりません" actionLabel="戻る" onPressAction={() => router.back()} />
-      </SafeAreaView>
+      <NotFoundScreen message="予定が見つかりません" title="ルーティン" onPressBack={() => router.back()} />
     );
   }
 
   return <RoutineLoadView routineId={routineId} routineName={routineName} onSubmit={handleSubmit} />;
 }
-
-const styles = StyleSheet.create({
-  safeArea: { flex: 1, backgroundColor: Colors.background },
-});

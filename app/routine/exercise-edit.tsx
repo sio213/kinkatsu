@@ -7,7 +7,7 @@ import { HeaderMenu, type DropdownMenuItem } from '@/components/ui/dropdown-menu
 import { KeyboardAvoidingScreen } from '@/components/ui/keyboard-avoiding-screen';
 import { PrimaryButton } from '@/components/ui/primary-button';
 import { ExerciseEmptyState } from '@/components/workout/exercise-empty-state';
-import { Colors } from '@/constants/theme';
+import { Colors, ScreenStyles } from '@/constants/theme';
 import { useExercisesWithHistory } from '@/hooks/use-workout-session';
 import { useRoutineDraftStore } from '@/lib/routines/draft-store';
 import { NO_SESSION_TO_EXCLUDE } from '@/lib/workout/history';
@@ -174,7 +174,7 @@ export default function RoutineExerciseEditScreen() {
   ];
 
   return (
-    <SafeAreaView style={styles.safe} edges={['bottom']}>
+    <SafeAreaView style={ScreenStyles.safeArea} edges={['bottom']}>
       <Stack.Screen
         options={{
           headerRight: () => <HeaderMenu groups={[menuItems]} accessibilityLabel="種目編集のメニューを開く" />,
@@ -226,7 +226,6 @@ export default function RoutineExerciseEditScreen() {
 }
 
 const styles = StyleSheet.create({
-  safe: { flex: 1, backgroundColor: Colors.background },
   scroll: { flex: 1 },
   content: { paddingHorizontal: 20, paddingTop: 12, paddingBottom: 24 },
   // ExerciseEmptyStateはトレーニング画面と同じ画面中央寄せのため、ScrollViewの

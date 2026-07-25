@@ -2,7 +2,7 @@ import { ExerciseForm, type ExerciseFormHandle } from '@/components/exercises/ex
 import { FormScrollProvider } from '@/components/ui/form-scroll-context';
 import { KeyboardAvoidingScreen } from '@/components/ui/keyboard-avoiding-screen';
 import { PrimaryButton } from '@/components/ui/primary-button';
-import { Colors } from '@/constants/theme';
+import { Colors, ScreenStyles } from '@/constants/theme';
 import type { ExerciseFormValues } from '@/lib/exercises/validation';
 import { forwardRef, useImperativeHandle, useRef, useState } from 'react';
 import { ScrollView, StyleSheet, View } from 'react-native';
@@ -36,7 +36,7 @@ export const ExerciseFormScreen = forwardRef<ExerciseFormScreenHandle, Props>(fu
   );
 
   return (
-    <SafeAreaView style={styles.safe} edges={['bottom']}>
+    <SafeAreaView style={ScreenStyles.safeArea} edges={['bottom']}>
       <KeyboardAvoidingScreen>
         <FormScrollProvider scrollRef={scrollRef}>
           <ScrollView ref={scrollRef} contentContainerStyle={styles.content} keyboardShouldPersistTaps="handled">
@@ -61,8 +61,6 @@ export const ExerciseFormScreen = forwardRef<ExerciseFormScreenHandle, Props>(fu
 });
 
 const styles = StyleSheet.create({
-  safe: { flex: 1, backgroundColor: Colors.background },
-
   content: { paddingHorizontal: 20, paddingTop: 12, paddingBottom: 24 },
 
   footer: {

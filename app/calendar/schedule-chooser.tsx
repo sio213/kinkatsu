@@ -1,7 +1,7 @@
 import { HeaderTitle } from '@/components/ui/header-title';
-import { NotFoundState } from '@/components/ui/not-found-state';
+import { NotFoundScreen } from '@/components/ui/not-found-screen';
 import { StartMethodRow } from '@/components/workout/start-method-row';
-import { Colors } from '@/constants/theme';
+import { ScreenStyles } from '@/constants/theme';
 import { useDebouncedPush } from '@/hooks/use-debounced-push';
 import { isValidDateKey, parseDateKey } from '@/lib/calendar/date-grid';
 import { formatSessionDateGroup } from '@/lib/workout/summary';
@@ -41,17 +41,14 @@ export default function ScheduleChooserScreen() {
   // 明示的にガードする（schedule-routine-picker.tsxと同じ方針）
   if (!isValidDateKey(dateKey)) {
     return (
-      <SafeAreaView style={styles.safeArea} edges={['bottom']}>
-        <Stack.Screen options={{ title: '予定を追加' }} />
-        <NotFoundState message="日付が見つかりません" actionLabel="戻る" onPressAction={() => router.back()} />
-      </SafeAreaView>
+      <NotFoundScreen message="日付が見つかりません" onPressBack={() => router.back()} />
     );
   }
 
   const dateLabel = formatSessionDateGroup(parseDateKey(dateKey).getTime());
 
   return (
-    <SafeAreaView style={styles.safeArea} edges={['bottom']}>
+    <SafeAreaView style={ScreenStyles.safeArea} edges={['bottom']}>
       <Stack.Screen
         options={{
           headerTitle: () => <HeaderTitle title="予定を追加" subtitle={dateLabel} />,
@@ -85,6 +82,5 @@ export default function ScheduleChooserScreen() {
 }
 
 const styles = StyleSheet.create({
-  safeArea: { flex: 1, backgroundColor: Colors.background },
   list: { paddingHorizontal: 16, paddingTop: 14, gap: 11 },
 });

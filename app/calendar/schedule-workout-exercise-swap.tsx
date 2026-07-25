@@ -1,12 +1,9 @@
 import { ExerciseSwapPicker } from '@/components/exercises/exercise-swap-picker';
-import { NotFoundState } from '@/components/ui/not-found-state';
-import { Colors } from '@/constants/theme';
+import { NotFoundScreen } from '@/components/ui/not-found-screen';
 import type { Exercise } from '@/db/schema';
 import { replaceScheduledWorkoutExercise } from '@/lib/calendar/scheduled-workout-detail';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { useCallback } from 'react';
-import { StyleSheet } from 'react-native';
-import { SafeAreaView } from 'react-native-safe-area-context';
 
 // 種目カード⋮メニュー「種目を入れ替え」用（app/routine/exercise-swap.tsxのカレンダー版、
 // 2026-07-20）。選択UI自体はExerciseSwapPickerを共有し、確定処理だけがDB
@@ -38,9 +35,7 @@ export default function ScheduleWorkoutExerciseSwapScreen() {
 
   if (!Number.isFinite(scheduledWorkoutExerciseId)) {
     return (
-      <SafeAreaView style={styles.safeArea} edges={['bottom']}>
-        <NotFoundState message="種目が見つかりません" actionLabel="戻る" onPressAction={() => router.back()} />
-      </SafeAreaView>
+      <NotFoundScreen message="種目が見つかりません" onPressBack={() => router.back()} />
     );
   }
 
@@ -54,7 +49,3 @@ export default function ScheduleWorkoutExerciseSwapScreen() {
     />
   );
 }
-
-const styles = StyleSheet.create({
-  safeArea: { flex: 1, backgroundColor: Colors.background },
-});

@@ -3,7 +3,7 @@ import { IconSymbol } from '@/components/ui/icon-symbol';
 import { PrimaryButton } from '@/components/ui/primary-button';
 import { ResumeWorkoutBanner } from '@/components/workout/resume-workout-banner';
 import { SessionCard } from '@/components/workout/session-card';
-import { Colors, Typography } from '@/constants/theme';
+import { Colors, ScreenStyles, Typography } from '@/constants/theme';
 import type { WorkoutSession } from '@/db/schema';
 import { useDebouncedPush } from '@/hooks/use-debounced-push';
 import { useTickingNow } from '@/hooks/use-ticking-now';
@@ -47,7 +47,7 @@ export default function RecordScreen() {
   }, [activeSession, pushDebounced]);
 
   return (
-    <SafeAreaView style={styles.safeArea} edges={[]}>
+    <SafeAreaView style={ScreenStyles.safeArea} edges={[]}>
       <Stack.Screen
         options={{
           headerRight: () =>
@@ -125,7 +125,6 @@ export default function RecordScreen() {
 }
 
 const styles = StyleSheet.create({
-  safeArea: { flex: 1, backgroundColor: Colors.background },
   container: { flex: 1, padding: 16 },
 
   routineLinkBanner: {

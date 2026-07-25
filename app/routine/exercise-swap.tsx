@@ -1,13 +1,10 @@
 import { ExerciseSwapPicker } from '@/components/exercises/exercise-swap-picker';
-import { NotFoundState } from '@/components/ui/not-found-state';
-import { Colors } from '@/constants/theme';
+import { NotFoundScreen } from '@/components/ui/not-found-screen';
 import type { Exercise } from '@/db/schema';
-import { useRoutineDraftStore } from '@/lib/routines/draft-store';
 import { buildInitialRoutineSets } from '@/lib/routines/db';
+import { useRoutineDraftStore } from '@/lib/routines/draft-store';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { useCallback } from 'react';
-import { StyleSheet } from 'react-native';
-import { SafeAreaView } from 'react-native-safe-area-context';
 
 // app/workout/exercise-swap.tsxのルーティン版。DB(workoutSessionExercises)ではなく
 // useRoutineDraftStoreの下書き配列を書き換える点だけが異なり、選択UI自体はExerciseSwapPickerを共有する
@@ -50,9 +47,7 @@ export default function RoutineExerciseSwapScreen() {
 
   if (!Number.isFinite(index)) {
     return (
-      <SafeAreaView style={styles.safeArea} edges={['bottom']}>
-        <NotFoundState message="種目が見つかりません" actionLabel="戻る" onPressAction={() => router.back()} />
-      </SafeAreaView>
+      <NotFoundScreen message="種目が見つかりません" onPressBack={() => router.back()} />
     );
   }
 
@@ -66,7 +61,3 @@ export default function RoutineExerciseSwapScreen() {
     />
   );
 }
-
-const styles = StyleSheet.create({
-  safeArea: { flex: 1, backgroundColor: Colors.background },
-});

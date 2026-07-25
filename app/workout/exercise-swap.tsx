@@ -1,13 +1,10 @@
 import { ExerciseSwapPicker } from '@/components/exercises/exercise-swap-picker';
-import { NotFoundState } from '@/components/ui/not-found-state';
-import { Colors } from '@/constants/theme';
+import { NotFoundScreen } from '@/components/ui/not-found-screen';
 import type { Exercise } from '@/db/schema';
 import { notifyPrefilled } from '@/lib/workout/prefill-feedback';
 import { replaceSessionExercise } from '@/lib/workout/session';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { useCallback } from 'react';
-import { StyleSheet } from 'react-native';
-import { SafeAreaView } from 'react-native-safe-area-context';
 
 export default function ExerciseSwapScreen() {
   const {
@@ -40,13 +37,7 @@ export default function ExerciseSwapScreen() {
 
   if (!Number.isFinite(sessionExerciseId)) {
     return (
-      <SafeAreaView style={styles.safeArea} edges={['bottom']}>
-        <NotFoundState
-          message="トレーニングが見つかりません"
-          actionLabel="戻る"
-          onPressAction={() => router.back()}
-        />
-      </SafeAreaView>
+      <NotFoundScreen message="トレーニングが見つかりません" onPressBack={() => router.back()} />
     );
   }
 
@@ -63,7 +54,3 @@ export default function ExerciseSwapScreen() {
     />
   );
 }
-
-const styles = StyleSheet.create({
-  safeArea: { flex: 1, backgroundColor: Colors.background },
-});
