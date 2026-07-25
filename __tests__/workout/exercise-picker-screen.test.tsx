@@ -75,7 +75,7 @@ beforeEach(() => {
   jest.spyOn(Alert, 'alert').mockImplementation(() => {});
   // zustandのstoreはモジュールシングルトンでテスト間を跨いで共有されるため、
   // 前のテストで選んだ並び替え軸が漏れないようデフォルトへ戻す
-  useExerciseSortStore.setState({ listSortBy: 'category', pickerSortBy: 'frequent' });
+  useExerciseSortStore.setState({ listSortBy: 'category', pickerSortBy: 'frequent', swapSortBy: 'frequent' });
 });
 
 test('初期状態は未選択で「追加」ボタンは無効', () => {
@@ -390,6 +390,30 @@ test('種目タブとは独立した並び替え軸を持つ（種目タブの�
   expect(findSortTrigger(root)!.props.accessibilityLabel).toBe('並び替え: よく使う順');
   // 逆方向（ピッカー側の変更が種目タブのlistSortByに影響しないこと）も併せて確認
   expect(useExerciseSortStore.getState().listSortBy).toBe('name');
+});
+
+// ピッカーと入れ替えは共通のExerciseSelectViewを使い、sortScopeでストアのキーを出し分けている。
+// その対応を取り違えても、コンポーネント内で読み書きが一貫するため表示も順序も辻褄が合ってしまう。
+// 「ピッカーが見ているのはpickerSortByであってswapSortByではない」ことを両方向から固定する
+test('種目入れ替えとは独立した並び替え軸を持つ（swapSortByの影響を受けない）', () => {
+  useExerciseSortStore.getState().setSwapSortBy('name');
+  const root = render();
+
+  expect(findSortTrigger(root)!.props.accessibilityLabel).toBe('並び替え: よく使う順');
+});
+
+test('ピッカーで並び替えを変更してもswapSortByは変わらない', () => {
+  const root = render();
+
+  act(() => {
+    findSortTrigger(root)!.props.onPress();
+  });
+  act(() => {
+    root.findByProps({ accessibilityLabel: '最近使った順' }).props.onPress();
+  });
+
+  expect(useExerciseSortStore.getState().pickerSortBy).toBe('recent');
+  expect(useExerciseSortStore.getState().swapSortBy).toBe('frequent');
 });
 
 test('並び替えを「最近使った順」に変更すると、frequentとは逆順（直近使った種目が上）に並び替わる', () => {
