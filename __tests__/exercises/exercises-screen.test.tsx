@@ -49,6 +49,12 @@ function findButtonByLabel(root: ReactTestInstance, label: string) {
     );
 }
 
+// ヘッダー右の追加ボタン(HeaderAddButton)はアイコンのみでテキストを持たないため、
+// accessibilityLabelで特定する
+function findByAccessibilityLabel(root: ReactTestInstance, label: string) {
+  return root.findAllByType(TouchableOpacity).find((t) => t.props.accessibilityLabel === label);
+}
+
 function render() {
   let instance!: ReturnType<typeof create>;
   act(() => {
@@ -67,10 +73,10 @@ beforeEach(() => {
   useExerciseSortStore.setState({ listSortBy: 'category' });
 });
 
-test('「追加」ボタンで名前を空にして/exercise/newへ遷移する', () => {
+test('ヘッダーの追加ボタンで名前を空にして/exercise/newへ遷移する', () => {
   const root = render();
 
-  const addBtn = findButtonByLabel(root, '追加')!;
+  const addBtn = findByAccessibilityLabel(root, '種目を追加')!;
   act(() => {
     addBtn.props.onPress();
   });

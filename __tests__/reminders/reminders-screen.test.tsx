@@ -79,16 +79,12 @@ jest.mock('@/components/reminders/reminder-form', () => {
 
 import React from 'react';
 import { act, create, type ReactTestInstance } from 'react-test-renderer';
-import { Alert, Text, TouchableOpacity } from 'react-native';
+import { Alert, TouchableOpacity } from 'react-native';
 import RemindersScreen from '@/app/(tabs)/reminders';
 
-function findButtonByLabel(root: ReactTestInstance, label: string) {
-  return root
-    .findAllByType(TouchableOpacity)
-    .find((btn: ReactTestInstance) =>
-      btn.findAllByType(Text).some((t: ReactTestInstance) => [t.props.children].flat().join('') === label),
-    );
-}
+// ヘッダー右の追加ボタン(HeaderAddButton)はアイコンのみでテキストを持たないため、
+// accessibilityLabelで特定する
+const HEADER_ADD_LABEL = 'リマインダーを追加';
 
 function findByAccessibilityLabel(root: ReactTestInstance, label: string) {
   return root.findAllByType(TouchableOpacity).find((t) => t.props.accessibilityLabel === label);
@@ -124,24 +120,24 @@ beforeEach(() => {
   mockUseReminders.mockReturnValue(baseReminders());
 });
 
-test('初期表示ではヘッダーに「追加」ボタンを表示する', async () => {
+test('初期表示ではヘッダーに追加ボタンを表示する', async () => {
   const root = await render();
-  expect(findButtonByLabel(root, '追加')).toBeDefined();
+  expect(findByAccessibilityLabel(root, HEADER_ADD_LABEL)).toBeDefined();
 });
 
-test('「追加」ボタン押下でフォームが開き、ヘッダーの「追加」ボタンは消える', async () => {
+test('追加ボタン押下でフォームが開き、ヘッダーの追加ボタンは消える', async () => {
   const root = await render();
 
-  const headerAddBtn = findButtonByLabel(root, '追加')!;
+  const headerAddBtn = findByAccessibilityLabel(root, HEADER_ADD_LABEL)!;
   act(() => {
     headerAddBtn.props.onPress();
   });
 
   expect(root.findByProps({ children: 'フォーム' })).toBeDefined();
-  expect(findButtonByLabel(root, '追加')).toBeUndefined();
+  expect(findByAccessibilityLabel(root, HEADER_ADD_LABEL)).toBeUndefined();
 });
 
-test('既存リマインダーの編集を開始した場合もヘッダーの「追加」ボタンは消える', async () => {
+test('既存リマインダーの編集を開始した場合もヘッダーの追加ボタンは消える', async () => {
   mockUseReminders.mockReturnValue(
     baseReminders({ reminders: [{ id: 1, title: 'スクワット', enabled: true } as never] }),
   );
@@ -152,24 +148,24 @@ test('既存リマインダーの編集を開始した場合もヘッダーの�
     editBtn.props.onPress();
   });
 
-  expect(findButtonByLabel(root, '追加')).toBeUndefined();
+  expect(findByAccessibilityLabel(root, HEADER_ADD_LABEL)).toBeUndefined();
 });
 
-test('フォームをキャンセルすると、ヘッダーの「追加」ボタンが再表示される', async () => {
+test('フォームをキャンセルすると、ヘッダーの追加ボタンが再表示される', async () => {
   const root = await render();
 
-  const headerAddBtn = findButtonByLabel(root, '追加')!;
+  const headerAddBtn = findByAccessibilityLabel(root, HEADER_ADD_LABEL)!;
   act(() => {
     headerAddBtn.props.onPress();
   });
-  expect(findButtonByLabel(root, '追加')).toBeUndefined();
+  expect(findByAccessibilityLabel(root, HEADER_ADD_LABEL)).toBeUndefined();
 
   const closeBtn = findByAccessibilityLabel(root, 'フォームを閉じる')!;
   act(() => {
     closeBtn.props.onPress();
   });
 
-  expect(findButtonByLabel(root, '追加')).toBeDefined();
+  expect(findByAccessibilityLabel(root, HEADER_ADD_LABEL)).toBeDefined();
 });
 
 describe('タスク9: ルーティン由来のリマインダーのルーティンへの遷移', () => {
