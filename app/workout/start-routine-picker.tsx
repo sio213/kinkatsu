@@ -1,3 +1,4 @@
+import { RoutineCreateHeaderButton } from '@/components/routines/routine-create-header-button';
 import { RoutinePickerList } from '@/components/routines/routine-picker-list';
 import { HeaderTitle } from '@/components/ui/header-title';
 import { NotFoundState } from '@/components/ui/not-found-state';
@@ -77,15 +78,23 @@ export default function StartRoutinePickerScreen() {
 
   return (
     <SafeAreaView style={styles.safeArea} edges={['bottom']}>
-      {isPastMode && (
-        <Stack.Screen
-          options={{
-            headerTitle: () => (
-              <HeaderTitle title="ルーティンを選択" subtitle={formatSessionDateGroup(dateKeyToNoonMs(pastDateKey!))} />
-            ),
-          }}
-        />
-      )}
+      <Stack.Screen
+        options={{
+          // 過去日モードのときだけ対象日をサブタイトルに出す。今日のライブ開始では
+          // app/_layout.tsxのtitle「ルーティンを選択」をそのまま使うため何も上書きしない
+          ...(isPastMode
+            ? {
+                headerTitle: () => (
+                  <HeaderTitle
+                    title="ルーティンを選択"
+                    subtitle={formatSessionDateGroup(dateKeyToNoonMs(pastDateKey!))}
+                  />
+                ),
+              }
+            : {}),
+          headerRight: () => <RoutineCreateHeaderButton />,
+        }}
+      />
       <RoutinePickerList
         routines={routines}
         summaries={summaries}

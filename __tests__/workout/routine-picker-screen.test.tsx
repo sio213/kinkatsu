@@ -7,6 +7,14 @@ const mockUseRoutineExerciseSummaries = jest.fn();
 jest.mock('expo-router', () => ({
   useRouter: () => ({ back: mockBack, push: mockPush }),
   useLocalSearchParams: () => mockUseLocalSearchParams(),
+  // Stack.Screen はナビゲーターのoptionsを設定するコンポーネントで本来は見た目を持たないが、
+  // headerRightの中身（ルーティン作成ボタン）をテストで検証できるよう、そのレンダー関数だけ実行してやる
+  Stack: {
+    Screen: ({ options }: { options?: { headerRight?: () => unknown } }) => {
+      const { createElement, Fragment } = require('react');
+      return createElement(Fragment, null, options?.headerRight?.());
+    },
+  },
 }));
 
 jest.mock('@/hooks/use-routines', () => ({
@@ -140,4 +148,18 @@ test('カードを連打してもpushは1回しか呼ばれない（useDebounced
   });
 
   expect(mockPush).toHaveBeenCalledTimes(1);
+});
+
+// 一覧に読み込みたいルーティンが無いとき、フローを抜けて記録タブのルーティン一覧まで
+// 戻らなくてもその場で作れるようにするヘッダー右の＋ボタン（2026-07-25追加）
+test('ヘッダーの＋でルーティン作成画面へ遷移する', () => {
+  mockUseRoutines.mockReturnValue({ routines: [] });
+  const root = render();
+
+  const createBtn = findCardByLabel(root, 'ルーティンを作成')!;
+  act(() => {
+    createBtn.props.onPress();
+  });
+
+  expect(mockPush).toHaveBeenCalledWith('/routine/new');
 });
