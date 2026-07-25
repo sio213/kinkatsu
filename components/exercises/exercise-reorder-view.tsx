@@ -1,5 +1,6 @@
 import { ReorderableExerciseRow, type ReorderableExercise } from '@/components/exercises/reorderable-exercise-row';
 import { PrimaryButton } from '@/components/ui/primary-button';
+import { ScreenFooter } from '@/components/ui/screen-footer';
 import { Colors, ScreenStyles } from '@/constants/theme';
 import { useCallback } from 'react';
 import { StyleSheet, View } from 'react-native';
@@ -73,9 +74,9 @@ export function ExerciseReorderView<T extends ReorderableExercise>({
           </View>
         )}
       />
-      <View style={styles.footer}>
+      <ScreenFooter>
         <PrimaryButton label="戻る" onPress={onPressBack} />
-      </View>
+      </ScreenFooter>
     </SafeAreaView>
   );
 }
@@ -83,13 +84,6 @@ export function ExerciseReorderView<T extends ReorderableExercise>({
 const styles = StyleSheet.create({
   list: { flex: 1 },
   content: { paddingHorizontal: 20, paddingTop: 12, paddingBottom: 24, gap: 8 },
-  footer: {
-    paddingHorizontal: 20,
-    paddingTop: 8,
-    paddingBottom: 12,
-    borderTopWidth: 1,
-    borderTopColor: Colors.border,
-  },
   dropIndicator: {
     height: 2,
     borderRadius: 1,
