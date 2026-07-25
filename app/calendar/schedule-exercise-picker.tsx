@@ -24,15 +24,10 @@ export default function ScheduleExercisePickerScreen() {
   const router = useRouter();
   const pushDebounced = useDebouncedPush();
 
-  const handlePressInfo = useCallback(
-    (id: number) => {
-      pushDebounced(`/exercise/${id}`);
-    },
-    [pushDebounced],
-  );
-
+  // この画面ではまだDBに書き込まないため失敗しようがないが、ExercisePickerViewのonConfirm契約
+  // (Promise<void>)に合わせてasyncで宣言する
   const handleConfirm = useCallback(
-    (selectedIds: number[]) => {
+    async (selectedIds: number[]) => {
       if (selectedIds.length === 0) return;
       pushDebounced({
         pathname: '/calendar/schedule-time-picker',
@@ -64,7 +59,7 @@ export default function ScheduleExercisePickerScreen() {
           headerTitle: () => <HeaderTitle title="種目を選択" subtitle={dateLabel} />,
         }}
       />
-      <ExercisePickerView onPressInfo={handlePressInfo} onConfirm={handleConfirm} />
+      <ExercisePickerView onConfirm={handleConfirm} />
     </SafeAreaView>
   );
 }

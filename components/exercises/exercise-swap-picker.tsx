@@ -1,20 +1,12 @@
-import { ExerciseFilterHeader } from '@/components/exercises/exercise-filter-header';
+import { ExerciseSelectView } from '@/components/exercises/exercise-select-view';
 import { HeaderTitle } from '@/components/ui/header-title';
-import { KeyboardAvoidingScreen } from '@/components/ui/keyboard-avoiding-screen';
-import { ListErrorBoundary } from '@/components/ui/list-error-boundary';
 import { PrimaryButton } from '@/components/ui/primary-button';
-import { PickerExerciseRow } from '@/components/workout/picker-exercise-row';
-import { Colors, Typography } from '@/constants/theme';
+import { Colors } from '@/constants/theme';
 import type { Exercise } from '@/db/schema';
-import { useDebouncedPush } from '@/hooks/use-debounced-push';
-import { useExerciseUsageStats } from '@/hooks/use-exercise-usage-stats';
 import { useExercises } from '@/hooks/use-exercises';
-import { CATEGORY_ALL } from '@/lib/exercises/constants';
-import { filterExercises } from '@/lib/exercises/filter';
-import { useExerciseSortStore } from '@/lib/exercises/sort-store';
-import { Stack, useFocusEffect } from 'expo-router';
+import { Stack } from 'expo-router';
 import { useCallback, useMemo, useRef, useState } from 'react';
-import { Alert, FlatList, Keyboard, StyleSheet, Text, View } from 'react-native';
+import { Alert, Keyboard, StyleSheet } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 type Props = {
@@ -32,9 +24,11 @@ type Props = {
   onSubmit: (exercise: Exercise) => Promise<void>;
 };
 
-// app/workout/exercise-swap.tsx・app/routine/exercise-swap.tsxで共有する「種目を入れ替え」
-// 選択画面の本体。検索・カテゴリ絞り込み・並び替え・単一選択・確認ダイアログ・エラーハンドリングは
-// 完全に共通で、実際にどこへ(DB/ルーティン下書き)反映するかだけが呼び出し元ごとに異なる
+// app/workout/exercise-swap.tsx・app/routine/exercise-swap.tsx・
+// app/calendar/schedule-workout-exercise-swap.tsxで共有する「種目を入れ替え」画面の本体。
+// 検索/カテゴリ絞り込み/並び替え/一覧の描画はExerciseSelectView（種目追加ピッカーと共通）に
+// 委ね、ここは単一選択・確認ダイアログ・エラーハンドリングと、実際にどこへ反映するかの
+// 呼び出し側への委譲を担う
 export function ExerciseSwapPicker({
   currentExerciseId,
   currentExerciseName,
@@ -43,45 +37,17 @@ export function ExerciseSwapPicker({
   confirmMessage,
   onSubmit,
 }: Props) {
-  const pushDebounced = useDebouncedPush();
   const { exercises } = useExercises();
-  const usageStats = useExerciseUsageStats(usageStatsExcludeSessionId);
-  const sortBy = useExerciseSortStore((state) => state.swapSortBy);
-  const setSortBy = useExerciseSortStore((state) => state.setSwapSortBy);
-
-  const [search, setSearch] = useState('');
-  const [activeCategory, setActiveCategory] = useState<string>(CATEGORY_ALL);
-  // 種目追加ピッカーと違い単一選択（1件だけ）のため、選択idはSetではなく単一の値で持つ
+  // 種目追加ピッカーと違い単一選択（1件だけ）のため、選択idはSetではなく単一の値で持つ。
+  // ExerciseSelectViewへは0件か1件の配列として渡す
   const [selectedId, setSelectedId] = useState<number | null>(null);
+  const selectedIds = useMemo(() => (selectedId == null ? [] : [selectedId]), [selectedId]);
   const isSubmittingRef = useRef(false);
-
-  // 種目詳細等へ遷移してこの画面がフォーカスを失うタイミングでキーボードを閉じる（exercise-picker.tsxと同じ対応）
-  useFocusEffect(
-    useCallback(() => {
-      return () => Keyboard.dismiss();
-    }, []),
-  );
-
-  // 入れ替え先の候補から自分自身（現在の種目）は除く。選んでも差分が無いため
-  const candidates = useMemo(
-    () =>
-      filterExercises(exercises, activeCategory, search, { sortBy, usageStats }).filter(
-        (e) => e.id !== currentExerciseId,
-      ),
-    [exercises, activeCategory, search, currentExerciseId, sortBy, usageStats],
-  );
 
   const handleToggle = useCallback((id: number) => {
     Keyboard.dismiss();
     setSelectedId(id);
   }, []);
-
-  const handlePressInfo = useCallback(
-    (id: number) => {
-      pushDebounced(`/exercise/${id}`);
-    },
-    [pushDebounced],
-  );
 
   const runSubmit = useCallback(
     async (exercise: Exercise) => {
@@ -100,7 +66,7 @@ export function ExerciseSwapPicker({
   );
 
   const handleSubmit = useCallback(() => {
-    // 選択済みidが検索・カテゴリ絞り込みでcandidatesから一時的に外れていても解決できるよう、
+    // 選択済みidが検索・カテゴリ絞り込みで一覧から一時的に外れていても解決できるよう、
     // 絞り込み前の全種目一覧から探す（絞り込み後のリストだと無言で何も起きなくなるバグを避ける）
     const selected = exercises.find((e) => e.id === selectedId);
     if (!selected) return;
@@ -117,82 +83,30 @@ export function ExerciseSwapPicker({
     ]);
   }, [exercises, selectedId, hasRecordedData, confirmMessage, runSubmit]);
 
-  const renderItem = useCallback(
-    ({ item: e }: { item: Exercise }) => (
-      <ListErrorBoundary>
-        <PickerExerciseRow
-          exercise={e}
-          selected={e.id === selectedId}
-          onToggle={handleToggle}
-          onPressInfo={handlePressInfo}
-          selectionMode="radio"
-        />
-      </ListErrorBoundary>
-    ),
-    [selectedId, handleToggle, handlePressInfo],
-  );
-
-  const listHeader = (
-    <ExerciseFilterHeader
-      search={search}
-      onChangeSearch={setSearch}
-      onSubmitSearch={Keyboard.dismiss}
-      activeCategory={activeCategory}
-      onChangeCategory={setActiveCategory}
-      sortBy={sortBy}
-      onChangeSortBy={setSortBy}
-    />
-  );
-
-  const trimmedSearch = search.trim();
-  const emptyComponent = (
-    <View style={styles.emptyWrapper}>
-      <Text style={styles.empty}>
-        {trimmedSearch ? `「${trimmedSearch}」は見つかりません` : '該当する種目がありません'}
-      </Text>
-    </View>
-  );
-
   return (
+    // 3つの呼び出し元はいずれも「フロー内の中間画面」としてルートStack上にあるため
+    // edgesは['bottom']で固定してよい（ExerciseReorderViewと同じ判断）
     <SafeAreaView style={styles.safeArea} edges={['bottom']}>
       <Stack.Screen
         options={{
           headerTitle: () => <HeaderTitle title="種目を入れ替え" subtitle={currentExerciseName} />,
         }}
       />
-      <KeyboardAvoidingScreen>
-        <FlatList
-          style={styles.list}
-          data={candidates}
-          keyExtractor={(item) => String(item.id)}
-          renderItem={renderItem}
-          ListHeaderComponent={listHeader}
-          // 検索・カテゴリ絞り込み・並び替えをスクロールしても隠れないよう先頭(index 0)で固定する
-          stickyHeaderIndices={[0]}
-          ListEmptyComponent={emptyComponent}
-          contentContainerStyle={styles.content}
-          keyboardShouldPersistTaps="handled"
-        />
-        <View style={styles.footer}>
-          <PrimaryButton label="入れ替える" onPress={handleSubmit} disabled={selectedId == null} />
-        </View>
-      </KeyboardAvoidingScreen>
+      <ExerciseSelectView
+        exercises={exercises}
+        sortScope="swap"
+        usageStatsExcludeSessionId={usageStatsExcludeSessionId}
+        // 入れ替え先の候補から自分自身（現在の種目）は除く。選んでも差分が無いため
+        excludeExerciseId={currentExerciseId}
+        selectedIds={selectedIds}
+        selectionMode="radio"
+        onToggle={handleToggle}
+        footer={<PrimaryButton label="入れ替える" onPress={handleSubmit} disabled={selectedId == null} />}
+      />
     </SafeAreaView>
   );
 }
 
 const styles = StyleSheet.create({
   safeArea: { flex: 1, backgroundColor: Colors.background },
-  list: { flex: 1 },
-  content: { paddingHorizontal: 16, paddingBottom: 16 },
-
-  emptyWrapper: { alignItems: 'center', paddingVertical: 32 },
-  empty: { color: Colors.textMuted, ...Typography.body, textAlign: 'center' },
-
-  footer: {
-    padding: 16,
-    paddingTop: 8,
-    borderTopWidth: 1,
-    borderTopColor: Colors.border,
-  },
 });

@@ -15,8 +15,8 @@ type Props = {
   onChangeSortBy: (sortBy: ExerciseSortBy) => void;
 };
 
-// 種目一覧(app/(tabs)/(library)/exercises/index.tsx)・種目追加ピッカー(exercise-picker-view.tsx)・
-// 種目入れ替えピッカー(exercise-swap-picker.tsx)で共有する検索+カテゴリ絞り込み+並び替えの
+// 種目一覧(app/(tabs)/(library)/exercises/index.tsx)・種目選択リスト(exercise-select-view.tsx、
+// 種目追加ピッカーと種目入れ替えの共通実装)で共有する検索+カテゴリ絞り込み+並び替えの
 // ヘッダー。呼び出し側でFlatListのListHeaderComponentに渡し、stickyHeaderIndices={[0]}と
 // 組み合わせてスクロールしても隠れない固定表示にする想定
 export function ExerciseFilterHeader({

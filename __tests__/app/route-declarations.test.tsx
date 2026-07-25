@@ -188,9 +188,11 @@ describe('種目詳細は2箇所からマウントされる（来歴でタブバ
     const rootRouteCallers = sourceFiles().filter((f) =>
       /push\w*\(\s*`\/exercise\/\$\{/.test(fs.readFileSync(f.abs, 'utf8')),
     );
-    // 少なくとも「トレーニング中・ルーティン編集・予定編集・種目入れ替え・各種ピッカーのⓘ」が該当する。
-    // 件数は増減しうるので下限だけ固定し、種目タブの一覧カードが混ざっていないことを確かめる
-    expect(rootRouteCallers.length).toBeGreaterThanOrEqual(8);
+    // 少なくとも「トレーニング中・ルーティン編集・予定編集・種目選択リストのⓘ」が該当する。
+    // 件数は増減しうるので下限だけ固定し、種目タブの一覧カードが混ざっていないことを確かめる。
+    // 以前は下限が8だったが、種目追加ピッカー・種目入れ替えの各画面が同じ遷移を個別に持っていた
+    // ためで、components/exercises/exercise-select-view.tsx へ集約した分だけ実数が減っている
+    expect(rootRouteCallers.length).toBeGreaterThanOrEqual(4);
     expect(rootRouteCallers.map((f) => f.rel)).not.toContain(
       'components/exercises/exercise-card.tsx',
     );
