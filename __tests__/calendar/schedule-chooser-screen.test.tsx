@@ -54,9 +54,9 @@ test('未実装のプレースホルダー（おすすめメニュー・履歴�
   expect(() => root.findByProps({ children: '準備中' })).toThrow();
 });
 
-test('タイトル「どう予定する？」と対象日をサブタイトルで表示する', () => {
+test('タイトル「予定を追加」と対象日をサブタイトルで表示する', () => {
   const root = render();
-  expect(root.findByProps({ children: 'どう予定する？' })).toBeDefined();
+  expect(root.findByProps({ children: '予定を追加' })).toBeDefined();
   expect(root.findByProps({ children: '7月25日（土）' })).toBeDefined();
 });
 

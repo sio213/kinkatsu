@@ -102,9 +102,9 @@ describe('pastDateKeyモード（過去日の事後記録）', () => {
     mockUseLocalSearchParams.mockReturnValue({ pastDateKey: '2026-07-25' });
   });
 
-  test('タイトルに「どう記録する？」と対象日をサブタイトルで表示する（@user-advisor指摘: 日付取り違え防止）', () => {
+  test('タイトルに「記録を追加」と対象日をサブタイトルで表示する（@user-advisor指摘: 日付取り違え防止）', () => {
     const root = render();
-    expect(root.findByProps({ children: 'どう記録する？' })).toBeDefined();
+    expect(root.findByProps({ children: '記録を追加' })).toBeDefined();
     expect(root.findByProps({ children: '7月25日（土）' })).toBeDefined();
   });
 

@@ -204,14 +204,19 @@ export default function RootLayout() {
           <Stack.Screen name="workout/routine-load" options={{ title: '' }} />
           {/* デザイン案「トレーニング開始選択画面」の見出し文言に合わせる（2026-07-25、
               旧「どう始める？」から変更）。過去日の事後記録モードでは画面側で
-              「どう記録する？」＋対象日サブタイトルに上書きする */}
+              「記録を追加」＋対象日サブタイトルに上書きする。
+              3つの選択画面のタイトルは、カレンダー選択日パネルの入口ボタンの文言と1:1で
+              揃える方針（今日=トレーニングを開始 / 過去日=記録を追加 / 未来日=予定を追加）。
+              押したボタンと同じ言葉が次の画面の見出しに出るため、どこに来たかが迷わない
+              （2026-07-25、@ユーザー確認済み。旧「どう記録する？」「どう予定する？」の
+              疑問形から変更） */}
           <Stack.Screen name="workout/start-chooser" options={{ title: 'トレーニングを開始' }} />
           {/* 過去日モード（pastDateKey付き）のときだけ選択中の日付をサブタイトルに動的表示
               するため、その場合のみ画面側でStack.Screen optionsを上書きする */}
           <Stack.Screen name="workout/start-routine-picker" options={{ title: 'ルーティンを選択' }} />
           {/* 選択中の日付をヘッダーに動的表示するため、画面側でStack.Screen optionsを
               上書きする（workout/routine-loadと同じ方針、2026-07-20新設） */}
-          <Stack.Screen name="calendar/schedule-chooser" options={{ title: 'どう予定する？' }} />
+          <Stack.Screen name="calendar/schedule-chooser" options={{ title: '予定を追加' }} />
           <Stack.Screen name="calendar/schedule-exercise-picker" options={{ title: '種目を選択' }} />
           {/* どちらも選択中の日付をヘッダーに動的表示するため、画面側でStack.Screen optionsを
               上書きする（workout/routine-loadと同じ方針） */}

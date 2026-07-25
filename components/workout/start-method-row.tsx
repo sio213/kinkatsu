@@ -21,7 +21,7 @@ type Props = {
 };
 
 // 「開始/予定の方法を1つ選ぶ」リストの1行。トレーニング開始選択画面
-// （app/workout/start-chooser.tsx）とカレンダーの「どう予定する？」
+// （app/workout/start-chooser.tsx）とカレンダーの「予定を追加」
 // （app/calendar/schedule-chooser.tsx）で共有する
 export function StartMethodRow({ icon, label, description, onPress, hint }: Props) {
   return (

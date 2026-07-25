@@ -37,7 +37,7 @@ export default function ScheduleChooserScreen() {
   if (!isValidDateKey(dateKey)) {
     return (
       <SafeAreaView style={styles.safeArea} edges={['bottom']}>
-        <Stack.Screen options={{ title: 'どう予定する？' }} />
+        <Stack.Screen options={{ title: '予定を追加' }} />
         <NotFoundState message="日付が見つかりません" actionLabel="戻る" onPressAction={() => router.back()} />
       </SafeAreaView>
     );
@@ -49,7 +49,7 @@ export default function ScheduleChooserScreen() {
     <SafeAreaView style={styles.safeArea} edges={['bottom']}>
       <Stack.Screen
         options={{
-          headerTitle: () => <HeaderTitle title="どう予定する？" subtitle={dateLabel} />,
+          headerTitle: () => <HeaderTitle title="予定を追加" subtitle={dateLabel} />,
         }}
       />
       <View style={styles.list}>

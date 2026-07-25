@@ -80,7 +80,7 @@ export default function StartChooserScreen() {
   if (pastDateKey !== undefined && !isPastMode) {
     return (
       <SafeAreaView style={styles.safeArea} edges={['bottom']}>
-        <Stack.Screen options={{ title: 'どう記録する？' }} />
+        <Stack.Screen options={{ title: '記録を追加' }} />
         <NotFoundState message="日付が見つかりません" actionLabel="戻る" onPressAction={() => router.back()} />
       </SafeAreaView>
     );
@@ -95,7 +95,7 @@ export default function StartChooserScreen() {
       {isPastMode && (
         <Stack.Screen
           options={{
-            headerTitle: () => <HeaderTitle title="どう記録する？" subtitle={pastDateLabel!} />,
+            headerTitle: () => <HeaderTitle title="記録を追加" subtitle={pastDateLabel!} />,
           }}
         />
       )}
