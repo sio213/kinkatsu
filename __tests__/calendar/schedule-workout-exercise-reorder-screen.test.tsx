@@ -173,7 +173,7 @@ describe('ScheduleWorkoutExerciseReorderScreen', () => {
     });
   });
 
-  test('セット数がmetaTextに反映される', () => {
+  test('セット数が行に表示される', () => {
     mockUseScheduledWorkoutExercises.mockReturnValue([
       makeExercise(100, {
         name: '種目100',
