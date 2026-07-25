@@ -1,16 +1,9 @@
 const mockPush = jest.fn();
 const mockBack = jest.fn();
-const mockStartWorkoutSession = jest.fn();
-const mockCreatePastWorkoutSession = jest.fn();
 const mockUseLocalSearchParams = jest.fn();
 
 jest.mock('@/hooks/use-debounced-push', () => ({
   useDebouncedPush: () => mockPush,
-}));
-
-jest.mock('@/lib/workout/session', () => ({
-  startWorkoutSession: (...args: unknown[]) => mockStartWorkoutSession(...args),
-  createPastWorkoutSession: (...args: unknown[]) => mockCreatePastWorkoutSession(...args),
 }));
 
 jest.mock('expo-router', () => ({
@@ -24,10 +17,10 @@ jest.mock('expo-router', () => ({
 
 import React from 'react';
 import { act, create, type ReactTestInstance } from 'react-test-renderer';
-import { Alert, Text, TouchableOpacity } from 'react-native';
+import { TouchableOpacity } from 'react-native';
 import StartChooserScreen from '@/app/workout/start-chooser';
 
-function findCardByLabel(root: ReactTestInstance, label: string) {
+function findRowByLabel(root: ReactTestInstance, label: string) {
   return root.findAllByType(TouchableOpacity).find((c) => c.props.accessibilityLabel === label);
 }
 
@@ -41,98 +34,64 @@ function render() {
 
 beforeEach(() => {
   jest.clearAllMocks();
-  jest.spyOn(Alert, 'alert').mockImplementation(() => {});
   // pastDateKey無し = 今日の通常フロー（既存挙動）
   mockUseLocalSearchParams.mockReturnValue({});
 });
 
-test('4択のカードを全て表示する', () => {
+// 2026-07-25にデザイン確定（「トレーニング開始選択画面 デザイン案.html」案06）。
+// 未実装のプレースホルダー（おすすめメニュー・履歴から）を廃し、実装済みの3択の縦リストにした
+test('3択の行を説明文つきで表示する', () => {
   const root = render();
-  expect(root.findByProps({ children: 'おすすめメニュー' })).toBeDefined();
-  expect(root.findByProps({ children: '履歴から' })).toBeDefined();
-  expect(root.findByProps({ children: '自分で選ぶ' })).toBeDefined();
+  expect(root.findByProps({ children: '種目を追加' })).toBeDefined();
+  expect(root.findByProps({ children: '好きな種目を選んで開始' })).toBeDefined();
   expect(root.findByProps({ children: 'ルーティン' })).toBeDefined();
+  expect(root.findByProps({ children: '登録したメニューから開始' })).toBeDefined();
+  expect(root.findByProps({ children: '過去の記録' })).toBeDefined();
+  expect(root.findByProps({ children: '過去の履歴と同じ内容で開始' })).toBeDefined();
 });
 
-test('未実装(おすすめメニュー・履歴から)はdisabledで「準備中」バッジを表示する', () => {
+test('「おすすめメニュー」は表示しない（デザイン確定に伴い削除）', () => {
   const root = render();
-  const badgeTexts = root.findAllByType(Text).filter((t) => t.props.children === '準備中');
-  expect(badgeTexts.length).toBe(2);
-  const recommend = findCardByLabel(root, 'おすすめメニュー')!;
-  const history = findCardByLabel(root, '履歴から')!;
-  expect(recommend.props.accessibilityState).toEqual({ disabled: true });
-  expect(history.props.accessibilityState).toEqual({ disabled: true });
+  expect(() => root.findByProps({ children: 'おすすめメニュー' })).toThrow();
 });
 
-test('「自分で選ぶ」をタップすると空セッションを作成し、newSession=1付きで種目追加ピッカーへ直接遷移する（/workout/{id}は経由しない、2026-07-20）', async () => {
-  mockStartWorkoutSession.mockResolvedValue({ id: 42 });
-  const root = render();
-
-  await act(async () => {
-    findCardByLabel(root, '自分で選ぶ')!.props.onPress();
-    await Promise.resolve();
-    await Promise.resolve();
-  });
-
-  expect(mockStartWorkoutSession).toHaveBeenCalled();
-  expect(mockPush).toHaveBeenCalledWith({
-    pathname: '/workout/exercise-picker',
-    params: { sessionId: '42', newSession: '1' },
-  });
-});
-
-test('「自分で選ぶ」が失敗したらAlertを表示し遷移しない', async () => {
-  mockStartWorkoutSession.mockRejectedValue(new Error('fail'));
-  const root = render();
-
-  await act(async () => {
-    findCardByLabel(root, '自分で選ぶ')!.props.onPress();
-    await Promise.resolve();
-    await Promise.resolve();
-  });
-
-  expect(Alert.alert).toHaveBeenCalledWith('エラー', 'トレーニングを開始できませんでした。');
-  expect(mockPush).not.toHaveBeenCalled();
-});
-
-test('「ルーティン」をタップすると専用ピッカー画面(start-routine-picker)へ遷移する（pastDateKeyは付けない、セッション作成はしない、2026-07-20: フルCRUD一覧app/routine/index.tsxから統一）', () => {
+// 2026-07-25、@ユーザー指摘: 以前はここでセッションを作っていたため、子画面で「戻る」を押すと
+// 空の記録がDBに残ってしまっていた。セッション作成は子画面の確定操作まで遅らせる
+test('「種目を追加」をタップしてもセッションは作らず、newSession=1付きで種目追加ピッカーへ遷移するだけ', () => {
   const root = render();
 
   act(() => {
-    findCardByLabel(root, 'ルーティン')!.props.onPress();
+    findRowByLabel(root, '種目を追加')!.props.onPress();
+  });
+
+  expect(mockPush).toHaveBeenCalledWith({
+    pathname: '/workout/exercise-picker',
+    params: { newSession: '1' },
+  });
+});
+
+test('「ルーティン」をタップすると専用ピッカー画面(start-routine-picker)へ遷移する（pastDateKeyは付けない、2026-07-20: フルCRUD一覧app/routine/index.tsxから統一）', () => {
+  const root = render();
+
+  act(() => {
+    findRowByLabel(root, 'ルーティン')!.props.onPress();
   });
 
   expect(mockPush).toHaveBeenCalledWith({ pathname: '/workout/start-routine-picker', params: {} });
-  expect(mockStartWorkoutSession).not.toHaveBeenCalled();
 });
 
-test('disabledなカードはonPressを持たない（タップしても何も起きない）', () => {
+// 2026-07-25、要件確認済み: トレーニング画面ヘッダー⋮の「過去の記録から読み込み」と同じ画面へ送る
+test('「過去の記録」をタップするとnewSession=1付きでsession-history-pickerへ遷移する', () => {
   const root = render();
-  const recommend = findCardByLabel(root, 'おすすめメニュー')!;
-  expect(recommend.props.onPress).toBeUndefined();
-});
-
-test('「自分で選ぶ」を連打してもstartWorkoutSessionは1回しか呼ばれない（useWorkoutStarterのisStartingRefによる二重生成防止）', async () => {
-  let resolveStart!: (v: { id: number }) => void;
-  mockStartWorkoutSession.mockReturnValue(
-    new Promise((resolve) => {
-      resolveStart = resolve;
-    }),
-  );
-  const root = render();
-  const card = findCardByLabel(root, '自分で選ぶ')!;
 
   act(() => {
-    card.props.onPress();
-    card.props.onPress();
+    findRowByLabel(root, '過去の記録')!.props.onPress();
   });
-  expect(mockStartWorkoutSession).toHaveBeenCalledTimes(1);
 
-  await act(async () => {
-    resolveStart({ id: 1 });
-    await Promise.resolve();
+  expect(mockPush).toHaveBeenCalledWith({
+    pathname: '/workout/session-history-picker',
+    params: { newSession: '1' },
   });
-  expect(mockPush).toHaveBeenCalledTimes(1);
 });
 
 // カレンダー過去日パネル「記録を追加」から遷移してきた場合（2026-07-20）。pastDateKeyが
@@ -143,47 +102,66 @@ describe('pastDateKeyモード（過去日の事後記録）', () => {
     mockUseLocalSearchParams.mockReturnValue({ pastDateKey: '2026-07-25' });
   });
 
-  test('タイトルに「どう記録する？」と対象日をサブタイトルで表示する（@user-advisor指摘: 日付取り違え防止）', () => {
+  test('タイトルに「記録を追加」と対象日をサブタイトルで表示する（@user-advisor指摘: 日付取り違え防止）', () => {
     const root = render();
-    expect(root.findByProps({ children: 'どう記録する？' })).toBeDefined();
+    expect(root.findByProps({ children: '記録を追加' })).toBeDefined();
     expect(root.findByProps({ children: '7月25日（土）' })).toBeDefined();
   });
 
-  test('「自分で選ぶ」をタップすると、選択日の正午時刻でcreatePastWorkoutSessionを呼び種目追加ピッカーへ直接遷移する', async () => {
-    mockCreatePastWorkoutSession.mockResolvedValue({ id: 42 });
-    const root = render();
-
-    await act(async () => {
-      findCardByLabel(root, '自分で選ぶ')!.props.onPress();
-      await Promise.resolve();
-      await Promise.resolve();
-    });
-
-    expect(mockStartWorkoutSession).not.toHaveBeenCalled();
-    expect(mockCreatePastWorkoutSession).toHaveBeenCalledTimes(1);
-    const calledWith = new Date(mockCreatePastWorkoutSession.mock.calls[0][0]);
-    expect(calledWith.getFullYear()).toBe(2026);
-    expect(calledWith.getMonth()).toBe(6);
-    expect(calledWith.getDate()).toBe(25);
-    expect(calledWith.getHours()).toBe(12);
-    expect(mockPush).toHaveBeenCalledWith({
-      pathname: '/workout/exercise-picker',
-      params: { sessionId: '42', newSession: '1' },
-    });
-  });
-
-  test('「ルーティン」をタップすると、pastDateKey付きで専用ピッカー画面(start-routine-picker)へ遷移する（セッション作成はしない）', () => {
+  test('「種目を追加」はpastDateKeyを引き継いで種目追加ピッカーへ遷移する（作るセッションの種類は確定時に子画面が決める）', () => {
     const root = render();
 
     act(() => {
-      findCardByLabel(root, 'ルーティン')!.props.onPress();
+      findRowByLabel(root, '種目を追加')!.props.onPress();
+    });
+
+    expect(mockPush).toHaveBeenCalledWith({
+      pathname: '/workout/exercise-picker',
+      params: { newSession: '1', pastDateKey: '2026-07-25' },
+    });
+  });
+
+  test('「過去の記録」もpastDateKeyを引き継いでsession-history-pickerへ遷移する', () => {
+    const root = render();
+
+    act(() => {
+      findRowByLabel(root, '過去の記録')!.props.onPress();
+    });
+
+    expect(mockPush).toHaveBeenCalledWith({
+      pathname: '/workout/session-history-picker',
+      params: { newSession: '1', pastDateKey: '2026-07-25' },
+    });
+  });
+
+  test('「ルーティン」をタップすると、pastDateKey付きで専用ピッカー画面(start-routine-picker)へ遷移する', () => {
+    const root = render();
+
+    act(() => {
+      findRowByLabel(root, 'ルーティン')!.props.onPress();
     });
 
     expect(mockPush).toHaveBeenCalledWith({
       pathname: '/workout/start-routine-picker',
       params: { pastDateKey: '2026-07-25' },
     });
-    expect(mockCreatePastWorkoutSession).not.toHaveBeenCalled();
+  });
+
+  // 2026-07-25、@ユーザー指摘: 過去日は「これから始める」のではなく「済んだトレーニングを
+  // 後から記録する」操作のため、説明文の末尾を「開始」→「記録」に差し替える
+  test('説明文の末尾が「記録」になる（今日の「開始」から差し替え）', () => {
+    const root = render();
+    expect(root.findByProps({ children: '好きな種目を選んで記録' })).toBeDefined();
+    expect(root.findByProps({ children: '登録したメニューから記録' })).toBeDefined();
+    expect(root.findByProps({ children: '過去の履歴と同じ内容で記録' })).toBeDefined();
+    expect(() => root.findByProps({ children: '好きな種目を選んで開始' })).toThrow();
+  });
+
+  test('各行のVoiceOverヒントに対象日を補う（@designer指摘: 視覚的なサブタイトルだけでは伝わらないため）', () => {
+    const root = render();
+    expect(findRowByLabel(root, '種目を追加')!.props.accessibilityHint).toBe(
+      '好きな種目を選んで記録。7月25日（土）の記録として追加します',
+    );
   });
 
   test('不正なpastDateKeyの場合は日付が見つからない旨のエラー状態を表示する', () => {

@@ -186,6 +186,60 @@ test('複数セッションが表示された状態で、押したカードに�
   });
 });
 
+// start-chooser「過去の記録」経由でのみ付くパラメータ。この経路ではセッションがまだ存在せず
+// （確定時に作る）、確定後の閉じ方も変わるため、次の画面(session-history-load)まで引き継ぐ
+test('newSession=1付きで開かれた場合は、sessionIdを渡さずnewSession=1を引き継ぐ', async () => {
+  mockUseLocalSearchParams.mockReturnValue({ newSession: '1' });
+  const root = await renderResolved([chestSession]);
+  const card = root
+    .findAllByType(TouchableOpacity)
+    .find((btn) => typeof btn.props.accessibilityLabel === 'string' && btn.props.accessibilityLabel.includes('ベンチプレス'))!;
+  act(() => {
+    card.props.onPress();
+  });
+  expect(mockPush).toHaveBeenCalledWith({
+    pathname: '/workout/session-history-load',
+    params: {
+      newSession: '1',
+      sourceSessionId: '1',
+      sourceStartedAt: String(chestSession.startedAt),
+    },
+  });
+});
+
+test('newSession=1のときはpastDateKeyも引き継ぐ（過去日の完了済みセッションを作るため）', async () => {
+  mockUseLocalSearchParams.mockReturnValue({ newSession: '1', pastDateKey: '2026-07-25' });
+  const root = await renderResolved([chestSession]);
+  const card = root
+    .findAllByType(TouchableOpacity)
+    .find((btn) => typeof btn.props.accessibilityLabel === 'string' && btn.props.accessibilityLabel.includes('ベンチプレス'))!;
+  act(() => {
+    card.props.onPress();
+  });
+  expect(mockPush).toHaveBeenCalledWith({
+    pathname: '/workout/session-history-load',
+    params: {
+      newSession: '1',
+      pastDateKey: '2026-07-25',
+      sourceSessionId: '1',
+      sourceStartedAt: String(chestSession.startedAt),
+    },
+  });
+});
+
+// まだセッションが存在しないため、除外すべき「自分自身」も無い
+test('newSession=1のときは除外対象なし(NO_SESSION_TO_EXCLUDE=-1)で一覧を取得する', async () => {
+  mockUseLocalSearchParams.mockReturnValue({ newSession: '1' });
+  await renderResolved([chestSession]);
+  expect(mockGetPastTrainingSessions).toHaveBeenCalledWith(-1, { limit: PAGE_SIZE, offset: 0 });
+});
+
+test('newSession=1ならsessionIdが無くても「見つかりません」画面にはならない', async () => {
+  mockUseLocalSearchParams.mockReturnValue({ newSession: '1' });
+  const root = await renderResolved([chestSession]);
+  expect(() => root.findByProps({ children: 'トレーニングが見つかりません' })).toThrow();
+});
+
 test('カードを連打してもpushは1回しか呼ばれない（useDebouncedPushによる二重遷移防止）', async () => {
   const root = await renderResolved([chestSession]);
   const card = root

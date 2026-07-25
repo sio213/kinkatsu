@@ -6,11 +6,15 @@ import { PrimaryButton } from '@/components/ui/primary-button';
 import { Colors, Typography } from '@/constants/theme';
 import { useExercises } from '@/hooks/use-exercises';
 import { usePermissionState } from '@/hooks/use-permission-state';
-import { formatDirectScheduleTitle } from '@/lib/calendar/schedule';
+import { formatDirectScheduleTitle, parseHistorySelectionsParam } from '@/lib/calendar/schedule';
 import { isValidDateKey, parseDateKey } from '@/lib/calendar/date-grid';
 import { formatHourMinuteParts } from '@/lib/calendar/time-of-day';
 import { ensurePermission } from '@/lib/notifications/permissions';
-import { createDirectScheduledWorkout, createScheduledWorkout } from '@/lib/notifications/scheduled-workout-scheduler';
+import {
+  createDirectScheduledWorkout,
+  createHistoryScheduledWorkout,
+  createScheduledWorkout,
+} from '@/lib/notifications/scheduled-workout-scheduler';
 import { formatSessionDateGroup } from '@/lib/workout/summary';
 import DateTimePicker from '@react-native-community/datetimepicker';
 import { Stack, useLocalSearchParams, useRouter } from 'expo-router';
@@ -45,26 +49,38 @@ export default function ScheduleTimePickerScreen() {
     routineId: routineIdParam,
     routineName,
     exerciseIds: exerciseIdsParam,
+    historySelections: historySelectionsParam,
   } = useLocalSearchParams<{
     dateKey: string;
     // ルーティン版(schedule-routine-picker経由)はroutineId、直接追加版
-    // (schedule-exercise-picker経由)はexerciseIdsのどちらか一方だけが渡る
+    // (schedule-exercise-picker経由)はexerciseIds、過去の記録版
+    // (schedule-workout-history-load経由、2026-07-25)はhistorySelectionsのいずれか1つだけが渡る
     routineId?: string;
     routineName?: string;
     exerciseIds?: string;
+    historySelections?: string;
   }>();
   const { exercises } = useExercises();
   const routineId = Number(routineIdParam);
   const isRoutineMode = isPositiveInteger(routineId);
   const exerciseIds = useMemo(() => parseExerciseIds(exerciseIdsParam), [exerciseIdsParam]);
-  const isDirectMode = !isRoutineMode && exerciseIds.length > 0;
-  // 直接追加の予定タイトルは選んだ種目名から合成する（ルーティン名に相当するものが無いため）。
-  // 選択順(exerciseIds順)を保つため、Map経由でidから名前を引く
+  const historySelections = useMemo(
+    () => parseHistorySelectionsParam(historySelectionsParam),
+    [historySelectionsParam],
+  );
+  const isHistoryMode = !isRoutineMode && historySelections.length > 0;
+  const isDirectMode = !isRoutineMode && !isHistoryMode && exerciseIds.length > 0;
+  // 直接追加・過去の記録の予定タイトルは選んだ種目名から合成する（ルーティン名に相当するものが
+  // 無いため）。どちらも「個別に選んだ種目の集まり」で見え方は同じなので同じ合成規則にする。
+  // 選択順を保つため、Map経由でidから名前を引く
+  const titleExerciseIds = isHistoryMode ? historySelections.map((s) => s.exerciseId) : exerciseIds;
   const directTitle = useMemo(() => {
-    if (!isDirectMode) return '';
+    if (!isDirectMode && !isHistoryMode) return '';
     const nameById = new Map(exercises.map((e) => [e.id, e.name] as const));
-    return formatDirectScheduleTitle(exerciseIds.map((id) => nameById.get(id)).filter((n): n is string => n != null));
-  }, [isDirectMode, exerciseIds, exercises]);
+    return formatDirectScheduleTitle(
+      titleExerciseIds.map((id) => nameById.get(id)).filter((n): n is string => n != null),
+    );
+  }, [isDirectMode, isHistoryMode, titleExerciseIds, exercises]);
   const router = useRouter();
   const isSubmittingRef = useRef(false);
 
@@ -124,7 +140,16 @@ export default function ScheduleTimePickerScreen() {
       // 進む」ため厳密には性質が異なる）。ルーティン予定も直接追加と同じ画面遷移に統一する
       // （PR7、ユーザー確認済み）
       let createdScheduledWorkoutId: number | null = null;
-      if (isDirectMode) {
+      if (isHistoryMode) {
+        createdScheduledWorkoutId = await createHistoryScheduledWorkout(
+          historySelections,
+          directTitle,
+          dateKey,
+          hour,
+          minute,
+          notifyEnabled,
+        );
+      } else if (isDirectMode) {
         createdScheduledWorkoutId = await createDirectScheduledWorkout(
           exerciseIds,
           directTitle,
@@ -145,8 +170,10 @@ export default function ScheduleTimePickerScreen() {
       }
       // カレンダーからの3階層（schedule-chooser/schedule-routine-picker or
       // schedule-exercise-picker/この画面）をまとめて閉じる必要がある(app/workout/routine-load.tsxの
-      // router.dismiss(2)と同じ考え方だが、schedule-chooserが1枚増えた分+1)
-      const dismissCount = 3;
+      // router.dismiss(2)と同じ考え方だが、schedule-chooserが1枚増えた分+1)。
+      // 過去の記録経路（2026-07-25）だけは「一覧から1セッションを選ぶ」画面と「読み込む種目を選ぶ」
+      // 画面の2枚を経由するため、さらに+1の4階層になる
+      const dismissCount = isHistoryMode ? 4 : 3;
       // dismissしてから、作成した予定（直接追加・ルーティンとも）の目標セット編集画面をpushし直す。
       // dismiss/pushとも同期的にルーターの状態へ反映されるため、この順で呼んでも遷移が競合しない
       // (app/workout/routine-load.tsx等の既存のdismiss(N)単体パターンを拡張したもの)。
@@ -168,7 +195,9 @@ export default function ScheduleTimePickerScreen() {
     }
   }, [
     isDirectMode,
+    isHistoryMode,
     exerciseIds,
+    historySelections,
     directTitle,
     routineId,
     routineName,
@@ -184,10 +213,11 @@ export default function ScheduleTimePickerScreen() {
     setPermState(await ensurePermission());
   }, [setPermState]);
 
-  // 前画面（schedule-routine-picker.tsxまたはschedule-exercise-picker.tsx）は必ずどちらか一方の
-  // 妥当なパラメータ・'YYYY-MM-DD'形式のdateKeyを渡すが、不正な直リンク等への防御として
-  // 明示的にガードする（dateKeyが不正なままparseDateKeyに渡るとクラッシュするため）
-  if ((!isRoutineMode && !isDirectMode) || !isValidDateKey(dateKey)) {
+  // 前画面（schedule-routine-picker.tsx / schedule-exercise-picker.tsx /
+  // schedule-workout-history-load.tsx）は必ずいずれか1つの妥当なパラメータ・'YYYY-MM-DD'形式の
+  // dateKeyを渡すが、不正な直リンク等への防御として明示的にガードする
+  // （dateKeyが不正なままparseDateKeyに渡るとクラッシュするため）
+  if ((!isRoutineMode && !isDirectMode && !isHistoryMode) || !isValidDateKey(dateKey)) {
     return (
       <SafeAreaView style={styles.safeArea} edges={['bottom']}>
         <Stack.Screen options={{ title: '時刻を設定' }} />

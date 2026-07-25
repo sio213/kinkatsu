@@ -1,8 +1,10 @@
 import { db } from '@/db/client';
 import { scheduledWorkoutExercises, scheduledWorkouts } from '@/db/schema';
 import {
+  addHistoryCardsToScheduledWorkout,
   insertInitialScheduledWorkoutSets,
   insertRoutineExerciseRowsIntoScheduledWorkout,
+  type HistoryCardSelection,
 } from '@/lib/calendar/scheduled-workout-detail';
 import { getRoutineDetail } from '@/lib/routines/db';
 import { eq } from 'drizzle-orm';
@@ -77,6 +79,40 @@ export async function addDirectScheduledWorkout(
     await insertInitialScheduledWorkoutSets(tx, exerciseRows, now);
     return inserted.id;
   });
+}
+
+// 「予定を追加」→「過去の記録」（app/calendar/schedule-workout-history-load.tsx経由、2026-07-25）用。
+// 直接予定(routineId=null)である点はaddDirectScheduledWorkoutと同じだが、目標セットに種目ごとの
+// 直近実績をプリフィルするのではなく、画面上で確認した「その過去カードそのもの」のセット値を
+// コピーする。この種目・セットの入れ方は既存の「既存予定へ過去の記録から読み込み」
+// (addHistoryCardsToScheduledWorkout)と全く同じ処理のため、予定枠だけ先に作って再利用する。
+//
+// 予定枠の作成と種目の投入が別トランザクションになるため、後者が失敗したら予定枠を消して
+// 「0種目の予定だけが残る」状態を防ぐ（呼び出し側から見て、成功したか何も起きなかったかの
+// どちらかになる）
+export async function addHistoryScheduledWorkout(
+  selections: HistoryCardSelection[],
+  scheduledDate: string,
+  hour: number,
+  minute: number,
+  notifyEnabled: boolean,
+): Promise<number> {
+  assertValidTime(hour, minute);
+  if (selections.length === 0) throw new Error('selections must not be empty');
+
+  const now = Date.now();
+  const [inserted] = await db
+    .insert(scheduledWorkouts)
+    .values({ routineId: null, scheduledDate, hour, minute, notifyEnabled, createdAt: now, updatedAt: now })
+    .returning();
+
+  try {
+    await addHistoryCardsToScheduledWorkout(inserted.id, selections);
+  } catch (e) {
+    await deleteScheduledWorkout(inserted.id).catch(() => {});
+    throw e;
+  }
+  return inserted.id;
 }
 
 // 目標セット編集画面(app/calendar/schedule-workout-edit.tsx)のヘッダー⋮「削除」から呼ばれる

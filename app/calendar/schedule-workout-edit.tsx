@@ -182,7 +182,9 @@ export default function ScheduleWorkoutEditScreen() {
     {
       key: 'routine',
       label: 'ルーティンから読み込み',
-      icon: 'fitness-center',
+      // ルーティンを表すアイコンは、トレーニング開始選択画面のデザイン確定（2026-07-25）で
+      // repeatに統一した
+      icon: 'repeat',
       disabled: routines.length === 0,
       hint:
         routines.length === 0

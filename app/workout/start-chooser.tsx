@@ -1,66 +1,91 @@
 import { HeaderTitle } from '@/components/ui/header-title';
 import { NotFoundState } from '@/components/ui/not-found-state';
-import { StartMethodCard } from '@/components/workout/start-method-card';
+import { StartMethodRow } from '@/components/workout/start-method-row';
 import { Colors } from '@/constants/theme';
 import { useDebouncedPush } from '@/hooks/use-debounced-push';
-import { useWorkoutStarter } from '@/hooks/use-workout-starter';
 import { dateKeyToNoonMs, isValidDateKey } from '@/lib/calendar/date-grid';
-import { createPastWorkoutSession, startWorkoutSession } from '@/lib/workout/session';
 import { formatSessionDateGroup } from '@/lib/workout/summary';
 import { Stack, useLocalSearchParams, useRouter } from 'expo-router';
 import { useCallback } from 'react';
 import { StyleSheet, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
-// 「デザイン検討/開始方法を選ぶ 検討.html」（デザイン未確定と明記されたプレースホルダー）をそのまま
-// 実装した画面。カレンダーの「今日・記録なし」パネルの「トレーニングを開始」ボタンから遷移する。
-// 4択のうち「自分で選ぶ」「ルーティン」だけが現状実装可能（履歴から新規セッションを始める導線・
-// おすすめメニュー機能自体が未実装のため）。動かないカードを隠さずdisabled+「準備中」表示にするのは、
-// 4択のレイアウト自体はデザイン案を維持しつつ、将来の実装場所を示すための意図的な判断（要件確認済み）。
+// 「トレーニング開始選択画面 デザイン案.html」（案06 説明つきリスト）を実装した画面。
+// カレンダーの「今日・記録なし」パネルの「トレーニングを開始」ボタンから遷移する。
+// 2026-07-25にデザインが確定し、2×2グリッド4択（うち「おすすめメニュー」「履歴から」は
+// disabledのプレースホルダー）から、実装済みの3択だけを並べた縦リストへ差し替えた。
+//
+// この画面自体はDBに触れない。3択のいずれもタップした時点ではセッションを作らず、子画面で
+// 内容を確定した時点で初めて作る（2026-07-25、@ユーザー指摘: 以前は「種目を追加」「過去の記録」が
+// タップ直後に空セッションを作っていたため、子画面で戻ると空の記録が残ってしまっていた）。
+// セッション作成はlib/workout/start-chooser-session.tsに集約している。
 //
 // 2026-07-20: カレンダーの過去日パネル「記録を追加」からもpastDateKey付きでこの画面へ遷移してくる
 // （要件確認済み: 今日と同じ選択画面を経由させ、選んだ後だけ着地先を変える）。この場合、
-// 「自分で選ぶ」「ルーティン」の選択結果は生きたトレーニング(endedAtがnull)ではなく、
+// どの選択肢を選んだ場合も、結果は生きたトレーニング(endedAtがnull)ではなく、
 // startedAt=endedAt=pastDateKeyの完了済みセッションとして作成する。app/workout/[id].tsxは
 // endedAt済みのセッションを自動的に「記録の編集」モード（タイマー非表示）で開くため、
 // 遷移先自体は同じ/workout/{id}のままでよい
+// 各行の説明文。選び方（前半）はどちらのモードでも同じで、末尾の動詞だけが変わる。
+// 今日のライブ開始はデザイン案「トレーニング開始選択画面 デザイン案.html」の文言をそのまま使い、
+// 過去日の事後記録モードでは「開始」→「記録」に差し替える（2026-07-25、@ユーザー指摘:
+// 過去日はこれから始めるのではなく、済んだトレーニングを後から記録する操作のため
+// 「開始」だと実態と合わない）。カレンダーの予定作成側の言い回しは
+// app/calendar/schedule-chooser.tsx が別途持つ
+const DESCRIPTIONS = {
+  live: {
+    addExercises: '好きな種目を選んで開始',
+    routine: '登録したメニューから開始',
+    history: '過去の履歴と同じ内容で開始',
+  },
+  past: {
+    addExercises: '好きな種目を選んで記録',
+    routine: '登録したメニューから記録',
+    history: '過去の履歴と同じ内容で記録',
+  },
+} as const;
+
 export default function StartChooserScreen() {
   const { pastDateKey } = useLocalSearchParams<{ pastDateKey?: string }>();
   const isPastMode = isValidDateKey(pastDateKey);
   const router = useRouter();
   const pushDebounced = useDebouncedPush();
-  // 「自分で選ぶ」は種目0件のまま/workout/{id}へ着地させず、種目追加ピッカーへ直接進める
-  // （2026-07-20、要件確認済み）。/workout/{id}をpushしてから種目追加ピッカーをさらにpushする
-  // 2段階の実装は、1タップで2回連続のスライドイン遷移が走る目に見える不具合になっていた
-  // （@designer指摘）ため、/workout/{id}を経由せず直接種目追加ピッカーへ遷移し、確定後は
-  // app/workout/exercise-picker.tsxのnewSessionパラメータで、確定後にdismiss(2)
-  // （この画面(start-chooser)+exercise-picker自身を閉じる）してからpushして/workout/{id}へ
-  // 差し込む方式にした（router.back()だとこの画面に戻ってしまうため使えない。2026-07-22、
-  // @ユーザー指摘: 当初はreplaceだったが、それだとstart-chooserがスタックに残ったままになり
-  // /workout/{id}側の「戻る」ボタンで呼び出し元まで戻れない不具合があった）
-  const startWorkout = useWorkoutStarter((sessionId) =>
-    pushDebounced({ pathname: '/workout/exercise-picker', params: { sessionId: String(sessionId), newSession: '1' } }),
+
+  // 「種目を追加」「過去の記録」はどちらも、まだ存在しないセッションに対する子画面を開く。
+  // newSession=1が「この経路ではsessionIdがまだ無い（確定時に作る）」ことを表す目印で、
+  // 子画面はこれを見てセッション作成・確定後の閉じ方を切り替える。過去日モードのときだけ
+  // pastDateKeyも引き継ぎ、確定時にどちらのセッションを作るかを子画面側で判断できるようにする
+  const openNewSessionScreen = useCallback(
+    (pathname: '/workout/exercise-picker' | '/workout/session-history-picker') => {
+      pushDebounced({
+        pathname,
+        params: { newSession: '1', ...(isPastMode ? { pastDateKey: pastDateKey! } : {}) },
+      });
+    },
+    [pushDebounced, isPastMode, pastDateKey],
   );
 
-  // この画面は「進行中セッションが無い」ことを呼び出し元（カレンダーのhandleStartToday）が
-  // 保証した上でのみ遷移してくる前提で、ここではactiveSessionの有無を再チェックしない
-  // （index.tsx・routine/index.tsxのように複数経路から到達し得る画面ではないため）。
-  // 将来この画面が他の入口からも開かれるようになった場合は、ここにもactiveSession分岐が必要になる。
-  // pastDateKeyモードでも同様に「進行中セッションと競合しない」（endedAtが最初から入っており
-  // activeSessionとして拾われないため）ため、この前提のままでよい
-  const handlePickManually = useCallback(() => {
-    if (isPastMode) {
-      startWorkout(async () => (await createPastWorkoutSession(dateKeyToNoonMs(pastDateKey!))).id);
-      return;
-    }
-    startWorkout(async () => (await startWorkoutSession()).id);
-  }, [isPastMode, pastDateKey, startWorkout]);
+  // 種目0件のまま/workout/{id}へ着地させず、種目追加ピッカーへ直接進める（2026-07-20、
+  // 要件確認済み）。/workout/{id}をpushしてから種目追加ピッカーをさらにpushする2段階の実装は、
+  // 1タップで2回連続のスライドイン遷移が走る目に見える不具合になっていた（@designer指摘）
+  const handleAddExercises = useCallback(
+    () => openNewSessionScreen('/workout/exercise-picker'),
+    [openNewSessionScreen],
+  );
+
+  // トレーニング画面ヘッダー⋮の「過去の記録から読み込み」と同じ画面
+  // (app/workout/session-history-picker.tsx)へ遷移する（2026-07-25、デザイン確定）。
+  // あちらは既存セッションに種目を足す導線だが、こちらはセッションがまだ無い状態で同じ画面を開く
+  const handlePickHistory = useCallback(
+    () => openNewSessionScreen('/workout/session-history-picker'),
+    [openNewSessionScreen],
+  );
 
   // app/routine/index.tsx（フルCRUD一覧）ではなく、「選ぶだけ」の専用ピッカー画面
   // (app/workout/start-routine-picker.tsx)を使う（2026-07-20、要件確認済み: 編集・複製・
   // 削除・並び替えが同居する一覧を選択操作に使うと誤操作リスクがあるため、当初は過去日限定で
-  // 置き換えたが、今日のライブ開始でも同じ理由で統一した）。過去日モードのときだけ
-  // pastDateKeyを引き継ぐ
+  // 置き換えたが、今日のライブ開始でも同じ理由で統一した）。あちらは元々ルーティンを選んだ時点で
+  // セッションを作るため、この画面では何もしない
   const handlePickRoutine = useCallback(() => {
     pushDebounced({
       pathname: '/workout/start-routine-picker',
@@ -74,7 +99,7 @@ export default function StartChooserScreen() {
   if (pastDateKey !== undefined && !isPastMode) {
     return (
       <SafeAreaView style={styles.safeArea} edges={['bottom']}>
-        <Stack.Screen options={{ title: 'どう記録する？' }} />
+        <Stack.Screen options={{ title: '記録を追加' }} />
         <NotFoundState message="日付が見つかりません" actionLabel="戻る" onPressAction={() => router.back()} />
       </SafeAreaView>
     );
@@ -82,35 +107,40 @@ export default function StartChooserScreen() {
 
   // ヘッダーサブタイトル・VoiceOverヒントの両方で使うため1回だけ計算する
   const pastDateLabel = isPastMode ? formatSessionDateGroup(dateKeyToNoonMs(pastDateKey!)) : null;
+  const pastDateHint = pastDateLabel ? `${pastDateLabel}の記録として追加します` : undefined;
+  const descriptions = isPastMode ? DESCRIPTIONS.past : DESCRIPTIONS.live;
 
   return (
     <SafeAreaView style={styles.safeArea} edges={['bottom']}>
       {isPastMode && (
         <Stack.Screen
           options={{
-            headerTitle: () => <HeaderTitle title="どう記録する？" subtitle={pastDateLabel!} />,
+            headerTitle: () => <HeaderTitle title="記録を追加" subtitle={pastDateLabel!} />,
           }}
         />
       )}
-      <View style={styles.grid}>
-        <View style={styles.row}>
-          <StartMethodCard icon="sparkles" label="おすすめメニュー" disabled />
-          <StartMethodCard icon="clock.arrow.circlepath" label="履歴から" disabled />
-        </View>
-        <View style={styles.row}>
-          <StartMethodCard
-            icon="dumbbell.fill"
-            label="自分で選ぶ"
-            onPress={handlePickManually}
-            hint={pastDateLabel ? `${pastDateLabel}の記録として追加します` : undefined}
-          />
-          <StartMethodCard
-            icon="list.bullet"
-            label="ルーティン"
-            onPress={handlePickRoutine}
-            hint={pastDateLabel ? `${pastDateLabel}の記録として追加します` : undefined}
-          />
-        </View>
+      <View style={styles.list}>
+        <StartMethodRow
+          icon="add"
+          label="種目を追加"
+          description={descriptions.addExercises}
+          onPress={handleAddExercises}
+          hint={pastDateHint}
+        />
+        <StartMethodRow
+          icon="repeat"
+          label="ルーティン"
+          description={descriptions.routine}
+          onPress={handlePickRoutine}
+          hint={pastDateHint}
+        />
+        <StartMethodRow
+          icon="history"
+          label="過去の記録"
+          description={descriptions.history}
+          onPress={handlePickHistory}
+          hint={pastDateHint}
+        />
       </View>
     </SafeAreaView>
   );
@@ -118,6 +148,5 @@ export default function StartChooserScreen() {
 
 const styles = StyleSheet.create({
   safeArea: { flex: 1, backgroundColor: Colors.background },
-  grid: { padding: 16, gap: 10 },
-  row: { flexDirection: 'row', gap: 10 },
+  list: { paddingHorizontal: 16, paddingTop: 14, gap: 11 },
 });
