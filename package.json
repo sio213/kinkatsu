@@ -21,6 +21,10 @@
     "moduleNameMapper": {
       "^@/(.*)$": "<rootDir>/$1"
     },
+    "testPathIgnorePatterns": [
+      "/node_modules/",
+      "<rootDir>/.claude/worktrees/"
+    ],
     "transformIgnorePatterns": [
       "node_modules/(?!((jest-)?react-native|@react-native(-community)?|expo(-[^/]*)?|@expo(-[^/]*)?/.*|react-navigation|@react-navigation/.*|@unimodules/.*|unimodules|sentry-expo|native-base|react-native-svg|react-native-gesture-handler|react-native-reorderable-list|react-native-reanimated|react-native-worklets|drizzle-orm)/)"
     ]
