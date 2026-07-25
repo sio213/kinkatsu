@@ -133,3 +133,15 @@ export function groupByMonth<T extends { startedAt: number }>(
   }
   return groups.map(({ monthLabel, items: i }) => ({ monthLabel, items: i }));
 }
+
+// groupByMonthの結果をSectionListのsectionsの形へ変換する。
+// ExerciseHistoryPickerView(種目単位の実績一覧)とSessionHistoryPickerView(セッション単位の
+// 一覧)がまったく同じ変換を書いていたためここへ寄せた（@reviewer指摘）。
+// 月ヘッダーの描画とstyle(monthLabelWrapper等)も両者で完全一致しているが、そちらの共通化は
+// 利用箇所が2つでrule of threeに達していないため見送っている。3本目が出たら
+// components/workout/month-section-list.tsx として切り出すこと
+export function toMonthSections<T extends { startedAt: number }>(
+  items: T[],
+): { title: string; data: T[] }[] {
+  return groupByMonth(items).map((group) => ({ title: group.monthLabel, data: group.items }));
+}

@@ -2,7 +2,7 @@ import { Colors, Typography } from '@/constants/theme';
 import { StyleSheet, Text, View } from 'react-native';
 
 // headerTitleにそのまま渡せる、ナビゲーションタイトル＋補足サブタイトル(任意)。
-// subtitleを渡さなければ1行表示になる（history-picker.tsx・exercise-swap.tsxで使用）
+// subtitleを渡さなければ1行表示になる（app/workout/start-chooser.tsx等で使用）
 export function HeaderTitle({ title, subtitle }: { title: string; subtitle?: string }) {
   return (
     <View style={styles.wrap}>
