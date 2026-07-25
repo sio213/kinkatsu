@@ -1,15 +1,13 @@
-import { NotFoundState } from '@/components/ui/not-found-state';
+import { NotFoundScreen } from '@/components/ui/not-found-screen';
 import { SessionHistoryLoadView } from '@/components/workout/session-history-load-view';
-import { Colors } from '@/constants/theme';
 import { useDebouncedPush } from '@/hooks/use-debounced-push';
 import { isValidDateKey } from '@/lib/calendar/date-grid';
 import { formatHistorySelectionsParam } from '@/lib/calendar/schedule';
 import { addHistoryCardsToScheduledWorkout } from '@/lib/calendar/scheduled-workout-detail';
 import type { SessionHistoryCard } from '@/lib/workout/history';
-import { Stack, useLocalSearchParams, useRouter } from 'expo-router';
+import { useLocalSearchParams, useRouter } from 'expo-router';
 import { useCallback } from 'react';
-import { Alert, StyleSheet } from 'react-native';
-import { SafeAreaView } from 'react-native-safe-area-context';
+import { Alert } from 'react-native';
 
 // 「過去の記録から読み込む」フローの画面3。app/workout/session-history-load.tsxの
 // カレンダー版（2026-07-21新設）。選択UIの実体はcomponents/workout/session-history-load-view.tsx
@@ -67,10 +65,7 @@ export default function ScheduleWorkoutHistoryLoadScreen() {
 
   if ((!isNewSchedule && !Number.isFinite(scheduledWorkoutId)) || !Number.isFinite(sourceSessionId)) {
     return (
-      <SafeAreaView style={styles.safeArea} edges={['bottom']}>
-        <Stack.Screen options={{ title: '過去の記録' }} />
-        <NotFoundState message="予定が見つかりません" actionLabel="戻る" onPressAction={() => router.back()} />
-      </SafeAreaView>
+      <NotFoundScreen message="予定が見つかりません" title="過去の記録" onPressBack={() => router.back()} />
     );
   }
 
@@ -78,7 +73,3 @@ export default function ScheduleWorkoutHistoryLoadScreen() {
     <SessionHistoryLoadView sourceSessionId={sourceSessionId} sourceStartedAt={sourceStartedAt} onSubmit={handleSubmit} />
   );
 }
-
-const styles = StyleSheet.create({
-  safeArea: { flex: 1, backgroundColor: Colors.background },
-});

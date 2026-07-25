@@ -1,9 +1,8 @@
 import { ExercisePickerView } from '@/components/workout/exercise-picker-view';
-import { Colors } from '@/constants/theme';
+import { ScreenStyles } from '@/constants/theme';
 import { addExercisesToScheduledWorkout } from '@/lib/calendar/scheduled-workout-detail';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { useCallback } from 'react';
-import { StyleSheet } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 // 種目編集画面(app/calendar/schedule-workout-edit.tsx)ヘッダー⋮「種目を追加」用
@@ -24,12 +23,8 @@ export default function ScheduleWorkoutAddExerciseScreen() {
   );
 
   return (
-    <SafeAreaView style={styles.safeArea} edges={['bottom']}>
+    <SafeAreaView style={ScreenStyles.safeArea} edges={['bottom']}>
       <ExercisePickerView onConfirm={handleConfirm} />
     </SafeAreaView>
   );
 }
-
-const styles = StyleSheet.create({
-  safeArea: { flex: 1, backgroundColor: Colors.background },
-});

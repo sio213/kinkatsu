@@ -1,7 +1,7 @@
 import { HeaderTitle } from '@/components/ui/header-title';
-import { NotFoundState } from '@/components/ui/not-found-state';
+import { NotFoundScreen } from '@/components/ui/not-found-screen';
 import { StartMethodRow } from '@/components/workout/start-method-row';
-import { Colors } from '@/constants/theme';
+import { ScreenStyles } from '@/constants/theme';
 import { useDebouncedPush } from '@/hooks/use-debounced-push';
 import { dateKeyToNoonMs, isValidDateKey } from '@/lib/calendar/date-grid';
 import { formatSessionDateGroup } from '@/lib/workout/summary';
@@ -98,10 +98,7 @@ export default function StartChooserScreen() {
   // isValidDateKeyの結果のため、ここでは再評価せずisPastModeを再利用する（@reviewer指摘）
   if (pastDateKey !== undefined && !isPastMode) {
     return (
-      <SafeAreaView style={styles.safeArea} edges={['bottom']}>
-        <Stack.Screen options={{ title: '記録を追加' }} />
-        <NotFoundState message="日付が見つかりません" actionLabel="戻る" onPressAction={() => router.back()} />
-      </SafeAreaView>
+      <NotFoundScreen message="日付が見つかりません" title="記録を追加" onPressBack={() => router.back()} />
     );
   }
 
@@ -111,7 +108,7 @@ export default function StartChooserScreen() {
   const descriptions = isPastMode ? DESCRIPTIONS.past : DESCRIPTIONS.live;
 
   return (
-    <SafeAreaView style={styles.safeArea} edges={['bottom']}>
+    <SafeAreaView style={ScreenStyles.safeArea} edges={['bottom']}>
       {isPastMode && (
         <Stack.Screen
           options={{
@@ -147,6 +144,5 @@ export default function StartChooserScreen() {
 }
 
 const styles = StyleSheet.create({
-  safeArea: { flex: 1, backgroundColor: Colors.background },
   list: { paddingHorizontal: 16, paddingTop: 14, gap: 11 },
 });

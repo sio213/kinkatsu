@@ -10,7 +10,7 @@ import { IconSymbol } from '@/components/ui/icon-symbol';
 import { PrimaryButton } from '@/components/ui/primary-button';
 import { AddExerciseButton } from '@/components/workout/add-exercise-button';
 import { ResumeWorkoutBanner } from '@/components/workout/resume-workout-banner';
-import { Colors, Typography } from '@/constants/theme';
+import { Colors, ScreenStyles, Typography } from '@/constants/theme';
 import type { Reminder } from '@/db/schema';
 import { useCalendarDayExercises, type CalendarDayCard } from '@/hooks/use-calendar-day-exercises';
 import { useCalendarDayManualSchedule, type ManualScheduleCard } from '@/hooks/use-calendar-day-manual-schedule';
@@ -22,9 +22,9 @@ import { useStartWithConfirm } from '@/hooks/use-start-with-confirm';
 import { useTickingNow } from '@/hooks/use-ticking-now';
 import { useResumeWorkoutSummary, useWorkoutSessions } from '@/hooks/use-workout-session';
 import { addMonths, isSameDay, toDateKey } from '@/lib/calendar/date-grid';
-import { CATEGORY_ALL, EXERCISE_CATEGORIES } from '@/lib/exercises/constants';
-import { buildTodayTimeline, groupCardsBySession } from '@/lib/calendar/session-groups';
 import { excludeActiveScheduledCard, mergeScheduleCards, type UnifiedScheduleCard } from '@/lib/calendar/schedule';
+import { buildTodayTimeline, groupCardsBySession } from '@/lib/calendar/session-groups';
+import { CATEGORY_ALL, EXERCISE_CATEGORIES } from '@/lib/exercises/constants';
 import { materializeReminderOccurrence } from '@/lib/notifications/scheduled-workout-scheduler';
 import { startWorkoutFromScheduledWorkout } from '@/lib/workout/session';
 import { formatElapsedClock, formatMonthGroup, formatSessionDateGroup } from '@/lib/workout/summary';
@@ -512,7 +512,7 @@ export default function CalendarScreen() {
   );
 
   return (
-    <SafeAreaView style={styles.safeArea} edges={[]}>
+    <SafeAreaView style={ScreenStyles.safeArea} edges={[]}>
       <Stack.Screen
         options={{
           title: formatMonthGroup(new Date(viewed.year, viewed.month, 1).getTime()),
@@ -690,7 +690,6 @@ export default function CalendarScreen() {
 }
 
 const styles = StyleSheet.create({
-  safeArea: { flex: 1, backgroundColor: Colors.background },
   content: { paddingHorizontal: 16, paddingTop: 8, paddingBottom: 24 },
   navButton: { width: 36, height: 36, alignItems: 'center', justifyContent: 'center' },
   filterRow: { marginBottom: 10 },

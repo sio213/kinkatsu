@@ -1,13 +1,12 @@
 import { ExercisePickerView } from '@/components/workout/exercise-picker-view';
-import { Colors } from '@/constants/theme';
+import { ScreenStyles } from '@/constants/theme';
 import type { Exercise } from '@/db/schema';
 import { useExercises } from '@/hooks/use-exercises';
-import { useRoutineDraftStore } from '@/lib/routines/draft-store';
 import { buildInitialRoutineSets } from '@/lib/routines/db';
+import { useRoutineDraftStore } from '@/lib/routines/draft-store';
 import type { DraftExercise } from '@/lib/routines/validation';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { useCallback } from 'react';
-import { StyleSheet } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 export default function RoutineExercisePickerScreen() {
@@ -56,12 +55,8 @@ export default function RoutineExercisePickerScreen() {
   );
 
   return (
-    <SafeAreaView style={styles.safeArea} edges={['bottom']}>
+    <SafeAreaView style={ScreenStyles.safeArea} edges={['bottom']}>
       <ExercisePickerView onConfirm={handleConfirm} />
     </SafeAreaView>
   );
 }
-
-const styles = StyleSheet.create({
-  safeArea: { flex: 1, backgroundColor: Colors.background },
-});

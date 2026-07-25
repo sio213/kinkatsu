@@ -3,11 +3,16 @@
  * Palette = 生の色値。Colors = 画面が参照する意味づけされたトークン。
  * ダークモードは未定なので、いまは light 相当の値のみを持つフラットな構成にしている。
  * 将来ダークモードをやるなら、その時に light/dark で出し分ける構造に戻す。
+ *
+ * トークンに加えて、画面共通のスタイル(ScreenStyles)とナビゲーションのヘッダー設定
+ * (headerOptions / tabHeaderOptions)も持つ。ScreenStylesに固定フッターや空状態など
+ * レイアウトの塊が増えてくるようなら、その時点で constants/screen-styles.ts へ切り出すこと
+ * （なし崩しにこのファイルを「トークン」から「共通レイアウト」へ太らせない）。
  */
 
 import type { BottomTabNavigationOptions } from '@react-navigation/bottom-tabs';
 import type { NativeStackNavigationOptions } from '@react-navigation/native-stack';
-import { Platform } from 'react-native';
+import { Platform, StyleSheet } from 'react-native';
 
 const Palette = {
   white: '#FFFFFF',
@@ -184,6 +189,18 @@ export const Typography = {
    */
   timeDisplay: { fontSize: 28, fontWeight: '700', letterSpacing: 2 },
 } as const;
+
+/**
+ * 画面ルートの共通スタイル。
+ *
+ * `safeArea` は `{ flex: 1, backgroundColor: Colors.background }` として40箇所以上の画面で
+ * 個別に定義されていたため集約した。`SafeAreaView` の `edges` は画面の置き場所によって変わる
+ * （タブ配下なら `[]`、ルートStack上なら `['bottom']`。CLAUDE.md「ナビゲーション・タブバーの
+ * 表示範囲」を参照）ので、ここには含めず各画面が明示する。
+ */
+export const ScreenStyles = StyleSheet.create({
+  safeArea: { flex: 1, backgroundColor: Colors.background },
+});
 
 /**
  * push画面・タブ画面で共通のヘッダーの見た目（中央揃えタイトル・影なし）。

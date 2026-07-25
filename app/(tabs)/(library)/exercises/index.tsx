@@ -2,7 +2,7 @@ import { ExerciseCard } from '@/components/exercises/exercise-card';
 import { ExerciseFilterHeader } from '@/components/exercises/exercise-filter-header';
 import { HeaderAddButton } from '@/components/ui/header-add-button';
 import { ListErrorBoundary } from '@/components/ui/list-error-boundary';
-import { Colors, Typography } from '@/constants/theme';
+import { Colors, ScreenStyles, Typography } from '@/constants/theme';
 import type { Exercise } from '@/db/schema';
 import { useExerciseUsageStats } from '@/hooks/use-exercise-usage-stats';
 import { useExercises } from '@/hooks/use-exercises';
@@ -89,7 +89,7 @@ export default function ExercisesScreen() {
   );
 
   return (
-    <SafeAreaView style={styles.safeArea} edges={[]}>
+    <SafeAreaView style={ScreenStyles.safeArea} edges={[]}>
       <Stack.Screen
         options={{
           headerRight: () => (
@@ -117,7 +117,6 @@ export default function ExercisesScreen() {
 }
 
 const styles = StyleSheet.create({
-  safeArea: { flex: 1, backgroundColor: Colors.background },
   list: { flex: 1 },
   content: { paddingHorizontal: 16, paddingBottom: 40 },
 

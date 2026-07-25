@@ -1,7 +1,7 @@
 import { CategoryFilterChips } from '@/components/exercises/category-filter-chips';
 import { NotFoundState } from '@/components/ui/not-found-state';
 import { PastTrainingSessionCard } from '@/components/workout/past-training-session-card';
-import { Colors, Typography } from '@/constants/theme';
+import { Colors, ScreenStyles, Typography } from '@/constants/theme';
 import { CATEGORY_ALL, CATEGORY_ORDER, UNKNOWN_CATEGORY_ORDER } from '@/lib/exercises/constants';
 import { getPastTrainingSessions, type PastTrainingSession } from '@/lib/workout/history';
 import { toMonthSections } from '@/lib/workout/summary';
@@ -142,7 +142,7 @@ export function SessionHistoryPickerView({ excludeSessionId, onSelect }: Props) 
   );
 
   return (
-    <SafeAreaView style={styles.safeArea} edges={['bottom']}>
+    <SafeAreaView style={ScreenStyles.safeArea} edges={['bottom']}>
       {Array.isArray(sessions) && sessions.length > 0 && (
         <View style={styles.chipsWrap}>
           <CategoryFilterChips
@@ -228,8 +228,6 @@ export function SessionHistoryPickerView({ excludeSessionId, onSelect }: Props) 
 }
 
 const styles = StyleSheet.create({
-  safeArea: { flex: 1, backgroundColor: Colors.background },
-
   chipsWrap: { paddingHorizontal: 16, paddingTop: 12, paddingBottom: 4 },
 
   loading: { flex: 1, alignItems: 'center', justifyContent: 'center' },

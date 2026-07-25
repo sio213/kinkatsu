@@ -1,22 +1,14 @@
-import { NotFoundState } from '@/components/ui/not-found-state';
+import { NotFoundScreen } from '@/components/ui/not-found-screen';
 import { ExercisePickerView } from '@/components/workout/exercise-picker-view';
-import { Colors } from '@/constants/theme';
+import { ScreenStyles } from '@/constants/theme';
 import { useDebouncedPush } from '@/hooks/use-debounced-push';
 import { notifyPrefilled } from '@/lib/workout/prefill-feedback';
 import { addExercisesToSession } from '@/lib/workout/session';
+import { START_CHOOSER_DISMISS_COUNT } from '@/lib/workout/start-chooser-navigation';
 import { createStartChooserSession } from '@/lib/workout/start-chooser-session';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { useCallback } from 'react';
-import { StyleSheet } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-
-// start-chooser「種目を追加」経由のnewSession確定時にdismissする段数。
-// スタックは常にcalendar/記録タブ(0)→start-chooser(+1)→この画面自身(+1)の2段
-// （start-chooserはapp/(tabs)/(record)/index.tsx・app/(tabs)/calendar.tsxの2画面からしかpushされず、
-// このnewSession経路はstart-chooserからのみ到達するため、常にこの深さで固定できる。
-// @reviewer指摘: マジックナンバーのままだと将来別の深さから開かれるようになった場合に
-// 静かに誤動作するため、根拠をここに明記しておく）
-const START_CHOOSER_DISMISS_COUNT = 2;
 
 export default function ExercisePickerScreen() {
   // newSessionは、start-chooser「種目を追加」からこの画面へ直接遷移してきた場合にのみ付く
@@ -59,7 +51,7 @@ export default function ExercisePickerScreen() {
       const prefilled = await addExercisesToSession(targetSessionId, selectedIds);
       notifyPrefilled(prefilled);
       if (isNewSession) {
-        router.dismiss(START_CHOOSER_DISMISS_COUNT);
+        router.dismiss(START_CHOOSER_DISMISS_COUNT.fromChild);
         pushDebounced(`/workout/${targetSessionId}`);
       } else {
         router.back();
@@ -70,18 +62,12 @@ export default function ExercisePickerScreen() {
 
   if (!isNewSession && !Number.isFinite(sessionId)) {
     return (
-      <SafeAreaView style={styles.safeArea} edges={['bottom']}>
-        <NotFoundState
-          message="トレーニングが見つかりません"
-          actionLabel="戻る"
-          onPressAction={() => router.back()}
-        />
-      </SafeAreaView>
+      <NotFoundScreen message="トレーニングが見つかりません" onPressBack={() => router.back()} />
     );
   }
 
   return (
-    <SafeAreaView style={styles.safeArea} edges={['bottom']}>
+    <SafeAreaView style={ScreenStyles.safeArea} edges={['bottom']}>
       <ExercisePickerView
         // newSession経路はまだセッションが無いため、実績集計から除外すべき自分自身も存在しない
         excludeSessionId={isNewSession ? undefined : sessionId}
@@ -90,7 +76,3 @@ export default function ExercisePickerScreen() {
     </SafeAreaView>
   );
 }
-
-const styles = StyleSheet.create({
-  safeArea: { flex: 1, backgroundColor: Colors.background },
-});

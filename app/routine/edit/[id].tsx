@@ -1,6 +1,6 @@
 import { RoutineFormScreen } from '@/components/routines/routine-form-screen';
-import { NotFoundState } from '@/components/ui/not-found-state';
-import { Colors } from '@/constants/theme';
+import { NotFoundScreen } from '@/components/ui/not-found-screen';
+import { Colors, ScreenStyles } from '@/constants/theme';
 import { useDebouncedPush } from '@/hooks/use-debounced-push';
 import { useRoutines } from '@/hooks/use-routines';
 import { getRoutineDetail } from '@/lib/routines/db';
@@ -91,7 +91,7 @@ export default function RoutineEditScreen() {
 
   if (status === 'loading') {
     return (
-      <SafeAreaView style={styles.safe} edges={['bottom']}>
+      <SafeAreaView style={ScreenStyles.safeArea} edges={['bottom']}>
         <View style={styles.loading}>
           <ActivityIndicator size="small" color={Colors.accent} accessibilityLabel="読み込み中" />
         </View>
@@ -101,13 +101,10 @@ export default function RoutineEditScreen() {
 
   if (status === 'not-found' || status === 'error') {
     return (
-      <SafeAreaView style={styles.safe} edges={['bottom']}>
-        <NotFoundState
-          message={status === 'error' ? 'ルーティンの読み込みに失敗しました' : 'ルーティンが見つかりません'}
-          actionLabel="戻る"
-          onPressAction={() => router.back()}
-        />
-      </SafeAreaView>
+      <NotFoundScreen
+        message={status === 'error' ? 'ルーティンの読み込みに失敗しました' : 'ルーティンが見つかりません'}
+        onPressBack={() => router.back()}
+      />
     );
   }
 
@@ -125,6 +122,5 @@ export default function RoutineEditScreen() {
 }
 
 const styles = StyleSheet.create({
-  safe: { flex: 1, backgroundColor: Colors.background },
   loading: { flex: 1, alignItems: 'center', justifyContent: 'center' },
 });

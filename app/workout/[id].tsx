@@ -4,12 +4,12 @@ import { HeaderTitle } from '@/components/ui/header-title';
 import { IconSymbol } from '@/components/ui/icon-symbol';
 import { KeyboardAvoidingScreen } from '@/components/ui/keyboard-avoiding-screen';
 import { ListErrorBoundary } from '@/components/ui/list-error-boundary';
-import { NotFoundState } from '@/components/ui/not-found-state';
+import { NotFoundScreen } from '@/components/ui/not-found-screen';
 import { PrimaryButton } from '@/components/ui/primary-button';
 import { AddExerciseButton } from '@/components/workout/add-exercise-button';
 import { ExerciseEmptyState } from '@/components/workout/exercise-empty-state';
 import { SessionExerciseCard, type SessionExerciseCardHandle } from '@/components/workout/session-exercise-card';
-import { Colors, Typography } from '@/constants/theme';
+import { Colors, ScreenStyles, Typography } from '@/constants/theme';
 import { useAutoCollapseCompletedExercises } from '@/hooks/use-auto-collapse-completed-exercises';
 import { useDebouncedPush } from '@/hooks/use-debounced-push';
 import { useRoutines } from '@/hooks/use-routines';
@@ -195,14 +195,7 @@ export default function WorkoutScreen() {
 
   if (sessionId == null || (loaded && !session)) {
     return (
-      <SafeAreaView style={styles.safeArea} edges={['bottom']}>
-        <Stack.Screen options={{ title: 'トレーニング' }} />
-        <NotFoundState
-          message="トレーニングが見つかりません"
-          actionLabel="戻る"
-          onPressAction={() => router.back()}
-        />
-      </SafeAreaView>
+      <NotFoundScreen message="トレーニングが見つかりません" title="トレーニング" onPressBack={() => router.back()} />
     );
   }
 
@@ -257,7 +250,7 @@ export default function WorkoutScreen() {
   ];
 
   return (
-    <SafeAreaView style={styles.safeArea} edges={['bottom']}>
+    <SafeAreaView style={ScreenStyles.safeArea} edges={['bottom']}>
       <Stack.Screen
         options={{
           headerTitle: () => (
@@ -345,8 +338,6 @@ export default function WorkoutScreen() {
 }
 
 const styles = StyleSheet.create({
-  safeArea: { flex: 1, backgroundColor: Colors.background },
-
   timerChip: {
     flexDirection: 'row',
     alignItems: 'center',

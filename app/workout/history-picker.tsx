@@ -1,13 +1,10 @@
-import { NotFoundState } from '@/components/ui/not-found-state';
+import { NotFoundScreen } from '@/components/ui/not-found-screen';
 import { ExerciseHistoryPickerView } from '@/components/workout/exercise-history-picker-view';
-import { Colors } from '@/constants/theme';
 import type { HistoryEntry } from '@/lib/workout/history';
 import { notifyPrefilled } from '@/lib/workout/prefill-feedback';
 import { loadHistoryIntoSessionExercise } from '@/lib/workout/session';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { useCallback } from 'react';
-import { StyleSheet } from 'react-native';
-import { SafeAreaView } from 'react-native-safe-area-context';
 
 // トレーニング中の種目カード⋮「過去の記録から読み込み」から開く画面。一覧・自己ベスト判定・
 // 確認ダイアログの実体はcomponents/workout/exercise-history-picker-view.tsx
@@ -47,13 +44,7 @@ export default function HistoryPickerScreen() {
 
   if (!Number.isFinite(sessionId) || !Number.isFinite(sessionExerciseId) || !Number.isFinite(exerciseId)) {
     return (
-      <SafeAreaView style={styles.safeArea} edges={['bottom']}>
-        <NotFoundState
-          message="トレーニングが見つかりません"
-          actionLabel="戻る"
-          onPressAction={() => router.back()}
-        />
-      </SafeAreaView>
+      <NotFoundScreen message="トレーニングが見つかりません" onPressBack={() => router.back()} />
     );
   }
 
@@ -71,7 +62,3 @@ export default function HistoryPickerScreen() {
     />
   );
 }
-
-const styles = StyleSheet.create({
-  safeArea: { flex: 1, backgroundColor: Colors.background },
-});

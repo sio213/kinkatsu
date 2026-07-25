@@ -3,7 +3,7 @@ import { HeaderTitle } from '@/components/ui/header-title';
 import { ListErrorBoundary } from '@/components/ui/list-error-boundary';
 import { NotFoundState } from '@/components/ui/not-found-state';
 import { HistoryEntryCard } from '@/components/workout/history-entry-card';
-import { Colors, Typography } from '@/constants/theme';
+import { Colors, ScreenStyles, Typography } from '@/constants/theme';
 import { useExercise } from '@/hooks/use-exercises';
 import { resolveMeasurementType } from '@/lib/exercises/constants';
 import { computePersonalBestIds, getExerciseHistoryEntries, type HistoryEntry } from '@/lib/workout/history';
@@ -131,7 +131,7 @@ export function ExerciseHistoryPickerView({
     // 2画面ともCLAUDE.mdの分類でいう「フロー内の中間画面」でルートStack上にあるため
     // edgesは['bottom']で固定してよい(ExerciseReorderViewと同じ判断)。タブ配下に置く画面が
     // 増えた場合は、タブバーが下端を占有するのでedges={[]}が必要になる
-    <SafeAreaView style={styles.safeArea} edges={['bottom']}>
+    <SafeAreaView style={ScreenStyles.safeArea} edges={['bottom']}>
       <Stack.Screen
         options={{
           headerTitle: () => <HeaderTitle title="過去の記録から読み込み" subtitle={exerciseName} />,
@@ -192,8 +192,6 @@ export function ExerciseHistoryPickerView({
 }
 
 const styles = StyleSheet.create({
-  safeArea: { flex: 1, backgroundColor: Colors.background },
-
   banner: {
     flexDirection: 'row',
     alignItems: 'center',

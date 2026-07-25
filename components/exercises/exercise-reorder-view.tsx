@@ -1,6 +1,6 @@
 import { ReorderableExerciseRow, type ReorderableExercise } from '@/components/exercises/reorderable-exercise-row';
 import { PrimaryButton } from '@/components/ui/primary-button';
-import { Colors } from '@/constants/theme';
+import { Colors, ScreenStyles } from '@/constants/theme';
 import { useCallback } from 'react';
 import { StyleSheet, View } from 'react-native';
 import ReorderableList, { type ReorderableListReorderEvent } from 'react-native-reorderable-list';
@@ -58,7 +58,7 @@ export function ExerciseReorderView<T extends ReorderableExercise>({
     // 並び替えはCLAUDE.mdの分類でいう「フロー内の中間画面」で、3画面ともタブバーを隠す
     // ルートStack上にあるためedgesは['bottom']で固定してよい。将来タブ配下に置く並び替え画面が
     // 増えた場合は、タブバーが下端を占有するのでedges={[]}が必要になる(その時点でpropへ外出しする)
-    <SafeAreaView style={styles.safe} edges={['bottom']}>
+    <SafeAreaView style={ScreenStyles.safeArea} edges={['bottom']}>
       <ReorderableList
         data={rows}
         onReorder={onReorder}
@@ -81,7 +81,6 @@ export function ExerciseReorderView<T extends ReorderableExercise>({
 }
 
 const styles = StyleSheet.create({
-  safe: { flex: 1, backgroundColor: Colors.background },
   list: { flex: 1 },
   content: { paddingHorizontal: 20, paddingTop: 12, paddingBottom: 24, gap: 8 },
   footer: {

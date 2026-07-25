@@ -1,22 +1,19 @@
-import { NotFoundState } from '@/components/ui/not-found-state';
+import { NotFoundScreen } from '@/components/ui/not-found-screen';
 import { SessionHistoryLoadView } from '@/components/workout/session-history-load-view';
-import { Colors } from '@/constants/theme';
 import { useDebouncedPush } from '@/hooks/use-debounced-push';
 import type { SessionHistoryCard } from '@/lib/workout/history';
 import { notifyPrefilled } from '@/lib/workout/prefill-feedback';
 import { addHistoryCardsToSession } from '@/lib/workout/session';
+import { START_CHOOSER_DISMISS_COUNT } from '@/lib/workout/start-chooser-navigation';
 import { createStartChooserSession } from '@/lib/workout/start-chooser-session';
-import { Stack, useLocalSearchParams, useRouter } from 'expo-router';
+import { useLocalSearchParams, useRouter } from 'expo-router';
 import { useCallback } from 'react';
-import { Alert, StyleSheet } from 'react-native';
-import { SafeAreaView } from 'react-native-safe-area-context';
+import { Alert } from 'react-native';
 
-// start-chooser「過去の記録」経由(newSession=1)の確定時にdismissする段数。スタックは常に
-// カレンダー/記録タブ(0)→start-chooser(+1)→session-history-picker(+1)→この画面自身(+1)の3段
-// （start-chooserはapp/(tabs)/(record)/index.tsx・app/(tabs)/calendar.tsxの2画面からしかpushされず、
-// このnewSession経路はstart-chooserからのみ到達するため、常にこの深さで固定できる。
-// app/workout/exercise-picker.tsxの同名定数と同じ根拠）
-const START_CHOOSER_DISMISS_COUNT = 3;
+// トレーニング画面⋮からの通常経路で確定したときにdismissする段数。この画面(画面3)と
+// 一覧(画面2)を閉じるとトレーニング画面に戻る。start-chooser経由の段数
+// (START_CHOOSER_DISMISS_COUNT)とは起点も意味も別なので、そちらには含めない
+const DISMISS_TO_WORKOUT_SCREEN = 2;
 
 // トレーニング画面の「過去の記録から読み込む」フロー最後の画面。選択UIの実体は
 // components/workout/session-history-load-view.tsx（app/routine/session-history-load.tsxと共通）
@@ -60,10 +57,10 @@ export default function SessionHistoryLoadScreen() {
         // 画面3→画面2→トレーニング画面の2階層を一度に閉じるだけでよい。どちらも遷移経路が
         // 1本しか無い前提に依存するため、将来ディープリンク等 別経路が増える場合は見直すこと
         if (isNewSession) {
-          router.dismiss(START_CHOOSER_DISMISS_COUNT);
+          router.dismiss(START_CHOOSER_DISMISS_COUNT.fromGrandchild);
           pushDebounced(`/workout/${targetSessionId}`);
         } else {
-          router.dismiss(2);
+          router.dismiss(DISMISS_TO_WORKOUT_SCREEN);
         }
       } catch (e) {
         console.error('[add history cards to session]', e);
@@ -75,14 +72,7 @@ export default function SessionHistoryLoadScreen() {
 
   if ((!isNewSession && !Number.isFinite(sessionId)) || !Number.isFinite(sourceSessionId)) {
     return (
-      <SafeAreaView style={styles.safeArea} edges={['bottom']}>
-        <Stack.Screen options={{ title: '過去の記録' }} />
-        <NotFoundState
-          message="トレーニングが見つかりません"
-          actionLabel="戻る"
-          onPressAction={() => router.back()}
-        />
-      </SafeAreaView>
+      <NotFoundScreen message="トレーニングが見つかりません" title="過去の記録" onPressBack={() => router.back()} />
     );
   }
 
@@ -94,7 +84,3 @@ export default function SessionHistoryLoadScreen() {
     />
   );
 }
-
-const styles = StyleSheet.create({
-  safeArea: { flex: 1, backgroundColor: Colors.background },
-});

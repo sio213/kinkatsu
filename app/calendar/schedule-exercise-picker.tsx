@@ -1,13 +1,12 @@
-import { ExercisePickerView } from '@/components/workout/exercise-picker-view';
 import { HeaderTitle } from '@/components/ui/header-title';
-import { NotFoundState } from '@/components/ui/not-found-state';
-import { Colors } from '@/constants/theme';
+import { NotFoundScreen } from '@/components/ui/not-found-screen';
+import { ExercisePickerView } from '@/components/workout/exercise-picker-view';
+import { ScreenStyles } from '@/constants/theme';
 import { useDebouncedPush } from '@/hooks/use-debounced-push';
 import { isValidDateKey, parseDateKey } from '@/lib/calendar/date-grid';
 import { formatSessionDateGroup } from '@/lib/workout/summary';
 import { Stack, useLocalSearchParams, useRouter } from 'expo-router';
 import { useCallback } from 'react';
-import { StyleSheet } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 // カレンダー選択日パネル「予定を追加」→「直接追加」フローの画面1（2026-07-20新設）。
@@ -41,10 +40,7 @@ export default function ScheduleExercisePickerScreen() {
   // 明示的にガードする（schedule-chooser.tsxと同じ方針）
   if (!isValidDateKey(dateKey)) {
     return (
-      <SafeAreaView style={styles.safeArea} edges={['bottom']}>
-        <Stack.Screen options={{ title: '種目を選択' }} />
-        <NotFoundState message="日付が見つかりません" actionLabel="戻る" onPressAction={() => router.back()} />
-      </SafeAreaView>
+      <NotFoundScreen message="日付が見つかりません" onPressBack={() => router.back()} />
     );
   }
 
@@ -53,7 +49,7 @@ export default function ScheduleExercisePickerScreen() {
   const dateLabel = formatSessionDateGroup(parseDateKey(dateKey).getTime());
 
   return (
-    <SafeAreaView style={styles.safeArea} edges={['bottom']}>
+    <SafeAreaView style={ScreenStyles.safeArea} edges={['bottom']}>
       <Stack.Screen
         options={{
           headerTitle: () => <HeaderTitle title="種目を選択" subtitle={dateLabel} />,
@@ -63,7 +59,3 @@ export default function ScheduleExercisePickerScreen() {
     </SafeAreaView>
   );
 }
-
-const styles = StyleSheet.create({
-  safeArea: { flex: 1, backgroundColor: Colors.background },
-});

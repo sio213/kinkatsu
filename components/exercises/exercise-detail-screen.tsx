@@ -1,16 +1,16 @@
-import { Colors, Typography } from '@/constants/theme';
 import { HeaderMenu, type DropdownMenuItem } from '@/components/ui/dropdown-menu';
 import { NotFoundState } from '@/components/ui/not-found-state';
 import { SectionGroup } from '@/components/ui/section-group';
 import { SectionHeading } from '@/components/ui/section-heading';
-import { getGuide } from '@/lib/exercises/guides';
-import { parseFormPoints } from '@/lib/exercises/form-points';
-import { getExerciseImages } from '@/lib/exercises/images';
-import { getCategoryLabel } from '@/lib/exercises/constants';
-import { getYoutubeSearchUrl } from '@/lib/exercises/youtube';
+import { Colors, ScreenStyles, Typography } from '@/constants/theme';
+import { useDebouncedPush } from '@/hooks/use-debounced-push';
 import { useExercise, useExercises } from '@/hooks/use-exercises';
 import { useFavoriteToggle } from '@/hooks/use-favorite-toggle';
-import { useDebouncedPush } from '@/hooks/use-debounced-push';
+import { getCategoryLabel } from '@/lib/exercises/constants';
+import { parseFormPoints } from '@/lib/exercises/form-points';
+import { getGuide } from '@/lib/exercises/guides';
+import { getExerciseImages } from '@/lib/exercises/images';
+import { getYoutubeSearchUrl } from '@/lib/exercises/youtube';
 import { Stack, useFocusEffect, useLocalSearchParams, useRouter } from 'expo-router';
 import { useCallback } from 'react';
 import { useVideoPlayer, VideoView } from 'expo-video';
@@ -146,7 +146,7 @@ export function ExerciseDetailScreen({ insideTabBar = false }: Props) {
 
   if (!exercise) {
     return (
-      <SafeAreaView style={styles.safe} edges={safeAreaEdges}>
+      <SafeAreaView style={ScreenStyles.safeArea} edges={safeAreaEdges}>
         <Stack.Screen options={{ title: '種目' }} />
         <NotFoundState
           message="種目が見つかりません"
@@ -168,7 +168,7 @@ export function ExerciseDetailScreen({ insideTabBar = false }: Props) {
   }
 
   return (
-    <SafeAreaView style={styles.safe} edges={safeAreaEdges}>
+    <SafeAreaView style={ScreenStyles.safeArea} edges={safeAreaEdges}>
       <Stack.Screen
         options={{
           title: exercise.name,
@@ -264,8 +264,6 @@ export function ExerciseDetailScreen({ insideTabBar = false }: Props) {
 }
 
 const styles = StyleSheet.create({
-  safe: { flex: 1, backgroundColor: Colors.background },
-
   content: { paddingBottom: 48 },
 
   mediaBox: {

@@ -4,7 +4,7 @@ import { ReminderForm } from '@/components/reminders/reminder-form';
 import { FormScrollProvider } from '@/components/ui/form-scroll-context';
 import { HeaderAddButton } from '@/components/ui/header-add-button';
 import { ListErrorBoundary } from '@/components/ui/list-error-boundary';
-import { Colors, Typography } from '@/constants/theme';
+import { Colors, ScreenStyles, Typography } from '@/constants/theme';
 import { useDebouncedPush } from '@/hooks/use-debounced-push';
 import { useKeyboardInset } from '@/hooks/use-keyboard-inset';
 import { usePermissionState } from '@/hooks/use-permission-state';
@@ -114,7 +114,7 @@ export default function RemindersScreen() {
   }, [setPermState]);
 
   return (
-    <SafeAreaView style={styles.safeArea} edges={[]}>
+    <SafeAreaView style={ScreenStyles.safeArea} edges={[]}>
       <Stack.Screen
         options={{
           headerRight: () =>
@@ -175,7 +175,6 @@ export default function RemindersScreen() {
 }
 
 const styles = StyleSheet.create({
-  safeArea: { flex: 1, backgroundColor: Colors.background },
   scroll: { padding: 16, gap: 12, paddingBottom: 40 },
 
   empty: { ...Typography.body, color: Colors.textMuted, textAlign: 'center', paddingVertical: 16 },

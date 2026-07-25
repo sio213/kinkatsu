@@ -1,13 +1,10 @@
-import { NotFoundState } from '@/components/ui/not-found-state';
+import { NotFoundScreen } from '@/components/ui/not-found-screen';
 import { SessionHistoryLoadView } from '@/components/workout/session-history-load-view';
-import { Colors } from '@/constants/theme';
 import { useRoutineDraftStore } from '@/lib/routines/draft-store';
 import { historyCardsToDraftExercises } from '@/lib/routines/validation';
 import type { SessionHistoryCard } from '@/lib/workout/history';
-import { Stack, useLocalSearchParams, useRouter } from 'expo-router';
+import { useLocalSearchParams, useRouter } from 'expo-router';
 import { useCallback } from 'react';
-import { StyleSheet } from 'react-native';
-import { SafeAreaView } from 'react-native-safe-area-context';
 
 // ルーティンの「過去の記録から読み込む」フロー最後の画面(app/workout/session-history-load.tsxの
 // ルーティン版)。選択UIの実体はcomponents/workout/session-history-load-view.tsx(workout版と共通)
@@ -36,10 +33,7 @@ export default function RoutineSessionHistoryLoadScreen() {
 
   if (!Number.isFinite(sourceSessionId)) {
     return (
-      <SafeAreaView style={styles.safeArea} edges={['bottom']}>
-        <Stack.Screen options={{ title: '過去の記録' }} />
-        <NotFoundState message="記録が見つかりません" actionLabel="戻る" onPressAction={() => router.back()} />
-      </SafeAreaView>
+      <NotFoundScreen message="記録が見つかりません" title="過去の記録" onPressBack={() => router.back()} />
     );
   }
 
@@ -51,7 +45,3 @@ export default function RoutineSessionHistoryLoadScreen() {
     />
   );
 }
-
-const styles = StyleSheet.create({
-  safeArea: { flex: 1, backgroundColor: Colors.background },
-});

@@ -1,12 +1,9 @@
-import { NotFoundState } from '@/components/ui/not-found-state';
+import { NotFoundScreen } from '@/components/ui/not-found-screen';
 import { SessionHistoryPickerView, PAGE_SIZE } from '@/components/workout/session-history-picker-view';
-import { Colors } from '@/constants/theme';
 import { useDebouncedPush } from '@/hooks/use-debounced-push';
 import { NO_SESSION_TO_EXCLUDE, type PastTrainingSession } from '@/lib/workout/history';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { useCallback } from 'react';
-import { StyleSheet } from 'react-native';
-import { SafeAreaView } from 'react-native-safe-area-context';
 
 export { PAGE_SIZE };
 
@@ -52,13 +49,7 @@ export default function SessionHistoryPickerScreen() {
 
   if (!isNewSession && !Number.isFinite(sessionId)) {
     return (
-      <SafeAreaView style={styles.safeArea} edges={['bottom']}>
-        <NotFoundState
-          message="トレーニングが見つかりません"
-          actionLabel="戻る"
-          onPressAction={() => router.back()}
-        />
-      </SafeAreaView>
+      <NotFoundScreen message="トレーニングが見つかりません" onPressBack={() => router.back()} />
     );
   }
 
@@ -71,7 +62,3 @@ export default function SessionHistoryPickerScreen() {
     />
   );
 }
-
-const styles = StyleSheet.create({
-  safeArea: { flex: 1, backgroundColor: Colors.background },
-});

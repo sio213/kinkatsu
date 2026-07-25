@@ -1,12 +1,12 @@
 import { ExerciseSelectView } from '@/components/exercises/exercise-select-view';
 import { HeaderTitle } from '@/components/ui/header-title';
 import { PrimaryButton } from '@/components/ui/primary-button';
-import { Colors } from '@/constants/theme';
+import { ScreenStyles } from '@/constants/theme';
 import type { Exercise } from '@/db/schema';
 import { useExercises } from '@/hooks/use-exercises';
 import { Stack } from 'expo-router';
 import { useCallback, useMemo, useRef, useState } from 'react';
-import { Alert, Keyboard, StyleSheet } from 'react-native';
+import { Alert, Keyboard } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 type Props = {
@@ -86,7 +86,7 @@ export function ExerciseSwapPicker({
   return (
     // 3つの呼び出し元はいずれも「フロー内の中間画面」としてルートStack上にあるため
     // edgesは['bottom']で固定してよい（ExerciseReorderViewと同じ判断）
-    <SafeAreaView style={styles.safeArea} edges={['bottom']}>
+    <SafeAreaView style={ScreenStyles.safeArea} edges={['bottom']}>
       <Stack.Screen
         options={{
           headerTitle: () => <HeaderTitle title="種目を入れ替え" subtitle={currentExerciseName} />,
@@ -106,7 +106,3 @@ export function ExerciseSwapPicker({
     </SafeAreaView>
   );
 }
-
-const styles = StyleSheet.create({
-  safeArea: { flex: 1, backgroundColor: Colors.background },
-});

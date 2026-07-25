@@ -3,7 +3,7 @@ import { CheckboxSelectHeader } from '@/components/ui/checkbox-select-header';
 import { HeaderTitle } from '@/components/ui/header-title';
 import { LoadSubmitFooter } from '@/components/ui/load-submit-footer';
 import { NotFoundState } from '@/components/ui/not-found-state';
-import { Colors } from '@/constants/theme';
+import { Colors, ScreenStyles } from '@/constants/theme';
 import { useCheckboxSelection } from '@/hooks/use-checkbox-selection';
 import { getRoutineDetail, type RoutineDetail, type RoutineExerciseSelection } from '@/lib/routines/db';
 import { Stack, useRouter } from 'expo-router';
@@ -82,7 +82,7 @@ export function RoutineLoadView({ routineId, routineName, onSubmit }: Props) {
   const hasExercises = exercises.length > 0;
 
   return (
-    <SafeAreaView style={styles.safeArea} edges={['bottom']}>
+    <SafeAreaView style={ScreenStyles.safeArea} edges={['bottom']}>
       <Stack.Screen
         options={{ headerTitle: () => <HeaderTitle title="このルーティンから読み込み" subtitle={routineName} /> }}
       />
@@ -133,8 +133,6 @@ export function RoutineLoadView({ routineId, routineName, onSubmit }: Props) {
 }
 
 const styles = StyleSheet.create({
-  safeArea: { flex: 1, backgroundColor: Colors.background },
-
   loading: { flex: 1, alignItems: 'center', justifyContent: 'center' },
 
   list: { flex: 1 },

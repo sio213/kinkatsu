@@ -2,7 +2,7 @@ import { ReminderForm, type ReminderFormHandle } from '@/components/reminders/re
 import { FormScrollProvider } from '@/components/ui/form-scroll-context';
 import { KeyboardAvoidingScreen } from '@/components/ui/keyboard-avoiding-screen';
 import { PrimaryButton } from '@/components/ui/primary-button';
-import { Colors } from '@/constants/theme';
+import { Colors, ScreenStyles } from '@/constants/theme';
 import { DEFAULT_REMINDER_BODY, DEFAULT_REMINDER_TITLE } from '@/lib/notifications/messages';
 import type { ReminderInput } from '@/lib/notifications/types';
 import { useRoutineDraftStore } from '@/lib/routines/draft-store';
@@ -51,7 +51,7 @@ export default function RoutineReminderScreen() {
   }, [router]);
 
   return (
-    <SafeAreaView style={styles.safe} edges={['bottom']}>
+    <SafeAreaView style={ScreenStyles.safeArea} edges={['bottom']}>
       <KeyboardAvoidingScreen>
         <FormScrollProvider scrollRef={scrollRef}>
           <ScrollView ref={scrollRef} contentContainerStyle={styles.content} keyboardShouldPersistTaps="handled">
@@ -76,7 +76,6 @@ export default function RoutineReminderScreen() {
 }
 
 const styles = StyleSheet.create({
-  safe: { flex: 1, backgroundColor: Colors.background },
   content: { paddingHorizontal: 20, paddingTop: 12, paddingBottom: 24 },
 
   footer: {

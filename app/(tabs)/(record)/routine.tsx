@@ -2,7 +2,7 @@ import { RoutineCard } from '@/components/routines/routine-card';
 import { HeaderAddButton } from '@/components/ui/header-add-button';
 import { ListErrorBoundary } from '@/components/ui/list-error-boundary';
 import { PrimaryButton } from '@/components/ui/primary-button';
-import { Colors, Typography } from '@/constants/theme';
+import { Colors, ScreenStyles, Typography } from '@/constants/theme';
 import type { Routine } from '@/db/schema';
 import { useDebouncedPush } from '@/hooks/use-debounced-push';
 import { useRoutineExerciseSummaries, useRoutineReminders, useRoutines } from '@/hooks/use-routines';
@@ -146,7 +146,7 @@ export default function RoutineListScreen() {
   return (
     // タブ配下の画面はタブバーが下端を占有するのでedges={[]}が正（他のタブ画面と統一）。
     // ルートStack上にあった頃はホームインジケータ分を自前で確保するedges={['bottom']}だった
-    <SafeAreaView style={styles.safeArea} edges={[]}>
+    <SafeAreaView style={ScreenStyles.safeArea} edges={[]}>
       <Stack.Screen
         options={{
           headerRight: () => (
@@ -173,7 +173,6 @@ export default function RoutineListScreen() {
 }
 
 const styles = StyleSheet.create({
-  safeArea: { flex: 1, backgroundColor: Colors.background },
   list: { flex: 1 },
   content: { padding: 16, flexGrow: 1 },
   separator: { height: 11 },
