@@ -1,4 +1,4 @@
-import { RoutineCreateHeaderButton } from '@/components/routines/routine-create-header-button';
+import { routineCreateHeaderRight } from '@/components/routines/routine-create-header-button';
 import { RoutinePickerList } from '@/components/routines/routine-picker-list';
 import { HeaderTitle } from '@/components/ui/header-title';
 import { NotFoundScreen } from '@/components/ui/not-found-screen';
@@ -84,7 +84,7 @@ export default function StartRoutinePickerScreen() {
                 ),
               }
             : {}),
-          headerRight: () => <RoutineCreateHeaderButton />,
+          headerRight: routineCreateHeaderRight(routines),
         }}
       />
       <RoutinePickerList

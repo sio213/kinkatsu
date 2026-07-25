@@ -84,3 +84,19 @@ test('セッションカードをタップすると/routine/session-history-load
     params: { sourceSessionId: '1', sourceStartedAt: String(chestSession.startedAt) },
   });
 });
+
+// 0件時の空状態（デザイン案06-c′）。ルーティン編集からの読み込みでは「今から記録する」という
+// 行き先が無いため主CTAは出さず、「戻る」だけになる（@tester指摘: 未カバーだった）
+test('過去の記録が0件なら空状態を表示し、主CTAは出さず戻るボタンでrouter.backする', async () => {
+  const root = await renderResolved([]);
+  expect(root.findByProps({ children: '過去の記録がまだありません' })).toBeDefined();
+  expect(
+    root.findAllByType(TouchableOpacity).find((btn) => btn.props.accessibilityLabel === '新しく記録する'),
+  ).toBeUndefined();
+
+  const backBtn = root.findAllByType(TouchableOpacity).find((btn) => btn.props.accessibilityLabel === '戻る')!;
+  act(() => {
+    backBtn.props.onPress();
+  });
+  expect(mockBack).toHaveBeenCalled();
+});

@@ -9,7 +9,15 @@ const mockResetDraft = jest.fn();
 
 jest.mock('expo-router', () => ({
   useRouter: () => ({ push: mockPush }),
-  Stack: { Screen: () => null },
+  // Stack.Screen はナビゲーターのoptionsを設定するコンポーネントで本来は見た目を持たないが、
+  // headerRightの中身（ルーティン作成ボタン）の有無をテストで検証できるよう、そのレンダー関数だけ実行してやる
+  // （routine-picker-screen.test.tsxと同じ方式）
+  Stack: {
+    Screen: ({ options }: { options?: { headerRight?: () => unknown } }) => {
+      const { createElement, Fragment } = require('react');
+      return createElement(Fragment, null, options?.headerRight?.());
+    },
+  },
 }));
 
 jest.mock('@/hooks/use-routines', () => ({
@@ -399,4 +407,52 @@ test('1枚目の開始ボタンの処理が終わる前に2枚目の開始ボタ
   await act(async () => {
     resolveStart({ sessionId: 1, cards: [] });
   });
+});
+
+// 0件時の空状態（デザイン案06-b′）。ルーティン選択画面(routine-picker-list.tsx)と同じ型に
+// 揃えているが、タブ直下の一覧なので戻る先が無く「戻る」は出さない（@ユーザー指摘）
+describe('ルーティンが0件のとき', () => {
+  beforeEach(() => {
+    mockUseRoutines.mockReturnValue({
+      routines: [],
+      removeRoutine: jest.fn(),
+      swapOrder: jest.fn(),
+      duplicateRoutine: jest.fn(),
+    });
+  });
+
+  test('デザイン案06-b′の空状態（タイトル+説明）を表示する', () => {
+    const root = render();
+    expect(root.findByProps({ children: 'ルーティンがまだありません' })).toBeDefined();
+    expect(
+      root.findByProps({ children: 'いつものメニューを登録すると、\n次回から選ぶだけで開始できます' }),
+    ).toBeDefined();
+  });
+
+  test('「戻る」は出さない（タブ直下で戻る先が無いため）', () => {
+    expect(findByAccessibilityLabel(render(), '戻る')).toBeUndefined();
+  });
+
+  test('「ルーティンを作成」は画面全体で1つだけ（ヘッダーの＋は出さない）', () => {
+    const root = render();
+    expect(
+      root.findAllByType(TouchableOpacity).filter((t) => t.props.accessibilityLabel === 'ルーティンを作成').length,
+    ).toBe(1);
+  });
+
+  test('「ルーティンを作成」を押すと下書きをリセットしてから作成画面へ遷移する', () => {
+    const root = render();
+    act(() => {
+      findByAccessibilityLabel(root, 'ルーティンを作成')!.props.onPress();
+    });
+    expect(mockResetDraft).toHaveBeenCalled();
+    expect(mockPush).toHaveBeenCalledWith('/routine/new');
+  });
+});
+
+test('ルーティンが1件以上あるときはヘッダーの＋が「ルーティンを作成」を出す', () => {
+  const root = render();
+  expect(
+    root.findAllByType(TouchableOpacity).filter((t) => t.props.accessibilityLabel === 'ルーティンを作成').length,
+  ).toBe(1);
 });

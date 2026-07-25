@@ -1,19 +1,19 @@
 import { RoutineCard } from '@/components/routines/routine-card';
-import { HeaderAddButton } from '@/components/ui/header-add-button';
+import { routineCreateHeaderRight } from '@/components/routines/routine-create-header-button';
+import { EmptyState } from '@/components/ui/empty-state';
 import { ListErrorBoundary } from '@/components/ui/list-error-boundary';
-import { PrimaryButton } from '@/components/ui/primary-button';
-import { Colors, ScreenStyles, Typography } from '@/constants/theme';
+import { ScreenStyles } from '@/constants/theme';
 import type { Routine } from '@/db/schema';
 import { useDebouncedPush } from '@/hooks/use-debounced-push';
+import { useRoutineCreate } from '@/hooks/use-routine-create';
 import { useRoutineExerciseSummaries, useRoutineReminders, useRoutines } from '@/hooks/use-routines';
 import { useStartWithConfirm } from '@/hooks/use-start-with-confirm';
 import { useWorkoutSessions } from '@/hooks/use-workout-session';
-import { useRoutineDraftStore } from '@/lib/routines/draft-store';
 import { getRoutineScheduleDisplay } from '@/lib/routines/format';
 import { startWorkoutFromRoutine } from '@/lib/workout/session';
 import { Stack } from 'expo-router';
 import { useCallback, useRef } from 'react';
-import { Alert, FlatList, StyleSheet, Text, View } from 'react-native';
+import { Alert, FlatList, StyleSheet, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 export default function RoutineListScreen() {
@@ -22,20 +22,15 @@ export default function RoutineListScreen() {
   const routineReminders = useRoutineReminders();
   const { activeSession } = useWorkoutSessions();
   const pushDebounced = useDebouncedPush();
-  const resetDraft = useRoutineDraftStore((state) => state.reset);
   const startRoutine = useStartWithConfirm(
     activeSession,
     (sessionId) => pushDebounced(`/workout/${sessionId}`),
     startWorkoutFromRoutine,
   );
 
-  const handleCreate = useCallback(() => {
-    // app/routine/new.tsx自身のマウント時resetに加えてここでも空にしておくことで、
-    // 新規作成フォームの初回描画（defaultValuesの読み込み）がuseEffect実行より前に
-    // 走っても前回の下書きが一瞬表示される余地を無くす
-    resetDraft();
-    pushDebounced('/routine/new');
-  }, [resetDraft, pushDebounced]);
+  // resetDraft→pushの順序契約はhooks/use-routine-create.tsに集約している
+  // （ルーティン選択画面のヘッダー＋・0件時の空状態CTAと共通）
+  const handleCreate = useRoutineCreate();
 
   const handleEdit = useCallback(
     (id: number) => {
@@ -147,13 +142,9 @@ export default function RoutineListScreen() {
     // タブ配下の画面はタブバーが下端を占有するのでedges={[]}が正（他のタブ画面と統一）。
     // ルートStack上にあった頃はホームインジケータ分を自前で確保するedges={['bottom']}だった
     <SafeAreaView style={ScreenStyles.safeArea} edges={[]}>
-      <Stack.Screen
-        options={{
-          headerRight: () => (
-            <HeaderAddButton onPress={handleCreate} accessibilityLabel="ルーティンを作成" />
-          ),
-        }}
-      />
+      {/* 0件時は空状態が同じ「ルーティンを作成」を主CTAとして出すため、ヘッダーの＋は出さない
+          （出すと同じラベルのボタンが2つ並びVoiceOverで区別が付かない。@tester指摘） */}
+      <Stack.Screen options={{ headerRight: routineCreateHeaderRight(routines) }} />
       <FlatList
         style={styles.list}
         data={routines}
@@ -161,11 +152,16 @@ export default function RoutineListScreen() {
         renderItem={renderItem}
         ItemSeparatorComponent={() => <View style={styles.separator} />}
         contentContainerStyle={styles.content}
+        // 0件時はルーティン選択画面（components/routines/routine-picker-list.tsx）と同じ
+        // デザイン案06-b′の空状態に揃える。タブ直下の一覧で戻る先が無いためonPressBackは渡さない
+        // （@ユーザー指摘）
         ListEmptyComponent={
-          <View style={styles.emptyWrapper}>
-            <Text style={styles.empty}>ルーティンがありません</Text>
-            <PrimaryButton label="＋ 最初のルーティンを作成" onPress={handleCreate} style={styles.emptyAddBtn} />
-          </View>
+          <EmptyState
+            icon="repeat"
+            title="ルーティンがまだありません"
+            description={'いつものメニューを登録すると、\n次回から選ぶだけで開始できます'}
+            action={{ label: 'ルーティンを作成', icon: 'add', onPress: handleCreate }}
+          />
         }
       />
     </SafeAreaView>
@@ -176,8 +172,4 @@ const styles = StyleSheet.create({
   list: { flex: 1 },
   content: { padding: 16, flexGrow: 1 },
   separator: { height: 11 },
-
-  emptyWrapper: { flex: 1, alignItems: 'center', justifyContent: 'center', gap: 12, paddingVertical: 32 },
-  empty: { ...Typography.body, color: Colors.textMuted, textAlign: 'center' },
-  emptyAddBtn: { paddingHorizontal: 20 },
 });

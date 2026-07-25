@@ -30,6 +30,19 @@ export default function SessionHistoryPickerScreen() {
   const router = useRouter();
   const pushDebounced = useDebouncedPush();
 
+  // 記録が0件のときの空状態の主CTA「新しく記録する」（デザイン案06-c′）。この画面では新しい記録を
+  // 作れないため、実装済みのもう一つの開始手段＝「種目を追加」へ逃がす。pushではなくreplaceで
+  // 置き換えるのは、(1)行き止まりのこの画面をスタックに残さないため、(2)種目追加ピッカーが
+  // start-chooserの直下にいる前提でdismiss段数(START_CHOOSER_DISMISS_COUNT.fromChild)を
+  // 決めており、replaceなら深さが変わらずその前提が保たれるため。
+  // 過去日の事後記録モードではpastDateKeyも引き継ぎ、作るセッションの種類を変えない
+  const handleStartNew = useCallback(() => {
+    router.replace({
+      pathname: '/workout/exercise-picker',
+      params: { newSession: '1', ...(pastDateKey ? { pastDateKey } : {}) },
+    });
+  }, [router, pastDateKey]);
+
   const handleSelect = useCallback(
     (session: PastTrainingSession) => {
       pushDebounced({
@@ -59,6 +72,9 @@ export default function SessionHistoryPickerScreen() {
       // app/routine/session-history-picker.tsx・app/calendar/schedule-workout-history-picker.tsxと同じ
       excludeSessionId={isNewSession ? NO_SESSION_TO_EXCLUDE : sessionId}
       onSelect={handleSelect}
+      // 「新しく記録する」はトレーニング開始選択画面から来た場合だけ意味を持つ。トレーニング画面
+      // ヘッダー⋮から来た場合は既に進行中のセッションがあり、そこへ種目を足すのが本筋のため出さない
+      onPressStartNew={isNewSession ? handleStartNew : undefined}
     />
   );
 }

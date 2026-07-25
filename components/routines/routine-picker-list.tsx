@@ -1,7 +1,8 @@
 import { RoutinePickerCard } from '@/components/routines/routine-picker-card';
+import { EmptyState } from '@/components/ui/empty-state';
 import { ListErrorBoundary } from '@/components/ui/list-error-boundary';
-import { NotFoundState } from '@/components/ui/not-found-state';
 import type { Routine } from '@/db/schema';
+import { useRoutineCreate } from '@/hooks/use-routine-create';
 import { useCallback } from 'react';
 import { FlatList, StyleSheet, View } from 'react-native';
 
@@ -24,6 +25,10 @@ type Props = {
 // 描画部分のみをこのコンポーネントに集約する。呼び出し元のparams検証（不正なsessionId/dateKey等）
 // はこのコンポーネントの責務外で、各画面が自分のガードとして個別に持つ
 export function RoutinePickerList({ routines, summaries, onSelect, onPressBack, hint }: Props) {
+  // 4つの呼び出し元すべてがヘッダーにRoutineCreateHeaderButtonを持つ＝どの画面でもその場で
+  // 作れるため、0件時の主CTAはこのコンポーネント側に固定で持たせる
+  const handleCreate = useRoutineCreate();
+
   const renderItem = useCallback(
     ({ item }: { item: Routine }) => {
       const summary = summaries.get(item.id);
@@ -43,7 +48,15 @@ export function RoutinePickerList({ routines, summaries, onSelect, onPressBack, 
   );
 
   if (routines.length === 0) {
-    return <NotFoundState message="ルーティンがまだありません" actionLabel="戻る" onPressAction={onPressBack} />;
+    return (
+      <EmptyState
+        icon="repeat"
+        title="ルーティンがまだありません"
+        description={'いつものメニューを登録すると、\n次回から選ぶだけで開始できます'}
+        action={{ label: 'ルーティンを作成', icon: 'add', onPress: handleCreate }}
+        onPressBack={onPressBack}
+      />
+    );
   }
 
   return (

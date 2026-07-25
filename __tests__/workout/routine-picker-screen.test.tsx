@@ -80,6 +80,25 @@ test('ルーティンが0件なら空状態を表示し、戻るボタンでrout
   expect(mockBack).toHaveBeenCalled();
 });
 
+// 上のexpo-routerモックがheaderRightをツリーへ展開するため、ヘッダーの＋と空状態のCTAは
+// どちらも同じrootから数えられる。
+// 0件時は空状態が「ルーティンを作成」を主CTAとして出すため、ヘッダーの＋は出さない。
+// 両方出すと同じラベル・同じ遷移のボタンが2つ並び、VoiceOverで区別が付かなくなる（@tester指摘）
+function countCreateButtons(root: ReactTestInstance) {
+  return root.findAllByType(TouchableOpacity).filter((btn) => btn.props.accessibilityLabel === 'ルーティンを作成')
+    .length;
+}
+
+test('ルーティンが0件のとき「ルーティンを作成」ボタンは画面全体で1つだけ（ヘッダーの＋は出さない）', () => {
+  expect(countCreateButtons(render())).toBe(1);
+});
+
+test('ルーティンが1件以上あるときはヘッダーの＋だけが「ルーティンを作成」を出す', () => {
+  mockUseRoutines.mockReturnValue({ routines: [baseRoutine({ id: 1, name: '胸トレ' })] });
+  mockUseRoutineExerciseSummaries.mockReturnValue(new Map([[1, { exerciseCount: 3, categories: ['chest'] }]]));
+  expect(countCreateButtons(render())).toBe(1);
+});
+
 test('ルーティン一覧をカードで表示する(名前+種目数+カテゴリ)', () => {
   mockUseRoutines.mockReturnValue({ routines: [baseRoutine({ id: 1, name: '胸トレ' })] });
   mockUseRoutineExerciseSummaries.mockReturnValue(new Map([[1, { exerciseCount: 3, categories: ['chest'] }]]));
