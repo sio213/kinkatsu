@@ -204,7 +204,8 @@ export const SessionExerciseCard = memo(
     }
   }, [sessionId, exercise.id, exercise.sessionExerciseId, sets, columns, notifyInteraction]);
 
-  const runDeleteLastSet = useCallback(async () => {
+  const handleDeleteSet = useCallback(async () => {
+    notifyInteraction();
     if (isMutatingRef.current) return;
     isMutatingRef.current = true;
     try {
@@ -218,22 +219,7 @@ export const SessionExerciseCard = memo(
     } finally {
       isMutatingRef.current = false;
     }
-  }, [exercise.sessionExerciseId, sets]);
-
-  const handleDeleteSet = useCallback(() => {
-    notifyInteraction();
-    const last = sets[sets.length - 1];
-    // 値が入っている（チェック済みの）セットを消す場合だけ確認する。空のセットの削除は毎回確認すると
-    // かえって煩わしいため確認なしで即削除してよい
-    if (last?.completedAt != null) {
-      Alert.alert('このセットを削除しますか？', '入力した記録が失われます。', [
-        { text: 'キャンセル', style: 'cancel' },
-        { text: '削除', style: 'destructive', onPress: runDeleteLastSet },
-      ]);
-      return;
-    }
-    runDeleteLastSet();
-  }, [sets, runDeleteLastSet, notifyInteraction]);
+  }, [exercise.sessionExerciseId, sets, notifyInteraction]);
 
   const handleSaveSet = useCallback(
     async (setId: number, values: SetValues) => {

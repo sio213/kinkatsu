@@ -369,36 +369,15 @@ test('最後のセットが未入力（未完了）のときは確認無しで�
   expect(mockDeleteLastSet).toHaveBeenCalledWith(500);
 });
 
-test('最後のセットが完了済み（値あり）のときは確認ダイアログを出し、確定するとdeleteLastSetが呼ばれる', async () => {
+test('最後のセットが完了済み（値あり）でも確認無しで即座にdeleteLastSetが呼ばれる', async () => {
   const sets = [{ id: 1, setNumber: 1, weight: 60, reps: 10, completedAt: 1 }] as any;
-  (Alert.alert as jest.Mock).mockImplementation((_title, _msg, buttons) => {
-    const confirmBtn = buttons?.find((b: { text: string }) => b.text === '削除');
-    confirmBtn?.onPress?.();
-  });
   const root = render({ exercise, sessionId: 1, sets });
   const btn = findButtonByLabel(root, 'セット削除')!;
   await act(async () => {
     btn.props.onPress();
   });
-  expect(Alert.alert).toHaveBeenCalledWith(
-    'このセットを削除しますか？',
-    '入力した記録が失われます。',
-    expect.anything(),
-  );
+  expect(Alert.alert).not.toHaveBeenCalled();
   expect(mockDeleteLastSet).toHaveBeenCalledWith(500);
-});
-
-test('削除確認をキャンセルするとdeleteLastSetは呼ばれない', async () => {
-  const sets = [{ id: 1, setNumber: 1, weight: 60, reps: 10, completedAt: 1 }] as any;
-  (Alert.alert as jest.Mock).mockImplementation(() => {
-    // キャンセル: どのボタンも押さない
-  });
-  const root = render({ exercise, sessionId: 1, sets });
-  const btn = findButtonByLabel(root, 'セット削除')!;
-  await act(async () => {
-    btn.props.onPress();
-  });
-  expect(mockDeleteLastSet).not.toHaveBeenCalled();
 });
 
 test('セット削除後に別idの新しいセットが同じ位置に来ても、削除済みセットの古いdraftは使われない', async () => {
