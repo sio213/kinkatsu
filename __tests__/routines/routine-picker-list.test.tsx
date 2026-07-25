@@ -1,8 +1,17 @@
+const mockRoutineCreate = jest.fn();
+jest.mock('@/hooks/use-routine-create', () => ({
+  useRoutineCreate: () => mockRoutineCreate,
+}));
+
 import { RoutinePickerList } from '@/components/routines/routine-picker-list';
 import type { Routine } from '@/db/schema';
 import React from 'react';
 import { act, create, type ReactTestInstance } from 'react-test-renderer';
 import { Text, TouchableOpacity } from 'react-native';
+
+beforeEach(() => {
+  mockRoutineCreate.mockClear();
+});
 
 function baseRoutine(overrides: Partial<Routine> = {}): Routine {
   return { id: 1, name: '胸の日', orderIndex: 0, createdAt: 0, updatedAt: 0, ...overrides };
@@ -71,10 +80,33 @@ test('summariesに無いルーティンは種目数0・カテゴリ無しで表�
 test('ルーティンが0件の場合は空状態を表示し、戻るボタンでonPressBackを呼ぶ', () => {
   const { root, onPressBack } = render({ routines: [] });
   expect(root.findByProps({ children: 'ルーティンがまだありません' })).toBeDefined();
+  expect(
+    root.findByProps({ children: 'いつものメニューを登録すると、\n次回から選ぶだけで開始できます' }),
+  ).toBeDefined();
 
   const backBtn = root.findAllByType(TouchableOpacity).find((t) => t.props.accessibilityLabel === '戻る')!;
   act(() => {
     backBtn.props.onPress();
   });
   expect(onPressBack).toHaveBeenCalled();
+});
+
+// デザイン案06-b′の主CTA。0件時は一覧が空でヘッダーの＋に気づきにくいため、
+// 空状態からも同じ作成画面へ行けるようにする
+test('ルーティンが0件の場合の「ルーティンを作成」で作成画面へ遷移する', () => {
+  const { root } = render({ routines: [] });
+  const createBtn = root
+    .findAllByType(TouchableOpacity)
+    .find((t) => t.props.accessibilityLabel === 'ルーティンを作成')!;
+  act(() => {
+    createBtn.props.onPress();
+  });
+  expect(mockRoutineCreate).toHaveBeenCalled();
+});
+
+test('ルーティンが1件以上あるときは空状態のCTAを出さない', () => {
+  const { root } = render();
+  expect(
+    root.findAllByType(TouchableOpacity).find((t) => t.props.accessibilityLabel === 'ルーティンを作成'),
+  ).toBeUndefined();
 });

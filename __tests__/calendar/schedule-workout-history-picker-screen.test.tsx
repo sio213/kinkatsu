@@ -101,6 +101,22 @@ describe('ScheduleWorkoutHistoryPickerScreen', () => {
       params: { scheduledWorkoutId: '5', sourceSessionId: '1', sourceStartedAt: String(chestSession.startedAt) },
     });
   });
+
+  // 0件時の空状態（デザイン案06-c′）。予定への読み込みでは「今から記録する」という行き先が
+  // 無いため主CTAは出さず、「戻る」だけになる（@tester指摘: 未カバーだった）
+  test('過去の記録が0件なら空状態を表示し、主CTAは出さず戻るボタンでrouter.backする', async () => {
+    const root = await renderResolved([]);
+    expect(root.findByProps({ children: '過去の記録がまだありません' })).toBeDefined();
+    expect(
+      root.findAllByType(TouchableOpacity).find((btn) => btn.props.accessibilityLabel === '新しく記録する'),
+    ).toBeUndefined();
+
+    const backBtn = root.findAllByType(TouchableOpacity).find((btn) => btn.props.accessibilityLabel === '戻る')!;
+    act(() => {
+      backBtn.props.onPress();
+    });
+    expect(mockBack).toHaveBeenCalled();
+  });
 });
 
 // 「予定を追加」→「過去の記録」経路（2026-07-25新設）。予定がまだ存在しないため
@@ -144,5 +160,16 @@ describe('dateKeyモード（新規予定の作成経路）', () => {
     mockUseLocalSearchParams.mockReturnValue({ dateKey: '2026-13-99' });
     const root = render();
     expect(root.findByProps({ children: '予定が見つかりません' })).toBeDefined();
+  });
+
+  // dateKeyモードは「予定がまだ無い」＝workout側のnewSession経路と同じ位置づけだが、
+  // 「今から記録する」は予定作成フローでは意味を持たない（予定は未来日のもの）ため主CTAは
+  // 出さない。@tester指摘の論点で、意図的にCTA無しであることを明示しておく
+  test('dateKeyモードでも0件時に「新しく記録する」は出さない（予定作成フローには馴染まないため）', async () => {
+    const root = await renderResolved([]);
+    expect(root.findByProps({ children: '過去の記録がまだありません' })).toBeDefined();
+    expect(
+      root.findAllByType(TouchableOpacity).find((btn) => btn.props.accessibilityLabel === '新しく記録する'),
+    ).toBeUndefined();
   });
 });

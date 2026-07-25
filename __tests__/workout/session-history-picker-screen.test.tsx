@@ -1,9 +1,10 @@
 const mockBack = jest.fn();
 const mockPush = jest.fn();
+const mockReplace = jest.fn();
 const mockUseLocalSearchParams = jest.fn();
 
 jest.mock('expo-router', () => ({
-  useRouter: () => ({ back: mockBack, push: mockPush }),
+  useRouter: () => ({ back: mockBack, push: mockPush, replace: mockReplace }),
   useLocalSearchParams: () => mockUseLocalSearchParams(),
 }));
 
@@ -108,9 +109,12 @@ test('取得失敗時はエラーメッセージと再試行ボタンを表示�
   expect(root.findByProps({ children: 'ベンチプレス・ダンベルフライ' })).toBeDefined();
 });
 
-test('過去のトレーニング記録が0件なら空状態のメッセージを表示し、戻るボタンでrouter.backする', async () => {
+test('過去の記録が0件なら空状態のメッセージを表示し、戻るボタンでrouter.backする', async () => {
   const root = await renderResolved([]);
-  expect(root.findByProps({ children: '過去のトレーニング記録がまだありません' })).toBeDefined();
+  expect(root.findByProps({ children: '過去の記録がまだありません' })).toBeDefined();
+  expect(
+    root.findByProps({ children: 'トレーニングを記録すると、\n次回からここで選べます' }),
+  ).toBeDefined();
 
   const backBtn = root
     .findAllByType(TouchableOpacity)
@@ -119,6 +123,48 @@ test('過去のトレーニング記録が0件なら空状態のメッセージ�
     backBtn.props.onPress();
   });
   expect(mockBack).toHaveBeenCalled();
+});
+
+// デザイン案06-c′の主CTA。この画面では記録を作れないため「種目を追加」へ逃がす（replaceで
+// 置き換えることでstart-chooserからの深さが変わらず、dismiss段数の前提が保たれる）
+test('newSession経路で0件なら「新しく記録する」で種目追加ピッカーへreplaceする', async () => {
+  mockUseLocalSearchParams.mockReturnValue({ newSession: '1' });
+  const root = await renderResolved([]);
+
+  const startBtn = root
+    .findAllByType(TouchableOpacity)
+    .find((btn) => btn.props.accessibilityLabel === '新しく記録する')!;
+  act(() => {
+    startBtn.props.onPress();
+  });
+  expect(mockReplace).toHaveBeenCalledWith({
+    pathname: '/workout/exercise-picker',
+    params: { newSession: '1' },
+  });
+});
+
+test('過去日モードのnewSession経路では「新しく記録する」がpastDateKeyを引き継ぐ', async () => {
+  mockUseLocalSearchParams.mockReturnValue({ newSession: '1', pastDateKey: '2026-07-20' });
+  const root = await renderResolved([]);
+
+  const startBtn = root
+    .findAllByType(TouchableOpacity)
+    .find((btn) => btn.props.accessibilityLabel === '新しく記録する')!;
+  act(() => {
+    startBtn.props.onPress();
+  });
+  expect(mockReplace).toHaveBeenCalledWith({
+    pathname: '/workout/exercise-picker',
+    params: { newSession: '1', pastDateKey: '2026-07-20' },
+  });
+});
+
+// 進行中セッションのヘッダー⋮から来た場合は既にセッションがあり、「今から記録する」の行き先が無い
+test('sessionId経路（トレーニング画面⋮から）では「新しく記録する」を出さない', async () => {
+  const root = await renderResolved([]);
+  expect(
+    root.findAllByType(TouchableOpacity).find((btn) => btn.props.accessibilityLabel === '新しく記録する'),
+  ).toBeUndefined();
 });
 
 test('カテゴリチップは実際にデータに含まれるカテゴリのみを表示する（★お気に入りは含まない）', async () => {

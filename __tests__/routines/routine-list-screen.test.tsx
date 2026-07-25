@@ -9,7 +9,15 @@ const mockResetDraft = jest.fn();
 
 jest.mock('expo-router', () => ({
   useRouter: () => ({ push: mockPush }),
-  Stack: { Screen: () => null },
+  // Stack.Screen はナビゲーターのoptionsを設定するコンポーネントで本来は見た目を持たないが、
+  // headerRightの中身（ルーティン作成ボタン）の有無をテストで検証できるよう、そのレンダー関数だけ実行してやる
+  // （routine-picker-screen.test.tsxと同じ方式）
+  Stack: {
+    Screen: ({ options }: { options?: { headerRight?: () => unknown } }) => {
+      const { createElement, Fragment } = require('react');
+      return createElement(Fragment, null, options?.headerRight?.());
+    },
+  },
 }));
 
 jest.mock('@/hooks/use-routines', () => ({
@@ -399,4 +407,58 @@ test('1枚目の開始ボタンの処理が終わる前に2枚目の開始ボタ
   await act(async () => {
     resolveStart({ sessionId: 1, cards: [] });
   });
+});
+
+// 0件時の空状態（デザイン案06-b′）。ルーティン選択画面(routine-picker-list.tsx)と同じ型に
+// 揃えているが、タブ直下の一覧なので戻る先が無く「戻る」は出さない（@ユーザー指摘）
+describe('ルーティンが0件のとき', () => {
+  beforeEach(() => {
+    mockUseRoutines.mockReturnValue({
+      routines: [],
+      removeRoutine: jest.fn(),
+      swapOrder: jest.fn(),
+      duplicateRoutine: jest.fn(),
+    });
+  });
+
+  test('デザイン案06-b′の空状態（タイトル+説明）を表示する', () => {
+    const root = render();
+    expect(root.findByProps({ children: 'ルーティンがまだありません' })).toBeDefined();
+    expect(
+      root.findByProps({ children: 'いつものメニューを登録すると、\n次回から選ぶだけで開始できます' }),
+    ).toBeDefined();
+  });
+
+  test('「戻る」は出さない（タブ直下で戻る先が無いため）', () => {
+    expect(findByAccessibilityLabel(render(), '戻る')).toBeUndefined();
+  });
+
+  // ヘッダーの＋は一覧の有無に関わらず常に出す（ユーザー判断）。0件時は空状態のCTAと合わせて
+  // 同じラベルが2つになるが承知の上の仕様なので、意図せず数が変わったら気付けるよう固定しておく
+  test('ヘッダーの＋と空状態の主CTAで「ルーティンを作成」が2つ出る', () => {
+    const root = render();
+    expect(
+      root.findAllByType(TouchableOpacity).filter((t) => t.props.accessibilityLabel === 'ルーティンを作成').length,
+    ).toBe(2);
+  });
+
+  test('空状態の「ルーティンを作成」を押すと下書きをリセットしてから作成画面へ遷移する', () => {
+    const root = render();
+    // ヘッダーの＋ではなく空状態側（後に描画されるPrimaryButton）を明示的に選ぶ
+    const createBtns = root
+      .findAllByType(TouchableOpacity)
+      .filter((t) => t.props.accessibilityLabel === 'ルーティンを作成');
+    act(() => {
+      createBtns[createBtns.length - 1].props.onPress();
+    });
+    expect(mockResetDraft).toHaveBeenCalled();
+    expect(mockPush).toHaveBeenCalledWith('/routine/new');
+  });
+});
+
+test('ルーティンが1件以上あるときはヘッダーの＋だけが「ルーティンを作成」を出す', () => {
+  const root = render();
+  expect(
+    root.findAllByType(TouchableOpacity).filter((t) => t.props.accessibilityLabel === 'ルーティンを作成').length,
+  ).toBe(1);
 });

@@ -1,4 +1,5 @@
 import { CategoryFilterChips } from '@/components/exercises/category-filter-chips';
+import { EmptyState } from '@/components/ui/empty-state';
 import { NotFoundState } from '@/components/ui/not-found-state';
 import { PastTrainingSessionCard } from '@/components/workout/past-training-session-card';
 import { Colors, ScreenStyles, Typography } from '@/constants/theme';
@@ -19,13 +20,20 @@ type Props = {
   // 「進行中セッション」という概念自体が無いためNO_SESSION_TO_EXCLUDE(-1)を渡す
   excludeSessionId: number;
   onSelect: (session: PastTrainingSession) => void;
+  /**
+   * 記録が0件のときの空状態に出す主CTA（デザイン案06-c′「新しく記録する」）。この画面は
+   * 過去の記録を選ぶだけで新しい記録を作れないため、他の開始手段へ逃がす導線を呼び出し元が渡す。
+   * トレーニング開始選択画面から来た場合だけ意味を持ち、進行中セッションへの追加・ルーティン編集・
+   * 予定作成から来た場合は「今から記録する」という行き先が無いため省略する（「戻る」だけになる）
+   */
+  onPressStartNew?: () => void;
 };
 
 // app/workout/session-history-picker.tsx・app/routine/session-history-picker.tsxの共通実装。
 // 「過去のトレーニングを1つ選ぶ」という操作自体はトレーニング画面・ルーティンどちらから
 // 開いても同じ体験のため、除外セッションIDと選択後の遷移先（onSelect）だけを呼び出し側に委ね、
 // 一覧取得・ページング・カテゴリ絞り込みのロジックと見た目はここに一元化する
-export function SessionHistoryPickerView({ excludeSessionId, onSelect }: Props) {
+export function SessionHistoryPickerView({ excludeSessionId, onSelect, onPressStartNew }: Props) {
   const router = useRouter();
 
   const [activeCategory, setActiveCategory] = useState<string>(CATEGORY_ALL);
@@ -164,10 +172,14 @@ export function SessionHistoryPickerView({ excludeSessionId, onSelect }: Props) 
           onPressAction={fetchSessions}
         />
       ) : sessions.length === 0 ? (
-        <NotFoundState
-          message="過去のトレーニング記録がまだありません"
-          actionLabel="戻る"
-          onPressAction={() => router.back()}
+        <EmptyState
+          icon="history"
+          title="過去の記録がまだありません"
+          description={'トレーニングを記録すると、\n次回からここで選べます'}
+          action={
+            onPressStartNew ? { label: '新しく記録する', icon: 'add', onPress: onPressStartNew } : undefined
+          }
+          onPressBack={() => router.back()}
         />
       ) : filteredSessions.length === 0 ? (
         loadingMore ? (

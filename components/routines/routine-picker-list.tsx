@@ -1,6 +1,6 @@
+import { RoutineEmptyState } from '@/components/routines/routine-empty-state';
 import { RoutinePickerCard } from '@/components/routines/routine-picker-card';
 import { ListErrorBoundary } from '@/components/ui/list-error-boundary';
-import { NotFoundState } from '@/components/ui/not-found-state';
 import type { Routine } from '@/db/schema';
 import { useCallback } from 'react';
 import { FlatList, StyleSheet, View } from 'react-native';
@@ -42,8 +42,10 @@ export function RoutinePickerList({ routines, summaries, onSelect, onPressBack, 
     [summaries, onSelect, hint],
   );
 
+  // 4つの呼び出し元すべてがヘッダーにRoutineCreateHeaderButtonを持つ＝どの画面でもその場で
+  // 作れるため、0件時の主CTA（作成画面への遷移）はRoutineEmptyStateに任せて固定で出す
   if (routines.length === 0) {
-    return <NotFoundState message="ルーティンがまだありません" actionLabel="戻る" onPressAction={onPressBack} />;
+    return <RoutineEmptyState onPressBack={onPressBack} />;
   }
 
   return (

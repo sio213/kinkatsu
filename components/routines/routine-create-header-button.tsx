@@ -1,26 +1,17 @@
 import { HeaderAddButton } from '@/components/ui/header-add-button';
-import { useDebouncedPush } from '@/hooks/use-debounced-push';
-import { useRoutineDraftStore } from '@/lib/routines/draft-store';
-import { useCallback } from 'react';
+import { useRoutineCreate } from '@/hooks/use-routine-create';
 
-// ルーティン選択画面（components/routines/routine-picker-list.tsxを使う4画面）のヘッダー右に
-// 置く「ルーティンを作成」ボタン。選びたいルーティンがまだ無いとき、フローを抜けて記録タブの
-// ルーティン一覧まで戻らなくてもその場で作れるようにする。1アクションだけのため⋮メニューでは
-// なく、種目一覧・ルーティン一覧・リマインダー一覧と同じHeaderAddButton（＋）に揃える。
+// ルーティン選択画面（components/routines/routine-picker-list.tsxを使う4画面）と記録タブの
+// ルーティン一覧のヘッダー右に置く「ルーティンを作成」ボタン。選びたいルーティンがまだ無いとき、
+// フローを抜けて記録タブのルーティン一覧まで戻らなくてもその場で作れるようにする。1アクション
+// だけのため⋮メニューではなく、種目一覧・ルーティン一覧・リマインダー一覧と同じ
+// HeaderAddButton（＋）に揃える。
 //
-// 保存後はapp/routine/new.tsxがrouter.back()するため呼び出し元のピッカーへ戻り、一覧は
-// useRoutinesのlive queryで自動的に新しいルーティンを含む。
-// 下書きのresetをpush前にも行うのはapp/(tabs)/(record)/routine.tsxのhandleCreateと同じ理由で、
-// 新規作成フォームの初回描画（defaultValuesの読み込み）が作成画面側のuseEffectより前に
-// 走っても前回の下書きが一瞬見えないようにするため
+// 0件のときは空状態(EmptyState)も同じ遷移の主CTA「ルーティンを作成」を出すため、同じラベルの
+// ボタンが1画面に2つ並ぶ。＋を隠す案もあったが、一覧の有無でヘッダーの構成が変わらないほうが
+// 分かりやすいとの判断でそのまま出す（@ユーザー指摘）。遷移処理はuseRoutineCreateで共通化してある
 export function RoutineCreateHeaderButton() {
-  const pushDebounced = useDebouncedPush();
-  const resetDraft = useRoutineDraftStore((state) => state.reset);
-
-  const handlePress = useCallback(() => {
-    resetDraft();
-    pushDebounced('/routine/new');
-  }, [resetDraft, pushDebounced]);
+  const handlePress = useRoutineCreate();
 
   return <HeaderAddButton onPress={handlePress} accessibilityLabel="ルーティンを作成" />;
 }

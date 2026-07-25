@@ -16,7 +16,11 @@
  * 結果としてdismiss段数の検証がモックの値を見るだけの空回りになっていた（@reviewer指摘）
  */
 export const START_CHOOSER_DISMISS_COUNT = {
-  /** start-chooserの直下の子画面から確定する場合（種目追加ピッカー・ルーティン選択）: 自分自身+start-chooser */
+  /**
+   * start-chooserの直下の子画面から確定する場合（種目追加ピッカー・ルーティン選択）: 自分自身+start-chooser。
+   * 過去の記録一覧が0件で「新しく記録する」から種目追加ピッカーへ移った場合も、pushではなくreplaceで
+   * 一覧を置き換えるため深さは+1のまま＝ここに該当する（2026-07-25。app/workout/session-history-picker.tsx参照）
+   */
   fromChild: 2,
   /** start-chooserから2段下で確定する場合（過去の記録一覧→読み込み）: 自分自身+一覧+start-chooser */
   fromGrandchild: 3,
