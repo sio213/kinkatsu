@@ -75,7 +75,7 @@ test('ルーティンが0件なら空状態を表示し、戻るボタンでrout
 });
 
 // 今日のライブ開始（2026-07-20: start-chooserの「ルーティン」がフルCRUD一覧
-// app/routine/index.tsxではなくこの専用ピッカーに統一された。要件確認済み）
+// app/(tabs)/(record)/routine.tsxではなくこの専用ピッカーに統一された。要件確認済み）
 describe('今日のライブ開始（pastDateKeyなし）', () => {
   test('カードをタップすると、startWorkoutFromRoutineを呼び即座にワークアウト画面へ遷移する（進行中セッション確認は挟まない）', async () => {
     mockUseRoutines.mockReturnValue({ routines: [baseRoutine({ id: 10, name: '胸の日' })] });

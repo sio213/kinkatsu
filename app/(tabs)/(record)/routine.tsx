@@ -144,7 +144,9 @@ export default function RoutineListScreen() {
   );
 
   return (
-    <SafeAreaView style={styles.safeArea} edges={['bottom']}>
+    // タブ配下の画面はタブバーが下端を占有するのでedges={[]}が正（他のタブ画面と統一）。
+    // ルートStack上にあった頃はホームインジケータ分を自前で確保するedges={['bottom']}だった
+    <SafeAreaView style={styles.safeArea} edges={[]}>
       <Stack.Screen
         options={{
           headerRight: () => (

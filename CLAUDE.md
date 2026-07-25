@@ -92,6 +92,35 @@ kinkatsu用のGoogle Driveフォルダが `仕事 > Webサービス > 🏋️ ki
   2. `FormField`に各フィールドの`name`（`Controller`/`register`に渡すnameと同じもの）を渡す。現時点でエラーを表示していないフィールド（チップ選択のkind切替など）でも、単一のRHFフィールドに対応するものには付けておくと、後からそのフィールドにバリデーションを追加した際も自動的に効く
   3. `useImperativeHandle`のsubmitや送信ボタンの`onPress`は、`useScrollToFirstError()`で得た関数を`handleSubmit(onSubmit, onInvalid)`の第2引数に渡す（`handleSubmit(onSubmit)`単体のままにしない）
 
+### ナビゲーション・タブバーの表示範囲
+下部タブは4本（記録／カレンダー／種目／設定）で確定。当面再編しない。
+
+**原則: タブのコンテンツを「見て回っている」間はタブバーを出す。作成・編集・選択フローと没入モードでは隠す。**
+
+新しい画面を追加するときは、指示がなくても以下のどれに当たるかを判定して配置を決める。
+
+| 分類 | 例 | タブバー | 置き場所 |
+|---|---|---|---|
+| 閲覧・ドリルダウン | 一覧画面、詳細画面 | **出す** | `app/(tabs)/(<tab>)/` 配下のStack |
+| 作成・編集フォーム | `exercise/new`、`routine/edit/[id]`、`calendar/schedule-workout-edit` | 隠す | ルートStack（`app/` 直下） |
+| フロー内の中間画面 | picker / chooser / load / reorder / swap 系 | 隠す | ルートStack |
+| 没入モード | `workout/[id]`（トレーニング中） | 隠す | ルートStack |
+
+タブ配下にStackを作るときの必須事項（1つでも欠けると壊れる）:
+
+1. **実ディレクトリではなくグループ `( )` を使う。** `app/(tabs)/record/` にするとURLが `/routine` → `/record/routine` に変わり、ディープリンクとtyped routesが壊れる。`app/(tabs)/(record)/` ならURLは不変
+2. **`Tabs.Screen` 側に `headerShown: false` を付ける。** 付けないとタブナビゲータのヘッダーと配下Stackのヘッダーが二重に出る
+3. **配下Stackに `export const unstable_settings = { anchor: 'index' }` を書く。** expo-routerはグループ名と同名の子ルートが無いと暗黙のanchorを設定しない。anchorはディープリンク・コールドスタート時のstate復元にのみ使われるため、無いと `kinkatsu:///routine` で直接起動したときに下に `index` が積まれず戻る導線が消える（型チェックもテストも素通りする。実機で再現確認済み）
+4. タブのヘッダーがJS実装（bottom-tabs）からネイティブ（native-stack）に変わるため、**タイトルの縦位置が他タブと約4ptズレる**。`sharedHeaderStyle` を共有していてもreact-navigationの実装差で吸収できない既知の差異
+
+- **`tabBarStyle` で出し分けることはできない。** expo-routerでは親Stackにpushされた画面はタブナビゲータの外側にあるため、タブバーを出したい画面は物理的にタブ配下のStackへ置く必要がある。逆に、タブ配下に置いた画面を隠したいときだけ `tabBarStyle: { display: 'none' }` が使える
+- タブ配下へ移した画面の `SafeAreaView` は `edges={[]}` にする（タブバーが下端を占有するため）。ルートStack上の画面は `edges={['bottom']}`。移設時の直し忘れが起きやすい
+- 同じ画面が「閲覧から」と「編集フロー内から」の両方で開かれる場合は、画面本体を `components/**/*-screen.tsx` に抽出し、タブ配下とルートStackの2箇所からマウントして呼び出し側でパスを出し分ける。**2つのマウント先は別々のURLが必要**（同一URLは衝突する）。実例が種目詳細で、実体は `components/exercises/exercise-detail-screen.tsx`、経路は次の2つ
+  - `/exercises/[id]`（`app/(tabs)/(library)/exercises/[id].tsx`）… 種目タブの一覧から。タブバーあり
+  - `/exercise/[id]`（`app/exercise/[id].tsx`）… トレーニング中・ルーティン編集・予定編集・種目入れ替えから。タブバーなし
+- ディレクトリをリネーム・移動したら **Metroを `npx expo start --clear` で再起動する**。Metroのモジュールグラフは旧パスを掴んだままになりやすく、古いルートが幽霊タブとして残ったりビルドが500で失敗したりする（実際に発生。コードは正しいのに壊れて見えるので原因を見誤りやすい）
+- ルートを移動したら **通知タップの遷移（`app/_layout.tsx` の `resolveReminderTapDestination` → `router.navigate`）を実機で再検証する**。「タブ切り替えを伴うので`replace`/`dismissTo`ではなく`navigate`」という実機検証済みの前提があり、パス変更で崩れやすい
+
 ### タイポグラフィ・共通コンポーネント
 - フォントサイズ・ウェイト・行間は、必ず共通トークン（theme.ts等で一元管理するFontSize/Typography定義）を参照する。画面やコンポーネント個別に`fontSize`の値をハードコードしない
 - 本文・見出し・カード見出し・画面タイトル・Dropdownメニュー項目など、役割が同じテキスト/コンポーネントは、実装場所が違っても同じトークン・同じスタイルを使い、サイズやウェイトを揃える

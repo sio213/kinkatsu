@@ -3,10 +3,18 @@ const mockBack = jest.fn();
 const mockUseExercise = jest.fn();
 const mockToggleFavorite = jest.fn();
 const mockRemoveExercise = jest.fn();
+const mockPlayerPlay = jest.fn();
+const mockPlayerPause = jest.fn();
 
 jest.mock('expo-router', () => ({
   useRouter: () => ({ push: mockPush, back: mockBack }),
   useLocalSearchParams: () => ({ id: '1' }),
+  // 動画(Mp4Player)はフォーカスを失うと再生を止める。ここでは即時実行して
+  // マウント時にplay()が走る本番と同じ状態にする
+  useFocusEffect: (effect: () => (() => void) | void) => {
+    const cleanup = effect();
+    return cleanup;
+  },
   // Stack.Screen はナビゲーターのoptionsを設定するコンポーネントで本来は見た目を持たないが、
   // headerRightの中身（⋮ボタン）をテストで検証できるよう、そのレンダー関数だけ実行してやる
   Stack: {
@@ -24,7 +32,9 @@ jest.mock('@/hooks/use-exercises', () => ({
 }));
 
 jest.mock('expo-video', () => ({
-  useVideoPlayer: () => ({}),
+  // Mp4Playerがフォーカス連動でplay/pauseを呼ぶ（タブ配下では画面が残り続けるため、
+  // 裏で動画がループしないようblur時に止めている）
+  useVideoPlayer: () => ({ play: mockPlayerPlay, pause: mockPlayerPause }),
   VideoView: 'VideoView',
 }));
 

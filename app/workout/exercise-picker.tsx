@@ -12,7 +12,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 
 // start-chooser「種目を追加」経由のnewSession確定時にdismissする段数。
 // スタックは常にcalendar/記録タブ(0)→start-chooser(+1)→この画面自身(+1)の2段
-// （start-chooserはapp/(tabs)/index.tsx・app/(tabs)/calendar.tsxの2画面からしかpushされず、
+// （start-chooserはapp/(tabs)/(record)/index.tsx・app/(tabs)/calendar.tsxの2画面からしかpushされず、
 // このnewSession経路はstart-chooserからのみ到達するため、常にこの深さで固定できる。
 // @reviewer指摘: マジックナンバーのままだと将来別の深さから開かれるようになった場合に
 // 静かに誤動作するため、根拠をここに明記しておく）

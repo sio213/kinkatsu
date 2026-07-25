@@ -210,8 +210,11 @@ export const headerOptions: NativeStackNavigationOptions = {
 };
 
 /**
- * タブ画面（記録・種目ライブラリ・カレンダー・リマインダー）共通のヘッダー設定。
+ * 配下にStackを持たないタブ画面（カレンダー・設定）のヘッダー設定。
  * Tabsナビゲータ自身のヘッダー（@react-navigation/bottom-tabs）が対象。
+ * 記録タブ・種目タブは配下のStackがヘッダーを出すため`headerOptions`（native-stack）を使う
+ * ＝この2系統は実装が違うぶんタイトルの縦位置が約4ptズレる（CLAUDE.md「ナビゲーション・
+ * タブバーの表示範囲」の既知事項）。
  * push画面はネイティブのUINavigationBarが左右端に標準マージンを自動で入れるが、
  * bottom-tabsのヘッダーはJS実装で自動マージンを持たないため、headerLeft/RightContainerStyleで
  * 明示的に左右端の余白を入れないとheaderLeft/headerRightのボタンが画面端に張り付いて見える

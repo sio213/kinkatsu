@@ -70,7 +70,7 @@ test('「種目を追加」をタップしてもセッションは作らず、ne
   });
 });
 
-test('「ルーティン」をタップすると専用ピッカー画面(start-routine-picker)へ遷移する（pastDateKeyは付けない、2026-07-20: フルCRUD一覧app/routine/index.tsxから統一）', () => {
+test('「ルーティン」をタップすると専用ピッカー画面(start-routine-picker)へ遷移する（pastDateKeyは付けない、2026-07-20: フルCRUD一覧app/(tabs)/(record)/routine.tsxから統一）', () => {
   const root = render();
 
   act(() => {

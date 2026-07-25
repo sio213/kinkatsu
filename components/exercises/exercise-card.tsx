@@ -23,7 +23,9 @@ export const ExerciseCard = memo(function ExerciseCard({
   const images = getExerciseImages(e);
 
   const handlePress = useCallback(() => {
-    push(`/exercise/${e.id}`);
+    // 種目タブの一覧からだけタブ配下Stackの詳細(/exercises/[id])へ＝タブバーを残す。
+    // 他の導線はすべてルートStackの /exercise/[id]（CLAUDE.md「ナビゲーション・タブバーの表示範囲」）
+    push(`/exercises/${e.id}`);
   }, [push, e.id]);
 
   return (

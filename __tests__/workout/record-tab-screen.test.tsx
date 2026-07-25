@@ -34,7 +34,7 @@ jest.mock('@/hooks/use-ticking-now', () => ({
 import React from 'react';
 import { act, create, type ReactTestInstance } from 'react-test-renderer';
 import { Alert, Text, TouchableOpacity } from 'react-native';
-import RecordScreen from '@/app/(tabs)/index';
+import RecordScreen from '@/app/(tabs)/(record)/index';
 
 function findButtonByLabel(root: ReactTestInstance, label: string) {
   return root

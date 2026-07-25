@@ -21,7 +21,7 @@ const START_CHOOSER_DISMISS_COUNT = 2;
 
 // start-chooserの「ルーティン」カード専用の画面（2026-07-20。当初は過去日の事後記録専用
 // だったが、今日のライブ開始でも同じ「選ぶだけ」の専用ピッカーを使うよう統一した
-// （要件確認済み）: app/routine/index.tsx（フルCRUD一覧）を選択操作に使うと編集・複製・
+// （要件確認済み）: app/(tabs)/(record)/routine.tsx（フルCRUD一覧）を選択操作に使うと編集・複製・
 // 削除・並び替えが同居し誤操作リスクがあるため、今日・過去日どちらもこの専用ピッカーへ寄せる。
 // pastDateKeyが付いていれば過去日の事後記録（startedAt=endedAt=pastDateKeyの完了済み
 // セッションを直接作成、時刻選択画面は挟まない）、無ければ今日のライブセッションを

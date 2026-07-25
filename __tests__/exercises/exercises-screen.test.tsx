@@ -36,7 +36,7 @@ jest.mock('@/hooks/use-exercise-usage-stats', () => ({
 import React from 'react';
 import { act, create, type ReactTestInstance } from 'react-test-renderer';
 import { Keyboard, Text, TextInput, TouchableOpacity } from 'react-native';
-import ExercisesScreen from '@/app/(tabs)/exercises';
+import ExercisesScreen from '@/app/(tabs)/(library)/exercises/index';
 import { useExerciseSortStore } from '@/lib/exercises/sort-store';
 
 function findButtonByLabel(root: ReactTestInstance, label: string) {

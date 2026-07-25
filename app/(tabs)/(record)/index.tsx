@@ -62,8 +62,9 @@ export default function RecordScreen() {
         }}
       />
       <View style={styles.container}>
-        {/* ルーティン一覧への暫定の橋渡し。タブ構成にルーティン専用の入り口が無いため、
-            本実装(専用タブ等)ができるまでのつなぎとしてここに置く */}
+        {/* ルーティン一覧((record)/routine)への入口。下部タブは4本で確定しルーティン専用タブは
+            作らない方針なので、記録タブからのドリルダウンが正式な導線（旧コメントの「専用タブが
+            できるまでの暫定」ではない）。導線の見せ方自体の改善は別途検討 */}
         <TouchableOpacity
           style={styles.routineLinkBanner}
           onPress={() => router.push('/routine')}

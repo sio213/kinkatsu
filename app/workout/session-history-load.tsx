@@ -13,7 +13,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 
 // start-chooser「過去の記録」経由(newSession=1)の確定時にdismissする段数。スタックは常に
 // カレンダー/記録タブ(0)→start-chooser(+1)→session-history-picker(+1)→この画面自身(+1)の3段
-// （start-chooserはapp/(tabs)/index.tsx・app/(tabs)/calendar.tsxの2画面からしかpushされず、
+// （start-chooserはapp/(tabs)/(record)/index.tsx・app/(tabs)/calendar.tsxの2画面からしかpushされず、
 // このnewSession経路はstart-chooserからのみ到達するため、常にこの深さで固定できる。
 // app/workout/exercise-picker.tsxの同名定数と同じ根拠）
 const START_CHOOSER_DISMISS_COUNT = 3;

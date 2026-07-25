@@ -4,7 +4,7 @@ import { useCallback } from 'react';
 import { Alert } from 'react-native';
 
 // 「種目入りで新規セッションを開始する」ボタン用の共通ロジック。ルーティン一覧のカード「開始」
-// ボタン(元はapp/routine/index.tsxのhandleStartWorkout)、カレンダー選択日パネルの今日の予定
+// ボタン(元はapp/(tabs)/(record)/routine.tsxのhandleStartWorkout)、カレンダー選択日パネルの今日の予定
 // カード「開始」ボタン（ルーティン予定・直接追加予定どちらも、2026-07-20）で挙動が同一になった
 // ため共通化した。startWorkoutは呼び出し側が渡す「idからセッションを作る関数」
 // （startWorkoutFromRoutine/startWorkoutFromScheduledWorkout等）に委譲し、このフック自体は

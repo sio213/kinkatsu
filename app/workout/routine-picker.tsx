@@ -11,7 +11,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 
 // トレーニング中画面ヘッダー⋮「ルーティンから読み込む」フローの画面2。ルーティンを1つ選ぶと、
 // 画面3(app/workout/routine-load.tsx)でそのルーティン内の種目を個別に選べる（過去の記録から
-// 読み込む、と同じ2段階構成）。一覧の取得・見た目はapp/routine/index.tsxと同じフック
+// 読み込む、と同じ2段階構成）。一覧の取得・見た目はapp/(tabs)/(record)/routine.tsxと同じフック
 // (useRoutines/useRoutineExerciseSummaries)を使うが、こちらは選択専用でルーティン自体の
 // 編集・複製・削除は行わないため、RoutinePickerCard(読み取り専用の簡易カード)を使う。
 // 描画部分（一覧・空状態）はcomponents/routines/routine-picker-list.tsxへ集約している

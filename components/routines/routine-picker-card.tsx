@@ -22,7 +22,7 @@ type Props = {
 // ルーティン行。routine-card.tsxと違い⋮メニュー・スケジュール・「開始」ボタンは持たず、
 // タップ＝そのルーティンを選ぶ、という単一の操作だけに絞る（past-training-session-card.tsxと
 // 同じく「一覧から1件選ぶだけの画面」用の簡易カードという位置づけ）。
-// 見た目はrouting一覧画面(app/routine/index.tsx)で既に馴染みのあるRoutineCardの
+// 見た目はrouting一覧画面(app/(tabs)/(record)/routine.tsx)で既に馴染みのあるRoutineCardの
 // 「名前+N種目+カテゴリチップ」の行にそろえ、選ぶ対象が同じルーティンだと一目でわかるようにする
 export const RoutinePickerCard = memo(function RoutinePickerCard({
   name,
