@@ -8,16 +8,19 @@ import { Colors, tabHeaderOptions } from '@/constants/theme';
 export default function TabLayout() {
   return (
     <Tabs
-      initialRouteName="index"
+      initialRouteName="(record)"
       screenOptions={{
         tabBarActiveTintColor: Colors.tint,
         ...tabHeaderOptions,
       }}
     >
       <Tabs.Screen
-        name="index"
+        name="(record)"
         options={{
-          title: '記録',
+          tabBarLabel: '記録',
+          // 記録タブは配下にStack((record)/_layout.tsx)を持ち、そちらがヘッダーを出す。
+          // ここでheaderShownを切らないとタブナビゲータのヘッダーと二重になる
+          headerShown: false,
           tabBarIcon: ({ color }) => <DesignIcon name="assignment" size={28} color={color} />,
         }}
       />
@@ -32,10 +35,12 @@ export default function TabLayout() {
         }}
       />
       <Tabs.Screen
-        name="exercises"
+        name="(library)"
         options={{
           tabBarLabel: '種目',
-          headerTitle: '種目ライブラリ',
+          // 種目タブは配下にStack((library)/_layout.tsx)を持ち、そちらがヘッダーを出す
+          // （headerTitle「種目ライブラリ」もそちらへ移した）。切らないとヘッダーが二重になる
+          headerShown: false,
           tabBarIcon: ({ color }) => (
             <IconSymbol size={28} name="dumbbell.fill" color={color} />
           ),

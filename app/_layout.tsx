@@ -159,7 +159,8 @@ export default function RootLayout() {
             options={{ title: '種目を編集' }}
           />
           <Stack.Screen name="exercise/new" options={{ title: '種目を作成' }} />
-          <Stack.Screen name="routine/index" options={{ title: 'ルーティン' }} />
+          {/* ルーティン一覧(/routine)は記録タブ配下のapp/(tabs)/(record)/routine.tsxへ移設。
+              以下の作成・編集系は編集フローなのでここに残す（CLAUDE.md「ナビゲーション・タブバーの表示範囲」） */}
           <Stack.Screen name="routine/new" options={{ title: 'ルーティンを作成' }} />
           <Stack.Screen name="routine/edit/[id]" options={{ title: 'ルーティンを編集' }} />
           <Stack.Screen name="routine/exercise-picker" options={{ title: '種目を追加' }} />

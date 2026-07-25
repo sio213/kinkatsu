@@ -81,7 +81,7 @@ export default function StartChooserScreen() {
     [openNewSessionScreen],
   );
 
-  // app/routine/index.tsx（フルCRUD一覧）ではなく、「選ぶだけ」の専用ピッカー画面
+  // app/(tabs)/(record)/routine.tsx（フルCRUD一覧）ではなく、「選ぶだけ」の専用ピッカー画面
   // (app/workout/start-routine-picker.tsx)を使う（2026-07-20、要件確認済み: 編集・複製・
   // 削除・並び替えが同居する一覧を選択操作に使うと誤操作リスクがあるため、当初は過去日限定で
   // 置き換えたが、今日のライブ開始でも同じ理由で統一した）。あちらは元々ルーティンを選んだ時点で

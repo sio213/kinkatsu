@@ -439,7 +439,7 @@ export default function CalendarScreen() {
   // 今日の空状態は進行中セッション(endedAtがnull)のendedAtがnullなためuseCalendarDayExercises
   // 側では「記録なし」に見えている状態でも起こりうる（今日開始したが1セットも確定していない等）。
   // その場合「トレーニングを開始」ボタンのまま無言でそのセッションに合流すると、新規に始めたい
-  // ユーザーの意図と実際の挙動がズレるため、記録タブ(app/(tabs)/index.tsx)と同じ
+  // ユーザーの意図と実際の挙動がズレるため、記録タブ(app/(tabs)/(record)/index.tsx)と同じ
   // ResumeWorkoutBannerに出し分けて「再開」であることを明示する
   const handleResumeToday = useCallback(() => {
     if (activeSession) pushDebounced(`/workout/${activeSession.id}`);
@@ -697,7 +697,7 @@ const styles = StyleSheet.create({
   legend: { marginTop: 10 },
 
   dayPanel: { marginTop: 16, paddingTop: 12, borderTopWidth: 1, borderTopColor: Colors.border },
-  // 記録タブ(app/(tabs)/index.tsx)の日付グループ見出しはformatSessionDateGroupを使う点は
+  // 記録タブ(app/(tabs)/(record)/index.tsx)の日付グループ見出しはformatSessionDateGroupを使う点は
   // 同じだが、そちらは長いリストの中で繰り返される控えめなeyebrowラベル(12px/muted/700)。
   // 一方こちらは選択日パネルに1つだけ出る、その画面が「何の日を見ているか」を示す見出しのため、
   // デザイン案（スケジュール（カレンダー）機能 デザイン案.html、font-size:14px/font-weight:800/

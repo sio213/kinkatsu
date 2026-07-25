@@ -14,7 +14,7 @@ export default function RoutineNewScreen() {
 
   // この画面に新規に遷移してきたとき（=真のマウント時）だけ下書きを空にする。
   // 種目追加ピッカーがpushされて戻ってきただけではこの画面は再マウントされないため、
-  // 追加した種目が消えることはない。呼び出し元(app/routine/index.tsxのhandleCreate)でも
+  // 追加した種目が消えることはない。呼び出し元(app/(tabs)/(record)/routine.tsxのhandleCreate)でも
   // push前に念のためresetしているため、この画面が初めて描画される瞬間に古い下書きが
   // 一瞬だけ見える余地は無い
   useEffect(() => {

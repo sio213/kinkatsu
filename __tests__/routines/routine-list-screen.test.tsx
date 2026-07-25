@@ -31,7 +31,7 @@ jest.mock('@/lib/routines/draft-store', () => ({
   useRoutineDraftStore: (selector: (state: { reset: () => void }) => unknown) => selector({ reset: mockResetDraft }),
 }));
 
-import RoutineListScreen from '@/app/routine/index';
+import RoutineListScreen from '@/app/(tabs)/(record)/routine';
 import type { Routine } from '@/db/schema';
 import React from 'react';
 import { act, create, type ReactTestInstance } from 'react-test-renderer';
