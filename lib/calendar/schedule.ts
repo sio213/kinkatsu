@@ -52,6 +52,32 @@ export function formatDirectScheduleTitle(exerciseNames: string[]): string {
   return `${exerciseNames[0]} 他${exerciseNames.length - 1}種目`;
 }
 
+export type HistorySelectionParam = { exerciseId: number; sourceWorkoutSessionExerciseId: number };
+
+// 「予定を追加」→「過去の記録」フロー（2026-07-25）で、読み込む種目の選択結果を画面3
+// (schedule-workout-history-load)から画面4(schedule-time-picker)へ渡すためのエンコード。
+// 予定は時刻を決めた時点で初めて作るため、それまで選択結果をURLパラメータで持ち回す必要がある。
+// 「直接追加」経路のexerciseIds（"10,11"形式）と揃えて、こちらは
+// "種目id:元カードid" のペアをカンマ区切りにする（並び順＝画面での表示順を保つ）
+export function formatHistorySelectionsParam(selections: HistorySelectionParam[]): string {
+  return selections.map((s) => `${s.exerciseId}:${s.sourceWorkoutSessionExerciseId}`).join(',');
+}
+
+// formatHistorySelectionsParamの逆変換。1件でも不正なペアが混ざっていたら直リンク等の異常値と
+// みなし空配列にフォールバックする（schedule-time-picker.tsxのparseExerciseIdsと同じ方針:
+// 1件だけ静かに無視すると選んだ内容と保存内容がズレるため、全体を無効にする方が安全）
+export function parseHistorySelectionsParam(value: string | undefined): HistorySelectionParam[] {
+  if (!value) return [];
+  const selections = value.split(',').map((pair) => {
+    const [exerciseId, sourceWorkoutSessionExerciseId] = pair.split(':').map(Number);
+    return { exerciseId, sourceWorkoutSessionExerciseId };
+  });
+  const isPositiveInteger = (n: number) => Number.isInteger(n) && n > 0;
+  return selections.every((s) => isPositiveInteger(s.exerciseId) && isPositiveInteger(s.sourceWorkoutSessionExerciseId))
+    ? selections
+    : [];
+}
+
 // scheduledWorkoutExercisesをexercisesとJOINした行から、scheduledWorkoutIdごとの種目名リストを
 // 組み立てる純粋関数。hooks/use-calendar-direct-schedule-summaries.tsとlib/notifications/
 // scheduled-workout-scheduler.tsの両方が同じ集計を必要とするため共通化する（@reviewer指摘）。

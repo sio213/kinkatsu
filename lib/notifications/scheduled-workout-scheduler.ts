@@ -2,7 +2,13 @@ import { db } from '@/db/client';
 import { exercises, routines, scheduledWorkoutExercises, scheduledWorkouts } from '@/db/schema';
 import { formatDirectScheduleTitle, groupExerciseNamesByScheduleId } from '@/lib/calendar/schedule';
 import { parseDateKey, toDateKey } from '@/lib/calendar/date-grid';
-import { addDirectScheduledWorkout, addScheduledWorkout, deleteScheduledWorkout } from '@/lib/calendar/scheduled-workouts';
+import type { HistoryCardSelection } from '@/lib/calendar/scheduled-workout-detail';
+import {
+  addDirectScheduledWorkout,
+  addHistoryScheduledWorkout,
+  addScheduledWorkout,
+  deleteScheduledWorkout,
+} from '@/lib/calendar/scheduled-workouts';
 import { and, eq, gte, inArray } from 'drizzle-orm';
 import * as Notifications from 'expo-notifications';
 import { REMINDER_CHANNEL_ID } from './channels';
@@ -115,6 +121,27 @@ export async function createDirectScheduledWorkout(
     await scheduleNotification({ id, routineId: null, scheduledDate, hour, minute, notifyEnabled }, title);
   } catch (e) {
     console.error('[schedule direct scheduled-workout notification]', e);
+  }
+  return id;
+}
+
+// 選択日パネル「予定を追加」→「過去の記録」(app/calendar/schedule-workout-history-load.tsx経由、
+// 2026-07-25)専用のオーケストレータ。作られる予定はルーティンを介さない直接予定のため、
+// 通知の扱い・titleの合成方法はcreateDirectScheduledWorkoutと同じ（違いは目標セットに
+// 「選んだ過去カードそのもの」の値が入る点だけ）
+export async function createHistoryScheduledWorkout(
+  selections: HistoryCardSelection[],
+  title: string,
+  scheduledDate: string,
+  hour: number,
+  minute: number,
+  notifyEnabled: boolean,
+): Promise<number> {
+  const id = await addHistoryScheduledWorkout(selections, scheduledDate, hour, minute, notifyEnabled);
+  try {
+    await scheduleNotification({ id, routineId: null, scheduledDate, hour, minute, notifyEnabled }, title);
+  } catch (e) {
+    console.error('[schedule history scheduled-workout notification]', e);
   }
   return id;
 }

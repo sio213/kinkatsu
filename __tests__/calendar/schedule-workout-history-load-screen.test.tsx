@@ -2,6 +2,11 @@ const mockBack = jest.fn();
 const mockDismiss = jest.fn();
 const mockUseLocalSearchParams = jest.fn();
 const mockAddHistoryCardsToScheduledWorkout = jest.fn();
+const mockPush = jest.fn();
+
+jest.mock('@/hooks/use-debounced-push', () => ({
+  useDebouncedPush: () => mockPush,
+}));
 
 jest.mock('expo-router', () => ({
   useRouter: () => ({ back: mockBack, dismiss: mockDismiss }),
@@ -62,6 +67,17 @@ const flyCard: SessionHistoryCard = {
   source: 'preset',
   slug: 'dumbbell_fly',
   sets: [{ setNumber: 1, weight: 14, reps: 12, durationSeconds: null, distanceMeters: null, completedAt: 1 }],
+};
+// 「中央の1件だけ解除しても並び順が保たれる」ことを見るために3件目を用意する
+const curlCard: SessionHistoryCard = {
+  workoutSessionExerciseId: 502,
+  exerciseId: 12,
+  name: 'アームカール',
+  category: 'arm',
+  measurementType: 'weight_reps',
+  source: 'preset',
+  slug: 'arm_curl',
+  sets: [{ setNumber: 1, weight: 10, reps: 12, durationSeconds: null, distanceMeters: null, completedAt: 1 }],
 };
 
 function findSubmitButton(root: ReactTestInstance) {
@@ -199,5 +215,62 @@ describe('ScheduleWorkoutHistoryLoadScreen', () => {
     const root = render();
     expect(root.findByProps({ children: '予定が見つかりません' })).toBeDefined();
     expect(mockGetSessionExerciseCards).not.toHaveBeenCalled();
+  });
+});
+
+// 「予定を追加」→「過去の記録」経路（2026-07-25新設）。予定がまだ存在しないため、この画面では
+// DBに触れず、選択結果を時刻設定画面へ引き継ぐだけ（「種目を追加」「ルーティン」経路と同じ
+// 2段階構成に揃えた）
+describe('dateKeyモード（新規予定の作成経路）', () => {
+  beforeEach(() => {
+    mockUseLocalSearchParams.mockReturnValue({
+      dateKey: '2026-07-25',
+      sourceSessionId: '99',
+      sourceStartedAt: String(new Date(2026, 6, 3, 10, 0).getTime()),
+    });
+  });
+
+  test('確定してもDBには書き込まず、選択ペアをhistorySelectionsとして時刻設定画面へ渡す', async () => {
+    const root = await renderResolved([benchCard, flyCard]);
+    await act(async () => {
+      findSubmitButton(root)!.props.onPress();
+      await Promise.resolve();
+      await Promise.resolve();
+    });
+
+    expect(mockAddHistoryCardsToScheduledWorkout).not.toHaveBeenCalled();
+    expect(mockDismiss).not.toHaveBeenCalled();
+    expect(mockPush).toHaveBeenCalledWith({
+      pathname: '/calendar/schedule-time-picker',
+      params: { dateKey: '2026-07-25', historySelections: '10:500,11:501' },
+    });
+  });
+
+  test('一部だけ選択した場合も、渡すペアは表示順(orderIndex順)を保つ', async () => {
+    const root = await renderResolved([benchCard, flyCard, curlCard]);
+    const flyRow = root
+      .findAllByType(TouchableOpacity)
+      .find(
+        (btn) =>
+          typeof btn.props.accessibilityLabel === 'string' && btn.props.accessibilityLabel.startsWith('ダンベルフライ'),
+      )!;
+    act(() => {
+      flyRow.props.onPress(); // 中央(fly)だけ解除
+    });
+    await act(async () => {
+      findSubmitButton(root)!.props.onPress();
+      await Promise.resolve();
+      await Promise.resolve();
+    });
+
+    expect(mockPush).toHaveBeenCalledWith({
+      pathname: '/calendar/schedule-time-picker',
+      params: { dateKey: '2026-07-25', historySelections: '10:500,12:502' },
+    });
+  });
+
+  test('scheduledWorkoutIdが無くても「見つかりません」画面にはならない', async () => {
+    const root = await renderResolved([benchCard]);
+    expect(() => root.findByProps({ children: '予定が見つかりません' })).toThrow();
   });
 });

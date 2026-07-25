@@ -39,12 +39,27 @@ beforeEach(() => {
 
 // 2026-07-25、@ユーザー指示: トレーニング開始選択画面のデザイン確定に合わせて縦リストへ変更し、
 // 未実装のプレースホルダー（おすすめメニュー・履歴から）を廃止した
-test('実装済みの2択を説明文つきで表示する', () => {
+test('3択を説明文つきで表示する', () => {
   const root = render();
   expect(root.findByProps({ children: '種目を追加' })).toBeDefined();
   expect(root.findByProps({ children: '好きな種目を選んで予定にする' })).toBeDefined();
   expect(root.findByProps({ children: 'ルーティン' })).toBeDefined();
   expect(root.findByProps({ children: '登録したメニューを予定にする' })).toBeDefined();
+  expect(root.findByProps({ children: '過去の記録' })).toBeDefined();
+  expect(root.findByProps({ children: '過去の履歴と同じ内容を予定にする' })).toBeDefined();
+});
+
+// 2026-07-25、@ユーザー指示: 開始選択画面と同じ3択に揃えた。既存予定の⋮「過去の記録から
+// 読み込み」と同じ画面へ、scheduledWorkoutIdの代わりにdateKeyを渡して開く
+test('「過去の記録」をタップするとdateKey付きでschedule-workout-history-pickerへ遷移する（DBには触れない）', () => {
+  const root = render();
+  act(() => {
+    findCardByLabel(root, '過去の記録')!.props.onPress();
+  });
+  expect(mockPush).toHaveBeenCalledWith({
+    pathname: '/calendar/schedule-workout-history-picker',
+    params: { dateKey: '2026-07-25' },
+  });
 });
 
 test('未実装のプレースホルダー（おすすめメニュー・履歴から）は表示しない', () => {

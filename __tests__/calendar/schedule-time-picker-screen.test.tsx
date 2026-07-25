@@ -4,6 +4,7 @@ const mockPush = jest.fn();
 const mockUseLocalSearchParams = jest.fn();
 const mockCreateScheduledWorkout = jest.fn();
 const mockCreateDirectScheduledWorkout = jest.fn();
+const mockCreateHistoryScheduledWorkout = jest.fn();
 const mockEnsurePermission = jest.fn();
 let mockExercises: { id: number; name: string }[];
 
@@ -19,6 +20,7 @@ jest.mock('expo-router', () => ({
 jest.mock('@/lib/notifications/scheduled-workout-scheduler', () => ({
   createScheduledWorkout: (...args: unknown[]) => mockCreateScheduledWorkout(...args),
   createDirectScheduledWorkout: (...args: unknown[]) => mockCreateDirectScheduledWorkout(...args),
+  createHistoryScheduledWorkout: (...args: unknown[]) => mockCreateHistoryScheduledWorkout(...args),
 }));
 
 // 直接追加モード（exerciseIdsパラメータ、2026-07-20）のタイトル合成に使う。このテストファイルは
@@ -67,6 +69,7 @@ beforeEach(() => {
   mockUseLocalSearchParams.mockReturnValue({ dateKey: '2026-07-25', routineId: '10', routineName: '胸の日' });
   mockCreateScheduledWorkout.mockResolvedValue(1);
   mockCreateDirectScheduledWorkout.mockResolvedValue(1);
+  mockCreateHistoryScheduledWorkout.mockResolvedValue(1);
   mockEnsurePermission.mockResolvedValue('granted');
   mockExercises = [];
   jest.spyOn(Alert, 'alert').mockImplementation(() => {});
@@ -567,5 +570,83 @@ describe('Android', () => {
       await Promise.resolve();
     });
     expect(mockCreateScheduledWorkout).toHaveBeenCalledWith(10, '胸の日', '2026-07-25', 9, 45, true);
+  });
+});
+
+// 「予定を追加」→「過去の記録」経路（2026-07-25新設）。画面3(schedule-workout-history-load)が
+// 「種目id:元カードid」のペア列をhistorySelectionsとして渡してくる。予定は時刻を確定した
+// この画面で初めて作られ、目標セットには選んだ過去カードそのものの値が入る
+describe('過去の記録モード（historySelectionsパラメータ）', () => {
+  beforeEach(() => {
+    mockUseLocalSearchParams.mockReturnValue({
+      dateKey: '2026-07-25',
+      historySelections: '10:500,11:501',
+    });
+    mockExercises = [
+      { id: 10, name: 'ベンチプレス' },
+      { id: 11, name: 'ダンベルフライ' },
+    ];
+  });
+
+  test('確定するとcreateHistoryScheduledWorkoutへ選択ペアと合成タイトルを渡す', async () => {
+    const root = await renderAndSettle();
+    await act(async () => {
+      findByLabel(root, 'この時刻で予定を追加')!.props.onPress();
+      await Promise.resolve();
+      await Promise.resolve();
+    });
+
+    expect(mockCreateHistoryScheduledWorkout).toHaveBeenCalledWith(
+      [
+        { exerciseId: 10, sourceWorkoutSessionExerciseId: 500 },
+        { exerciseId: 11, sourceWorkoutSessionExerciseId: 501 },
+      ],
+      // 直接追加モードと同じ合成規則（種目名 他N種目）
+      'ベンチプレス 他1種目',
+      '2026-07-25',
+      18,
+      0,
+      true,
+    );
+    expect(mockCreateDirectScheduledWorkout).not.toHaveBeenCalled();
+    expect(mockCreateScheduledWorkout).not.toHaveBeenCalled();
+  });
+
+  // カレンダー(0)→schedule-chooser(+1)→history-picker(+1)→history-load(+1)→この画面(+1)の
+  // 4階層。他の経路（3階層）より1枚多い
+  test('成功後はdismiss(4)してから作成した予定の目標セット編集画面へpushする', async () => {
+    mockCreateHistoryScheduledWorkout.mockResolvedValue(77);
+    const root = await renderAndSettle();
+    await act(async () => {
+      findByLabel(root, 'この時刻で予定を追加')!.props.onPress();
+      await Promise.resolve();
+      await Promise.resolve();
+    });
+
+    expect(mockDismiss).toHaveBeenCalledWith(4);
+    expect(mockPush).toHaveBeenCalledWith({
+      pathname: '/calendar/schedule-workout-edit',
+      params: { scheduledWorkoutId: '77' },
+    });
+  });
+
+  test('失敗した場合はエラーAlertを表示し、遷移しない', async () => {
+    mockCreateHistoryScheduledWorkout.mockRejectedValueOnce(new Error('fail'));
+    const root = await renderAndSettle();
+    await act(async () => {
+      findByLabel(root, 'この時刻で予定を追加')!.props.onPress();
+      await Promise.resolve();
+      await Promise.resolve();
+    });
+
+    expect(Alert.alert).toHaveBeenCalledWith('エラー', '予定を追加できませんでした。');
+    expect(mockDismiss).not.toHaveBeenCalled();
+    expect(mockPush).not.toHaveBeenCalled();
+  });
+
+  test('historySelectionsに不正なペアが混ざっていたら全体を無効とみなし「見つかりません」画面になる', () => {
+    mockUseLocalSearchParams.mockReturnValue({ dateKey: '2026-07-25', historySelections: '10:500,abc' });
+    const root = render();
+    expect(root.findByProps({ children: 'ルーティンが見つかりません' })).toBeDefined();
   });
 });

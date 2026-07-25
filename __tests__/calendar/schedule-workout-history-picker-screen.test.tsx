@@ -5,6 +5,10 @@ const mockUseLocalSearchParams = jest.fn();
 jest.mock('expo-router', () => ({
   useRouter: () => ({ back: mockBack, push: mockPush }),
   useLocalSearchParams: () => mockUseLocalSearchParams(),
+  Stack: {
+    Screen: ({ options }: { options?: { headerTitle?: () => unknown } }) =>
+      options?.headerTitle ? options.headerTitle() : null,
+  },
 }));
 
 // lib/workout/history.tsはトップレベルで@/db/client(expo-sqlite依存)を読み込むため、
@@ -96,5 +100,49 @@ describe('ScheduleWorkoutHistoryPickerScreen', () => {
       pathname: '/calendar/schedule-workout-history-load',
       params: { scheduledWorkoutId: '5', sourceSessionId: '1', sourceStartedAt: String(chestSession.startedAt) },
     });
+  });
+});
+
+// 「予定を追加」→「過去の記録」経路（2026-07-25新設）。予定がまだ存在しないため
+// scheduledWorkoutIdの代わりにdateKeyが渡り、選んだセッションはそのまま画面3へ引き継がれる
+describe('dateKeyモード（新規予定の作成経路）', () => {
+  beforeEach(() => {
+    mockUseLocalSearchParams.mockReturnValue({ dateKey: '2026-07-25' });
+  });
+
+  test('scheduledWorkoutIdが無くても「見つかりません」画面にはならない', async () => {
+    const root = await renderResolved([chestSession]);
+    expect(() => root.findByProps({ children: '予定が見つかりません' })).toThrow();
+  });
+
+  test('対象日をヘッダーのサブタイトルに表示する（@designer指摘: 選択中に日付を見失わないため）', async () => {
+    const root = await renderResolved([chestSession]);
+    expect(root.findByProps({ children: '過去の記録' })).toBeDefined();
+    expect(root.findByProps({ children: '7月25日（土）' })).toBeDefined();
+  });
+
+  test('セッションカードをタップするとdateKey付きでschedule-workout-history-loadへ遷移する', async () => {
+    const root = await renderResolved([chestSession]);
+    const card = root
+      .findAllByType(TouchableOpacity)
+      .find(
+        (btn: ReactTestInstance) =>
+          typeof btn.props.accessibilityLabel === 'string' && btn.props.accessibilityLabel.includes('ベンチプレス'),
+      )!;
+
+    act(() => {
+      card.props.onPress();
+    });
+
+    expect(mockPush).toHaveBeenCalledWith({
+      pathname: '/calendar/schedule-workout-history-load',
+      params: { dateKey: '2026-07-25', sourceSessionId: '1', sourceStartedAt: String(chestSession.startedAt) },
+    });
+  });
+
+  test('不正なdateKeyだけが渡った場合は「見つかりません」画面になる', () => {
+    mockUseLocalSearchParams.mockReturnValue({ dateKey: '2026-13-99' });
+    const root = render();
+    expect(root.findByProps({ children: '予定が見つかりません' })).toBeDefined();
   });
 });

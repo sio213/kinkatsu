@@ -5,7 +5,9 @@ import {
   DIRECT_SCHEDULE_DELETE_MESSAGE,
   excludeActiveScheduledCard,
   formatDirectScheduleTitle,
+  formatHistorySelectionsParam,
   groupExerciseNamesByScheduleId,
+  parseHistorySelectionsParam,
   mergeScheduleCards,
   type ScheduleFireRow,
 } from '@/lib/calendar/schedule';
@@ -234,5 +236,44 @@ describe('excludeActiveScheduledCard', () => {
   it('一致するカードが無ければ何も除外しない', () => {
     const merged = mergeScheduleCards([], [manualCard({ scheduledWorkoutId: 1 })]);
     expect(excludeActiveScheduledCard(merged, 999)).toEqual(merged);
+  });
+});
+
+// 「予定を追加」→「過去の記録」フロー（2026-07-25）。予定は時刻を確定した時点で初めて作るため、
+// 読み込む種目の選択結果を画面3→画面4へURLパラメータで持ち回す必要がある
+describe('formatHistorySelectionsParam / parseHistorySelectionsParam', () => {
+  it('「種目id:元カードid」のペアをカンマ区切りにし、往復しても並び順が保たれる', () => {
+    const selections = [
+      { exerciseId: 10, sourceWorkoutSessionExerciseId: 500 },
+      { exerciseId: 12, sourceWorkoutSessionExerciseId: 502 },
+      { exerciseId: 11, sourceWorkoutSessionExerciseId: 501 },
+    ];
+    const encoded = formatHistorySelectionsParam(selections);
+    expect(encoded).toBe('10:500,12:502,11:501');
+    expect(parseHistorySelectionsParam(encoded)).toEqual(selections);
+  });
+
+  it('同じ種目を複数カード読み込むケース（元カードidだけが違う）も区別できる', () => {
+    const selections = [
+      { exerciseId: 10, sourceWorkoutSessionExerciseId: 500 },
+      { exerciseId: 10, sourceWorkoutSessionExerciseId: 900 },
+    ];
+    expect(parseHistorySelectionsParam(formatHistorySelectionsParam(selections))).toEqual(selections);
+  });
+
+  it('未指定・空文字は空配列になる', () => {
+    expect(parseHistorySelectionsParam(undefined)).toEqual([]);
+    expect(parseHistorySelectionsParam('')).toEqual([]);
+  });
+
+  // 1件だけ静かに無視すると選んだ内容と保存内容がズレるため、全体を無効にする
+  it.each([
+    ['ペアになっていない', '10:500,11'],
+    ['数値でない', '10:500,abc:1'],
+    ['0以下', '10:500,0:1'],
+    ['小数', '10:500,11.5:501'],
+    ['区切りだけ', ','],
+  ])('不正な値が1件でも混ざっていたら全体を空配列にする（%s）', (_label, value) => {
+    expect(parseHistorySelectionsParam(value)).toEqual([]);
   });
 });

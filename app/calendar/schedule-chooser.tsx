@@ -11,14 +11,12 @@ import { StyleSheet, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 // カレンダー選択日パネル「予定を追加」フローの画面0（2026-07-20新設）。app/workout/start-chooser.tsxと
-// 同じレイアウト（StartMethodRow再利用）を予定作成向けに流用する。「種目を追加」は
-// schedule-exercise-pickerへ、「ルーティン」はschedule-routine-pickerへ、それぞれdateKeyを
-// 引き継いで遷移するだけ（この画面自体はDBに触れない）。
-// 2026-07-25: トレーニング開始選択画面のデザイン確定に合わせ、2×2グリッド4択から縦リストへ変更した
-// （@ユーザー指示）。「おすすめメニュー」「履歴から」のdisabledプレースホルダーは廃止。
-// 「過去の記録から予定を作る」導線は、予定作成が時刻設定画面(schedule-time-picker)を挟む都合で
-// 実績セットの引き継ぎ方から設計が必要なため、この時点では見送っている
-// （既存予定に対する「過去の記録から読み込み」はschedule-workout-edit.tsxの⋮メニューにある）
+// 同じレイアウト（StartMethodRow再利用）を予定作成向けに流用する。3択とも、それぞれの画面へ
+// dateKeyを引き継いで遷移するだけ（この画面自体はDBに触れない）。予定の実体は、どの経路でも
+// 時刻設定画面(schedule-time-picker)で時刻を確定した時点で初めて作られる。
+// 2026-07-25: トレーニング開始選択画面のデザイン確定に合わせ、2×2グリッド4択から縦リストへ変更し
+// （@ユーザー指示）「おすすめメニュー」「履歴から」のdisabledプレースホルダーを廃止。あわせて
+// 開始選択画面と同じ3択になるよう「過去の記録」を実装した（@ユーザー指示）
 export default function ScheduleChooserScreen() {
   const { dateKey } = useLocalSearchParams<{ dateKey: string }>();
   const router = useRouter();
@@ -30,6 +28,13 @@ export default function ScheduleChooserScreen() {
 
   const handlePickRoutine = useCallback(() => {
     pushDebounced({ pathname: '/calendar/schedule-routine-picker', params: { dateKey } });
+  }, [pushDebounced, dateKey]);
+
+  // 既存予定の⋮「過去の記録から読み込み」と同じ画面へ送る（app/workout/start-chooser.tsxの
+  // 「過去の記録」と同じ考え方）。あちらは既存予定に種目を足す導線なので、こちらは
+  // scheduledWorkoutIdの代わりにdateKeyを渡し、予定がまだ無い状態で同じ画面を開く
+  const handlePickHistory = useCallback(() => {
+    pushDebounced({ pathname: '/calendar/schedule-workout-history-picker', params: { dateKey } });
   }, [pushDebounced, dateKey]);
 
   // カレンダー画面から遷移する限り不正なdateKeyは渡らないが、不正な直リンク等への防御として
@@ -66,6 +71,13 @@ export default function ScheduleChooserScreen() {
           description="登録したメニューを予定にする"
           onPress={handlePickRoutine}
           hint={`${dateLabel}の予定としてルーティンを選びます`}
+        />
+        <StartMethodRow
+          icon="history"
+          label="過去の記録"
+          description="過去の履歴と同じ内容を予定にする"
+          onPress={handlePickHistory}
+          hint={`${dateLabel}の予定として過去のトレーニングを選びます`}
         />
       </View>
     </SafeAreaView>
