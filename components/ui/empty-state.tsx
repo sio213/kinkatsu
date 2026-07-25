@@ -35,6 +35,14 @@ type Props = {
  * あちらは「見つからない・読み込めなかった」＝異常系で、ユーザーに次の一手が無いため
  * 装飾を持たないテキスト＋単一ボタン。こちらは「まだ空なだけ」＝正常系の初期状態で、
  * 空を埋める導線を主CTAとして提示する。取得失敗（再試行）にこちらを流用しないこと。
+ *
+ * ただし現時点でこちらへ移行済みなのはデザイン案が確定した2種（ルーティン0件・過去の記録0件）
+ * だけで、正常系の0件でもNotFoundStateのまま残っている画面がある
+ * （exercise-history-picker-view.tsx「この種目の過去の記録がまだありません」・
+ * routine-load-view.tsx「このルーティンには種目がありません」・
+ * session-history-load-view.tsx「この日の記録がまだありません」）。
+ * 「正常系は必ずEmptyState」という不変条件はまだ成立していないので、
+ * 順次移行する前提で読むこと（@reviewer指摘）。
  */
 export function EmptyState({ icon, title, description, action, onPressBack }: Props) {
   return (

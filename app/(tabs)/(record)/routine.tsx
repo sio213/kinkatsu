@@ -1,11 +1,10 @@
 import { RoutineCard } from '@/components/routines/routine-card';
-import { routineCreateHeaderRight } from '@/components/routines/routine-create-header-button';
-import { EmptyState } from '@/components/ui/empty-state';
+import { RoutineCreateHeaderButton } from '@/components/routines/routine-create-header-button';
+import { RoutineEmptyState } from '@/components/routines/routine-empty-state';
 import { ListErrorBoundary } from '@/components/ui/list-error-boundary';
 import { ScreenStyles } from '@/constants/theme';
 import type { Routine } from '@/db/schema';
 import { useDebouncedPush } from '@/hooks/use-debounced-push';
-import { useRoutineCreate } from '@/hooks/use-routine-create';
 import { useRoutineExerciseSummaries, useRoutineReminders, useRoutines } from '@/hooks/use-routines';
 import { useStartWithConfirm } from '@/hooks/use-start-with-confirm';
 import { useWorkoutSessions } from '@/hooks/use-workout-session';
@@ -27,10 +26,6 @@ export default function RoutineListScreen() {
     (sessionId) => pushDebounced(`/workout/${sessionId}`),
     startWorkoutFromRoutine,
   );
-
-  // resetDraft→pushの順序契約はhooks/use-routine-create.tsに集約している
-  // （ルーティン選択画面のヘッダー＋・0件時の空状態CTAと共通）
-  const handleCreate = useRoutineCreate();
 
   const handleEdit = useCallback(
     (id: number) => {
@@ -142,28 +137,26 @@ export default function RoutineListScreen() {
     // タブ配下の画面はタブバーが下端を占有するのでedges={[]}が正（他のタブ画面と統一）。
     // ルートStack上にあった頃はホームインジケータ分を自前で確保するedges={['bottom']}だった
     <SafeAreaView style={ScreenStyles.safeArea} edges={[]}>
-      {/* 0件時は空状態が同じ「ルーティンを作成」を主CTAとして出すため、ヘッダーの＋は出さない
-          （出すと同じラベルのボタンが2つ並びVoiceOverで区別が付かない。@tester指摘） */}
-      <Stack.Screen options={{ headerRight: routineCreateHeaderRight(routines) }} />
-      <FlatList
-        style={styles.list}
-        data={routines}
-        keyExtractor={(item) => String(item.id)}
-        renderItem={renderItem}
-        ItemSeparatorComponent={() => <View style={styles.separator} />}
-        contentContainerStyle={styles.content}
-        // 0件時はルーティン選択画面（components/routines/routine-picker-list.tsx）と同じ
-        // デザイン案06-b′の空状態に揃える。タブ直下の一覧で戻る先が無いためonPressBackは渡さない
-        // （@ユーザー指摘）
-        ListEmptyComponent={
-          <EmptyState
-            icon="repeat"
-            title="ルーティンがまだありません"
-            description={'いつものメニューを登録すると、\n次回から選ぶだけで開始できます'}
-            action={{ label: 'ルーティンを作成', icon: 'add', onPress: handleCreate }}
-          />
-        }
-      />
+      <Stack.Screen options={{ headerRight: () => <RoutineCreateHeaderButton /> }} />
+      {/* 0件時はルーティン選択画面（components/routines/routine-picker-list.tsx）と同じ
+          デザイン案06-b′の空状態に揃える。タブ直下の一覧で戻る先が無いためonPressBackは渡さず、
+          「戻る」を出さない（@ユーザー指摘）。
+          ListEmptyComponentではなくFlatListの外で分岐するのは、contentContainerStyleの
+          padding:16がEmptyState自身のpaddingHorizontal:28に足されて左右44ptになり、
+          同じ文言・同じ改行位置なのにルーティン選択画面（28pt）と折り返し幅がズレるため
+          （@reviewer指摘） */}
+      {routines.length === 0 ? (
+        <RoutineEmptyState />
+      ) : (
+        <FlatList
+          style={styles.list}
+          data={routines}
+          keyExtractor={(item) => String(item.id)}
+          renderItem={renderItem}
+          ItemSeparatorComponent={() => <View style={styles.separator} />}
+          contentContainerStyle={styles.content}
+        />
+      )}
     </SafeAreaView>
   );
 }

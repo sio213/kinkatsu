@@ -433,24 +433,30 @@ describe('ルーティンが0件のとき', () => {
     expect(findByAccessibilityLabel(render(), '戻る')).toBeUndefined();
   });
 
-  test('「ルーティンを作成」は画面全体で1つだけ（ヘッダーの＋は出さない）', () => {
+  // ヘッダーの＋は一覧の有無に関わらず常に出す（ユーザー判断）。0件時は空状態のCTAと合わせて
+  // 同じラベルが2つになるが承知の上の仕様なので、意図せず数が変わったら気付けるよう固定しておく
+  test('ヘッダーの＋と空状態の主CTAで「ルーティンを作成」が2つ出る', () => {
     const root = render();
     expect(
       root.findAllByType(TouchableOpacity).filter((t) => t.props.accessibilityLabel === 'ルーティンを作成').length,
-    ).toBe(1);
+    ).toBe(2);
   });
 
-  test('「ルーティンを作成」を押すと下書きをリセットしてから作成画面へ遷移する', () => {
+  test('空状態の「ルーティンを作成」を押すと下書きをリセットしてから作成画面へ遷移する', () => {
     const root = render();
+    // ヘッダーの＋ではなく空状態側（後に描画されるPrimaryButton）を明示的に選ぶ
+    const createBtns = root
+      .findAllByType(TouchableOpacity)
+      .filter((t) => t.props.accessibilityLabel === 'ルーティンを作成');
     act(() => {
-      findByAccessibilityLabel(root, 'ルーティンを作成')!.props.onPress();
+      createBtns[createBtns.length - 1].props.onPress();
     });
     expect(mockResetDraft).toHaveBeenCalled();
     expect(mockPush).toHaveBeenCalledWith('/routine/new');
   });
 });
 
-test('ルーティンが1件以上あるときはヘッダーの＋が「ルーティンを作成」を出す', () => {
+test('ルーティンが1件以上あるときはヘッダーの＋だけが「ルーティンを作成」を出す', () => {
   const root = render();
   expect(
     root.findAllByType(TouchableOpacity).filter((t) => t.props.accessibilityLabel === 'ルーティンを作成').length,

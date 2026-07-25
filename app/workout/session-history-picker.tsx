@@ -35,7 +35,10 @@ export default function SessionHistoryPickerScreen() {
   // 置き換えるのは、(1)行き止まりのこの画面をスタックに残さないため、(2)種目追加ピッカーが
   // start-chooserの直下にいる前提でdismiss段数(START_CHOOSER_DISMISS_COUNT.fromChild)を
   // 決めており、replaceなら深さが変わらずその前提が保たれるため。
-  // 過去日の事後記録モードではpastDateKeyも引き継ぎ、作るセッションの種類を変えない
+  // 過去日の事後記録モードではpastDateKeyも引き継ぎ、作るセッションの種類を変えない。
+  // 他の遷移と違いuseDebouncedPushを通していないのは、replaceが同一ルートを同一ルートで
+  // 差し替えるだけでスタックが伸びず、連打してもピッカーが積み重ならないため
+  // （アプリ内で唯一のrouter.replace使用箇所なので、意図的な例外として明記しておく。@reviewer指摘）
   const handleStartNew = useCallback(() => {
     router.replace({
       pathname: '/workout/exercise-picker',

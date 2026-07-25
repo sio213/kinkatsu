@@ -1,4 +1,4 @@
-import { routineCreateHeaderRight } from '@/components/routines/routine-create-header-button';
+import { RoutineCreateHeaderButton } from '@/components/routines/routine-create-header-button';
 import { RoutinePickerList } from '@/components/routines/routine-picker-list';
 import { NotFoundScreen } from '@/components/ui/not-found-screen';
 import { ScreenStyles } from '@/constants/theme';
@@ -48,7 +48,7 @@ export default function RoutinePickerScreen() {
 
   return (
     <SafeAreaView style={ScreenStyles.safeArea} edges={['bottom']}>
-      <Stack.Screen options={{ headerRight: routineCreateHeaderRight(routines) }} />
+      <Stack.Screen options={{ headerRight: () => <RoutineCreateHeaderButton /> }} />
       <RoutinePickerList
         routines={routines}
         summaries={summaries}

@@ -11,8 +11,13 @@ import { useCallback } from 'react';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 export default function ExercisePickerScreen() {
-  // newSessionは、start-chooser「種目を追加」からこの画面へ直接遷移してきた場合にのみ付く
-  // （2026-07-20）。この経路ではセッションがまだ存在せず（2026-07-25、@ユーザー指摘: 以前は
+  // newSessionは、start-chooser「種目を追加」からこの画面へ直接遷移してきた場合（2026-07-20）と、
+  // start-chooser「過去の記録」→app/workout/session-history-picker.tsxが0件で、その空状態の
+  // 「新しく記録する」からreplaceで置き換わってきた場合（2026-07-25）に付く。後者がpushではなく
+  // replaceなのは、この画面がstart-chooserの直下(+1)にいるという前提を保つため——
+  // 下のrouter.dismiss(START_CHOOSER_DISMISS_COUNT.fromChild)がその深さに依存しており、
+  // pushに変えると段数が1つ足りなくなって静かに誤動作する（lib/workout/start-chooser-navigation.ts参照）。
+  // この経路ではセッションがまだ存在せず（2026-07-25、@ユーザー指摘: 以前は
   // start-chooser側でタップ直後に作っていたが、ここで「戻る」を押すと空の記録が残ってしまうため、
   // 確定時に作るよう変更した）、確定時にcreateStartChooserSessionで作ってから種目を追加する。
   // また/workout/{id}を一度もpushしていないため、確定後はrouter.back()ではなく/workout/{id}へ
