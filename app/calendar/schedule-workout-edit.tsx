@@ -2,12 +2,12 @@ import { RoutineAddExerciseButton } from '@/components/routines/routine-add-exer
 import { ScheduledWorkoutExerciseCard } from '@/components/calendar/scheduled-workout-exercise-card';
 import { HeaderMenu, type DropdownMenuItem } from '@/components/ui/dropdown-menu';
 import { HeaderTitle } from '@/components/ui/header-title';
+import { KeyboardAvoidingScreen } from '@/components/ui/keyboard-avoiding-screen';
 import { NotFoundState } from '@/components/ui/not-found-state';
 import { PrimaryButton } from '@/components/ui/primary-button';
 import { ExerciseEmptyState } from '@/components/workout/exercise-empty-state';
 import { Colors } from '@/constants/theme';
 import { useDebouncedPush } from '@/hooks/use-debounced-push';
-import { useKeyboardInset } from '@/hooks/use-keyboard-inset';
 import { useRoutines } from '@/hooks/use-routines';
 import { useScheduledWorkoutTime } from '@/hooks/use-scheduled-workout';
 import { useScheduledWorkoutExercises } from '@/hooks/use-scheduled-workout-exercises';
@@ -35,7 +35,6 @@ export default function ScheduleWorkoutEditScreen() {
   const scheduledWorkoutId = Number(scheduledWorkoutIdParam);
   const router = useRouter();
   const pushDebounced = useDebouncedPush();
-  const keyboardInset = useKeyboardInset();
   const { exercises, loaded: exercisesLoaded } = useScheduledWorkoutExercises(scheduledWorkoutId);
   const { time: scheduledTime, loaded: scheduledTimeLoaded } = useScheduledWorkoutTime(scheduledWorkoutId);
   const { routines } = useRoutines();
@@ -239,49 +238,49 @@ export default function ScheduleWorkoutEditScreen() {
           headerRight: () => <HeaderMenu groups={[menuItems]} accessibilityLabel="種目編集のメニューを開く" />,
         }}
       />
-      <ScrollView
-        ref={scrollRef}
-        style={styles.scroll}
-        contentContainerStyle={exercises.length === 0 ? styles.contentEmpty : styles.content}
-        contentInset={{ bottom: keyboardInset }}
-        scrollIndicatorInsets={{ bottom: keyboardInset }}
-        keyboardShouldPersistTaps="handled"
-      >
-        {exercises.length === 0 ? (
-          // 種目0件は、ルーティン削除等の稀なケースに加え、⋮「削除」で最後の1件を消した場合にも
-          // 到達するようになった（2026-07-22、@ユーザー指摘で安全網を撤廃）。トレーニング画面
-          // (app/workout/[id].tsx)と同じ空状態デザインに統一する（2026-07-22、@ユーザー指摘。
-          // 一度RoutineAddExerciseButtonのvariant="empty"（破線ボックス）へ寄せてしまったのを
-          // 逆方向に修正した）
-          <ExerciseEmptyState onPress={handleAddExercise} />
-        ) : (
-          <View style={styles.list}>
-            {exercises.map((exercise, index) => (
-              <ScheduledWorkoutExerciseCard
-                key={exercise.scheduledWorkoutExerciseId}
-                exercise={exercise}
-                isFirst={index === 0}
-                isLast={index === exercises.length - 1}
-                onSwap={() =>
-                  handleSwap(
-                    exercise.scheduledWorkoutExerciseId,
-                    exercise.exerciseId,
-                    exercise.name,
-                    exercise.sets.some(hasAnyValue),
-                  )
-                }
-                onDelete={() => handleDelete(exercise.scheduledWorkoutExerciseId)}
-                onMoveUp={() => handleMove(exercise.scheduledWorkoutExerciseId, 'up')}
-                onMoveDown={() => handleMove(exercise.scheduledWorkoutExerciseId, 'down')}
-              />
-            ))}
-            <RoutineAddExerciseButton variant="ghost" onPress={handleAddExercise} />
-          </View>
-        )}
-      </ScrollView>
-      <View style={styles.footer}>
-        <PrimaryButton label="戻る" onPress={() => router.back()} />
-      </View>
+      <KeyboardAvoidingScreen>
+        <ScrollView
+          ref={scrollRef}
+          style={styles.scroll}
+          contentContainerStyle={exercises.length === 0 ? styles.contentEmpty : styles.content}
+          keyboardShouldPersistTaps="handled"
+        >
+          {exercises.length === 0 ? (
+            // 種目0件は、ルーティン削除等の稀なケースに加え、⋮「削除」で最後の1件を消した場合にも
+            // 到達するようになった（2026-07-22、@ユーザー指摘で安全網を撤廃）。トレーニング画面
+            // (app/workout/[id].tsx)と同じ空状態デザインに統一する（2026-07-22、@ユーザー指摘。
+            // 一度RoutineAddExerciseButtonのvariant="empty"（破線ボックス）へ寄せてしまったのを
+            // 逆方向に修正した）
+            <ExerciseEmptyState onPress={handleAddExercise} />
+          ) : (
+            <View style={styles.list}>
+              {exercises.map((exercise, index) => (
+                <ScheduledWorkoutExerciseCard
+                  key={exercise.scheduledWorkoutExerciseId}
+                  exercise={exercise}
+                  isFirst={index === 0}
+                  isLast={index === exercises.length - 1}
+                  onSwap={() =>
+                    handleSwap(
+                      exercise.scheduledWorkoutExerciseId,
+                      exercise.exerciseId,
+                      exercise.name,
+                      exercise.sets.some(hasAnyValue),
+                    )
+                  }
+                  onDelete={() => handleDelete(exercise.scheduledWorkoutExerciseId)}
+                  onMoveUp={() => handleMove(exercise.scheduledWorkoutExerciseId, 'up')}
+                  onMoveDown={() => handleMove(exercise.scheduledWorkoutExerciseId, 'down')}
+                />
+              ))}
+              <RoutineAddExerciseButton variant="ghost" onPress={handleAddExercise} />
+            </View>
+          )}
+        </ScrollView>
+        <View style={styles.footer}>
+          <PrimaryButton label="戻る" onPress={() => router.back()} />
+        </View>
+      </KeyboardAvoidingScreen>
     </SafeAreaView>
   );
 }
