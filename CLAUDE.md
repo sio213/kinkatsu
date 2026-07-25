@@ -92,6 +92,11 @@ kinkatsu用のGoogle Driveフォルダが `仕事 > Webサービス > 🏋️ ki
   2. `FormField`に各フィールドの`name`（`Controller`/`register`に渡すnameと同じもの）を渡す。現時点でエラーを表示していないフィールド（チップ選択のkind切替など）でも、単一のRHFフィールドに対応するものには付けておくと、後からそのフィールドにバリデーションを追加した際も自動的に効く
   3. `useImperativeHandle`のsubmitや送信ボタンの`onPress`は、`useScrollToFirstError()`で得た関数を`handleSubmit(onSubmit, onInvalid)`の第2引数に渡す（`handleSubmit(onSubmit)`単体のままにしない）
 
+### キーボードと下部固定フッター
+- TextInputを含み、かつ下部に固定フッター（保存・決定・戻る・追加などのボタン）を持つ画面は、`SafeAreaView`の内側・スクロール本体＋フッターの外側を `components/ui/keyboard-avoiding-screen.tsx` の `KeyboardAvoidingScreen` で包む。これでキーボードが開いてもフッターがキーボードの上に乗り、閉じずに押せる
+- **素の`KeyboardAvoidingView`をそのまま置いても直らない。** `keyboardVerticalOffset`にヘッダー高さを渡す必要がある（KeyboardAvoidingViewは自身のonLayout＝親からの相対座標とキーボードの画面座標を突き合わせて余白を計算するため、ヘッダー＋ステータスバーの分だけ余白が足りない）。`KeyboardAvoidingScreen`が`HeaderHeightContext`からこれを補っている
+- `KeyboardAvoidingScreen`で包んだスクロールビューに `contentInset={{ bottom: keyboardInset }}`（`hooks/use-keyboard-inset.ts`）を併用しない。スクロール領域自体がキーボードの上に収まるため二重に効いてしまう。`useKeyboardInset`は**固定フッターを持たない**一覧画面（種目一覧・リマインダー一覧）専用
+
 ### ナビゲーション・タブバーの表示範囲
 下部タブは4本（記録／カレンダー／種目／設定）で確定。当面再編しない。
 

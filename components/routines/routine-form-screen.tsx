@@ -1,10 +1,11 @@
 import { RoutineForm, type RoutineFormHandle } from '@/components/routines/routine-form';
 import { FormScrollProvider } from '@/components/ui/form-scroll-context';
+import { KeyboardAvoidingScreen } from '@/components/ui/keyboard-avoiding-screen';
 import { PrimaryButton } from '@/components/ui/primary-button';
 import { Colors } from '@/constants/theme';
 import type { RoutineFormValues } from '@/lib/routines/validation';
 import { useRef, useState } from 'react';
-import { KeyboardAvoidingView, Platform, ScrollView, StyleSheet, View } from 'react-native';
+import { ScrollView, StyleSheet, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 type Props = {
@@ -33,7 +34,7 @@ export function RoutineFormScreen({
 
   return (
     <SafeAreaView style={styles.safe} edges={['bottom']}>
-      <KeyboardAvoidingView style={styles.flex} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
+      <KeyboardAvoidingScreen>
         <FormScrollProvider scrollRef={scrollRef}>
           <ScrollView ref={scrollRef} contentContainerStyle={styles.content} keyboardShouldPersistTaps="handled">
             <RoutineForm
@@ -51,14 +52,13 @@ export function RoutineFormScreen({
         <View style={styles.footer}>
           <PrimaryButton label="保存" onPress={() => formRef.current?.submit()} disabled={submitDisabled} />
         </View>
-      </KeyboardAvoidingView>
+      </KeyboardAvoidingScreen>
     </SafeAreaView>
   );
 }
 
 const styles = StyleSheet.create({
   safe: { flex: 1, backgroundColor: Colors.background },
-  flex: { flex: 1 },
 
   content: { paddingHorizontal: 20, paddingTop: 12, paddingBottom: 24 },
 

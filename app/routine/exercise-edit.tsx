@@ -4,10 +4,10 @@ import {
   type RoutineTemplateExerciseCardHandle,
 } from '@/components/routines/routine-template-exercise-card';
 import { HeaderMenu, type DropdownMenuItem } from '@/components/ui/dropdown-menu';
+import { KeyboardAvoidingScreen } from '@/components/ui/keyboard-avoiding-screen';
 import { PrimaryButton } from '@/components/ui/primary-button';
 import { ExerciseEmptyState } from '@/components/workout/exercise-empty-state';
 import { Colors } from '@/constants/theme';
-import { useKeyboardInset } from '@/hooks/use-keyboard-inset';
 import { useExercisesWithHistory } from '@/hooks/use-workout-session';
 import { useRoutineDraftStore } from '@/lib/routines/draft-store';
 import { NO_SESSION_TO_EXCLUDE } from '@/lib/workout/history';
@@ -30,7 +30,6 @@ export default function RoutineExerciseEditScreen() {
   const focusIndex = focusIndexParam != null ? Number(focusIndexParam) : null;
   const exercises = useRoutineDraftStore((state) => state.exercises);
   const lastAddedAt = useRoutineDraftStore((state) => state.lastAddedAt);
-  const keyboardInset = useKeyboardInset();
   const historyExerciseIds = useExercisesWithHistory(NO_SESSION_TO_EXCLUDE);
 
   // ルーティンフォームの種目一覧でタップした種目のカードまで自動スクロールするための位置計測。
@@ -181,47 +180,47 @@ export default function RoutineExerciseEditScreen() {
           headerRight: () => <HeaderMenu groups={[menuItems]} accessibilityLabel="種目編集のメニューを開く" />,
         }}
       />
-      <ScrollView
-        ref={scrollRef}
-        style={styles.scroll}
-        contentContainerStyle={exercises.length === 0 ? styles.contentEmpty : styles.content}
-        contentInset={{ bottom: keyboardInset }}
-        scrollIndicatorInsets={{ bottom: keyboardInset }}
-        keyboardShouldPersistTaps="handled"
-      >
-        {exercises.length === 0 ? (
-          // トレーニング画面(app/workout/[id].tsx)と同じ空状態デザインに統一する（2026-07-22、
-          // @ユーザー指摘。一度RoutineAddExerciseButtonのvariant="empty"（破線ボックス）へ
-          // 寄せてしまったのを逆方向に修正した）
-          <ExerciseEmptyState onPress={handleAddExercise} />
-        ) : (
-          <View testID="exercise-list" style={styles.list} onLayout={handleListLayout}>
-            {exercises.map((exercise, index) => (
-              <View key={`${exercise.exerciseId}-${index}`} testID={`exercise-item-${index}`} onLayout={handleItemLayout(index)}>
-                <RoutineTemplateExerciseCard
-                  ref={(handle) => {
-                    if (handle) {
-                      cardRefsRef.current.set(index, handle);
-                      if (lastAddedAt?.index === index) tryFocusAdded();
-                    } else {
-                      cardRefsRef.current.delete(index);
-                    }
-                  }}
-                  exercise={exercise}
-                  index={index}
-                  isFirst={index === 0}
-                  isLast={index === exercises.length - 1}
-                  hasHistory={historyExerciseIds.has(exercise.exerciseId)}
-                />
-              </View>
-            ))}
-            <RoutineAddExerciseButton variant="ghost" onPress={handleAddExercise} />
-          </View>
-        )}
-      </ScrollView>
-      <View style={styles.footer}>
-        <PrimaryButton label="戻る" onPress={() => router.back()} />
-      </View>
+      <KeyboardAvoidingScreen>
+        <ScrollView
+          ref={scrollRef}
+          style={styles.scroll}
+          contentContainerStyle={exercises.length === 0 ? styles.contentEmpty : styles.content}
+          keyboardShouldPersistTaps="handled"
+        >
+          {exercises.length === 0 ? (
+            // トレーニング画面(app/workout/[id].tsx)と同じ空状態デザインに統一する（2026-07-22、
+            // @ユーザー指摘。一度RoutineAddExerciseButtonのvariant="empty"（破線ボックス）へ
+            // 寄せてしまったのを逆方向に修正した）
+            <ExerciseEmptyState onPress={handleAddExercise} />
+          ) : (
+            <View testID="exercise-list" style={styles.list} onLayout={handleListLayout}>
+              {exercises.map((exercise, index) => (
+                <View key={`${exercise.exerciseId}-${index}`} testID={`exercise-item-${index}`} onLayout={handleItemLayout(index)}>
+                  <RoutineTemplateExerciseCard
+                    ref={(handle) => {
+                      if (handle) {
+                        cardRefsRef.current.set(index, handle);
+                        if (lastAddedAt?.index === index) tryFocusAdded();
+                      } else {
+                        cardRefsRef.current.delete(index);
+                      }
+                    }}
+                    exercise={exercise}
+                    index={index}
+                    isFirst={index === 0}
+                    isLast={index === exercises.length - 1}
+                    hasHistory={historyExerciseIds.has(exercise.exerciseId)}
+                  />
+                </View>
+              ))}
+              <RoutineAddExerciseButton variant="ghost" onPress={handleAddExercise} />
+            </View>
+          )}
+        </ScrollView>
+        <View style={styles.footer}>
+          <PrimaryButton label="戻る" onPress={() => router.back()} />
+        </View>
+      </KeyboardAvoidingScreen>
     </SafeAreaView>
   );
 }

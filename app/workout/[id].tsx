@@ -2,6 +2,7 @@ import { ContextBar } from '@/components/ui/context-bar';
 import { HeaderMenu, type DropdownMenuItem } from '@/components/ui/dropdown-menu';
 import { HeaderTitle } from '@/components/ui/header-title';
 import { IconSymbol } from '@/components/ui/icon-symbol';
+import { KeyboardAvoidingScreen } from '@/components/ui/keyboard-avoiding-screen';
 import { ListErrorBoundary } from '@/components/ui/list-error-boundary';
 import { NotFoundState } from '@/components/ui/not-found-state';
 import { PrimaryButton } from '@/components/ui/primary-button';
@@ -11,7 +12,6 @@ import { SessionExerciseCard, type SessionExerciseCardHandle } from '@/component
 import { Colors, Typography } from '@/constants/theme';
 import { useAutoCollapseCompletedExercises } from '@/hooks/use-auto-collapse-completed-exercises';
 import { useDebouncedPush } from '@/hooks/use-debounced-push';
-import { useKeyboardInset } from '@/hooks/use-keyboard-inset';
 import { useRoutines } from '@/hooks/use-routines';
 import { useTickingNow } from '@/hooks/use-ticking-now';
 import {
@@ -46,7 +46,6 @@ export default function WorkoutScreen() {
   const exercisesWithHistory = useExercisesWithHistory(sessionId ?? -1);
   const { routines } = useRoutines();
   const isFinishingRef = useRef(false);
-  const keyboardInset = useKeyboardInset();
   // 種目追加/入れ替え/記録から読み込む画面はDB操作直後にrouter.back()で閉じるため、プリフィルが
   // 起きたことはpub/sub経由でここに届く（lib/workout/prefill-feedback.ts）。プリフィルされた
   // セットidが分かればカード内のゴースト表示に使える。カード（sessionExerciseId）単位のMapで持ち、
@@ -284,63 +283,63 @@ export default function WorkoutScreen() {
         </ContextBar>
       )}
 
-      {sessionExercises.length === 0 ? (
-        <ExerciseEmptyState onPress={handleAddExercise} />
-      ) : (
-        <FlatList
-          style={styles.exerciseList}
-          contentContainerStyle={styles.exerciseListContent}
-          data={sessionExercises}
-          keyExtractor={(item) => String(item.sessionExerciseId)}
-          renderItem={({ item, index }) => {
-            const prefilledEntry = prefilledByCardId.get(item.sessionExerciseId);
-            return (
-              <ListErrorBoundary>
-                <SessionExerciseCard
-                  ref={(handle) => {
-                    if (handle) {
-                      cardRefsRef.current.set(item.sessionExerciseId, handle);
-                      if (pendingFocusIdRef.current === item.sessionExerciseId) tryFocus();
-                    } else {
-                      cardRefsRef.current.delete(item.sessionExerciseId);
-                    }
-                  }}
-                  exercise={item}
-                  sessionId={sessionId}
-                  sets={sessionSets.get(item.sessionExerciseId) ?? EMPTY_SETS}
-                  collapsed={collapsedIds.has(item.sessionExerciseId)}
-                  isFirst={index === 0}
-                  isLast={index === sessionExercises.length - 1}
-                  previousSessionExerciseId={sessionExercises[index - 1]?.sessionExerciseId ?? null}
-                  nextSessionExerciseId={sessionExercises[index + 1]?.sessionExerciseId ?? null}
-                  onToggleCollapsed={handleToggleCollapsed}
-                  onInteract={handleInteract}
-                  prefilledSetIds={prefilledEntry?.prefilledSetIds ?? EMPTY_PREFILLED_SET_IDS}
-                  hasHistory={exercisesWithHistory.has(item.id)}
-                />
-              </ListErrorBoundary>
-            );
-          }}
-          ListFooterComponent={
-            <AddExerciseButton onPress={handleAddExercise} style={styles.addExerciseBtnInline} />
-          }
-          contentInset={{ bottom: keyboardInset }}
-          scrollIndicatorInsets={{ bottom: keyboardInset }}
-          keyboardShouldPersistTaps="handled"
-        />
-      )}
+      <KeyboardAvoidingScreen>
+        {sessionExercises.length === 0 ? (
+          <ExerciseEmptyState onPress={handleAddExercise} />
+        ) : (
+          <FlatList
+            style={styles.exerciseList}
+            contentContainerStyle={styles.exerciseListContent}
+            data={sessionExercises}
+            keyExtractor={(item) => String(item.sessionExerciseId)}
+            renderItem={({ item, index }) => {
+              const prefilledEntry = prefilledByCardId.get(item.sessionExerciseId);
+              return (
+                <ListErrorBoundary>
+                  <SessionExerciseCard
+                    ref={(handle) => {
+                      if (handle) {
+                        cardRefsRef.current.set(item.sessionExerciseId, handle);
+                        if (pendingFocusIdRef.current === item.sessionExerciseId) tryFocus();
+                      } else {
+                        cardRefsRef.current.delete(item.sessionExerciseId);
+                      }
+                    }}
+                    exercise={item}
+                    sessionId={sessionId}
+                    sets={sessionSets.get(item.sessionExerciseId) ?? EMPTY_SETS}
+                    collapsed={collapsedIds.has(item.sessionExerciseId)}
+                    isFirst={index === 0}
+                    isLast={index === sessionExercises.length - 1}
+                    previousSessionExerciseId={sessionExercises[index - 1]?.sessionExerciseId ?? null}
+                    nextSessionExerciseId={sessionExercises[index + 1]?.sessionExerciseId ?? null}
+                    onToggleCollapsed={handleToggleCollapsed}
+                    onInteract={handleInteract}
+                    prefilledSetIds={prefilledEntry?.prefilledSetIds ?? EMPTY_PREFILLED_SET_IDS}
+                    hasHistory={exercisesWithHistory.has(item.id)}
+                  />
+                </ListErrorBoundary>
+              );
+            }}
+            ListFooterComponent={
+              <AddExerciseButton onPress={handleAddExercise} style={styles.addExerciseBtnInline} />
+            }
+            keyboardShouldPersistTaps="handled"
+          />
+        )}
 
-      {isActive ? (
-        <View style={styles.footer}>
-          <PrimaryButton label="トレーニングを終了" onPress={handleFinish} />
-        </View>
-      ) : (
-        // 過去の記録の編集モード。app/calendar/schedule-workout-edit.tsxの「戻るのみ」の
-        // フッターと同じ体験に揃える（@ユーザー指摘）
-        <View style={styles.footer}>
-          <PrimaryButton label="戻る" onPress={() => router.back()} />
-        </View>
-      )}
+        {isActive ? (
+          <View style={styles.footer}>
+            <PrimaryButton label="トレーニングを終了" onPress={handleFinish} />
+          </View>
+        ) : (
+          // 過去の記録の編集モード。app/calendar/schedule-workout-edit.tsxの「戻るのみ」の
+          // フッターと同じ体験に揃える（@ユーザー指摘）
+          <View style={styles.footer}>
+            <PrimaryButton label="戻る" onPress={() => router.back()} />
+          </View>
+        )}
+      </KeyboardAvoidingScreen>
     </SafeAreaView>
   );
 }

@@ -1,8 +1,8 @@
 import { ReminderForm, type ReminderFormHandle } from '@/components/reminders/reminder-form';
 import { FormScrollProvider } from '@/components/ui/form-scroll-context';
+import { KeyboardAvoidingScreen } from '@/components/ui/keyboard-avoiding-screen';
 import { PrimaryButton } from '@/components/ui/primary-button';
 import { Colors } from '@/constants/theme';
-import { useKeyboardInset } from '@/hooks/use-keyboard-inset';
 import { DEFAULT_REMINDER_BODY, DEFAULT_REMINDER_TITLE } from '@/lib/notifications/messages';
 import type { ReminderInput } from '@/lib/notifications/types';
 import { useRoutineDraftStore } from '@/lib/routines/draft-store';
@@ -34,7 +34,6 @@ export default function RoutineReminderScreen() {
   const router = useRouter();
   const reminder = useRoutineDraftStore((state) => state.reminder);
   const setReminder = useRoutineDraftStore((state) => state.setReminder);
-  const keyboardInset = useKeyboardInset();
   const formRef = useRef<ReminderFormHandle>(null);
   const scrollRef = useRef<ScrollView>(null);
   const [submitDisabled, setSubmitDisabled] = useState(false);
@@ -53,29 +52,25 @@ export default function RoutineReminderScreen() {
 
   return (
     <SafeAreaView style={styles.safe} edges={['bottom']}>
-      <FormScrollProvider scrollRef={scrollRef}>
-        <ScrollView
-          ref={scrollRef}
-          contentContainerStyle={styles.content}
-          contentInset={{ bottom: keyboardInset }}
-          scrollIndicatorInsets={{ bottom: keyboardInset }}
-          keyboardShouldPersistTaps="handled"
-        >
-          <ReminderForm
-            ref={formRef}
-            initial={reminder ?? DEFAULT_INPUT}
-            onSubmit={handleSubmit}
-            onCancel={handleCancel}
-            onSubmitDisabledChange={setSubmitDisabled}
-            submitLabel="保存"
-            showTitleBody={false}
-            hideButtons
-          />
-        </ScrollView>
-      </FormScrollProvider>
-      <View style={styles.footer}>
-        <PrimaryButton label="保存" onPress={() => formRef.current?.submit()} disabled={submitDisabled} />
-      </View>
+      <KeyboardAvoidingScreen>
+        <FormScrollProvider scrollRef={scrollRef}>
+          <ScrollView ref={scrollRef} contentContainerStyle={styles.content} keyboardShouldPersistTaps="handled">
+            <ReminderForm
+              ref={formRef}
+              initial={reminder ?? DEFAULT_INPUT}
+              onSubmit={handleSubmit}
+              onCancel={handleCancel}
+              onSubmitDisabledChange={setSubmitDisabled}
+              submitLabel="保存"
+              showTitleBody={false}
+              hideButtons
+            />
+          </ScrollView>
+        </FormScrollProvider>
+        <View style={styles.footer}>
+          <PrimaryButton label="保存" onPress={() => formRef.current?.submit()} disabled={submitDisabled} />
+        </View>
+      </KeyboardAvoidingScreen>
     </SafeAreaView>
   );
 }

@@ -1,11 +1,11 @@
 import { ExerciseFilterHeader } from '@/components/exercises/exercise-filter-header';
+import { KeyboardAvoidingScreen } from '@/components/ui/keyboard-avoiding-screen';
 import { ListErrorBoundary } from '@/components/ui/list-error-boundary';
 import { PrimaryButton } from '@/components/ui/primary-button';
 import { Colors, Typography } from '@/constants/theme';
 import type { Exercise } from '@/db/schema';
 import { useExerciseUsageStats } from '@/hooks/use-exercise-usage-stats';
 import { useExercises } from '@/hooks/use-exercises';
-import { useKeyboardInset } from '@/hooks/use-keyboard-inset';
 import { CATEGORY_ALL } from '@/lib/exercises/constants';
 import { filterExercises } from '@/lib/exercises/filter';
 import { useExerciseSortStore } from '@/lib/exercises/sort-store';
@@ -41,7 +41,6 @@ export function ExercisePickerView({ excludeSessionId, onPressInfo, onConfirm }:
   const [activeCategory, setActiveCategory] = useState<string>(CATEGORY_ALL);
   // 選択順を保持するため配列で管理する（Setだと挿入順の保証が実装依存になるため避ける）
   const [selectedIds, setSelectedIds] = useState<number[]>([]);
-  const keyboardInset = useKeyboardInset();
 
   // 種目詳細等へ遷移してこの画面がフォーカスを失うタイミングでキーボードを閉じる。
   // 開いたままだと戻ってきたときに一覧が狭いままになってしまうため（exercises.tsxと同じ対応）
@@ -59,7 +58,8 @@ export function ExercisePickerView({ excludeSessionId, onPressInfo, onConfirm }:
   );
 
   const handleToggle = useCallback((id: number) => {
-    // 選択したら検索キーボードを閉じ、画面下部の確定ボタンを隠れさせない
+    // 選択したら検索キーボードを閉じ、一覧を広く見せる
+    // （確定ボタン自体はKeyboardAvoidingScreenでキーボードの上に出るため隠れない）
     Keyboard.dismiss();
     setSelectedIds((prev) =>
       prev.includes(id) ? prev.filter((existingId) => existingId !== id) : [...prev, id],
@@ -107,7 +107,7 @@ export function ExercisePickerView({ excludeSessionId, onPressInfo, onConfirm }:
   );
 
   return (
-    <>
+    <KeyboardAvoidingScreen>
       <FlatList
         style={styles.list}
         data={filtered}
@@ -118,8 +118,6 @@ export function ExercisePickerView({ excludeSessionId, onPressInfo, onConfirm }:
         stickyHeaderIndices={[0]}
         ListEmptyComponent={emptyComponent}
         contentContainerStyle={styles.content}
-        contentInset={{ bottom: keyboardInset }}
-        scrollIndicatorInsets={{ bottom: keyboardInset }}
         keyboardShouldPersistTaps="handled"
       />
       <View style={styles.footer}>
@@ -129,7 +127,7 @@ export function ExercisePickerView({ excludeSessionId, onPressInfo, onConfirm }:
           disabled={selectedIds.length === 0}
         />
       </View>
-    </>
+    </KeyboardAvoidingScreen>
   );
 }
 

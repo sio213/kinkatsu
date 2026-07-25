@@ -1,5 +1,6 @@
 import { ExerciseFilterHeader } from '@/components/exercises/exercise-filter-header';
 import { HeaderTitle } from '@/components/ui/header-title';
+import { KeyboardAvoidingScreen } from '@/components/ui/keyboard-avoiding-screen';
 import { ListErrorBoundary } from '@/components/ui/list-error-boundary';
 import { PrimaryButton } from '@/components/ui/primary-button';
 import { PickerExerciseRow } from '@/components/workout/picker-exercise-row';
@@ -8,7 +9,6 @@ import type { Exercise } from '@/db/schema';
 import { useDebouncedPush } from '@/hooks/use-debounced-push';
 import { useExerciseUsageStats } from '@/hooks/use-exercise-usage-stats';
 import { useExercises } from '@/hooks/use-exercises';
-import { useKeyboardInset } from '@/hooks/use-keyboard-inset';
 import { CATEGORY_ALL } from '@/lib/exercises/constants';
 import { filterExercises } from '@/lib/exercises/filter';
 import { useExerciseSortStore } from '@/lib/exercises/sort-store';
@@ -54,7 +54,6 @@ export function ExerciseSwapPicker({
   // 種目追加ピッカーと違い単一選択（1件だけ）のため、選択idはSetではなく単一の値で持つ
   const [selectedId, setSelectedId] = useState<number | null>(null);
   const isSubmittingRef = useRef(false);
-  const keyboardInset = useKeyboardInset();
 
   // 種目詳細等へ遷移してこの画面がフォーカスを失うタイミングでキーボードを閉じる（exercise-picker.tsxと同じ対応）
   useFocusEffect(
@@ -161,23 +160,23 @@ export function ExerciseSwapPicker({
           headerTitle: () => <HeaderTitle title="種目を入れ替え" subtitle={currentExerciseName} />,
         }}
       />
-      <FlatList
-        style={styles.list}
-        data={candidates}
-        keyExtractor={(item) => String(item.id)}
-        renderItem={renderItem}
-        ListHeaderComponent={listHeader}
-        // 検索・カテゴリ絞り込み・並び替えをスクロールしても隠れないよう先頭(index 0)で固定する
-        stickyHeaderIndices={[0]}
-        ListEmptyComponent={emptyComponent}
-        contentContainerStyle={styles.content}
-        contentInset={{ bottom: keyboardInset }}
-        scrollIndicatorInsets={{ bottom: keyboardInset }}
-        keyboardShouldPersistTaps="handled"
-      />
-      <View style={styles.footer}>
-        <PrimaryButton label="入れ替える" onPress={handleSubmit} disabled={selectedId == null} />
-      </View>
+      <KeyboardAvoidingScreen>
+        <FlatList
+          style={styles.list}
+          data={candidates}
+          keyExtractor={(item) => String(item.id)}
+          renderItem={renderItem}
+          ListHeaderComponent={listHeader}
+          // 検索・カテゴリ絞り込み・並び替えをスクロールしても隠れないよう先頭(index 0)で固定する
+          stickyHeaderIndices={[0]}
+          ListEmptyComponent={emptyComponent}
+          contentContainerStyle={styles.content}
+          keyboardShouldPersistTaps="handled"
+        />
+        <View style={styles.footer}>
+          <PrimaryButton label="入れ替える" onPress={handleSubmit} disabled={selectedId == null} />
+        </View>
+      </KeyboardAvoidingScreen>
     </SafeAreaView>
   );
 }
