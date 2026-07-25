@@ -1,6 +1,5 @@
 import { RoutineAddExerciseButton } from '@/components/routines/routine-add-exercise-button';
 import { RoutineExerciseRow } from '@/components/routines/routine-exercise-row';
-import { ExerciseEmptyState } from '@/components/workout/exercise-empty-state';
 import { RoutineReminderField } from '@/components/routines/routine-reminder-field';
 import { BoxedTextInput } from '@/components/ui/boxed-text-input';
 import { FormField } from '@/components/ui/form-field';
@@ -154,11 +153,12 @@ export const RoutineForm = forwardRef<RoutineFormHandle, Props>(function Routine
 
       <FormField name="exercises" label="種目" required error={errors.exercises?.message}>
         {exercises.length === 0 ? (
-          // ルーティンテンプレート編集画面(app/routine/exercise-edit.tsx)・トレーニング画面
-          // (app/workout/[id].tsx)と同じ空状態デザインに統一する（2026-07-22、@designer指摘。
-          // 同じdraftExercisesを参照するexercise-edit.tsxと行き来した際に見た目が入れ替わって
-          // 見えるのを防ぐため）
-          <ExerciseEmptyState onPress={onAddExercise} />
+          // デザイン案「②' 作成／編集（空）／種目未追加の初期状態」どおりの破線ボックス。
+          // 2026-07-22に一度ExerciseEmptyState（トレーニング画面の中央寄せ空状態）へ寄せたが、
+          // デザイン案から外れる変更だったため2026-07-25に戻した（@ユーザー指摘）。この画面は
+          // フォームの一部で、名前・リマインダーと並ぶ「種目」フィールドの入力口という位置づけの
+          // ため、画面中央寄せの空状態ではなくフィールド幅いっぱいの破線ボックスが正
+          <RoutineAddExerciseButton variant="empty" onPress={onAddExercise} />
         ) : (
           <View style={styles.exerciseList}>
             {exercises.map((exercise, index) => (
