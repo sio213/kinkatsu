@@ -10,9 +10,14 @@ const mockStartWorkoutFromRoutine = jest.fn();
 jest.mock('expo-router', () => ({
   useRouter: () => ({ back: mockBack, dismiss: mockDismiss }),
   useLocalSearchParams: () => mockUseLocalSearchParams(),
+  // Stack.Screen はナビゲーターのoptionsを設定するコンポーネントで本来は見た目を持たないが、
+  // headerTitle・headerRight（ルーティン作成ボタン）の中身をテストで検証できるよう、
+  // そのレンダー関数だけ実行してやる
   Stack: {
-    Screen: ({ options }: { options?: { headerTitle?: () => unknown } }) =>
-      options?.headerTitle ? options.headerTitle() : null,
+    Screen: ({ options }: { options?: { headerTitle?: () => unknown; headerRight?: () => unknown } }) => {
+      const { createElement, Fragment } = require('react');
+      return createElement(Fragment, null, options?.headerTitle?.(), options?.headerRight?.());
+    },
   },
 }));
 
@@ -304,4 +309,18 @@ describe('過去日の事後記録（pastDateKey付き）', () => {
     expect(root.findByProps({ children: '日付が見つかりません' })).toBeDefined();
     expect(() => root.findByProps({ children: '胸の日' })).toThrow();
   });
+});
+
+// 一覧に開始したいルーティンが無いとき、フローを抜けて記録タブのルーティン一覧まで
+// 戻らなくてもその場で作れるようにするヘッダー右の＋ボタン（2026-07-25追加）
+test('ヘッダーの＋でルーティン作成画面へ遷移する', () => {
+  mockUseRoutines.mockReturnValue({ routines: [] });
+  const root = render();
+
+  const createBtn = findCardByLabel(root, 'ルーティンを作成')!;
+  act(() => {
+    createBtn.props.onPress();
+  });
+
+  expect(mockPush).toHaveBeenCalledWith('/routine/new');
 });

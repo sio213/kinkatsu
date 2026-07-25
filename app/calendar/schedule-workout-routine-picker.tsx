@@ -1,10 +1,11 @@
+import { RoutineCreateHeaderButton } from '@/components/routines/routine-create-header-button';
 import { RoutinePickerList } from '@/components/routines/routine-picker-list';
 import { NotFoundState } from '@/components/ui/not-found-state';
 import { Colors } from '@/constants/theme';
 import { useDebouncedPush } from '@/hooks/use-debounced-push';
 import { useRoutineExerciseSummaries, useRoutines } from '@/hooks/use-routines';
 import type { Routine } from '@/db/schema';
-import { useLocalSearchParams, useRouter } from 'expo-router';
+import { Stack, useLocalSearchParams, useRouter } from 'expo-router';
 import { useCallback } from 'react';
 import { StyleSheet } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
@@ -46,6 +47,7 @@ export default function ScheduleWorkoutRoutinePickerScreen() {
 
   return (
     <SafeAreaView style={styles.safeArea} edges={['bottom']}>
+      <Stack.Screen options={{ headerRight: () => <RoutineCreateHeaderButton /> }} />
       <RoutinePickerList
         routines={routines}
         summaries={summaries}

@@ -1,3 +1,4 @@
+import { RoutineCreateHeaderButton } from '@/components/routines/routine-create-header-button';
 import { RoutinePickerList } from '@/components/routines/routine-picker-list';
 import { HeaderTitle } from '@/components/ui/header-title';
 import { NotFoundState } from '@/components/ui/not-found-state';
@@ -56,6 +57,7 @@ export default function ScheduleRoutinePickerScreen() {
           headerTitle: () => (
             <HeaderTitle title="ルーティンを選択" subtitle={formatSessionDateGroup(parseDateKey(dateKey).getTime())} />
           ),
+          headerRight: () => <RoutineCreateHeaderButton />,
         }}
       />
       <RoutinePickerList
