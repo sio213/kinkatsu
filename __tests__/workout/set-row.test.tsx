@@ -38,6 +38,33 @@ test('未完了のセットは重量・回数が編集可能で、チェック�
   expect(getCheck(root).props.accessibilityState).toEqual({ checked: false });
 });
 
+test('重量・回数の数値欄はタップ時に全選択される（selectTextOnFocus）。前回値プリフィルを削除→打ち直しせず上書きできるようにするため', () => {
+  const set = { id: 1, setNumber: 1, weight: null, reps: null, completedAt: null } as any;
+  const root = render({ set, measurementType: 'weight_reps', onSave: jest.fn(), onReopen: jest.fn() });
+
+  const inputs = root.findAllByType(TextInput);
+  expect(inputs).toHaveLength(2);
+  inputs.forEach((input) => expect(input.props.selectTextOnFocus).toBe(true));
+});
+
+test('数値欄は全選択/コピペのコンテキストメニューを隠す（contextMenuHidden）。数値入力では不要かつ英語表示になるのを避けるため', () => {
+  const set = { id: 1, setNumber: 1, weight: null, reps: null, completedAt: null } as any;
+  const root = render({ set, measurementType: 'weight_reps', onSave: jest.fn(), onReopen: jest.fn() });
+
+  const inputs = root.findAllByType(TextInput);
+  expect(inputs).toHaveLength(2);
+  inputs.forEach((input) => expect(input.props.contextMenuHidden).toBe(true));
+});
+
+test('time計測タイプの分・秒欄（DurationInput経由）も全選択される（selectTextOnFocus）。重量・回数と挙動を揃える', () => {
+  const set = { id: 1, setNumber: 1, durationSeconds: null, completedAt: null } as any;
+  const root = render({ set, measurementType: 'time', onSave: jest.fn(), onReopen: jest.fn() });
+
+  const inputs = root.findAllByType(TextInput);
+  expect(inputs).toHaveLength(2);
+  inputs.forEach((input) => expect(input.props.selectTextOnFocus).toBe(true));
+});
+
 test('未完了だが値がプリセット済み（直前セットからのコピー由来）の場合、初期表示にその値を反映し編集可能なままにする', () => {
   const set = { id: 2, setNumber: 2, weight: 62.5, reps: 8, completedAt: null } as any;
   const root = render({ set, measurementType: 'weight_reps', onSave: jest.fn(), onReopen: jest.fn() });

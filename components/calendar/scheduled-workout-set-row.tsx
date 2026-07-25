@@ -97,6 +97,10 @@ export const ScheduledWorkoutSetRow = memo(function ScheduledWorkoutSetRow({
                 value={display[c.key]}
                 onChangeText={(text) => handleFieldChange(c.key, text)}
                 keyboardType={c.keyboardType}
+                // 記録画面のセット行（set-row.tsx）と挙動を揃える。タップで全選択→上書き。
+                // 数値欄では不要なコンテキストメニュー（英語表示）も隠す
+                selectTextOnFocus
+                contextMenuHidden
                 textAlign="center"
                 placeholder="-"
                 placeholderTextColor={Colors.textPlaceholder}

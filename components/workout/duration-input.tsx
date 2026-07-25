@@ -36,6 +36,13 @@ export const DurationInput = forwardRef<DurationInputHandle, DurationInputProps>
 
   useImperativeHandle(ref, () => ({ focus: () => minInputRef.current?.focus() }), []);
 
+  // 余白（スペーサー・コロン）タップで隣接する入力欄へフォーカスを送る補助。ただしBoxedTextInputの
+  // 箱タップと同様、すでにフォーカス済みなら何もしない（無条件focus()だとselectTextOnFocusが
+  // 毎回再発火して全選択し直し、2回目タップでカーソルに移れず重量・回数欄と挙動がずれるため）
+  const focusIfNeeded = (target: { current: TextInput | null }) => {
+    if (!target.current?.isFocused()) target.current?.focus();
+  };
+
   const handleMinChange = (text: string) => {
     const digits = text.replace(/\D/g, '').slice(0, 3);
     minRef.current = digits;
@@ -55,26 +62,27 @@ export const DurationInput = forwardRef<DurationInputHandle, DurationInputProps>
 
   return (
     <View style={[styles.durationCell, ghost && styles.durationCellGhost]}>
-      {/* 分・秒を固定幅にして中央へ寄せた結果、枠の左右に生まれる余白がタップに反応しなく
-          なってしまうため、両端をそれぞれ隣接する分・秒欄へフォーカスするタップ領域にする */}
-      <TouchableOpacity
-        style={styles.durationSpacer}
-        activeOpacity={1}
-        onPress={() => minInputRef.current?.focus()}
-        accessibilityElementsHidden
-        importantForAccessibility="no-hide-descendants"
-      />
+      {/* 分・秒のTextInput本体をそれぞれ左半分・右半分いっぱい（flex:1）に広げ、コロン側に
+          文字を寄せる（分=右寄せ・秒=左寄せ）ことで「分:秒」の塊感を保ちつつ、箱の端まで
+          TextInput本体の当たり判定にする。こうすると重量・回数欄と同じく、タップした箇所に
+          そのままカーソルが立つ（2回目タップでカーソル移動できる）。固定幅＋左右スペーサーで
+          中央寄せしていた旧実装では、スペーサー部分がフォーカス補助しか持たず、既にフォーカス
+          済みの状態で端をタップしてもカーソルが動かなかった */}
       <BoxedTextInput
         ref={minInputRef}
-        height={18}
+        height={32}
         bare
-        boxStyle={styles.durationMinPart}
+        boxStyle={styles.durationPartBox}
         style={[styles.durationPart, ghost && styles.durationPartGhost]}
         value={min}
         onChangeText={handleMinChange}
         keyboardType="number-pad"
+        // 重量・回数セル（set-row.tsx）と挙動を揃え、タップで既存値を全選択して上書きできるようにする。
+        // 数値欄では全選択/コピペのコンテキストメニュー（英語表示にもなる）は不要なので隠す
+        selectTextOnFocus
+        contextMenuHidden
         maxLength={3}
-        textAlign="center"
+        textAlign="right"
         placeholder="分"
         placeholderTextColor={Colors.textPlaceholder}
         accessibilityLabel={`${exerciseName} セット${setNumber} 時間 分`}
@@ -83,7 +91,7 @@ export const DurationInput = forwardRef<DurationInputHandle, DurationInputProps>
       {/* 分が1桁のケース（プランク等の短時間種目で多い）では自動フォーカス移動が発火しないため、
           コロンをタップしても秒欄へ移動できるようにして手動タップの手間を減らす */}
       <TouchableOpacity
-        onPress={() => secInputRef.current?.focus()}
+        onPress={() => focusIfNeeded(secInputRef)}
         hitSlop={{ top: 12, bottom: 12, left: 8, right: 8 }}
         accessibilityElementsHidden
         importantForAccessibility="no-hide-descendants"
@@ -92,26 +100,21 @@ export const DurationInput = forwardRef<DurationInputHandle, DurationInputProps>
       </TouchableOpacity>
       <BoxedTextInput
         ref={secInputRef}
-        height={18}
+        height={32}
         bare
-        boxStyle={styles.durationSecPart}
+        boxStyle={styles.durationPartBox}
         style={[styles.durationPart, ghost && styles.durationPartGhost]}
         value={sec}
         onChangeText={handleSecChange}
         keyboardType="number-pad"
+        selectTextOnFocus
+        contextMenuHidden
         maxLength={2}
-        textAlign="center"
+        textAlign="left"
         placeholder="秒"
         placeholderTextColor={Colors.textPlaceholder}
         accessibilityLabel={`${exerciseName} セット${setNumber} 時間 秒`}
         accessibilityHint={ghost ? '前回の記録から自動入力された未確認の値です' : undefined}
-      />
-      <TouchableOpacity
-        style={styles.durationSpacer}
-        activeOpacity={1}
-        onPress={() => secInputRef.current?.focus()}
-        accessibilityElementsHidden
-        importantForAccessibility="no-hide-descendants"
       />
     </View>
   );
@@ -125,32 +128,24 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: Colors.borderStrong,
     borderRadius: 7,
-    paddingVertical: 7,
+    // 上下の余白は分・秒のBoxedTextInput(height:32)側に持たせ、ここではpaddingVerticalを
+    // 持たない。paddingVerticalにすると、その余白部分が分・秒どちらのタップ領域にも含まれず
+    // 「箱の上下端をタップしても反応しない」デッドゾーンになるため
     paddingHorizontal: 6,
   },
   // 前回の値がまだ未確認（ゴースト表示）の間、背景・枠線・文字色の3点を変えることで
   // 文字色の濃淡だけに頼らないようにする（WCAG 1.4.1対応）
   durationCellGhost: { backgroundColor: Colors.accentSurface, borderColor: Colors.accent },
-  // flex:1にすると、time単独のように列幅が広い場合に分・秒それぞれが独立してその半分の
-  // 幅の中央に寄ってしまい、間が間延びして見える。固定幅にして「分:秒」をひとまとまりの
-  // 塊にし、左右のdurationSpacer（flex:1の余白）で挟むことで中央寄せしつつ、その余白
-  // 部分もタップで隣接する入力欄へフォーカスできるようにする
   // 分・秒はBoxedTextInputで箱(幅)とTextInput本体を分離している(bare指定で枠線・背景は
   // 持たせず、親durationCellの枠内に収める)。文字色は既定値のままなのでここでは持たない。
   // 詳細はcomponents/ui/boxed-text-input.tsxのコメント参照
   durationPart: Typography.metric,
   durationPartGhost: { color: Colors.textSecondary },
-  durationSpacer: {
+  // 分・秒の箱をそれぞれ左半分・右半分いっぱいに広げる。TextInput本体が箱幅まで伸びるので
+  // 端までタップ＝カーソル配置になり、重量・回数欄と挙動が揃う。文字はtextAlignでコロン側
+  // （分=右・秒=左）に寄せているため、幅を広げても「分:秒」の塊感は保たれる
+  durationPartBox: {
     flex: 1,
-    alignSelf: 'stretch',
-  },
-  // フォントサイズ拡大（14→17）に合わせて固定幅も広げ、3桁の分・2桁の秒が収まるようにする。
-  // 距離+時間の種目は99分を超えるセッションもあり得るため、分側は3桁ぶんの余白を多めに確保する
-  durationMinPart: {
-    width: 40,
-  },
-  durationSecPart: {
-    width: 30,
   },
   durationColon: {
     ...Typography.metric,

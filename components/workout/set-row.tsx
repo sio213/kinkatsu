@@ -173,6 +173,13 @@ export const SetRow = memo(
             value={values[c.key]}
             onChangeText={(text) => handleFieldChange(c.key, text)}
             keyboardType={c.keyboardType}
+            // タップした瞬間に既存値を全選択し、そのまま数字を打てば上書きになるようにする。
+            // 前回値プリフィル（ゴースト）を「ちょい上げ・ちょい下げ」で直す操作が主なので、
+            // 削除→打ち直しの手間を省く。汎用のBoxedTextInputには付けず（検索・名称欄に波及するため）
+            // 数値セル側でのみ渡す。あわせて、数値欄では全選択/コピペのコンテキストメニュー
+            // （英語表示にもなる）は不要なのでcontextMenuHiddenで隠す
+            selectTextOnFocus
+            contextMenuHidden
             textAlign="center"
             placeholder="-"
             placeholderTextColor={Colors.textPlaceholder}
