@@ -10,11 +10,10 @@ import { useIsActive, useReorderableDrag } from 'react-native-reorderable-list';
 
 // 並び替え画面の行が表示に必要とする最小限の形。ルーティンの下書き(DraftExercise)・
 // トレーニング中セッション(SessionExercise)・カレンダーの予定(ScheduledWorkoutExerciseDetail)は
-// どれもこの形を満たすため、行側はどのドメインのデータかを知らずに描画できる
-export type ReorderableExercise = Pick<Exercise, 'source' | 'slug'> & {
-  name: string;
-  category: string;
-};
+// どれもこの形を満たすため、行側はどのドメインのデータかを知らずに描画できる。
+// nameとcategoryを手書きせずExerciseからPickするのは、将来schema側で型が絞られたとき
+// (categoryをunionにする等)にこの型だけ緩いまま取り残されないようにするため(@reviewer指摘)
+export type ReorderableExercise = Pick<Exercise, 'name' | 'category' | 'source' | 'slug'>;
 
 type Props = {
   exercise: ReorderableExercise;
@@ -28,7 +27,13 @@ type Props = {
 // 「種目まとめて並び替え」画面(ルーティン/トレーニング中/カレンダーの予定)で使う共通の行。
 // 通常の種目カード(RoutineTemplateExerciseCard・SessionExerciseCard等)はセット編集や⋮メニューを
 // 含み、そのまま使うと不要な状態を巻き込むため、ドラッグ表示に必要な情報(サムネイル・名前・
-// カテゴリ・セット数)だけを描画する専用の行にしている
+// カテゴリ・セット数)だけを描画する専用の行にしている。
+//
+// サムネイル+名前+CategoryChipの並びはExerciseIdentity(components/exercises/exercise-identity.tsx)
+// にも共通化されているが、こちらは意図的に流用していない。ドラッグ行は1画面に多数並ぶため
+// サムネイルを40px・枠線なしまで詰めており、ExerciseIdentity(46px・枠線あり)にバリアントを
+// 足すと利用中の4カード全てに影響が出るため(@reviewer指摘、CLAUDE.mdの既存コンポーネント
+// 自己点検ルールに対する判断の記録)
 export const ReorderableExerciseRow = memo(function ReorderableExerciseRow({
   exercise,
   setCount,
@@ -75,7 +80,9 @@ export const ReorderableExerciseRow = memo(function ReorderableExerciseRow({
         </Text>
         <View style={styles.meta}>
           <CategoryChip category={category} />
-          {/* 数値と文字列に分けて渡すとchildrenが配列になるため、1つの文字列として組み立てる */}
+          {/* {setCount}セット と書くとchildrenが配列[2, 'セット']になる。描画自体は問題ないが、
+              3画面のスクリーンテストがfindByProps({children: '2セット'})で単一文字列を前提に
+              照合しているため、1つの文字列として組み立てる */}
           <Text style={styles.setCount}>{`${setCount}セット`}</Text>
         </View>
       </View>

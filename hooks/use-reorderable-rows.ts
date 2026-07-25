@@ -62,8 +62,9 @@ export function useReorderableRows<T>({ source, persist, errorMessage, logLabel 
     [rows, applyOrder],
   );
 
-  // ドラッグ操作は支援技術から実行できないため、各行のドラッグハンドルに上へ/下へ移動の
-  // accessibilityActionsを提供し、隣接1件だけの入れ替えという形で同じ並び替えを代替する
+  // ドラッグを実行できない支援技術向けの、隣接1件だけの入れ替え
+  // (UI側でこれをどう提供しているかはcomponents/exercises/reorderable-exercise-row.tsxを参照)。
+  // 呼び出し側が境界をガードしていなくても安全なよう、範囲外への移動はここで無視する
   const handleMove = useCallback(
     (index: number, direction: 'up' | 'down') => {
       const targetIndex = direction === 'up' ? index - 1 : index + 1;

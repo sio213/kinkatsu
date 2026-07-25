@@ -1,4 +1,4 @@
-import { ExerciseReorderList } from '@/components/exercises/exercise-reorder-list';
+import { ExerciseReorderView } from '@/components/exercises/exercise-reorder-view';
 import { useReorderableRows } from '@/hooks/use-reorderable-rows';
 import { useRoutineDraftStore } from '@/lib/routines/draft-store';
 import type { DraftExercise } from '@/lib/routines/validation';
@@ -45,7 +45,7 @@ export default function RoutineExerciseReorderScreen() {
   });
 
   return (
-    <ExerciseReorderList
+    <ExerciseReorderView
       rows={rows}
       keyExtractor={(item) => String(item.rowKey)}
       setCountOf={(item) => item.sets.length}

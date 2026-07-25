@@ -1,4 +1,4 @@
-import { ExerciseReorderList } from '@/components/exercises/exercise-reorder-list';
+import { ExerciseReorderView } from '@/components/exercises/exercise-reorder-view';
 import { useReorderableRows } from '@/hooks/use-reorderable-rows';
 import { useScheduledWorkoutExercises, type ScheduledWorkoutExerciseDetail } from '@/hooks/use-scheduled-workout-exercises';
 import { reorderScheduledWorkoutExercises } from '@/lib/calendar/scheduled-workout-detail';
@@ -34,7 +34,7 @@ export default function ScheduleWorkoutExerciseReorderScreen() {
   });
 
   return (
-    <ExerciseReorderList
+    <ExerciseReorderView
       rows={rows}
       keyExtractor={(item) => String(item.scheduledWorkoutExerciseId)}
       setCountOf={(item) => item.sets.length}

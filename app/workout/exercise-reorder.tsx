@@ -1,4 +1,4 @@
-import { ExerciseReorderList } from '@/components/exercises/exercise-reorder-list';
+import { ExerciseReorderView } from '@/components/exercises/exercise-reorder-view';
 import { useReorderableRows } from '@/hooks/use-reorderable-rows';
 import { useSessionExercises, useSessionSets, type SessionExercise } from '@/hooks/use-workout-session';
 import { reorderSessionExercises } from '@/lib/workout/session';
@@ -40,7 +40,7 @@ export default function WorkoutExerciseReorderScreen() {
   });
 
   return (
-    <ExerciseReorderList
+    <ExerciseReorderView
       rows={rows}
       keyExtractor={(item) => String(item.sessionExerciseId)}
       setCountOf={(item) => sessionSets.get(item.sessionExerciseId)?.length ?? 0}
