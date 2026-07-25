@@ -26,6 +26,25 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 // startedAt=endedAt=pastDateKeyの完了済みセッションとして作成する。app/workout/[id].tsxは
 // endedAt済みのセッションを自動的に「記録の編集」モード（タイマー非表示）で開くため、
 // 遷移先自体は同じ/workout/{id}のままでよい
+// 各行の説明文。選び方（前半）はどちらのモードでも同じで、末尾の動詞だけが変わる。
+// 今日のライブ開始はデザイン案「トレーニング開始選択画面 デザイン案.html」の文言をそのまま使い、
+// 過去日の事後記録モードでは「開始」→「記録」に差し替える（2026-07-25、@ユーザー指摘:
+// 過去日はこれから始めるのではなく、済んだトレーニングを後から記録する操作のため
+// 「開始」だと実態と合わない）。カレンダーの予定作成側の言い回しは
+// app/calendar/schedule-chooser.tsx が別途持つ
+const DESCRIPTIONS = {
+  live: {
+    addExercises: '好きな種目を選んで開始',
+    routine: '登録したメニューから開始',
+    history: '過去の履歴と同じ内容で開始',
+  },
+  past: {
+    addExercises: '好きな種目を選んで記録',
+    routine: '登録したメニューから記録',
+    history: '過去の履歴と同じ内容で記録',
+  },
+} as const;
+
 export default function StartChooserScreen() {
   const { pastDateKey } = useLocalSearchParams<{ pastDateKey?: string }>();
   const isPastMode = isValidDateKey(pastDateKey);
@@ -89,6 +108,7 @@ export default function StartChooserScreen() {
   // ヘッダーサブタイトル・VoiceOverヒントの両方で使うため1回だけ計算する
   const pastDateLabel = isPastMode ? formatSessionDateGroup(dateKeyToNoonMs(pastDateKey!)) : null;
   const pastDateHint = pastDateLabel ? `${pastDateLabel}の記録として追加します` : undefined;
+  const descriptions = isPastMode ? DESCRIPTIONS.past : DESCRIPTIONS.live;
 
   return (
     <SafeAreaView style={styles.safeArea} edges={['bottom']}>
@@ -103,21 +123,21 @@ export default function StartChooserScreen() {
         <StartMethodRow
           icon="add"
           label="種目を追加"
-          description="好きな種目を選んで開始"
+          description={descriptions.addExercises}
           onPress={handleAddExercises}
           hint={pastDateHint}
         />
         <StartMethodRow
           icon="repeat"
           label="ルーティン"
-          description="登録したメニューから開始"
+          description={descriptions.routine}
           onPress={handlePickRoutine}
           hint={pastDateHint}
         />
         <StartMethodRow
           icon="history"
           label="過去の記録"
-          description="過去の履歴と同じ内容で開始"
+          description={descriptions.history}
           onPress={handlePickHistory}
           hint={pastDateHint}
         />

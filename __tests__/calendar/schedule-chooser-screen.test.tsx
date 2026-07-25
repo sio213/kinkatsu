@@ -42,11 +42,11 @@ beforeEach(() => {
 test('3択を説明文つきで表示する', () => {
   const root = render();
   expect(root.findByProps({ children: '種目を追加' })).toBeDefined();
-  expect(root.findByProps({ children: '好きな種目を選んで予定にする' })).toBeDefined();
+  expect(root.findByProps({ children: '好きな種目を選んで予定を作る' })).toBeDefined();
   expect(root.findByProps({ children: 'ルーティン' })).toBeDefined();
-  expect(root.findByProps({ children: '登録したメニューを予定にする' })).toBeDefined();
+  expect(root.findByProps({ children: '登録したメニューから予定を作る' })).toBeDefined();
   expect(root.findByProps({ children: '過去の記録' })).toBeDefined();
-  expect(root.findByProps({ children: '過去の履歴と同じ内容を予定にする' })).toBeDefined();
+  expect(root.findByProps({ children: '過去の履歴と同じ内容で予定を作る' })).toBeDefined();
 });
 
 // 2026-07-25、@ユーザー指示: 開始選択画面と同じ3択に揃えた。既存予定の⋮「過去の記録から
@@ -100,7 +100,7 @@ test('「ルーティン」をタップするとdateKey付きでschedule-routine
 test('各行のVoiceOverヒントに対象日を補う', () => {
   const root = render();
   expect(findCardByLabel(root, '種目を追加')!.props.accessibilityHint).toBe(
-    '好きな種目を選んで予定にする。7月25日（土）の予定として種目を選びます',
+    '好きな種目を選んで予定を作る。7月25日（土）の予定として種目を選びます',
   );
 });
 

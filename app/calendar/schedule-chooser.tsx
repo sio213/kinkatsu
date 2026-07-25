@@ -61,21 +61,21 @@ export default function ScheduleChooserScreen() {
         <StartMethodRow
           icon="add"
           label="種目を追加"
-          description="好きな種目を選んで予定にする"
+          description="好きな種目を選んで予定を作る"
           onPress={handlePickDirect}
           hint={`${dateLabel}の予定として種目を選びます`}
         />
         <StartMethodRow
           icon="repeat"
           label="ルーティン"
-          description="登録したメニューを予定にする"
+          description="登録したメニューから予定を作る"
           onPress={handlePickRoutine}
           hint={`${dateLabel}の予定としてルーティンを選びます`}
         />
         <StartMethodRow
           icon="history"
           label="過去の記録"
-          description="過去の履歴と同じ内容を予定にする"
+          description="過去の履歴と同じ内容で予定を作る"
           onPress={handlePickHistory}
           hint={`${dateLabel}の予定として過去のトレーニングを選びます`}
         />

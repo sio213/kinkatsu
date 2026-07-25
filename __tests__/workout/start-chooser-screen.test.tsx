@@ -147,10 +147,20 @@ describe('pastDateKeyモード（過去日の事後記録）', () => {
     });
   });
 
+  // 2026-07-25、@ユーザー指摘: 過去日は「これから始める」のではなく「済んだトレーニングを
+  // 後から記録する」操作のため、説明文の末尾を「開始」→「記録」に差し替える
+  test('説明文の末尾が「記録」になる（今日の「開始」から差し替え）', () => {
+    const root = render();
+    expect(root.findByProps({ children: '好きな種目を選んで記録' })).toBeDefined();
+    expect(root.findByProps({ children: '登録したメニューから記録' })).toBeDefined();
+    expect(root.findByProps({ children: '過去の履歴と同じ内容で記録' })).toBeDefined();
+    expect(() => root.findByProps({ children: '好きな種目を選んで開始' })).toThrow();
+  });
+
   test('各行のVoiceOverヒントに対象日を補う（@designer指摘: 視覚的なサブタイトルだけでは伝わらないため）', () => {
     const root = render();
     expect(findRowByLabel(root, '種目を追加')!.props.accessibilityHint).toBe(
-      '好きな種目を選んで開始。7月25日（土）の記録として追加します',
+      '好きな種目を選んで記録。7月25日（土）の記録として追加します',
     );
   });
 
