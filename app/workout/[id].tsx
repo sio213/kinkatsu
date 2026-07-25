@@ -6,6 +6,7 @@ import { KeyboardAvoidingScreen } from '@/components/ui/keyboard-avoiding-screen
 import { ListErrorBoundary } from '@/components/ui/list-error-boundary';
 import { NotFoundScreen } from '@/components/ui/not-found-screen';
 import { PrimaryButton } from '@/components/ui/primary-button';
+import { ScreenFooter } from '@/components/ui/screen-footer';
 import { AddExerciseButton } from '@/components/workout/add-exercise-button';
 import { ExerciseEmptyState } from '@/components/workout/exercise-empty-state';
 import { SessionExerciseCard, type SessionExerciseCardHandle } from '@/components/workout/session-exercise-card';
@@ -322,15 +323,15 @@ export default function WorkoutScreen() {
         )}
 
         {isActive ? (
-          <View style={styles.footer}>
+          <ScreenFooter>
             <PrimaryButton label="トレーニングを終了" onPress={handleFinish} />
-          </View>
+          </ScreenFooter>
         ) : (
           // 過去の記録の編集モード。app/calendar/schedule-workout-edit.tsxの「戻るのみ」の
           // フッターと同じ体験に揃える（@ユーザー指摘）
-          <View style={styles.footer}>
+          <ScreenFooter>
             <PrimaryButton label="戻る" onPress={() => router.back()} />
-          </View>
+          </ScreenFooter>
         )}
       </KeyboardAvoidingScreen>
     </SafeAreaView>
@@ -358,11 +359,4 @@ const styles = StyleSheet.create({
 
   // app/calendar/schedule-workout-edit.tsx等、明示保存を持たない編集画面のフッターと
   // 同じpadding値に揃える（@designer指摘）
-  footer: {
-    paddingHorizontal: 20,
-    paddingTop: 8,
-    paddingBottom: 12,
-    borderTopWidth: 1,
-    borderTopColor: Colors.border,
-  },
 });

@@ -1,4 +1,5 @@
 import { RoutineAddExerciseButton } from '@/components/routines/routine-add-exercise-button';
+import { ScreenFooter } from '@/components/ui/screen-footer';
 import {
   RoutineTemplateExerciseCard,
   type RoutineTemplateExerciseCardHandle,
@@ -7,7 +8,7 @@ import { HeaderMenu, type DropdownMenuItem } from '@/components/ui/dropdown-menu
 import { KeyboardAvoidingScreen } from '@/components/ui/keyboard-avoiding-screen';
 import { PrimaryButton } from '@/components/ui/primary-button';
 import { ExerciseEmptyState } from '@/components/workout/exercise-empty-state';
-import { Colors, ScreenStyles } from '@/constants/theme';
+import { ScreenStyles } from '@/constants/theme';
 import { useExercisesWithHistory } from '@/hooks/use-workout-session';
 import { useRoutineDraftStore } from '@/lib/routines/draft-store';
 import { NO_SESSION_TO_EXCLUDE } from '@/lib/workout/history';
@@ -217,9 +218,9 @@ export default function RoutineExerciseEditScreen() {
             </View>
           )}
         </ScrollView>
-        <View style={styles.footer}>
+        <ScreenFooter>
           <PrimaryButton label="戻る" onPress={() => router.back()} />
-        </View>
+        </ScreenFooter>
       </KeyboardAvoidingScreen>
     </SafeAreaView>
   );
@@ -233,12 +234,4 @@ const styles = StyleSheet.create({
   contentEmpty: { flexGrow: 1 },
 
   list: { gap: 10 },
-
-  footer: {
-    paddingHorizontal: 20,
-    paddingTop: 8,
-    paddingBottom: 12,
-    borderTopWidth: 1,
-    borderTopColor: Colors.border,
-  },
 });

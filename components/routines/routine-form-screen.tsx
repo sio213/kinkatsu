@@ -2,10 +2,11 @@ import { RoutineForm, type RoutineFormHandle } from '@/components/routines/routi
 import { FormScrollProvider } from '@/components/ui/form-scroll-context';
 import { KeyboardAvoidingScreen } from '@/components/ui/keyboard-avoiding-screen';
 import { PrimaryButton } from '@/components/ui/primary-button';
-import { Colors, ScreenStyles } from '@/constants/theme';
+import { ScreenFooter } from '@/components/ui/screen-footer';
+import { ScreenStyles } from '@/constants/theme';
 import type { RoutineFormValues } from '@/lib/routines/validation';
 import { useRef, useState } from 'react';
-import { ScrollView, StyleSheet, View } from 'react-native';
+import { ScrollView, StyleSheet } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 type Props = {
@@ -49,9 +50,9 @@ export function RoutineFormScreen({
             />
           </ScrollView>
         </FormScrollProvider>
-        <View style={styles.footer}>
+        <ScreenFooter>
           <PrimaryButton label="保存" onPress={() => formRef.current?.submit()} disabled={submitDisabled} />
-        </View>
+        </ScreenFooter>
       </KeyboardAvoidingScreen>
     </SafeAreaView>
   );
@@ -59,12 +60,4 @@ export function RoutineFormScreen({
 
 const styles = StyleSheet.create({
   content: { paddingHorizontal: 20, paddingTop: 12, paddingBottom: 24 },
-
-  footer: {
-    paddingHorizontal: 20,
-    paddingTop: 8,
-    paddingBottom: 12,
-    borderTopWidth: 1,
-    borderTopColor: Colors.border,
-  },
 });

@@ -3,6 +3,7 @@ import { FormField } from '@/components/ui/form-field';
 import { HeaderTitle } from '@/components/ui/header-title';
 import { NotFoundScreen } from '@/components/ui/not-found-screen';
 import { PrimaryButton } from '@/components/ui/primary-button';
+import { ScreenFooter } from '@/components/ui/screen-footer';
 import { Colors, ScreenStyles, Typography } from '@/constants/theme';
 import { useExercises } from '@/hooks/use-exercises';
 import { usePermissionState } from '@/hooks/use-permission-state';
@@ -269,9 +270,9 @@ export default function ScheduleTimePickerScreen() {
           </View>
         </FormField>
       </View>
-      <View style={styles.footer}>
+      <ScreenFooter>
         <PrimaryButton label="この時刻で予定を追加" onPress={handleConfirm} disabled={isSubmitting} />
-      </View>
+      </ScreenFooter>
     </SafeAreaView>
   );
 }
@@ -290,11 +291,4 @@ const styles = StyleSheet.create({
     paddingVertical: 12,
   },
   timeButtonText: { ...Typography.timeDisplay, color: Colors.textPrimary },
-  footer: {
-    paddingHorizontal: 20,
-    paddingTop: 8,
-    paddingBottom: 12,
-    borderTopWidth: 1,
-    borderTopColor: Colors.border,
-  },
 });

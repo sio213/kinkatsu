@@ -1,6 +1,7 @@
 import { ExerciseFilterHeader } from '@/components/exercises/exercise-filter-header';
 import { KeyboardAvoidingScreen } from '@/components/ui/keyboard-avoiding-screen';
 import { ListErrorBoundary } from '@/components/ui/list-error-boundary';
+import { ScreenFooter } from '@/components/ui/screen-footer';
 import { PickerExerciseRow } from '@/components/workout/picker-exercise-row';
 import { Colors, Typography } from '@/constants/theme';
 import type { Exercise } from '@/db/schema';
@@ -137,7 +138,7 @@ export function ExerciseSelectView({
         contentContainerStyle={styles.content}
         keyboardShouldPersistTaps="handled"
       />
-      <View style={styles.footer}>{footer}</View>
+      <ScreenFooter>{footer}</ScreenFooter>
     </KeyboardAvoidingScreen>
   );
 }
@@ -148,11 +149,4 @@ const styles = StyleSheet.create({
 
   emptyWrapper: { alignItems: 'center', paddingVertical: 32 },
   empty: { color: Colors.textMuted, ...Typography.body, textAlign: 'center' },
-
-  footer: {
-    padding: 16,
-    paddingTop: 8,
-    borderTopWidth: 1,
-    borderTopColor: Colors.border,
-  },
 });

@@ -5,8 +5,9 @@ import { HeaderTitle } from '@/components/ui/header-title';
 import { KeyboardAvoidingScreen } from '@/components/ui/keyboard-avoiding-screen';
 import { NotFoundScreen } from '@/components/ui/not-found-screen';
 import { PrimaryButton } from '@/components/ui/primary-button';
+import { ScreenFooter } from '@/components/ui/screen-footer';
 import { ExerciseEmptyState } from '@/components/workout/exercise-empty-state';
-import { Colors, ScreenStyles } from '@/constants/theme';
+import { ScreenStyles } from '@/constants/theme';
 import { useDebouncedPush } from '@/hooks/use-debounced-push';
 import { useRoutines } from '@/hooks/use-routines';
 import { useScheduledWorkoutTime } from '@/hooks/use-scheduled-workout';
@@ -274,9 +275,9 @@ export default function ScheduleWorkoutEditScreen() {
             </View>
           )}
         </ScrollView>
-        <View style={styles.footer}>
+        <ScreenFooter>
           <PrimaryButton label="戻る" onPress={() => router.back()} />
-        </View>
+        </ScreenFooter>
       </KeyboardAvoidingScreen>
     </SafeAreaView>
   );
@@ -289,11 +290,4 @@ const styles = StyleSheet.create({
   // コンテンツ自体をflexGrow:1にして高さを確保する（contentのpadding指定は空状態自身が持つため不要）
   contentEmpty: { flexGrow: 1 },
   list: { gap: 10 },
-  footer: {
-    paddingHorizontal: 20,
-    paddingTop: 8,
-    paddingBottom: 12,
-    borderTopWidth: 1,
-    borderTopColor: Colors.border,
-  },
 });
