@@ -4,7 +4,7 @@ import { PastTrainingSessionCard } from '@/components/workout/past-training-sess
 import { Colors, Typography } from '@/constants/theme';
 import { CATEGORY_ALL, CATEGORY_ORDER, UNKNOWN_CATEGORY_ORDER } from '@/lib/exercises/constants';
 import { getPastTrainingSessions, type PastTrainingSession } from '@/lib/workout/history';
-import { groupByMonth } from '@/lib/workout/summary';
+import { toMonthSections } from '@/lib/workout/summary';
 import { useRouter } from 'expo-router';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { ActivityIndicator, SectionList, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
@@ -36,7 +36,7 @@ export function SessionHistoryPickerView({ excludeSessionId, onSelect }: Props) 
     activeCategoryRef.current = activeCategory;
   }, [activeCategory]);
 
-  // null=読み込み中、'error'=取得失敗、配列=取得成功（0件含む）。history-picker.tsxと同じ三値管理
+  // null=読み込み中、'error'=取得失敗、配列=取得成功（0件含む）。exercise-history-picker-view.tsxと同じ三値管理
   const [sessions, setSessions] = useState<PastTrainingSession[] | 'error' | null>(null);
   const [loadingMore, setLoadingMore] = useState(false);
   const [loadMoreError, setLoadMoreError] = useState(false);
@@ -137,7 +137,7 @@ export function SessionHistoryPickerView({ excludeSessionId, onSelect }: Props) 
   }, [loadedSessions, activeCategory]);
 
   const sections = useMemo(
-    () => groupByMonth(filteredSessions).map((group) => ({ title: group.monthLabel, data: group.items })),
+    () => toMonthSections(filteredSessions),
     [filteredSessions],
   );
 
@@ -239,7 +239,7 @@ const styles = StyleSheet.create({
 
   list: { flex: 1 },
   content: { padding: 16, paddingBottom: 32 },
-  // history-picker.tsxと同じ理由でスティッキーヘッダーの背面を不透明にする
+  // exercise-history-picker-view.tsxと同じ理由でスティッキーヘッダーの背面を不透明にする
   monthLabelWrapper: {
     backgroundColor: Colors.background,
     marginHorizontal: -16,

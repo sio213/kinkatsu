@@ -27,7 +27,7 @@ export function SessionHistoryLoadView({ sourceSessionId, sourceStartedAt, onSub
   const router = useRouter();
   const isSubmittingRef = useRef(false);
 
-  // null=読み込み中、'error'=取得失敗、配列=取得成功（0件含む）。history-picker.tsxと同じ三値管理
+  // null=読み込み中、'error'=取得失敗、配列=取得成功（0件含む）。exercise-history-picker-view.tsxと同じ三値管理
   const [cards, setCards] = useState<SessionHistoryCard[] | 'error' | null>(null);
   const fetchCards = useCallback(() => {
     let cancelled = false;

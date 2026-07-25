@@ -1,5 +1,6 @@
 import { DesignIcon } from '@/components/ui/design-icon';
 import { HeaderTitle } from '@/components/ui/header-title';
+import { ListErrorBoundary } from '@/components/ui/list-error-boundary';
 import { NotFoundState } from '@/components/ui/not-found-state';
 import { HistoryEntryCard } from '@/components/workout/history-entry-card';
 import { Colors, Typography } from '@/constants/theme';
@@ -7,7 +8,7 @@ import { useExercise } from '@/hooks/use-exercises';
 import { resolveMeasurementType } from '@/lib/exercises/constants';
 import { computePersonalBestIds, getExerciseHistoryEntries, type HistoryEntry } from '@/lib/workout/history';
 import { MEASUREMENT_COLUMNS } from '@/lib/workout/set-format';
-import { formatSessionDateGroup, groupByMonth } from '@/lib/workout/summary';
+import { formatSessionDateGroup, toMonthSections } from '@/lib/workout/summary';
 import { Stack } from 'expo-router';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { Alert, SectionList, StyleSheet, Text, View } from 'react-native';
@@ -15,8 +16,9 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 
 type Props = {
   exerciseId: number;
-  // ヘッダーのサブタイトルに出す。呼び出し元がparamsで受け取った名前をそのまま渡す
-  // (ここで追加のDBクエリを発行せずに済ませるため)
+  // ヘッダーのサブタイトルに出す。種目自体はこのコンポーネントもuseExerciseで引いているが、
+  // それはlive queryのため初回描画では未解決で、待つとサブタイトルが一瞬空になる。
+  // 呼び出し元がparamsで既に持っている名前をそのまま渡してもらいちらつきを避ける
   exerciseName: string;
   // 実績集計から除外するセッション。トレーニング中は「今まさに読み込もうとしている自分自身」を
   // 除外し、ルーティン編集には進行中セッションの概念が無いためNO_SESSION_TO_EXCLUDEを渡す
@@ -26,13 +28,16 @@ type Props = {
   // 確認ダイアログの本文。「入力済みの記録」(トレーニング中)/「設定済みのセット内容」
   // (ルーティン編集)など、失われる対象の呼び方が呼び出し元の文脈で違うため引数化する
   confirmMessage: string;
-  // 過去の記録が0件だったときの空状態から戻る導線。router.backを呼ぶだけだが、
-  // このコンポーネントはナビゲーションを持たない方針(onLoadと同じ)なので呼び出し側から渡す
+  // 過去の記録が0件だったときの空状態から戻る導線。現状の呼び出し元は2つともrouter.back()だが、
+  // ExerciseReorderView・RoutinePickerListで確立したprop方式に揃えている
+  // (SessionHistoryPickerView系は内部でuseRouterする別流儀のままで、統一は別タスク)
   onPressBack: () => void;
   // 実際の読み込み(DB書き込み/ルーティン下書き配列の更新)と成功時のrouter.back()は呼び出し側の責務。
-  // 失敗時はthrowするだけでよく、二重送信防止・読み込み中表示・エラーAlertはこのコンポーネントが担う
-  // (ExerciseSwapPickerのonSubmitと同じ契約)
-  onLoad: (entry: HistoryEntry) => void | Promise<void>;
+  // 失敗時はthrowするだけでよく、二重送信防止・読み込み中表示・エラーAlertはこのコンポーネントが担う。
+  // 中身が同期処理(ルーティンの下書き更新)でもasyncで宣言する。ExerciseSwapPicker・RoutineLoadView・
+  // SessionHistoryLoadViewのonSubmitと契約を揃えるためで、既存のルーティン側の画面も同じ書き方をしている
+  // (@reviewer指摘: ここだけvoid|Promise<void>のunionにすると契約に穴が開く)
+  onLoad: (entry: HistoryEntry) => Promise<void>;
 };
 
 // app/workout/history-picker.tsx(トレーニング中のセットへ読み込む)・
@@ -84,33 +89,22 @@ export function ExerciseHistoryPickerView({
     () => computePersonalBestIds(loadedEntries, measurementType),
     [loadedEntries, measurementType],
   );
-  const sections = useMemo(
-    () =>
-      groupByMonth(loadedEntries).map((group) => ({
-        title: group.monthLabel,
-        data: group.items,
-      })),
-    [loadedEntries],
-  );
+  const sections = useMemo(() => toMonthSections(loadedEntries), [loadedEntries]);
 
   const runLoad = useCallback(
-    (entry: HistoryEntry) => {
+    async (entry: HistoryEntry) => {
       if (isLoadingRef.current) return;
       isLoadingRef.current = true;
       setLoadingCardId(entry.workoutSessionExerciseId);
-      // onLoadは同期的に呼ぶ(await前の式評価まではこの即時関数も同期実行される)。ルーティン側は
-      // 下書き配列への同期更新のため、マイクロタスクへ遅延させると呼び出し側から見た挙動が変わる
-      void (async () => {
-        try {
-          await onLoad(entry);
-        } catch (e) {
-          console.error('[load exercise history]', e);
-          Alert.alert('エラー', '記録を読み込めませんでした。');
-        } finally {
-          isLoadingRef.current = false;
-          setLoadingCardId(null);
-        }
-      })();
+      try {
+        await onLoad(entry);
+      } catch (e) {
+        console.error('[load exercise history]', e);
+        Alert.alert('エラー', '記録を読み込めませんでした。');
+      } finally {
+        isLoadingRef.current = false;
+        setLoadingCardId(null);
+      }
     },
     [onLoad],
   );
@@ -134,6 +128,9 @@ export function ExerciseHistoryPickerView({
   );
 
   return (
+    // 2画面ともCLAUDE.mdの分類でいう「フロー内の中間画面」でルートStack上にあるため
+    // edgesは['bottom']で固定してよい(ExerciseReorderViewと同じ判断)。タブ配下に置く画面が
+    // 増えた場合は、タブバーが下端を占有するのでedges={[]}が必要になる
     <SafeAreaView style={styles.safeArea} edges={['bottom']}>
       <Stack.Screen
         options={{
@@ -167,14 +164,18 @@ export function ExerciseHistoryPickerView({
           sections={sections}
           keyExtractor={(item) => String(item.workoutSessionExerciseId)}
           renderItem={({ item }) => (
-            <HistoryEntryCard
-              entry={item}
-              columns={columns}
-              isBest={bestIds.has(item.workoutSessionExerciseId)}
-              disabled={loadingCardId != null}
-              loading={loadingCardId === item.workoutSessionExerciseId}
-              onLoad={handleLoad}
-            />
+            // 他の一覧(RoutinePickerList・ExerciseSwapPicker等)と同じく、1行の描画例外で画面全体を
+            // 落とさないよう行単位で囲う。formatHistorySetSummaryは想定外のDB値で投げうる
+            <ListErrorBoundary>
+              <HistoryEntryCard
+                entry={item}
+                columns={columns}
+                isBest={bestIds.has(item.workoutSessionExerciseId)}
+                disabled={loadingCardId != null}
+                loading={loadingCardId === item.workoutSessionExerciseId}
+                onLoad={handleLoad}
+              />
+            </ListErrorBoundary>
           )}
           renderSectionHeader={({ section }) => (
             <View style={styles.monthLabelWrapper}>

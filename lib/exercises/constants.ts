@@ -98,7 +98,7 @@ export const MEASUREMENT_TYPES = [
 export type MeasurementType = (typeof MEASUREMENT_TYPES)[number];
 
 // 未知のmeasurementType（想定外のDB値、または種目自体が未取得でnull/undefined）でも
-// 画面ごとクラッシュさせず標準の重量×回数にフォールバックする。history-picker.tsx・
+// 画面ごとクラッシュさせず標準の重量×回数にフォールバックする。exercise-history-picker-view.tsx・
 // session-exercise-card.tsx・history-load-exercise-card.tsxで同じロジックが必要なため集約する
 export function resolveMeasurementType(value: string | null | undefined): MeasurementType {
   return value != null && (MEASUREMENT_TYPES as readonly string[]).includes(value)

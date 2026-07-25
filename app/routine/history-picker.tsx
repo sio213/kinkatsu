@@ -31,8 +31,10 @@ export default function RoutineHistoryPickerScreen() {
   const router = useRouter();
   const loadSetsIntoExerciseAt = useRoutineDraftStore((state) => state.loadSetsIntoExerciseAt);
 
+  // 下書きストアへの更新は同期処理だが、共通ビューのonLoad契約(Promise<void>)と、
+  // 他のルーティン側画面(exercise-swap.tsx・session-history-load.tsx)の書き方に合わせてasyncで宣言する
   const handleLoad = useCallback(
-    (entry: HistoryEntry) => {
+    async (entry: HistoryEntry) => {
       // getExerciseHistoryEntriesはカード単位(✓確定セットが1件以上あるか)でしか絞り込まないため、
       // entry.setsには値が1つも無い行(セット追加だけして未入力のまま終えた等)が混ざりうる。
       // historySetsToDraftSets(session-history-load.tsxと共用)で絞り込んでから読み込む

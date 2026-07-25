@@ -296,7 +296,7 @@ export type SessionHistoryCard = {
 // 引き継ぐための機能なので下書きを含めない）。カレンダー日別詳細のように未確定カードも
 // そのまま表示したい呼び出し元はincludeUnconfirmedCards: trueを渡す
 // （measurementTypeは想定外のDB値でも画面側でフォールバックできるようstringのまま返す。
-// history-picker.tsxのexerciseと同じ扱い）
+// exercise-history-picker-view.tsxのexerciseと同じ扱い）
 export async function getSessionExerciseCards(
   sessionId: number,
   options?: { includeUnconfirmedCards?: boolean },

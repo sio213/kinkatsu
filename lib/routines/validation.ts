@@ -70,7 +70,7 @@ export function toDraftReminder(detail: RoutineDetail): { enabled: boolean; remi
 // HistorySetValues[](✓確定・未確定を問わない実測値)からDraftExercise['sets']への変換。
 // 値が1つも無い行(セット追加だけして未入力のまま終えた等)はhasAnyValueで除外する
 // (絞り込まないと余分な空セットが混入する)。historyCardsToDraftExercises・
-// app/routine/history-picker.tsxのrunLoadで共用する
+// app/routine/history-picker.tsxのhandleLoadで共用する
 export function historySetsToDraftSets(sets: HistorySetValues[]): DraftExercise['sets'] {
   return sets.filter(hasAnyValue).map((s) => ({
     weight: s.weight,
