@@ -78,6 +78,10 @@ export const Colors = {
 
   favorite: Palette.amber500,
 
+  // 種目のアニメーション動画・サムネイルの白背景に乗算で被せる色。
+  // 素材(GymVisual)の背景は白く焼き込まれているため、この色を乗算すると背景だけが着色される
+  mediaBackdrop: Palette.blue50,
+
   danger: Palette.red600,
   dangerSurface: Palette.red100,
 
