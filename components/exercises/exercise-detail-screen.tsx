@@ -188,7 +188,7 @@ export function ExerciseDetailScreen({ insideTabBar = false }: Props) {
 
       <ScrollView contentContainerStyle={styles.content}>
         <View style={styles.mediaBox}>
-          {/* 素材の白背景を薄青にするため、乗算ブレンドのオーバーレイを重ねる。
+          {/* 素材の白背景をmediaBoxと同じ色にするため、乗算ブレンドのオーバーレイを重ねる。
               isolationでこのViewを合成グループにして、背後のmediaBoxやお気に入りバッジまで
               巻き込まないようにしている */}
           <View style={styles.mediaTintGroup}>
@@ -283,8 +283,7 @@ const styles = StyleSheet.create({
   content: { paddingBottom: 48 },
 
   mediaBox: {
-    // 白(255)に乗算した結果はmediaBackdropそのものになるため、上下paddingの帯と動画が継ぎ目なく繋がる
-    backgroundColor: Colors.mediaBackdrop,
+    backgroundColor: Colors.surfaceMuted,
     alignItems: 'center',
     justifyContent: 'center',
     paddingVertical: 16,
@@ -299,7 +298,9 @@ const styles = StyleSheet.create({
   },
   mediaTint: {
     ...StyleSheet.absoluteFillObject,
-    backgroundColor: Colors.mediaBackdrop,
+    // 白(255)に乗算した結果はこの色そのものになるため、mediaBoxの背景と同じ値にすると
+    // 上下paddingの帯と動画が継ぎ目なく繋がる
+    backgroundColor: Colors.surfaceMuted,
     mixBlendMode: 'multiply',
   },
   mediaThumbnail: {
