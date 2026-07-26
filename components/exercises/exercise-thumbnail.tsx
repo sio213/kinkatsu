@@ -14,17 +14,15 @@ type Props = {
 /**
  * 種目のサムネイル。一覧・ピッカー・カード類で共通。
  *
- * 素材(GymVisual)は背景が白く焼き込まれているため、`backgroundColor` を指定しても
- * 画像がその上を白で塗りつぶしてしまう。そこで乗算ブレンドのオーバーレイを重ねて
- * 背景だけを surfaceSubtle にしている（白(255)への乗算結果はオーバーレイ色そのもの、
- * 黒(0)は黒のまま。種目詳細のメディア枠 exercise-detail-screen.tsx と同じ手法）。
- * isolationでこのViewを合成グループにして、背後のカードまで巻き込まないようにしている。
+ * frameのbackgroundColorは素材が読み込まれるまでの下地。素材(GymVisual)は背景が白く
+ * 焼き込まれているため、表示後は画像の白がこの色を覆う。種目詳細のメディア枠
+ * (exercise-detail-screen.tsx)では乗算ブレンドで白背景を枠と同色に置き換えているが、
+ * 一覧のサムネイルは白のままのほうが良いという判断でここには入れていない。
  */
 export function ExerciseThumbnail({ source, size, bordered = true }: Props) {
   return (
     <View style={[styles.frame, { width: size, height: size }, bordered && styles.bordered]}>
       <Image source={source} style={styles.image} contentFit="cover" />
-      <View style={styles.tint} pointerEvents="none" />
     </View>
   );
 }
@@ -33,18 +31,12 @@ const styles = StyleSheet.create({
   frame: {
     borderRadius: 7,
     backgroundColor: Colors.surfaceSubtle,
-    // 角丸からオーバーレイがはみ出さないようにする
+    // 角丸から画像がはみ出さないようにする
     overflow: 'hidden',
-    isolation: 'isolate',
   },
   bordered: {
     borderWidth: 1,
     borderColor: Colors.border,
   },
   image: { flex: 1 },
-  tint: {
-    ...StyleSheet.absoluteFillObject,
-    backgroundColor: Colors.surfaceSubtle,
-    mixBlendMode: 'multiply',
-  },
 });
