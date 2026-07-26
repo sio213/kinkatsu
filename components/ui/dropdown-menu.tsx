@@ -6,6 +6,7 @@ import {
   Dimensions,
   Keyboard,
   Modal,
+  Platform,
   Pressable,
   StyleSheet,
   Text,
@@ -45,6 +46,9 @@ type DropdownMenuItemBase = {
   onPress: () => void;
   disabled?: boolean;
   hint?: string;
+  // onPressが自前で別の画面をpresentする（openBrowserAsync等）場合に立てる。
+  // メニューのModalが閉じ切るのを待ってから実行される。router.push・Alertは不要
+  deferUntilClosed?: boolean;
 };
 
 // 通常のアクション項目（アイコン付き）
@@ -93,6 +97,30 @@ export function DropdownMenu({ groups, renderTrigger, minWidth = 160, backdropTe
     setMenuHeight(null);
   };
 
+  // deferUntilClosed付きの項目の処理は、メニュー（Modal）が閉じ切ってから実行する。
+  // iOSはModalのdismissアニメーションが終わる前に別の画面をpresentできず、
+  // SFSafariViewController（expo-web-browserのopenBrowserAsync）がpresentに失敗したまま
+  // 画面がタップを受け付けなくなる（「YouTubeで検索」で発生）
+  const pendingActionRef = useRef<(() => void) | null>(null);
+
+  const runPendingAction = () => {
+    const action = pendingActionRef.current;
+    pendingActionRef.current = null;
+    action?.();
+  };
+
+  const handleSelect = (item: DropdownMenuItem) => {
+    if (!item.deferUntilClosed) {
+      handleClose();
+      item.onPress();
+      return;
+    }
+    pendingActionRef.current = item.onPress;
+    handleClose();
+    // ModalのonDismissはiOS専用。他プラットフォームは閉じた次のフレームで実行する
+    if (Platform.OS !== 'ios') requestAnimationFrame(runPendingAction);
+  };
+
   const handleMenuLayout = (e: LayoutChangeEvent) => {
     // 初回レイアウト時の高さだけを採用する（項目の展開等でこのメニュー自体の高さが
     // 動的に変わる想定は無いため、以降のonLayoutは無視して不要な位置再計算を避ける）
@@ -111,7 +139,13 @@ export function DropdownMenu({ groups, renderTrigger, minWidth = 160, backdropTe
         {renderTrigger({ open, onPress: handleOpen })}
       </View>
 
-      <Modal visible={open} transparent animationType="fade" onRequestClose={handleClose}>
+      <Modal
+        visible={open}
+        transparent
+        animationType="fade"
+        onRequestClose={handleClose}
+        onDismiss={runPendingAction}
+      >
         <Pressable testID={backdropTestID} style={styles.backdrop} onPress={handleClose} />
         {anchor && (
           <View
@@ -124,7 +158,7 @@ export function DropdownMenu({ groups, renderTrigger, minWidth = 160, backdropTe
               <View key={group.map((item) => item.key).join('-')}>
                 {index > 0 && <View style={styles.divider} />}
                 {group.map((item) => (
-                  <DropdownMenuRow key={item.key} item={item} onSelect={handleClose} />
+                  <DropdownMenuRow key={item.key} item={item} onSelect={handleSelect} />
                 ))}
               </View>
             ))}
@@ -181,8 +215,14 @@ export function HeaderMenu({
   );
 }
 
-function DropdownMenuRow({ item, onSelect }: { item: DropdownMenuItem; onSelect: () => void }) {
-  const { label, onPress, disabled, hint } = item;
+function DropdownMenuRow({
+  item,
+  onSelect,
+}: {
+  item: DropdownMenuItem;
+  onSelect: (item: DropdownMenuItem) => void;
+}) {
+  const { label, disabled, hint } = item;
   const isRadio = 'selected' in item;
   const danger = !isRadio && item.danger;
 
@@ -190,8 +230,7 @@ function DropdownMenuRow({ item, onSelect }: { item: DropdownMenuItem; onSelect:
     // TouchableOpacityのdisabledは実タップは防げるが、呼び出し側のonPressは
     // disabled理由（hasHistory等）を知らないことがあるため、ここでも防御する
     if (disabled) return;
-    onSelect();
-    onPress();
+    onSelect(item);
   };
 
   return (

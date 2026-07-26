@@ -168,6 +168,8 @@ export function ExerciseDetailScreen({ insideTabBar = false }: Props) {
       key: 'youtube',
       label: 'YouTubeで検索',
       icon: 'search',
+      // メニューのModalが閉じ切る前にブラウザをpresentすると画面が固まる
+      deferUntilClosed: true,
       onPress: () => handleYoutubeSearch(exercise.name),
     },
   ];
