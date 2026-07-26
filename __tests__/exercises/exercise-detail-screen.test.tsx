@@ -45,7 +45,9 @@ jest.mock('expo-web-browser', () => ({
 
 import React from 'react';
 import { act, create, type ReactTestInstance } from 'react-test-renderer';
-import { Alert, Text, TouchableOpacity } from 'react-native';
+import { Alert, Modal, Text, TouchableOpacity } from 'react-native';
+import { openBrowserAsync } from 'expo-web-browser';
+import { getYoutubeSearchUrl } from '@/lib/exercises/youtube';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
 import type { Exercise } from '@/db/schema';
 import ExerciseDetailScreen from '@/app/exercise/[id]';
@@ -293,5 +295,52 @@ describe('画面の基本ケース', () => {
     mockUseExercise.mockReturnValue({ exercise: undefined, loaded: true });
     const root = render();
     expect(allTexts(root)).toContain('種目が見つかりません');
+  });
+});
+
+describe('⋮メニュー: YouTubeで検索', () => {
+  test('メニューから、下部ボタンと同じ検索URLでブラウザを開く', () => {
+    mockUseExercise.mockReturnValue({
+      exercise: makeExercise({ source: 'preset', slug: 'bench_press' }),
+      loaded: true,
+    });
+
+    const root = render();
+    act(() => {
+      findButtonByLabel(root, '種目のメニューを開く')!.props.onPress();
+    });
+    // メニューが閉じるとModalはnullを返すため、開いている間に掴んでおく
+    const modal = root.findByType(Modal);
+
+    act(() => {
+      findButtonByLabel(root, 'YouTubeで検索')!.props.onPress();
+    });
+    // Modalのdismiss完了前にブラウザをpresentすると画面が固まるため、まだ開かない
+    expect(openBrowserAsync).not.toHaveBeenCalled();
+
+    act(() => {
+      modal.props.onDismiss();
+    });
+    expect(openBrowserAsync).toHaveBeenCalledWith(
+      getYoutubeSearchUrl('ベンチプレス'),
+      expect.anything(),
+    );
+  });
+
+  test('編集はメニューを閉じた時点で即座に実行される（遅延はブラウザを開く項目だけ）', () => {
+    mockUseExercise.mockReturnValue({
+      exercise: makeExercise({ source: 'custom' }),
+      loaded: true,
+    });
+
+    const root = render();
+    act(() => {
+      findButtonByLabel(root, '種目のメニューを開く')!.props.onPress();
+    });
+    act(() => {
+      findButtonByLabel(root, '編集')!.props.onPress();
+    });
+
+    expect(mockPush).toHaveBeenCalledWith('/exercise/edit/1');
   });
 });

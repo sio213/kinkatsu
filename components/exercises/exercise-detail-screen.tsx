@@ -162,7 +162,17 @@ export function ExerciseDetailScreen({ insideTabBar = false }: Props) {
   const images = getExerciseImages(exercise);
   const hasContent = Boolean(guide) || Boolean(exercise.note) || formPoints.length > 0;
 
-  const menuItems: DropdownMenuItem[] = [{ key: 'edit', label: '編集', icon: 'edit', onPress: handleEdit }];
+  const menuItems: DropdownMenuItem[] = [
+    { key: 'edit', label: '編集', icon: 'edit', onPress: handleEdit },
+    {
+      key: 'youtube',
+      label: 'YouTubeで検索',
+      icon: 'search',
+      // メニューのModalが閉じ切る前にブラウザをpresentすると画面が固まる
+      deferUntilClosed: true,
+      onPress: () => handleYoutubeSearch(exercise.name),
+    },
+  ];
   if (exercise.source === 'custom') {
     menuItems.push({ key: 'delete', label: '削除', icon: 'delete-outline', danger: true, onPress: handleDelete });
   }
