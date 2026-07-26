@@ -188,11 +188,17 @@ export function ExerciseDetailScreen({ insideTabBar = false }: Props) {
 
       <ScrollView contentContainerStyle={styles.content}>
         <View style={styles.mediaBox}>
-          {images.source != null ? (
-            <Mp4Player source={images.source} />
-          ) : (
-            <Image source={images.thumbnail} style={styles.mediaThumbnail} contentFit="contain" />
-          )}
+          {/* 素材の白背景をmediaBoxと同じ色にするため、乗算ブレンドのオーバーレイを重ねる。
+              isolationでこのViewを合成グループにして、背後のmediaBoxやお気に入りバッジまで
+              巻き込まないようにしている */}
+          <View style={styles.mediaTintGroup}>
+            {images.source != null ? (
+              <Mp4Player source={images.source} />
+            ) : (
+              <Image source={images.thumbnail} style={styles.mediaThumbnail} contentFit="contain" />
+            )}
+            <View style={styles.mediaTint} pointerEvents="none" />
+          </View>
           <TouchableOpacity
             style={styles.favoriteBadge}
             onPress={handleFavoritePress}
@@ -277,11 +283,28 @@ const styles = StyleSheet.create({
   content: { paddingBottom: 48 },
 
   mediaBox: {
-    backgroundColor: Colors.surfaceMuted,
+    // surfaceMutedだと本文の白との輝度差が2%程度しかなく、メディア枠が独立したゾーンに
+    // 見えないため一段濃いsurfaceSubtleにしている。accentSurface(薄青)は真下のカテゴリ
+    // チップと同じ色になり意味づけが衝突するので使わない
+    backgroundColor: Colors.surfaceSubtle,
     alignItems: 'center',
     justifyContent: 'center',
     paddingVertical: 16,
     position: 'relative',
+  },
+  mediaTintGroup: {
+    isolation: 'isolate',
+    // mediaThumbnailのwidth:'54%'が画面幅基準のままになるよう、親の幅いっぱいに広げる
+    alignSelf: 'stretch',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  mediaTint: {
+    ...StyleSheet.absoluteFillObject,
+    // 白(255)に乗算した結果はこの色そのものになるため、mediaBoxの背景と同じ値にすると
+    // 上下paddingの帯と動画が継ぎ目なく繋がる
+    backgroundColor: Colors.surfaceSubtle,
+    mixBlendMode: 'multiply',
   },
   mediaThumbnail: {
     width: '54%',
