@@ -283,7 +283,10 @@ const styles = StyleSheet.create({
   content: { paddingBottom: 48 },
 
   mediaBox: {
-    backgroundColor: Colors.surfaceMuted,
+    // surfaceMutedだと本文の白との輝度差が2%程度しかなく、メディア枠が独立したゾーンに
+    // 見えないため一段濃いsurfaceSubtleにしている。accentSurface(薄青)は真下のカテゴリ
+    // チップと同じ色になり意味づけが衝突するので使わない
+    backgroundColor: Colors.surfaceSubtle,
     alignItems: 'center',
     justifyContent: 'center',
     paddingVertical: 16,
@@ -300,7 +303,7 @@ const styles = StyleSheet.create({
     ...StyleSheet.absoluteFillObject,
     // 白(255)に乗算した結果はこの色そのものになるため、mediaBoxの背景と同じ値にすると
     // 上下paddingの帯と動画が継ぎ目なく繋がる
-    backgroundColor: Colors.surfaceMuted,
+    backgroundColor: Colors.surfaceSubtle,
     mixBlendMode: 'multiply',
   },
   mediaThumbnail: {
