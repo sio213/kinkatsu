@@ -1,7 +1,7 @@
 import { CategoryChip } from '@/components/exercises/category-chip';
+import { ExerciseThumbnail } from '@/components/exercises/exercise-thumbnail';
 import { Colors, Typography } from '@/constants/theme';
 import type { Exercise } from '@/db/schema';
-import { Image } from 'expo-image';
 import { memo, useCallback } from 'react';
 import { StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import { getExerciseImages } from '@/lib/exercises/images';
@@ -34,7 +34,7 @@ export const ExerciseCard = memo(function ExerciseCard({
       onPress={handlePress}
       accessibilityLabel={`${e.name}の詳細を見る`}
     >
-      <Image source={images.thumbnail} style={styles.thumbnail} contentFit="cover" />
+      <ExerciseThumbnail source={images.thumbnail} size={46} />
       <View style={styles.info}>
         <Text style={styles.name} numberOfLines={1}>{e.name}</Text>
         <View style={styles.meta}>
@@ -63,14 +63,6 @@ const styles = StyleSheet.create({
     backgroundColor: Colors.surfaceMuted,
     borderRadius: 10,
     padding: 12,
-    borderWidth: 1,
-    borderColor: Colors.border,
-  },
-  thumbnail: {
-    width: 46,
-    height: 46,
-    borderRadius: 7,
-    backgroundColor: Colors.surfaceSubtle,
     borderWidth: 1,
     borderColor: Colors.border,
   },

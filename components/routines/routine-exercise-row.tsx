@@ -1,11 +1,11 @@
 import { CategoryChip } from '@/components/exercises/category-chip';
+import { ExerciseThumbnail } from '@/components/exercises/exercise-thumbnail';
 import { IconSymbol } from '@/components/ui/icon-symbol';
 import { Colors, Typography } from '@/constants/theme';
 import { getCategoryLabel, resolveMeasurementType } from '@/lib/exercises/constants';
 import { getExerciseImages } from '@/lib/exercises/images';
 import type { DraftExercise } from '@/lib/routines/validation';
 import { summarizeExerciseSets } from '@/lib/workout/set-format';
-import { Image } from 'expo-image';
 import { memo } from 'react';
 import { StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 
@@ -29,7 +29,7 @@ export const RoutineExerciseRow = memo(function RoutineExerciseRow({ exercise, o
       accessibilityRole="button"
       accessibilityLabel={`${exercise.name}、${categoryLabel}、${setsSummary}`}
     >
-      <Image source={images.thumbnail} style={styles.thumbnail} contentFit="cover" />
+      <ExerciseThumbnail source={images.thumbnail} size={38} />
       <View style={styles.info}>
         <Text style={styles.name} numberOfLines={1}>{exercise.name}</Text>
         <View style={styles.meta}>
@@ -53,14 +53,6 @@ const styles = StyleSheet.create({
     borderColor: Colors.border,
     paddingVertical: 9,
     paddingHorizontal: 10,
-  },
-  thumbnail: {
-    width: 38,
-    height: 38,
-    borderRadius: 7,
-    backgroundColor: Colors.surfaceSubtle,
-    borderWidth: 1,
-    borderColor: Colors.border,
   },
   info: { flex: 1, minWidth: 0, gap: 3 },
   name: { ...Typography.cardTitle, color: Colors.textPrimary },
