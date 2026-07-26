@@ -1,9 +1,9 @@
 import { CategoryChip } from '@/components/exercises/category-chip';
+import { ExerciseThumbnail } from '@/components/exercises/exercise-thumbnail';
 import { DesignIcon } from '@/components/ui/design-icon';
 import { Colors, Typography } from '@/constants/theme';
 import type { Exercise } from '@/db/schema';
 import { getExerciseImages } from '@/lib/exercises/images';
-import { Image } from 'expo-image';
 import { memo } from 'react';
 import { Pressable, StyleSheet, Text, View, type AccessibilityActionEvent } from 'react-native';
 import { useIsActive, useReorderableDrag } from 'react-native-reorderable-list';
@@ -73,7 +73,7 @@ export const ReorderableExerciseRow = memo(function ReorderableExerciseRow({
       onAccessibilityAction={handleAccessibilityAction}
     >
       <DesignIcon name="drag-indicator" size={20} color={isActive ? Colors.accent : Colors.borderStrong} />
-      <Image source={thumbnail} style={styles.thumbnail} contentFit="cover" />
+      <ExerciseThumbnail source={thumbnail} size={40} bordered={false} />
       <View style={styles.info}>
         <Text style={styles.name} numberOfLines={1}>
           {name}
@@ -112,7 +112,6 @@ const styles = StyleSheet.create({
     elevation: 6,
     transform: [{ scale: 1.02 }],
   },
-  thumbnail: { width: 40, height: 40, borderRadius: 7, backgroundColor: Colors.surfaceSubtle },
   info: { flex: 1, minWidth: 0, gap: 3 },
   name: { ...Typography.cardTitle, color: Colors.textPrimary },
   meta: { flexDirection: 'row', alignItems: 'center', gap: 6 },

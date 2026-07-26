@@ -1,4 +1,5 @@
 import { CategoryChip } from '@/components/exercises/category-chip';
+import { ExerciseThumbnail } from '@/components/exercises/exercise-thumbnail';
 import { Checkbox } from '@/components/ui/checkbox';
 import { IconSymbol } from '@/components/ui/icon-symbol';
 import { Radio } from '@/components/ui/radio';
@@ -6,7 +7,6 @@ import { Colors, Typography } from '@/constants/theme';
 import type { Exercise } from '@/db/schema';
 import { getCategoryLabel } from '@/lib/exercises/constants';
 import { getExerciseImages } from '@/lib/exercises/images';
-import { Image } from 'expo-image';
 import { memo } from 'react';
 import { StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 
@@ -39,7 +39,7 @@ export const PickerExerciseRow = memo(function PickerExerciseRow({
       accessibilityLabel={`${e.name}、${getCategoryLabel(e.category)}`}
     >
       {isRadio ? <Radio selected={selected} size={22} /> : <Checkbox checked={selected} size={22} />}
-      <Image source={images.thumbnail} style={styles.thumbnail} contentFit="cover" />
+      <ExerciseThumbnail source={images.thumbnail} size={40} />
       <View style={styles.info}>
         <Text style={styles.name} numberOfLines={1}>
           {e.name}
@@ -66,14 +66,6 @@ const styles = StyleSheet.create({
     paddingVertical: 12,
     borderBottomWidth: 1,
     borderBottomColor: Colors.border,
-  },
-  thumbnail: {
-    width: 40,
-    height: 40,
-    borderRadius: 7,
-    backgroundColor: Colors.surfaceSubtle,
-    borderWidth: 1,
-    borderColor: Colors.border,
   },
   info: { flex: 1, gap: 3 },
   name: { ...Typography.cardTitle, color: Colors.textPrimary },

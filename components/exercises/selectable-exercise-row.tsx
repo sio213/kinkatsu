@@ -1,10 +1,10 @@
 import { CategoryChip } from '@/components/exercises/category-chip';
+import { ExerciseThumbnail } from '@/components/exercises/exercise-thumbnail';
 import { Checkbox } from '@/components/ui/checkbox';
 import { Colors, Typography } from '@/constants/theme';
 import { getCategoryLabel, resolveMeasurementType } from '@/lib/exercises/constants';
 import { getExerciseImages } from '@/lib/exercises/images';
 import { formatHistorySetSummary, MEASUREMENT_COLUMNS, type SetFieldKey } from '@/lib/workout/set-format';
-import { Image } from 'expo-image';
 import { memo } from 'react';
 import { StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 
@@ -60,7 +60,7 @@ export const SelectableExerciseRow = memo(function SelectableExerciseRow({
       accessibilityLabel={`${name}、${getCategoryLabel(category)}、${accessibilityValuePrefix ?? ''}${displaySummary}`}
     >
       <Checkbox checked={selected} />
-      <Image source={images.thumbnail} style={styles.thumbnail} contentFit="cover" />
+      <ExerciseThumbnail source={images.thumbnail} size={40} />
       <View style={styles.info}>
         <View style={styles.nameRow}>
           <Text style={styles.name} numberOfLines={1}>
@@ -84,14 +84,6 @@ const styles = StyleSheet.create({
     paddingVertical: 12,
     borderBottomWidth: 1,
     borderBottomColor: Colors.border,
-  },
-  thumbnail: {
-    width: 40,
-    height: 40,
-    borderRadius: 7,
-    backgroundColor: Colors.surfaceSubtle,
-    borderWidth: 1,
-    borderColor: Colors.border,
   },
   info: { flex: 1, gap: 3 },
   nameRow: { flexDirection: 'row', alignItems: 'center', gap: 6 },
