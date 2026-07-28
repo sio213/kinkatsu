@@ -448,24 +448,22 @@ describe('記録タブ: 記録0件／1件のとき', () => {
     expect(mockPush).toHaveBeenCalledWith('/workout/1');
   });
 
-  test('1件のときは「推移は2回目の記録から」を添え、過去の記録一覧は出さない（内訳カードと同じ内容のため）', () => {
+  test('1件のときは過去の記録一覧を出さない（真上の内訳カードと同じ内容になるため）', () => {
     mockUseExercise.mockReturnValue(presetExercise());
     mockUseExerciseRecordCount.mockReturnValue({ count: 1, loaded: true });
     withPoints([60]);
 
     const texts = allTexts(render());
-    expect(texts).toContain('推移は2回目の記録から見られます');
     expect(texts).not.toContain('過去の記録');
     expect(texts).not.toContain('1回目を記録する');
   });
 
-  test('2件以上なら注記も記録ボタンも出さず、過去の記録一覧が出る', () => {
+  test('2件以上なら記録ボタンを出さず、過去の記録一覧が出る', () => {
     mockUseExercise.mockReturnValue(presetExercise());
     mockUseExerciseRecordCount.mockReturnValue({ count: 2, loaded: true });
     withPoints([60, 65]);
 
     const texts = allTexts(render());
-    expect(texts).not.toContain('推移は2回目の記録から見られます');
     expect(texts).not.toContain('1回目を記録する');
     expect(texts).toContain('過去の記録');
   });

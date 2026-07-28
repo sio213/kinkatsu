@@ -24,6 +24,9 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 
 const SCREEN_WIDTH = Dimensions.get('window').width;
 
+/** メディア枠の高さ。デザイン案「要相談2」で採用されたV-2の値 */
+const MEDIA_HEIGHT = 150;
+
 function FormPointsList({ points }: { points: string[] }) {
   return (
     <>
@@ -352,9 +355,11 @@ const styles = StyleSheet.create({
     // 見えないため一段濃いsurfaceSubtleにしている。accentSurface(薄青)は真下のカテゴリ
     // チップと同じ色になり意味づけが衝突するので使わない
     backgroundColor: Colors.surfaceSubtle,
+    // デザイン案「要相談2」で採用されたV-2の高さ。これ以上取ると、記録タブでグラフと
+    // 内訳カードが折り返しの下に沈み「点をタップしたら下に内訳」の主要動線が初期状態で見えなくなる
+    height: MEDIA_HEIGHT,
     alignItems: 'center',
     justifyContent: 'center',
-    paddingVertical: 16,
     position: 'relative',
   },
   mediaTintGroup: {
@@ -371,15 +376,15 @@ const styles = StyleSheet.create({
     backgroundColor: Colors.surfaceSubtle,
     mixBlendMode: 'multiply',
   },
+  // 正方形のサムネイルは枠の高さいっぱいに収める（150×150）
   mediaThumbnail: {
-    width: '54%',
-    maxWidth: 180,
+    height: '100%',
     aspectRatio: 1,
   },
   favoriteBadge: {
     position: 'absolute',
-    top: 28,
-    right: 28,
+    top: 10,
+    right: 14,
     width: 34,
     height: 34,
     borderRadius: 17,
@@ -394,9 +399,11 @@ const styles = StyleSheet.create({
   },
   favoriteBadgeText: { fontSize: 20, color: Colors.textPlaceholder },
   favoriteBadgeTextActive: { color: Colors.favorite },
+  // 動画素材は16:9（db/seed.ts追加手順のffmpeg scale=960:540）。サムネイルと違い正方形では
+  // ないため、枠の高さに合わせてcontainさせる（結果は約267×150で左右に余白が入る）
   media: {
     width: SCREEN_WIDTH,
-    height: SCREEN_WIDTH * 0.75,
+    height: '100%',
   },
 
   // タブはメディア枠と本文の境目に置く。左右16pxは画面共通のscreen paddingで、本文の20px

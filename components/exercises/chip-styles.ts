@@ -21,9 +21,10 @@ export const chipStyles = StyleSheet.create({
     borderColor: Colors.border,
   },
   chipSmall: {
-    borderRadius: 14,
+    borderRadius: 16,
     paddingHorizontal: 10,
-    paddingVertical: 4,
+    // 4pxだと高さ26pxで、等幅に引き伸ばした横幅に対して細長く見えるため上下を厚くする
+    paddingVertical: 7,
     // 等幅で並べるため、文字幅ではなく行の残り幅を分け合う
     flex: 1,
     alignItems: 'center',

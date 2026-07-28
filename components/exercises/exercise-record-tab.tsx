@@ -35,7 +35,7 @@ type Props = {
 /**
  * 種目詳細「記録」タブの中身。期間チップ → グラフ → 選択中の内訳カード → 過去の記録一覧、
  * の順に縦に並ぶ（デザイン案）。記録が0件のときは薄い見本グラフと「1回目を記録する」に
- * 差し替わり、1件のときは点1つ＋「推移は2回目から」を添えて履歴一覧を出さない。
+ * 差し替わり、1件のときは点1つだけを描いて履歴一覧を出さない（真上の内訳カードと同じ内容になるため）。
  */
 export function ExerciseRecordTab({ exerciseId, exerciseName, measurementType, insideTabBar }: Props) {
   const push = useDebouncedPush();
@@ -114,10 +114,6 @@ export function ExerciseRecordTab({ exerciseId, exerciseName, measurementType, i
             selectedIndex={selectedIndex}
             onSelect={handleSelect}
           />
-          {/* 1点だけでは線が引けないので、次で推移が見られることを添える */}
-          {points.length === 1 && (
-            <Text style={styles.placeholder}>推移は2回目の記録から見られます</Text>
-          )}
           {selectedPoint && (
             <ExerciseRecordDetailCard
               // 別の日を選んだら「他N件を見る」の展開状態を持ち越さず畳んだ状態から始める

@@ -44,7 +44,7 @@ describe('PeriodFilterChips', () => {
 
   it('チップの高さが44ptに満たないぶんをhitSlopで補っている', () => {
     const { root } = render('3m');
-    expect(chip(root, '1ヶ月').props.hitSlop).toMatchObject({ top: 9, bottom: 9 });
+    expect(chip(root, '1ヶ月').props.hitSlop).toMatchObject({ top: 6, bottom: 6 });
   });
 
   it('押すと選んだ期間を通知する', () => {
