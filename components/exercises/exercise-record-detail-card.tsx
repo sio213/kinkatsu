@@ -113,20 +113,23 @@ export function ExerciseRecordDetailCard({
   const collapsible = point.sets.length >= COLLAPSE_THRESHOLD;
 
   return (
-    <View style={styles.card}>
-      <TouchableOpacity
-        style={styles.header}
-        onPress={() => onPressOpen(point.best.sessionId)}
-        accessibilityRole="button"
-        accessibilityLabel={`${dateLabel}${relativeLabel ? `、${relativeLabel}` : ''}の記録を開く`}
-      >
+    // 見出しの > だけでなくカード全体をタップ領域にする。「他N件を見る」は入れ子の
+    // TouchableOpacityとして残るので、そちらを押したときは展開が優先される
+    <TouchableOpacity
+      style={styles.card}
+      onPress={() => onPressOpen(point.best.sessionId)}
+      accessibilityRole="button"
+      accessibilityLabel={`${dateLabel}${relativeLabel ? `、${relativeLabel}` : ''}の記録`}
+      accessibilityHint="タップするとこの日の記録を編集できます"
+    >
+      <View style={styles.header}>
         <Text style={styles.date}>{dateLabel}</Text>
         {relativeLabel && <Text style={styles.relative}>{relativeLabel}</Text>}
         <View style={styles.headerSpacer} />
         {/* 非テキストUIのコントラスト比3:1を満たすため textPlaceholder(slate400) ではなく
             textSecondary(slate600) を使う（デザイン案の指定） */}
         <IconSymbol name="chevron.right" size={19} color={Colors.textSecondary} />
-      </TouchableOpacity>
+      </View>
 
       <View style={styles.sets}>
         {rows.map((row) => (
@@ -154,7 +157,7 @@ export function ExerciseRecordDetailCard({
           </TouchableOpacity>
         )}
       </View>
-    </View>
+    </TouchableOpacity>
   );
 }
 

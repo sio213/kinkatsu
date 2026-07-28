@@ -11,10 +11,10 @@ type Props = {
   onChange: (period: ProgressPeriod) => void;
 };
 
-// チップ自体の高さは26px（文字16 + 上下padding4 + 枠1）しかないため、上下に9pxずつ広げて
+// チップ自体の高さは32px（文字16 + 上下padding7 + 枠1）しかないため、上下に6pxずつ広げて
 // タップ判定を44pt以上にする。デザイン案は「外側に透明な余白＋列に負のマージン」で同じことを
 // していたが、React Nativeではレイアウトを歪めずに済むhitSlopで表現する
-const HIT_SLOP = { top: 9, bottom: 9, left: 0, right: 0 };
+const HIT_SLOP = { top: 6, bottom: 6, left: 0, right: 0 };
 
 /**
  * 重量グラフの表示期間を選ぶチップ（1ヶ月／3ヶ月／6ヶ月／全期間）。
