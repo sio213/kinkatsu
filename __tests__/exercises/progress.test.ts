@@ -2,9 +2,12 @@ import {
   buildProgressSeries,
   DEFAULT_PROGRESS_PERIOD,
   filterProgressPoints,
+  formatProgressAux,
   progressPeriodStart,
   toDayKey,
+  type ProgressPoint,
   type ProgressSetRow,
+  type ProgressUnit,
 } from '@/lib/exercises/progress';
 
 // 日付をローカル時刻のepoch msにする（テスト内の期待値もローカル基準で書く）
@@ -203,5 +206,54 @@ describe('期間の絞り込み', () => {
       row({ startedAt: at(2026, 4, 28, 23), setNumber: 1, weight: 60, reps: 8 }),
     ]);
     expect(filterProgressPoints(boundary.points, '3m', now)).toHaveLength(1);
+  });
+});
+
+describe('formatProgressAux: ツールチップの補助情報', () => {
+  const emptySet = {
+    sessionId: 1,
+    workoutSessionExerciseId: 1,
+    setNumber: 1,
+    weight: null,
+    reps: null,
+    durationSeconds: null,
+    distanceMeters: null,
+  };
+  const point = (best: Partial<ProgressSetRow>, setCount = 3): ProgressPoint => ({
+    dateKey: 0,
+    startedAt: 0,
+    value: 0,
+    best: { ...emptySet, ...best },
+    sets: new Array(setCount).fill(emptySet),
+  });
+
+  const unit = (auxKind: ProgressUnit['auxKind']): ProgressUnit => ({
+    label: 'kg',
+    step: 5,
+    minRange: 10,
+    integerOnly: false,
+    auxKind,
+  });
+
+  test('重量種目はBest Setの回数', () => {
+    expect(formatProgressAux(unit('reps'), point({ reps: 7 }))).toBe('×7');
+  });
+
+  test('加重ホールド系はBest Setの時間（1分以上は分:秒）', () => {
+    expect(formatProgressAux(unit('duration'), point({ durationSeconds: 45 }))).toBe('×45秒');
+    expect(formatProgressAux(unit('duration'), point({ durationSeconds: 90 }))).toBe('×1:30');
+  });
+
+  test('回数・時間種目はその日のセット数', () => {
+    expect(formatProgressAux(unit('sets'), point({}, 3))).toBe('×3セット');
+  });
+
+  test('距離・長時間の有酸素は補助情報を出さない', () => {
+    expect(formatProgressAux(unit('none'), point({ reps: 7 }))).toBeNull();
+  });
+
+  test('値が無ければ出さない（「×」だけが残らないように）', () => {
+    expect(formatProgressAux(unit('reps'), point({ reps: null }))).toBeNull();
+    expect(formatProgressAux(unit('duration'), point({ durationSeconds: null }))).toBeNull();
   });
 });

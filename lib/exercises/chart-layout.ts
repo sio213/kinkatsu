@@ -55,6 +55,8 @@ export type ChartPoint = {
 export type ChartLayout = {
   width: number;
   height: number;
+  /** 表示中の期間が1年以上にまたがるか。月日だけでは年が分からないのでラベルに年を足す */
+  withYear: boolean;
   /** プロット領域の上下端（Y座標） */
   top: number;
   bottom: number;
@@ -154,6 +156,7 @@ export function computeChartLayout(
   return {
     width,
     height: CHART_HEIGHT,
+    withYear,
     top,
     bottom,
     left,
@@ -229,6 +232,105 @@ export function placeBestChip(layout: ChartLayout, unit: ProgressUnit): BestChip
   }
 
   return { x: bestBox.x, y: bestBox.y, width, height, label };
+}
+
+/**
+ * タッチ位置のX座標から最も近い点の添字を返す。点そのものを狙わせず、指を置いたあたりの
+ * 一番近い記録にスナップさせるための判定（マーカーが間引かれて消えていても効く）
+ */
+export function findNearestPointIndex(layout: ChartLayout, x: number): number | null {
+  if (layout.points.length === 0) return null;
+  let nearest = 0;
+  let minDistance = Infinity;
+  for (const p of layout.points) {
+    const distance = Math.abs(p.x - x);
+    if (distance < minDistance) {
+      minDistance = distance;
+      nearest = p.index;
+    }
+  }
+  return nearest;
+}
+
+/** ツールチップ1行目の日付。全期間表示のように1年以上にまたがる場合だけ年を含める */
+export function formatTooltipDate(dateKey: number, withYear: boolean): string {
+  const d = new Date(dateKey);
+  const md = `${d.getMonth() + 1}/${d.getDate()}`;
+  return withYear ? `${d.getFullYear()}/${md}` : md;
+}
+
+const TOOLTIP_HEIGHT = 36;
+const TOOLTIP_DATE_FONT_SIZE = 9.5;
+const TOOLTIP_VALUE_FONT_SIZE = 13;
+const TOOLTIP_SUB_FONT_SIZE = 9.5;
+/** 点とチップの間隔。上に出す場合と下に逃がす場合で少し違う */
+const TOOLTIP_GAP_ABOVE = 9;
+const TOOLTIP_GAP_BELOW = 10;
+
+export type TooltipBox = {
+  x: number;
+  y: number;
+  width: number;
+  height: number;
+  /** 値の行（値＋単位＋補助情報）を中央揃えで並べ始めるX座標 */
+  valueX: number;
+  dateY: number;
+  valueY: number;
+};
+
+/**
+ * 選択中の点に出すツールチップの位置と大きさ。2行・中央揃えで、点の上に置くのが基本。
+ *
+ * 左右はプロット内に収まるようクランプする。ベストチップと重なる場合は、上のまま横
+ * （右→左）に逃がし、横に入らない場合のみ点の下に出す（デザイン案「要相談3」）。
+ */
+export function placeTooltip(
+  layout: ChartLayout,
+  index: number,
+  texts: { date: string; value: string; unit: string; aux: string | null },
+  bestChip: BestChipBox | null,
+): TooltipBox | null {
+  const point = layout.points[index];
+  if (!point) return null;
+
+  const valueWidth = estimateTextWidth(texts.value, TOOLTIP_VALUE_FONT_SIZE);
+  const unitWidth = estimateTextWidth(texts.unit, TOOLTIP_SUB_FONT_SIZE);
+  const auxWidth = texts.aux ? estimateTextWidth(texts.aux, TOOLTIP_SUB_FONT_SIZE) : 0;
+  const dateWidth = estimateTextWidth(texts.date, TOOLTIP_DATE_FONT_SIZE);
+
+  const valueRowWidth = valueWidth + unitWidth + (texts.aux ? auxWidth + 3 : 0);
+  const width = Math.round(Math.max(valueRowWidth + 7, dateWidth) + 22);
+  const height = TOOLTIP_HEIGHT;
+
+  let x = Math.min(Math.max(point.x - width / 2, layout.left + 2), layout.right - width - 2);
+  let y = point.y - height - TOOLTIP_GAP_ABOVE;
+
+  if (bestChip && overlapsChip(x, y, width, height, bestChip)) {
+    const rightX = bestChip.x + bestChip.width + 6;
+    const leftX = bestChip.x - 6 - width;
+    if (rightX + width <= layout.right - 2) x = rightX;
+    else if (leftX >= layout.left + 2) x = leftX;
+    else y = Math.min(point.y + TOOLTIP_GAP_BELOW, layout.bottom - height - 2);
+  }
+
+  return {
+    x,
+    y,
+    width,
+    height,
+    valueX: x + width / 2 - (valueRowWidth + 1.5) / 2,
+    dateY: y + 14,
+    valueY: y + 28,
+  };
+}
+
+function overlapsChip(x: number, y: number, width: number, height: number, chip: BestChipBox): boolean {
+  return (
+    x < chip.x + chip.width + 4 &&
+    x + width > chip.x - 4 &&
+    y < chip.y + chip.height + 4 &&
+    y + height > chip.y - 4
+  );
 }
 
 /** 星形のポリゴン点列（外接半径R・内接半径r）。DesignIconのstarはSVGパスなので座標指定ができない */
