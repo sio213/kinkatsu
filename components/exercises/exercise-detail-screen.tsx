@@ -2,17 +2,19 @@ import { HeaderMenu, type DropdownMenuItem } from '@/components/ui/dropdown-menu
 import { NotFoundState } from '@/components/ui/not-found-state';
 import { SectionGroup } from '@/components/ui/section-group';
 import { SectionHeading } from '@/components/ui/section-heading';
+import { SegmentedTabs, type SegmentedTabOption } from '@/components/ui/segmented-tabs';
 import { Colors, ScreenStyles, Typography } from '@/constants/theme';
 import { useDebouncedPush } from '@/hooks/use-debounced-push';
 import { useExercise, useExercises } from '@/hooks/use-exercises';
+import { useExerciseRecordCount } from '@/hooks/use-exercise-record-count';
 import { useFavoriteToggle } from '@/hooks/use-favorite-toggle';
 import { getCategoryLabel } from '@/lib/exercises/constants';
 import { parseFormPoints } from '@/lib/exercises/form-points';
-import { getGuide } from '@/lib/exercises/guides';
+import { getGuide, type ExerciseGuide } from '@/lib/exercises/guides';
 import { getExerciseImages } from '@/lib/exercises/images';
 import { getYoutubeSearchUrl } from '@/lib/exercises/youtube';
 import { Stack, useFocusEffect, useLocalSearchParams, useRouter } from 'expo-router';
-import { useCallback } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 import { useVideoPlayer, VideoView } from 'expo-video';
 import { Image } from 'expo-image';
 import { openBrowserAsync, WebBrowserPresentationStyle } from 'expo-web-browser';
@@ -79,6 +81,93 @@ async function handleYoutubeSearch(exerciseName: string) {
   }
 }
 
+type DetailTab = 'record' | 'guide';
+
+const TAB_OPTIONS: readonly SegmentedTabOption<DetailTab>[] = [
+  { value: 'record', label: '記録' },
+  { value: 'guide', label: '解説' },
+];
+
+/**
+ * 解説タブの中身。呼吸法セクションは持たない（2026-07-28のデザイン確定で削除。
+ * フォームのポイント側に統合済みという整理）。
+ */
+function GuideTabContent({
+  category,
+  guide,
+  formPoints,
+  note,
+  exerciseName,
+}: {
+  category: string;
+  guide: ExerciseGuide | undefined;
+  formPoints: string[];
+  note: string | null;
+  exerciseName: string;
+}) {
+  const hasContent = Boolean(guide) || Boolean(note) || formPoints.length > 0;
+
+  return (
+    <>
+      <SectionGroup>
+        <SectionHeading>カテゴリ</SectionHeading>
+        <View style={styles.categoryChip}>
+          <Text style={styles.categoryText}>{getCategoryLabel(category)}</Text>
+        </View>
+      </SectionGroup>
+
+      {guide && (
+        <>
+          <SectionGroup>
+            <SectionHeading>使う筋肉</SectionHeading>
+            <Text style={styles.sectionBody}>{guide.muscle}</Text>
+          </SectionGroup>
+
+          <SectionGroup>
+            <SectionHeading>フォームのポイント</SectionHeading>
+            <FormPointsList points={guide.points} />
+          </SectionGroup>
+
+          <SectionGroup>
+            <SectionHeading>よくあるミス</SectionHeading>
+            <View style={styles.cautionBox}>
+              <Text style={styles.cautionText}>⚠️ {guide.caution}</Text>
+            </View>
+          </SectionGroup>
+        </>
+      )}
+
+      {!guide && formPoints.length > 0 && (
+        <SectionGroup>
+          <SectionHeading>フォームのポイント</SectionHeading>
+          <FormPointsList points={formPoints} />
+        </SectionGroup>
+      )}
+
+      {note && (
+        <SectionGroup>
+          <SectionHeading>メモ</SectionHeading>
+          <Text style={styles.sectionBody}>{note}</Text>
+        </SectionGroup>
+      )}
+
+      {!hasContent && <Text style={styles.noGuide}>この種目の解説はまだありません</Text>}
+
+      <View style={[styles.youtubeSection, !hasContent && styles.youtubeSectionCentered]}>
+        <TouchableOpacity
+          style={styles.youtubeBtn}
+          onPress={() => handleYoutubeSearch(exerciseName)}
+          accessibilityRole="button"
+          hitSlop={{ top: 8, bottom: 8 }}
+          accessibilityLabel={`${exerciseName}のフォーム動画をYouTubeで検索`}
+        >
+          <Text style={styles.youtubeBtnText}>YouTubeで検索</Text>
+        </TouchableOpacity>
+      </View>
+    </>
+  );
+}
+
 type Props = {
   /**
    * タブ配下のStack（種目タブ経由 = /exercises/[id]）から表示されているか。
@@ -107,12 +196,23 @@ export function ExerciseDetailScreen({ insideTabBar = false }: Props) {
   const push = useDebouncedPush();
 
   const { exercise, loaded } = useExercise(Number(id));
+  const { count: recordCount, loaded: recordCountLoaded } = useExerciseRecordCount(Number(id));
   const { toggleFavorite, removeExercise } = useExercises();
   const { localFav, toggle: handleFavoritePress } = useFavoriteToggle(
     exercise?.id,
     exercise?.favorite,
     toggleFavorite,
   );
+
+  // 初期表示は記録0件なら解説タブ、1件以上なら記録タブ（デザイン確定事項）。件数が判明する前に
+  // 決めると解説→記録のちらつきが出るため、recordCountLoadedまでnullのままにしてタブを決めない。
+  // 一度決まった後（またはユーザーが自分で切り替えた後）は件数が変わっても勝手に切り替わらないよう、
+  // 既に値があるときは上書きしない
+  const [tab, setTab] = useState<DetailTab | null>(null);
+  useEffect(() => {
+    if (!recordCountLoaded) return;
+    setTab((current) => current ?? (recordCount > 0 ? 'record' : 'guide'));
+  }, [recordCountLoaded, recordCount]);
 
   const safeAreaEdges = insideTabBar ? ([] as const) : (['bottom'] as const);
 
@@ -142,7 +242,8 @@ export function ExerciseDetailScreen({ insideTabBar = false }: Props) {
     ]);
   }
 
-  if (!loaded) return null;
+  // 記録件数は初期タブの決定に必要なので、種目本体と揃ってから描画する
+  if (!loaded || !recordCountLoaded || tab == null) return null;
 
   if (!exercise) {
     return (
@@ -160,7 +261,6 @@ export function ExerciseDetailScreen({ insideTabBar = false }: Props) {
   const guide = getGuide(exercise);
   const formPoints = parseFormPoints(exercise.formPoints);
   const images = getExerciseImages(exercise);
-  const hasContent = Boolean(guide) || Boolean(exercise.note) || formPoints.length > 0;
 
   const menuItems: DropdownMenuItem[] = [
     { key: 'edit', label: '編集', icon: 'edit', onPress: handleEdit },
@@ -211,68 +311,29 @@ export function ExerciseDetailScreen({ insideTabBar = false }: Props) {
           </TouchableOpacity>
         </View>
 
+        <View style={styles.tabBar}>
+          <SegmentedTabs
+            options={TAB_OPTIONS}
+            value={tab}
+            onChange={setTab}
+            accessibilityLabel="記録と解説の切り替え"
+          />
+        </View>
+
         <View style={styles.body}>
-          <SectionGroup>
-            <SectionHeading>カテゴリ</SectionHeading>
-            <View style={styles.categoryChip}>
-              <Text style={styles.categoryText}>{getCategoryLabel(exercise.category)}</Text>
-            </View>
-          </SectionGroup>
-
-          {guide && (
-            <>
-              <SectionGroup>
-                <SectionHeading>使う筋肉</SectionHeading>
-                <Text style={styles.sectionBody}>{guide.muscle}</Text>
-              </SectionGroup>
-
-              <SectionGroup>
-                <SectionHeading>フォームのポイント</SectionHeading>
-                <FormPointsList points={guide.points} />
-              </SectionGroup>
-
-              <SectionGroup>
-                <SectionHeading>よくあるミス</SectionHeading>
-                <View style={styles.cautionBox}>
-                  <Text style={styles.cautionText}>⚠️ {guide.caution}</Text>
-                </View>
-              </SectionGroup>
-
-              <SectionGroup>
-                <SectionHeading>呼吸法</SectionHeading>
-                <Text style={styles.sectionBody}>{guide.breath}</Text>
-              </SectionGroup>
-            </>
+          {tab === 'guide' ? (
+            <GuideTabContent
+              category={exercise.category}
+              guide={guide}
+              formPoints={formPoints}
+              note={exercise.note}
+              exerciseName={exercise.name}
+            />
+          ) : (
+            // TODO(重量グラフ): 期間チップ・グラフ・内訳カード・過去の記録一覧を後続PRで載せる。
+            // このプレースホルダは記録タブの中身が入り次第まるごと差し替える
+            <Text style={styles.noGuide}>記録タブの中身は準備中です</Text>
           )}
-
-          {!guide && formPoints.length > 0 && (
-            <SectionGroup>
-              <SectionHeading>フォームのポイント</SectionHeading>
-              <FormPointsList points={formPoints} />
-            </SectionGroup>
-          )}
-
-          {exercise.note && (
-            <SectionGroup>
-              <SectionHeading>メモ</SectionHeading>
-              <Text style={styles.sectionBody}>{exercise.note}</Text>
-            </SectionGroup>
-          )}
-
-          {!guide && !exercise.note && formPoints.length === 0 && (
-            <Text style={styles.noGuide}>この種目の解説はまだありません</Text>
-          )}
-
-          <View style={[styles.youtubeSection, !hasContent && styles.youtubeSectionCentered]}>
-            <TouchableOpacity
-              style={styles.youtubeBtn}
-              onPress={() => handleYoutubeSearch(exercise.name)}
-              hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
-              accessibilityLabel={`${exercise.name}のフォーム動画をYouTubeで検索`}
-            >
-              <Text style={styles.youtubeBtnText}>YouTubeで検索</Text>
-            </TouchableOpacity>
-          </View>
         </View>
       </ScrollView>
     </SafeAreaView>
@@ -334,7 +395,12 @@ const styles = StyleSheet.create({
     height: SCREEN_WIDTH * 0.75,
   },
 
-  body: { paddingHorizontal: 20, paddingTop: 20, gap: 20 },
+  // タブはメディア枠と本文の境目に置く。左右16pxは画面共通のscreen paddingで、本文の20px
+  // （--space-9 = detail body padding）より一段外側までトラックを広げるデザイン案の指定どおり
+  tabBar: { paddingHorizontal: 16, paddingTop: 11, paddingBottom: 12, backgroundColor: Colors.surface },
+
+  // タブ側が既に下12pxを持つため、本文の上余白は2pxだけ足して合計14pxにする（デザイン案の値）
+  body: { paddingHorizontal: 20, paddingTop: 2, gap: 20 },
 
   categoryChip: {
     alignSelf: 'flex-start',
@@ -357,14 +423,17 @@ const styles = StyleSheet.create({
     paddingTop: 0,
     borderTopWidth: 0,
   },
+  // デザイン確定（2026-07-28）で左寄せの小さなボタンから全幅・中央揃えのoutlineボタンに変更。
+  // 解説タブの末尾で「次にやること」として目立たせるため
   youtubeBtn: {
-    alignSelf: 'flex-start',
+    alignSelf: 'stretch',
+    alignItems: 'center',
     borderRadius: 8,
     borderWidth: 1,
     borderColor: Colors.borderStrong,
     backgroundColor: Colors.surface,
     paddingHorizontal: 14,
-    paddingVertical: 8,
+    paddingVertical: 10,
   },
   youtubeBtnText: { ...Typography.footnote, fontWeight: '600', color: Colors.accent },
 

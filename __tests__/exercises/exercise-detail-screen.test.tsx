@@ -5,6 +5,7 @@ const mockToggleFavorite = jest.fn();
 const mockRemoveExercise = jest.fn();
 const mockPlayerPlay = jest.fn();
 const mockPlayerPause = jest.fn();
+const mockUseExerciseRecordCount = jest.fn();
 
 jest.mock('expo-router', () => ({
   useRouter: () => ({ push: mockPush, back: mockBack }),
@@ -29,6 +30,11 @@ jest.mock('@/hooks/use-exercises', () => ({
     toggleFavorite: mockToggleFavorite,
     removeExercise: mockRemoveExercise,
   }),
+}));
+
+// 記録件数はdb/client（expo-sqlite）に触るため、useExercisesと同じ流儀でフックごと差し替える
+jest.mock('@/hooks/use-exercise-record-count', () => ({
+  useExerciseRecordCount: (...args: unknown[]) => mockUseExerciseRecordCount(...args),
 }));
 
 jest.mock('expo-video', () => ({
@@ -103,6 +109,8 @@ function render() {
 
 beforeEach(() => {
   jest.clearAllMocks();
+  // 既存のテストはすべて解説タブの中身を見るため、既定は「記録0件＝解説タブが初期表示」にしておく
+  mockUseExerciseRecordCount.mockReturnValue({ count: 0, loaded: true });
   mockToggleFavorite.mockResolvedValue(undefined);
   mockRemoveExercise.mockResolvedValue(undefined);
   jest.spyOn(Alert, 'alert').mockImplementation(() => {});
@@ -295,6 +303,65 @@ describe('画面の基本ケース', () => {
     mockUseExercise.mockReturnValue({ exercise: undefined, loaded: true });
     const root = render();
     expect(allTexts(root)).toContain('種目が見つかりません');
+  });
+});
+
+describe('記録／解説タブ', () => {
+  const presetExercise = () => ({
+    exercise: makeExercise({ source: 'preset', slug: 'bench_press' }),
+    loaded: true,
+  });
+
+  test('記録0件のときは解説タブが初期表示になる', () => {
+    mockUseExercise.mockReturnValue(presetExercise());
+    mockUseExerciseRecordCount.mockReturnValue({ count: 0, loaded: true });
+
+    const root = render();
+    expect(allTexts(root)).toContain('使う筋肉');
+  });
+
+  test('記録1件以上のときは記録タブが初期表示になる', () => {
+    mockUseExercise.mockReturnValue(presetExercise());
+    mockUseExerciseRecordCount.mockReturnValue({ count: 1, loaded: true });
+
+    const root = render();
+    expect(allTexts(root)).not.toContain('使う筋肉');
+  });
+
+  test('記録件数がまだ読み込めていないうちは、タブが確定しないので何も描かない', () => {
+    mockUseExercise.mockReturnValue(presetExercise());
+    mockUseExerciseRecordCount.mockReturnValue({ count: 0, loaded: false });
+
+    const root = render();
+    expect(root.findAllByType(Text)).toHaveLength(0);
+  });
+
+  test('タブを押すと表示が切り替わる', () => {
+    mockUseExercise.mockReturnValue(presetExercise());
+    mockUseExerciseRecordCount.mockReturnValue({ count: 3, loaded: true });
+
+    const root = render();
+    expect(allTexts(root)).not.toContain('使う筋肉');
+
+    act(() => {
+      findButtonByLabel(root, '解説')!.props.onPress();
+    });
+    expect(allTexts(root)).toContain('使う筋肉');
+
+    act(() => {
+      findButtonByLabel(root, '記録')!.props.onPress();
+    });
+    expect(allTexts(root)).not.toContain('使う筋肉');
+  });
+
+  test('解説タブに呼吸法セクションは無い（2026-07-28のデザイン確定で削除）', () => {
+    mockUseExercise.mockReturnValue(presetExercise());
+
+    const root = render();
+    const texts = allTexts(root);
+    // ガイド自体は出ているのに呼吸法だけ消えていることを確かめる
+    expect(texts).toContain('よくあるミス');
+    expect(texts).not.toContain('呼吸法');
   });
 });
 
