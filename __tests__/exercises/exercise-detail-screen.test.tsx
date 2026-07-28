@@ -7,6 +7,8 @@ const mockPlayerPlay = jest.fn();
 const mockPlayerPause = jest.fn();
 const mockUseExerciseRecordCount = jest.fn();
 const mockUseExerciseProgress = jest.fn();
+const mockStartWorkoutWithExercise = jest.fn();
+const mockUseWorkoutSessions = jest.fn();
 
 jest.mock('expo-router', () => ({
   useRouter: () => ({ push: mockPush, back: mockBack }),
@@ -41,6 +43,16 @@ jest.mock('@/hooks/use-exercise-record-count', () => ({
 
 jest.mock('@/hooks/use-exercise-progress', () => ({
   useExerciseProgress: (...args: unknown[]) => mockUseExerciseProgress(...args),
+}));
+
+// 記録タブの「1回目を記録する」がdb/client（expo-sqlite）へ辿るのを断つ
+jest.mock('@/lib/workout/session', () => ({
+  startWorkoutWithExercise: (...args: unknown[]) => mockStartWorkoutWithExercise(...args),
+  endWorkoutSession: jest.fn(),
+}));
+
+jest.mock('@/hooks/use-workout-session', () => ({
+  useWorkoutSessions: () => mockUseWorkoutSessions(),
 }));
 
 jest.mock('expo-video', () => ({
@@ -118,9 +130,15 @@ beforeEach(() => {
   // 既存のテストはすべて解説タブの中身を見るため、既定は「記録0件＝解説タブが初期表示」にしておく
   mockUseExerciseRecordCount.mockReturnValue({ count: 0, loaded: true });
   mockUseExerciseProgress.mockReturnValue({
-    series: { unit: { label: 'kg', step: 5, minRange: 10, auxKind: 'reps' }, points: [] },
+    series: {
+      unit: { label: 'kg', step: 5, minRange: 10, integerOnly: false, auxKind: 'reps' },
+      points: [],
+    },
     loaded: true,
+    failed: false,
   });
+  mockUseWorkoutSessions.mockReturnValue({ sessions: [], activeSession: null });
+  mockStartWorkoutWithExercise.mockResolvedValue({ sessionId: 1 });
   mockToggleFavorite.mockResolvedValue(undefined);
   mockRemoveExercise.mockResolvedValue(undefined);
   jest.spyOn(Alert, 'alert').mockImplementation(() => {});
@@ -374,6 +392,82 @@ describe('記録／解説タブ', () => {
     // ガイド自体は出ているのに呼吸法だけ消えていることを確かめる
     expect(texts).toContain('よくあるミス');
     expect(texts).not.toContain('呼吸法');
+  });
+});
+
+describe('記録タブ: 記録0件／1件のとき', () => {
+  const presetExercise = () => ({
+    exercise: makeExercise({ source: 'preset', slug: 'bench_press' }),
+    loaded: true,
+  });
+  const unit = { label: 'kg', step: 5, minRange: 10, integerOnly: false, auxKind: 'reps' as const };
+  const makePoint = (index: number, weight: number) => {
+    const set = {
+      sessionId: index + 1,
+      workoutSessionExerciseId: index + 1,
+      setNumber: 1,
+      weight,
+      reps: 8,
+      durationSeconds: null,
+      distanceMeters: null,
+      completedAt: 1,
+    };
+    const dateKey = new Date(2026, 6, 1 + index * 7).getTime();
+    return { dateKey, startedAt: dateKey, value: weight, best: set, sets: [set] };
+  };
+  const withPoints = (weights: number[]) => {
+    mockUseExerciseProgress.mockReturnValue({
+      series: { unit, points: weights.map((w, i) => makePoint(i, w)) },
+      loaded: true,
+      failed: false,
+    });
+  };
+
+  test('0件のときは見本グラフと「1回目を記録する」を出す', () => {
+    mockUseExercise.mockReturnValue(presetExercise());
+    mockUseExerciseRecordCount.mockReturnValue({ count: 1, loaded: true });
+    withPoints([]);
+
+    const texts = allTexts(render());
+    expect(texts).toContain('記録の推移がここに出ます');
+    expect(texts).toContain('まずは今日の1回を記録しましょう');
+    expect(texts).toContain('1回目を記録する');
+  });
+
+  test('「1回目を記録する」でその種目だけのセッションを作り、記録画面へ遷移する', async () => {
+    mockUseExercise.mockReturnValue(presetExercise());
+    mockUseExerciseRecordCount.mockReturnValue({ count: 1, loaded: true });
+    withPoints([]);
+
+    const root = render();
+    await act(async () => {
+      findButtonByLabel(root, '1回目を記録する')!.props.onPress();
+    });
+
+    expect(mockStartWorkoutWithExercise).toHaveBeenCalledWith(1);
+    expect(mockPush).toHaveBeenCalledWith('/workout/1');
+  });
+
+  test('1件のときは「推移は2回目の記録から」を添え、過去の記録一覧は出さない（内訳カードと同じ内容のため）', () => {
+    mockUseExercise.mockReturnValue(presetExercise());
+    mockUseExerciseRecordCount.mockReturnValue({ count: 1, loaded: true });
+    withPoints([60]);
+
+    const texts = allTexts(render());
+    expect(texts).toContain('推移は2回目の記録から見られます');
+    expect(texts).not.toContain('過去の記録');
+    expect(texts).not.toContain('1回目を記録する');
+  });
+
+  test('2件以上なら注記も記録ボタンも出さず、過去の記録一覧が出る', () => {
+    mockUseExercise.mockReturnValue(presetExercise());
+    mockUseExerciseRecordCount.mockReturnValue({ count: 2, loaded: true });
+    withPoints([60, 65]);
+
+    const texts = allTexts(render());
+    expect(texts).not.toContain('推移は2回目の記録から見られます');
+    expect(texts).not.toContain('1回目を記録する');
+    expect(texts).toContain('過去の記録');
   });
 });
 
