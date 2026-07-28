@@ -24,8 +24,13 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 
 const SCREEN_WIDTH = Dimensions.get('window').width;
 
-/** メディア枠の高さ。デザイン案「要相談2」で採用されたV-2の値 */
-const MEDIA_HEIGHT = 150;
+/**
+ * メディア枠の高さ。デザイン案「要相談2」で採用されたV-2.5の値。
+ * 150pxでは横長動画のフォームが追いにくいため20px上げた。190px（V-3）まで上げると
+ * iPhone SEで内訳カードが折り返しの下に完全に沈み、「点をタップしたら下に内訳」の
+ * 主要動線が初期状態で見えなくなるため、170pxが上限。
+ */
+const MEDIA_HEIGHT = 170;
 
 function FormPointsList({ points }: { points: string[] }) {
   return (
@@ -355,8 +360,7 @@ const styles = StyleSheet.create({
     // 見えないため一段濃いsurfaceSubtleにしている。accentSurface(薄青)は真下のカテゴリ
     // チップと同じ色になり意味づけが衝突するので使わない
     backgroundColor: Colors.surfaceSubtle,
-    // デザイン案「要相談2」で採用されたV-2の高さ。これ以上取ると、記録タブでグラフと
-    // 内訳カードが折り返しの下に沈み「点をタップしたら下に内訳」の主要動線が初期状態で見えなくなる
+    // 高さを決めている理由は MEDIA_HEIGHT のコメントを参照
     height: MEDIA_HEIGHT,
     alignItems: 'center',
     justifyContent: 'center',
