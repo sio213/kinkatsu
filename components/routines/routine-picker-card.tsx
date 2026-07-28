@@ -1,5 +1,5 @@
 import { CategoryChip } from '@/components/exercises/category-chip';
-import { IconSymbol } from '@/components/ui/icon-symbol';
+import { DesignIcon } from '@/components/ui/design-icon';
 import { Colors, IconSizes, Typography } from '@/constants/theme';
 import { getCategoryLabel } from '@/lib/exercises/constants';
 import { summarizeCategories } from '@/lib/routines/format';
@@ -64,7 +64,7 @@ export const RoutinePickerCard = memo(function RoutinePickerCard({
           <Text style={styles.exerciseCount}>{exerciseCount}種目</Text>
         </View>
       </View>
-      <IconSymbol name="chevron.right" size={IconSizes.cardChevron} color={Colors.textSecondary} />
+      <DesignIcon name="chevron-right" size={IconSizes.cardChevron} color={Colors.textSecondary} />
     </TouchableOpacity>
   );
 });

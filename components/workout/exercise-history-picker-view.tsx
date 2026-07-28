@@ -3,6 +3,7 @@ import { HeaderTitle } from '@/components/ui/header-title';
 import { ListErrorBoundary } from '@/components/ui/list-error-boundary';
 import { NotFoundState } from '@/components/ui/not-found-state';
 import { HistoryEntryCard } from '@/components/workout/history-entry-card';
+import { RecordListHeading } from '@/components/workout/record-list-heading';
 import { Colors, ScreenStyles, Typography } from '@/constants/theme';
 import { useExercise } from '@/hooks/use-exercises';
 import { resolveMeasurementType } from '@/lib/exercises/constants';
@@ -177,6 +178,9 @@ export function ExerciseHistoryPickerView({
               />
             </ListErrorBoundary>
           )}
+          ListHeaderComponent={
+            <RecordListHeading label="記録一覧" count={loadedEntries.length} style={styles.listHeading} />
+          }
           renderSectionHeader={({ section }) => (
             <View style={styles.monthLabelWrapper}>
               <Text style={styles.monthLabel}>{section.title}</Text>
@@ -205,6 +209,7 @@ const styles = StyleSheet.create({
 
   list: { flex: 1 },
   content: { padding: 16, paddingBottom: 32 },
+  listHeading: { marginBottom: 8 },
   // スクロール中はスティッキーヘッダーとして画面上部に固定表示される。marginHorizontalで
   // contentの左右paddingを打ち消して画面端まで塗りつぶすことで、背面のカードが透けて
   // 文字と重なって見えないようにする（背景を不透明にするのが目的で、marginBottom分は

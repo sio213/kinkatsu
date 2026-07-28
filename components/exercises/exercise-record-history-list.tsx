@@ -1,5 +1,6 @@
 import { ExerciseRecordCard } from '@/components/exercises/exercise-record-card';
-import { IconSymbol } from '@/components/ui/icon-symbol';
+import { DesignIcon } from '@/components/ui/design-icon';
+import { RecordListHeading } from '@/components/workout/record-list-heading';
 import { Colors, IconSizes, Typography } from '@/constants/theme';
 import type { MeasurementType } from '@/lib/exercises/constants';
 import { findBestIndex, type ProgressPoint } from '@/lib/exercises/progress';
@@ -43,10 +44,7 @@ export function ExerciseRecordHistoryList({
 
   return (
     <View style={styles.container}>
-      <View style={styles.heading}>
-        <Text style={styles.headingText}>過去の記録</Text>
-        <Text style={styles.count}>全{points.length}件</Text>
-      </View>
+      <RecordListHeading label="過去の記録" count={points.length} style={styles.heading} />
 
       <View style={styles.cards}>
         {recent.map(({ point, index }) => (
@@ -69,7 +67,7 @@ export function ExerciseRecordHistoryList({
           accessibilityLabel={`この種目のすべての記録（全${points.length}件）を見る`}
         >
           <Text style={styles.seeAllText}>すべての記録を見る</Text>
-          <IconSymbol name="chevron.right" size={IconSizes.inlineChevron} color={Colors.accent} />
+          <DesignIcon name="chevron-right" size={IconSizes.inlineChevron} color={Colors.accent} />
         </TouchableOpacity>
       )}
     </View>
@@ -80,9 +78,7 @@ const styles = StyleSheet.create({
   container: { gap: 8 },
   // 右の余白はカードの内側パディング(12px)＋枠(1px)ぶん。件数の右端と、下のカードのchevronの
   // 縦のラインを揃えるため
-  heading: { flexDirection: 'row', alignItems: 'baseline', gap: 6, paddingRight: 13 },
-  headingText: { ...Typography.caption, fontWeight: '700', color: Colors.textSecondary },
-  count: { marginLeft: 'auto', ...Typography.caption, color: Colors.textMuted },
+  heading: { paddingRight: 13 },
   cards: { gap: 8 },
   // 面も枠も持たないテキストリンク。カードと同列の選択肢に見えないようにする
   seeAll: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 4, paddingVertical: 9 },

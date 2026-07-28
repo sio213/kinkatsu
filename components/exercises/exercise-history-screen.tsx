@@ -1,6 +1,7 @@
 import { ExerciseRecordCard } from '@/components/exercises/exercise-record-card';
 import { HeaderTitle } from '@/components/ui/header-title';
 import { ListErrorBoundary } from '@/components/ui/list-error-boundary';
+import { RecordListHeading } from '@/components/workout/record-list-heading';
 import { NotFoundState } from '@/components/ui/not-found-state';
 import { Colors, ScreenStyles, Typography } from '@/constants/theme';
 import { useDebouncedPush } from '@/hooks/use-debounced-push';
@@ -47,7 +48,9 @@ export function ExerciseHistoryScreen({ insideTabBar = false }: Props) {
   );
 
   const safeAreaEdges = insideTabBar ? ([] as const) : (['bottom'] as const);
-  const subtitle = exercise ? `${exercise.name}・全${series.points.length}件` : undefined;
+  // 件数はサブタイトルではなく一覧の見出し行に置く（デザイン案の採用案4-2）。
+  // ヘッダーは「どの種目の記録か」だけを示す
+  const subtitle = exercise?.name;
 
   return (
     <SafeAreaView style={ScreenStyles.safeArea} edges={safeAreaEdges}>
@@ -88,6 +91,9 @@ export function ExerciseHistoryScreen({ insideTabBar = false }: Props) {
               <Text style={styles.monthLabel}>{section.title}</Text>
             </View>
           )}
+          ListHeaderComponent={
+            <RecordListHeading label="記録一覧" count={series.points.length} style={styles.listHeading} />
+          }
           ItemSeparatorComponent={() => <View style={styles.cardSeparator} />}
           SectionSeparatorComponent={() => <View style={styles.sectionSeparator} />}
           contentContainerStyle={styles.content}
@@ -100,6 +106,7 @@ export function ExerciseHistoryScreen({ insideTabBar = false }: Props) {
 const styles = StyleSheet.create({
   list: { flex: 1 },
   content: { padding: 16, paddingBottom: 32 },
+  listHeading: { marginBottom: 8 },
   // スクロール中はスティッキーヘッダーとして固定されるため、背面のカードが透けないよう
   // marginHorizontalでcontentの左右paddingを打ち消して画面端まで塗りつぶす
   // （ExerciseHistoryPickerViewと同じ扱い）

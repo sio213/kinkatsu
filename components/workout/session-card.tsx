@@ -1,4 +1,4 @@
-import { IconSymbol } from '@/components/ui/icon-symbol';
+import { DesignIcon } from '@/components/ui/design-icon';
 import { Colors, IconSizes, Typography } from '@/constants/theme';
 import type { WorkoutSession } from '@/db/schema';
 import { useDebouncedPush } from '@/hooks/use-debounced-push';
@@ -45,7 +45,7 @@ export const SessionCard = memo(function SessionCard({ session, summary }: Props
           </View>
         </View>
       </View>
-      <IconSymbol name="chevron.right" size={IconSizes.cardChevron} color={Colors.textSecondary} />
+      <DesignIcon name="chevron-right" size={IconSizes.cardChevron} color={Colors.textSecondary} />
     </TouchableOpacity>
   );
 });

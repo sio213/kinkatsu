@@ -1,5 +1,4 @@
 import { DesignIcon, type DesignIconName } from '@/components/ui/design-icon';
-import { IconSymbol } from '@/components/ui/icon-symbol';
 import { Colors, IconSizes, Typography } from '@/constants/theme';
 import { StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 
@@ -39,7 +38,7 @@ export function StartMethodRow({ icon, label, description, onPress, hint }: Prop
         <Text style={styles.label}>{label}</Text>
         <Text style={styles.description}>{description}</Text>
       </View>
-      <IconSymbol name="chevron.right" size={IconSizes.cardChevron} color={Colors.textSecondary} />
+      <DesignIcon name="chevron-right" size={IconSizes.cardChevron} color={Colors.textSecondary} />
     </TouchableOpacity>
   );
 }

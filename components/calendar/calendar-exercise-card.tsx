@@ -1,5 +1,5 @@
 import { ExerciseIdentity } from '@/components/exercises/exercise-identity';
-import { IconSymbol } from '@/components/ui/icon-symbol';
+import { DesignIcon } from '@/components/ui/design-icon';
 import { BestBadge } from '@/components/workout/best-badge';
 import { Colors, IconSizes, Typography } from '@/constants/theme';
 import { resolveMeasurementType, getCategoryLabel } from '@/lib/exercises/constants';
@@ -96,7 +96,7 @@ export const CalendarExerciseCard = memo(function CalendarExerciseCard({
           </>
         }
       />
-      <IconSymbol name="chevron.right" size={IconSizes.cardChevron} color={Colors.textSecondary} />
+      <DesignIcon name="chevron-right" size={IconSizes.cardChevron} color={Colors.textSecondary} />
     </TouchableOpacity>
   );
 });
