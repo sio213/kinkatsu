@@ -39,7 +39,7 @@ export function StartMethodRow({ icon, label, description, onPress, hint }: Prop
         <Text style={styles.label}>{label}</Text>
         <Text style={styles.description}>{description}</Text>
       </View>
-      <IconSymbol name="chevron.right" size={IconSizes.cardChevron} color={Colors.textPlaceholder} />
+      <IconSymbol name="chevron.right" size={IconSizes.cardChevron} color={Colors.textSecondary} />
     </TouchableOpacity>
   );
 }

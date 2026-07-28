@@ -1,6 +1,6 @@
 import { IconSymbol } from '@/components/ui/icon-symbol';
 import { Switch } from '@/components/ui/switch';
-import { Colors, IconSizes, Typography } from '@/constants/theme';
+import { Colors, Typography } from '@/constants/theme';
 import type { Reminder } from '@/db/schema';
 import { formatKindSummary, formatNextFire } from '@/lib/notifications/format';
 import type { ReminderInput } from '@/lib/notifications/types';
@@ -54,7 +54,7 @@ export function ReminderCard({
           >
             <IconSymbol name="list.bullet.clipboard" size={13} color={Colors.textMuted} />
             <Text style={styles.routineBadgeText}>ルーティンのリマインダー</Text>
-            <IconSymbol name="chevron.right" size={IconSizes.inlineChevron} color={Colors.textMuted} />
+            <IconSymbol name="chevron.right" size={13} color={Colors.textMuted} />
           </TouchableOpacity>
         )}
         <View style={styles.cardMain}>

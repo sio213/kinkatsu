@@ -64,7 +64,7 @@ export const RoutinePickerCard = memo(function RoutinePickerCard({
           <Text style={styles.exerciseCount}>{exerciseCount}種目</Text>
         </View>
       </View>
-      <IconSymbol name="chevron.right" size={IconSizes.cardChevron} color={Colors.textPlaceholder} />
+      <IconSymbol name="chevron.right" size={IconSizes.cardChevron} color={Colors.textSecondary} />
     </TouchableOpacity>
   );
 });

@@ -84,7 +84,7 @@ export function RoutineReminderField({
               <Text style={styles.boxPlaceholderSubtitle}>タップして設定</Text>
             </View>
           )}
-          <IconSymbol name="chevron.right" size={IconSizes.cardChevron} color={Colors.textPlaceholder} />
+          <IconSymbol name="chevron.right" size={IconSizes.cardChevron} color={Colors.textSecondary} />
         </TouchableOpacity>
       )}
 

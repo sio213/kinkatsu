@@ -63,7 +63,7 @@ export const PastTrainingSessionCard = memo(function PastTrainingSessionCard({
           {exerciseNamesLabel}
         </Text>
       </View>
-      <IconSymbol name="chevron.right" size={IconSizes.cardChevron} color={Colors.textPlaceholder} />
+      <IconSymbol name="chevron.right" size={IconSizes.cardChevron} color={Colors.textSecondary} />
     </TouchableOpacity>
   );
 });

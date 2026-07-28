@@ -51,7 +51,7 @@ export const ExerciseCard = memo(function ExerciseCard({
           {localFav ? '★' : '☆'}
         </Text>
       </TouchableOpacity>
-      <IconSymbol name="chevron.right" size={IconSizes.cardChevron} color={Colors.textPlaceholder} />
+      <IconSymbol name="chevron.right" size={IconSizes.cardChevron} color={Colors.textSecondary} />
     </TouchableOpacity>
   );
 });

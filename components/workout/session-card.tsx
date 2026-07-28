@@ -45,7 +45,7 @@ export const SessionCard = memo(function SessionCard({ session, summary }: Props
           </View>
         </View>
       </View>
-      <IconSymbol name="chevron.right" size={IconSizes.cardChevron} color={Colors.textPlaceholder} />
+      <IconSymbol name="chevron.right" size={IconSizes.cardChevron} color={Colors.textSecondary} />
     </TouchableOpacity>
   );
 });

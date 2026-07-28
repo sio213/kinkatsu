@@ -37,7 +37,7 @@ export const RoutineExerciseRow = memo(function RoutineExerciseRow({ exercise, o
           <Text style={styles.setsSummary} numberOfLines={1}>{setsSummary}</Text>
         </View>
       </View>
-      <IconSymbol name="chevron.right" size={IconSizes.cardChevron} color={Colors.textPlaceholder} />
+      <IconSymbol name="chevron.right" size={IconSizes.cardChevron} color={Colors.textSecondary} />
     </TouchableOpacity>
   );
 });
