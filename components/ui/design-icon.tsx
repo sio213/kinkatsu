@@ -1,10 +1,16 @@
 import type { StyleProp, ViewStyle } from 'react-native';
-import Svg, { Path } from 'react-native-svg';
+import Svg, { G, Path } from 'react-native-svg';
+
+/** viewBoxの中心。rotateを使うアイコンの回転中心（Material Symbolsは 0 -960 960 960 で統一） */
+const VIEW_BOX_CENTER = '480, -480';
 
 // Claude Designからダウンロードした Material Symbols のSVGパス（viewBox: 0 -960 960 960 共通）。
 // IconSymbol（SF Symbols/MaterialIconsのクロスプラットフォーム抽象化）で十分な汎用ナビゲーション
 // アイコン（戻る・⋮・検索等）はそちらを使い、DesignIconはデザインとのピクセル一致が必要な
 // ⋮メニュー内アイコンなど限定的な用途にのみ使う。未使用のパスを増やさないよう使う分だけ追加する。
+const EXPAND_MORE_PATH =
+  'M480-362q-8 0-15-2.5t-13-8.5L268-557q-11-11-11-28t11-28q11-11 28-11t28 11l156 156 156-156q11-11 28-11t28 11q11 11 11 28t-11 28L508-373q-6 6-13 8.5t-15 2.5Z';
+
 const ICONS = {
   edit: {
     viewBox: '0 -960 960 960',
@@ -52,7 +58,16 @@ const ICONS = {
   },
   'expand-more': {
     viewBox: '0 -960 960 960',
-    d: 'M480-362q-8 0-15-2.5t-13-8.5L268-557q-11-11-11-28t11-28q11-11 28-11t28 11l156 156 156-156q11-11 28-11t28 11q11 11 11 28t-11 28L508-373q-6 6-13 8.5t-15 2.5Z',
+    d: EXPAND_MORE_PATH,
+  },
+  // Material Symbolsのchevron_rightはexpand_more（下向き）と同じ字形を反時計回りに90度
+  // 回したもの。同じパスを二重に持つとどちらかだけ直したときにズレるため、回転で作る。
+  // IconSymbolのchevron.rightと違い、iOS/Androidで同じ字形になり、デザイン案が使っている
+  // Material Symbolsとも字送り（em枠に対する矢印の大きさ）が一致する
+  'chevron-right': {
+    viewBox: '0 -960 960 960',
+    d: EXPAND_MORE_PATH,
+    rotate: -90,
   },
   'expand-less': {
     viewBox: '0 -960 960 960',
@@ -128,10 +143,17 @@ export function DesignIcon({
   color: string;
   style?: StyleProp<ViewStyle>;
 }) {
-  const icon = ICONS[name];
+  const icon: { viewBox: string; d: string; rotate?: number } = ICONS[name];
+  const path = <Path d={icon.d} fill={color} />;
   return (
     <Svg width={size} height={size} viewBox={icon.viewBox} style={style}>
-      <Path d={icon.d} fill={color} />
+      {icon.rotate == null ? (
+        path
+      ) : (
+        <G rotation={icon.rotate} origin={VIEW_BOX_CENTER}>
+          {path}
+        </G>
+      )}
     </Svg>
   );
 }

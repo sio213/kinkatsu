@@ -1,4 +1,4 @@
-import { IconSymbol } from '@/components/ui/icon-symbol';
+import { DesignIcon } from '@/components/ui/design-icon';
 import { RecordSummaryCard } from '@/components/workout/record-summary-card';
 import { Colors, IconSizes } from '@/constants/theme';
 import type { MeasurementType } from '@/lib/exercises/constants';
@@ -41,7 +41,7 @@ export const ExerciseRecordCard = memo(function ExerciseRecordCard({
         // 非テキストUIのコントラスト比3:1を満たすため textPlaceholder(slate400) ではなく
         // textSecondary(slate600) を使う（デザイン案の指定）
         <View style={styles.chevron}>
-          <IconSymbol name="chevron.right" size={IconSizes.cardChevron} color={Colors.textSecondary} />
+          <DesignIcon name="chevron-right" size={IconSizes.cardChevron} color={Colors.textSecondary} />
         </View>
       }
     />

@@ -1,6 +1,6 @@
 import { CategoryChip } from '@/components/exercises/category-chip';
 import { ExerciseThumbnail } from '@/components/exercises/exercise-thumbnail';
-import { IconSymbol } from '@/components/ui/icon-symbol';
+import { DesignIcon } from '@/components/ui/design-icon';
 import { Colors, IconSizes, Typography } from '@/constants/theme';
 import type { Exercise } from '@/db/schema';
 import { memo, useCallback } from 'react';
@@ -51,7 +51,7 @@ export const ExerciseCard = memo(function ExerciseCard({
           {localFav ? '★' : '☆'}
         </Text>
       </TouchableOpacity>
-      <IconSymbol name="chevron.right" size={IconSizes.cardChevron} color={Colors.textSecondary} />
+      <DesignIcon name="chevron-right" size={IconSizes.cardChevron} color={Colors.textSecondary} />
     </TouchableOpacity>
   );
 });

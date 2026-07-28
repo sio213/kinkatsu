@@ -1,6 +1,6 @@
 import { CategoryChip } from '@/components/exercises/category-chip';
 import { ExerciseThumbnail } from '@/components/exercises/exercise-thumbnail';
-import { IconSymbol } from '@/components/ui/icon-symbol';
+import { DesignIcon } from '@/components/ui/design-icon';
 import { Colors, IconSizes, Typography } from '@/constants/theme';
 import { getCategoryLabel, resolveMeasurementType } from '@/lib/exercises/constants';
 import { getExerciseImages } from '@/lib/exercises/images';
@@ -37,7 +37,7 @@ export const RoutineExerciseRow = memo(function RoutineExerciseRow({ exercise, o
           <Text style={styles.setsSummary} numberOfLines={1}>{setsSummary}</Text>
         </View>
       </View>
-      <IconSymbol name="chevron.right" size={IconSizes.cardChevron} color={Colors.textSecondary} />
+      <DesignIcon name="chevron-right" size={IconSizes.cardChevron} color={Colors.textSecondary} />
     </TouchableOpacity>
   );
 });

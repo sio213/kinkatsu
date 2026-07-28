@@ -1,5 +1,5 @@
 import { ExerciseRecordCard } from '@/components/exercises/exercise-record-card';
-import { IconSymbol } from '@/components/ui/icon-symbol';
+import { DesignIcon } from '@/components/ui/design-icon';
 import { RecordListHeading } from '@/components/workout/record-list-heading';
 import { Colors, IconSizes, Typography } from '@/constants/theme';
 import type { MeasurementType } from '@/lib/exercises/constants';
@@ -67,7 +67,7 @@ export function ExerciseRecordHistoryList({
           accessibilityLabel={`この種目のすべての記録（全${points.length}件）を見る`}
         >
           <Text style={styles.seeAllText}>すべての記録を見る</Text>
-          <IconSymbol name="chevron.right" size={IconSizes.inlineChevron} color={Colors.accent} />
+          <DesignIcon name="chevron-right" size={IconSizes.inlineChevron} color={Colors.accent} />
         </TouchableOpacity>
       )}
     </View>

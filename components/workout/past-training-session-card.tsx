@@ -1,5 +1,5 @@
 import { CategoryChip } from '@/components/exercises/category-chip';
-import { IconSymbol } from '@/components/ui/icon-symbol';
+import { DesignIcon } from '@/components/ui/design-icon';
 import { Colors, IconSizes, Typography } from '@/constants/theme';
 import { getCategoryLabel } from '@/lib/exercises/constants';
 import { pickPrimaryCategory, type PastTrainingSession } from '@/lib/workout/history';
@@ -63,7 +63,7 @@ export const PastTrainingSessionCard = memo(function PastTrainingSessionCard({
           {exerciseNamesLabel}
         </Text>
       </View>
-      <IconSymbol name="chevron.right" size={IconSizes.cardChevron} color={Colors.textSecondary} />
+      <DesignIcon name="chevron-right" size={IconSizes.cardChevron} color={Colors.textSecondary} />
     </TouchableOpacity>
   );
 });
