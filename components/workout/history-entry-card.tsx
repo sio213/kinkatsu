@@ -1,11 +1,11 @@
-import { BestBadge } from '@/components/workout/best-badge';
 import { DesignIcon } from '@/components/ui/design-icon';
+import { RecordSummaryCard } from '@/components/workout/record-summary-card';
 import { Colors, Typography } from '@/constants/theme';
 import type { HistoryEntry } from '@/lib/workout/history';
 import { formatHistorySetSummary, type SetColumn } from '@/lib/workout/set-format';
 import { formatRelativeDaysAgo, formatSessionDateGroup } from '@/lib/workout/summary';
 import { memo } from 'react';
-import { ActivityIndicator, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
+import { ActivityIndicator, StyleSheet, Text, TouchableOpacity } from 'react-native';
 
 type Props = {
   entry: HistoryEntry;
@@ -18,6 +18,8 @@ type Props = {
   onLoad: (entry: HistoryEntry) => void;
 };
 
+// 「過去の記録から読み込み」画面のカード。カードの箱と情報表示はRecordSummaryCardに共通化してあり、
+// ここは右端の「読み込む」ボタンだけを足している（種目詳細の過去記録一覧はchevronを足す）
 export const HistoryEntryCard = memo(function HistoryEntryCard({
   entry,
   columns,
@@ -27,27 +29,14 @@ export const HistoryEntryCard = memo(function HistoryEntryCard({
   onLoad,
 }: Props) {
   const dateLabel = formatSessionDateGroup(entry.startedAt);
-  const relativeLabel = formatRelativeDaysAgo(entry.startedAt);
-  const summary = formatHistorySetSummary(columns, entry.sets);
-  // VoiceOver/TalkBackで日付・相対日付・自己ベスト・要約がバラバラに読み上げられないよう、
-  // ボタン以外の情報表示部分は1つの読み上げ単位にまとめる
-  const infoLabel = [dateLabel, relativeLabel, isBest ? '自己ベスト' : null, summary]
-    .filter(Boolean)
-    .join('、');
 
   return (
-    <View style={styles.card}>
-      <View style={styles.topRow}>
-        <View style={styles.info} accessible accessibilityLabel={infoLabel}>
-          <View style={styles.dateRow}>
-            <Text style={styles.date}>{dateLabel}</Text>
-            {relativeLabel && <Text style={styles.relative}>{relativeLabel}</Text>}
-            {isBest && <BestBadge />}
-          </View>
-          <Text style={styles.summary} numberOfLines={1}>
-            {summary}
-          </Text>
-        </View>
+    <RecordSummaryCard
+      dateLabel={dateLabel}
+      relativeLabel={formatRelativeDaysAgo(entry.startedAt)}
+      summary={formatHistorySetSummary(columns, entry.sets)}
+      isBest={isBest}
+      trailing={
         <TouchableOpacity
           style={[styles.loadButton, disabled && styles.loadButtonDisabled]}
           onPress={() => onLoad(entry)}
@@ -64,24 +53,12 @@ export const HistoryEntryCard = memo(function HistoryEntryCard({
           )}
           <Text style={styles.loadButtonText}>読み込む</Text>
         </TouchableOpacity>
-      </View>
-    </View>
+      }
+    />
   );
 });
 
 const styles = StyleSheet.create({
-  card: {
-    backgroundColor: Colors.surfaceMuted,
-    borderWidth: 1,
-    borderColor: Colors.border,
-    borderRadius: 10,
-    padding: 12,
-  },
-  topRow: { flexDirection: 'row', alignItems: 'flex-start', justifyContent: 'space-between', gap: 8 },
-  info: { flex: 1, gap: 6 },
-  dateRow: { flexDirection: 'row', alignItems: 'center', gap: 6, flexWrap: 'wrap' },
-  date: { ...Typography.cardTitle, color: Colors.textPrimary },
-  relative: { ...Typography.caption, color: Colors.textMuted },
   loadButton: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -93,5 +70,4 @@ const styles = StyleSheet.create({
   },
   loadButtonDisabled: { backgroundColor: Colors.textPlaceholder },
   loadButtonText: { ...Typography.footnote, fontWeight: '700', color: Colors.onAccent },
-  summary: { ...Typography.footnote, color: Colors.textMuted },
 });

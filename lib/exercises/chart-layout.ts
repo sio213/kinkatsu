@@ -1,5 +1,5 @@
 import { computeChartScale, formatTickValue, type ChartScale } from '@/lib/exercises/chart-scale';
-import type { ProgressPoint, ProgressUnit } from '@/lib/exercises/progress';
+import { findBestIndex, type ProgressPoint, type ProgressUnit } from '@/lib/exercises/progress';
 
 /**
  * 重量グラフの座標計算。SVGの描画そのもの（exercise-progress-chart.tsx）から切り離して
@@ -74,19 +74,6 @@ export type ChartLayout = {
   /** X軸ラベル（位置と文字列） */
   xTicks: { x: number; label: string; anchor: 'start' | 'middle' | 'end' }[];
 };
-
-/**
- * 自己ベストの添字。同じ値が複数回あるときは最初に到達した回に付ける
- * （computePersonalBestIds が「後からタイしただけの日ではなく最初に達成した日」を選ぶのと同じ）
- */
-export function findBestIndex(points: ProgressPoint[]): number | null {
-  if (points.length === 0) return null;
-  let best = 0;
-  for (let i = 1; i < points.length; i++) {
-    if (points[i].value > points[best].value) best = i;
-  }
-  return best;
-}
 
 /**
  * マーカーを描く点の添字。線は常に全点で描くが、マーカーは平均間隔に応じて間引く。

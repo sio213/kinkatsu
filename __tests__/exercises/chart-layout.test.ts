@@ -2,7 +2,6 @@ import {
   CHART_HEIGHT,
   computeChartLayout,
   estimateTextWidth,
-  findBestIndex,
   findNearestPointIndex,
   formatTooltipDate,
   pickMarkerIndices,
@@ -166,18 +165,6 @@ describe('マーカーの間引き', () => {
 });
 
 describe('自己ベスト', () => {
-  test('最大値の点を選ぶ', () => {
-    expect(findBestIndex(makePoints([60, 75, 70]))).toBe(1);
-  });
-
-  test('同じ値が複数回あるときは最初に到達した回に付ける', () => {
-    expect(findBestIndex(makePoints([60, 75, 70, 75]))).toBe(1);
-  });
-
-  test('点が無ければnull', () => {
-    expect(findBestIndex([])).toBeNull();
-  });
-
   test('マーカーが間引かれても、ベストの点は描画対象として残る', () => {
     const layout = computeChartLayout(makePoints(new Array(52).fill(60).concat([80]), 3), KG, WIDTH);
     expect(layout.markerIndices).toEqual([]);
