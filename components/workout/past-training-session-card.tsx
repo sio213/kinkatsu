@@ -1,5 +1,6 @@
 import { CategoryChip } from '@/components/exercises/category-chip';
-import { Colors, Typography } from '@/constants/theme';
+import { IconSymbol } from '@/components/ui/icon-symbol';
+import { Colors, IconSizes, Typography } from '@/constants/theme';
 import { getCategoryLabel } from '@/lib/exercises/constants';
 import { pickPrimaryCategory, type PastTrainingSession } from '@/lib/workout/history';
 import { formatRelativeDaysAgo, formatSessionDateGroup } from '@/lib/workout/summary';
@@ -62,7 +63,7 @@ export const PastTrainingSessionCard = memo(function PastTrainingSessionCard({
           {exerciseNamesLabel}
         </Text>
       </View>
-      <Text style={styles.chevron}>›</Text>
+      <IconSymbol name="chevron.right" size={IconSizes.cardChevron} color={Colors.textSecondary} />
     </TouchableOpacity>
   );
 });
@@ -84,5 +85,4 @@ const styles = StyleSheet.create({
   date: { ...Typography.cardTitle, color: Colors.textPrimary },
   relative: { ...Typography.caption, color: Colors.textMuted },
   exercises: { ...Typography.footnote, color: Colors.textMuted },
-  chevron: { fontSize: 20, color: Colors.textPlaceholder, fontWeight: '600' },
 });

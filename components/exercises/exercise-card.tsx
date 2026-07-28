@@ -1,6 +1,7 @@
 import { CategoryChip } from '@/components/exercises/category-chip';
 import { ExerciseThumbnail } from '@/components/exercises/exercise-thumbnail';
-import { Colors, Typography } from '@/constants/theme';
+import { IconSymbol } from '@/components/ui/icon-symbol';
+import { Colors, IconSizes, Typography } from '@/constants/theme';
 import type { Exercise } from '@/db/schema';
 import { memo, useCallback } from 'react';
 import { StyleSheet, Text, TouchableOpacity, View } from 'react-native';
@@ -50,7 +51,7 @@ export const ExerciseCard = memo(function ExerciseCard({
           {localFav ? '★' : '☆'}
         </Text>
       </TouchableOpacity>
-      <Text style={styles.chevron}>›</Text>
+      <IconSymbol name="chevron.right" size={IconSizes.cardChevron} color={Colors.textSecondary} />
     </TouchableOpacity>
   );
 });
@@ -73,5 +74,4 @@ const styles = StyleSheet.create({
   star: { fontSize: 20, color: Colors.borderStrong },
   starActive: { color: Colors.favorite },
 
-  chevron: { fontSize: 20, color: Colors.textPlaceholder, fontWeight: '600' },
 });

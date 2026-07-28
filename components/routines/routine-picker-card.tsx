@@ -1,5 +1,6 @@
 import { CategoryChip } from '@/components/exercises/category-chip';
-import { Colors, Typography } from '@/constants/theme';
+import { IconSymbol } from '@/components/ui/icon-symbol';
+import { Colors, IconSizes, Typography } from '@/constants/theme';
 import { getCategoryLabel } from '@/lib/exercises/constants';
 import { summarizeCategories } from '@/lib/routines/format';
 import { memo, useCallback } from 'react';
@@ -63,7 +64,7 @@ export const RoutinePickerCard = memo(function RoutinePickerCard({
           <Text style={styles.exerciseCount}>{exerciseCount}種目</Text>
         </View>
       </View>
-      <Text style={styles.chevron}>›</Text>
+      <IconSymbol name="chevron.right" size={IconSizes.cardChevron} color={Colors.textSecondary} />
     </TouchableOpacity>
   );
 });
@@ -85,5 +86,4 @@ const styles = StyleSheet.create({
   meta: { flexDirection: 'row', alignItems: 'center', gap: 7, flexWrap: 'wrap' },
   exerciseCount: { ...Typography.caption, fontWeight: '600', color: Colors.textMuted },
   overflow: { ...Typography.caption, fontWeight: '700', color: Colors.textPlaceholder },
-  chevron: { fontSize: 20, color: Colors.textPlaceholder, fontWeight: '600' },
 });

@@ -132,7 +132,7 @@ test('カードをタップするとsessionを渡してonPressを呼ぶ', () => 
 
 test('右端に遷移を示すchevronを表示する', () => {
   const { root } = render();
-  expect(root.findAllByType(Text).some((t) => t.props.children === '›')).toBe(true);
+  expect(root.findAllByProps({ name: 'chevron.right' }).length).toBeGreaterThan(0);
 });
 
 test('開始時刻は表示しない', () => {

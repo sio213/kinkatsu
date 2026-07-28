@@ -1,6 +1,6 @@
 import { DesignIcon } from '@/components/ui/design-icon';
 import { IconSymbol } from '@/components/ui/icon-symbol';
-import { Colors, Typography } from '@/constants/theme';
+import { Colors, IconSizes, Typography } from '@/constants/theme';
 import type { MeasurementType } from '@/lib/exercises/constants';
 import type { ProgressPoint } from '@/lib/exercises/progress';
 import {
@@ -128,7 +128,7 @@ export function ExerciseRecordDetailCard({
         <View style={styles.headerSpacer} />
         {/* 非テキストUIのコントラスト比3:1を満たすため textPlaceholder(slate400) ではなく
             textSecondary(slate600) を使う（デザイン案の指定） */}
-        <IconSymbol name="chevron.right" size={19} color={Colors.textSecondary} />
+        <IconSymbol name="chevron.right" size={IconSizes.cardChevron} color={Colors.textSecondary} />
       </View>
 
       <View style={styles.sets}>

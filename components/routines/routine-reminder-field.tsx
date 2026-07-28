@@ -2,7 +2,7 @@ import { PermissionBanner } from '@/components/reminders/permission-banner';
 import { DesignIcon } from '@/components/ui/design-icon';
 import { IconSymbol } from '@/components/ui/icon-symbol';
 import { Switch } from '@/components/ui/switch';
-import { Colors, Typography } from '@/constants/theme';
+import { Colors, IconSizes, Typography } from '@/constants/theme';
 import { formatNextFire } from '@/lib/notifications/format';
 import type { PermissionState } from '@/lib/notifications/permissions';
 import type { ReminderInput } from '@/lib/notifications/types';
@@ -84,7 +84,7 @@ export function RoutineReminderField({
               <Text style={styles.boxPlaceholderSubtitle}>タップして設定</Text>
             </View>
           )}
-          <IconSymbol name="chevron.right" size={18} color={Colors.textPlaceholder} />
+          <IconSymbol name="chevron.right" size={IconSizes.cardChevron} color={Colors.textSecondary} />
         </TouchableOpacity>
       )}
 

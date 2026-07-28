@@ -1,7 +1,7 @@
 import { ExerciseIdentity } from '@/components/exercises/exercise-identity';
 import { IconSymbol } from '@/components/ui/icon-symbol';
 import { BestBadge } from '@/components/workout/best-badge';
-import { Colors, Typography } from '@/constants/theme';
+import { Colors, IconSizes, Typography } from '@/constants/theme';
 import { resolveMeasurementType, getCategoryLabel } from '@/lib/exercises/constants';
 import { getExerciseImages, type ExerciseImages } from '@/lib/exercises/images';
 import type { SetComparison } from '@/lib/workout/comparison';
@@ -96,7 +96,7 @@ export const CalendarExerciseCard = memo(function CalendarExerciseCard({
           </>
         }
       />
-      <IconSymbol name="chevron.right" size={19} color={Colors.textPlaceholder} />
+      <IconSymbol name="chevron.right" size={IconSizes.cardChevron} color={Colors.textSecondary} />
     </TouchableOpacity>
   );
 });

@@ -40,7 +40,7 @@ test('カードをタップするとonPressを呼ぶ', () => {
 
 test('右端に遷移を示すchevronを表示する（開始ボタン・⋮メニューは持たない）', () => {
   const { root } = render();
-  expect(root.findAllByType(Text).some((t) => t.props.children === '›')).toBe(true);
+  expect(root.findAllByProps({ name: 'chevron.right' }).length).toBeGreaterThan(0);
   // RoutineCardと違い開始ボタン・⋮メニューは持たない読み取り専用カードのため、
   // タップ可能なTouchableOpacityはカード全体1つだけのはず
   expect(root.findAllByType(TouchableOpacity)).toHaveLength(1);

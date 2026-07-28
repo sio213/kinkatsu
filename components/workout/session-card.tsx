@@ -1,4 +1,5 @@
-import { Colors, Typography } from '@/constants/theme';
+import { IconSymbol } from '@/components/ui/icon-symbol';
+import { Colors, IconSizes, Typography } from '@/constants/theme';
 import type { WorkoutSession } from '@/db/schema';
 import { useDebouncedPush } from '@/hooks/use-debounced-push';
 import type { SessionSummary } from '@/lib/workout/summary';
@@ -44,7 +45,7 @@ export const SessionCard = memo(function SessionCard({ session, summary }: Props
           </View>
         </View>
       </View>
-      <Text style={styles.chevron}>›</Text>
+      <IconSymbol name="chevron.right" size={IconSizes.cardChevron} color={Colors.textSecondary} />
     </TouchableOpacity>
   );
 });
@@ -61,7 +62,6 @@ const styles = StyleSheet.create({
     padding: 12,
   },
   content: { flex: 1, gap: 10 },
-  chevron: { fontSize: 20, color: Colors.textPlaceholder, fontWeight: '600' },
   cardRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'baseline' },
   cardTitle: { ...Typography.cardTitle, color: Colors.textPrimary },
   cardDuration: { ...Typography.caption, color: Colors.textPlaceholder },
