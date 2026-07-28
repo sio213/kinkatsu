@@ -1,3 +1,4 @@
+import { ExerciseRecordTab } from '@/components/exercises/exercise-record-tab';
 import { HeaderMenu, type DropdownMenuItem } from '@/components/ui/dropdown-menu';
 import { NotFoundState } from '@/components/ui/not-found-state';
 import { SectionGroup } from '@/components/ui/section-group';
@@ -8,7 +9,7 @@ import { useDebouncedPush } from '@/hooks/use-debounced-push';
 import { useExercise, useExercises } from '@/hooks/use-exercises';
 import { useExerciseRecordCount } from '@/hooks/use-exercise-record-count';
 import { useFavoriteToggle } from '@/hooks/use-favorite-toggle';
-import { getCategoryLabel } from '@/lib/exercises/constants';
+import { getCategoryLabel, resolveMeasurementType } from '@/lib/exercises/constants';
 import { parseFormPoints } from '@/lib/exercises/form-points';
 import { getGuide, type ExerciseGuide } from '@/lib/exercises/guides';
 import { getExerciseImages } from '@/lib/exercises/images';
@@ -330,9 +331,10 @@ export function ExerciseDetailScreen({ insideTabBar = false }: Props) {
               exerciseName={exercise.name}
             />
           ) : (
-            // TODO(重量グラフ): 期間チップ・グラフ・内訳カード・過去の記録一覧を後続PRで載せる。
-            // このプレースホルダは記録タブの中身が入り次第まるごと差し替える
-            <Text style={styles.noGuide}>記録タブの中身は準備中です</Text>
+            <ExerciseRecordTab
+              exerciseId={exercise.id}
+              measurementType={resolveMeasurementType(exercise.measurementType)}
+            />
           )}
         </View>
       </ScrollView>
