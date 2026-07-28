@@ -10,10 +10,12 @@ import {
   parseDurationInput,
   parseIntInput,
   parseNumberInput,
+  splitSetDisplay,
   pickRepresentativeSet,
   splitDurationDisplay,
   summarizeExerciseSets,
   toDisplayValues,
+  type SetFieldKey,
 } from '@/lib/workout/set-format';
 
 function set(weight: number | null, reps: number | null, durationSeconds: number | null = null, distanceMeters: number | null = null) {
@@ -400,5 +402,53 @@ describe('summarizeExerciseSets', () => {
   test('reps計測は単位付きで表示される', () => {
     const sets = [set(null, 10), set(null, 15)];
     expect(summarizeExerciseSets('reps', sets)).toBe('2セット・15回');
+  });
+});
+
+describe('splitSetDisplay（重量グラフの内訳カードのセット行）', () => {
+  const setOf = (values: Partial<Record<SetFieldKey, number | null>>) => ({
+    weight: null,
+    reps: null,
+    durationSeconds: null,
+    distanceMeters: null,
+    ...values,
+  });
+
+  test('重量種目は値と「単位 × 回数」に分かれる', () => {
+    expect(splitSetDisplay(MEASUREMENT_COLUMNS.weight_reps, setOf({ weight: 75, reps: 7 }))).toEqual({
+      value: '75',
+      rest: 'kg × 7',
+    });
+  });
+
+  test('回数種目は単位だけが残る', () => {
+    expect(splitSetDisplay(MEASUREMENT_COLUMNS.reps, setOf({ reps: 16 }))).toEqual({
+      value: '16',
+      rest: '回',
+    });
+  });
+
+  test('時間種目は"分:秒"が自己説明的なので単位を付けない', () => {
+    expect(splitSetDisplay(MEASUREMENT_COLUMNS.time, setOf({ durationSeconds: 90 }))).toEqual({
+      value: '1:30',
+      rest: '',
+    });
+  });
+
+  test('距離種目は距離が主指標で、時間が後ろに続く', () => {
+    expect(
+      splitSetDisplay(MEASUREMENT_COLUMNS.distance_time, setOf({ distanceMeters: 3500, durationSeconds: 1500 })),
+    ).toEqual({ value: '3.5', rest: 'km × 25:00' });
+  });
+
+  test('副指標が未入力なら値と単位だけになる', () => {
+    expect(splitSetDisplay(MEASUREMENT_COLUMNS.weight_reps, setOf({ weight: 60 }))).toEqual({
+      value: '60',
+      rest: 'kg',
+    });
+  });
+
+  test('主指標が未入力ならnull（値として表示できない）', () => {
+    expect(splitSetDisplay(MEASUREMENT_COLUMNS.weight_reps, setOf({ reps: 8 }))).toBeNull();
   });
 });

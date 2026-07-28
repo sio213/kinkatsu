@@ -29,6 +29,7 @@ function makePoints(values: number[], stepDays = 7): ProgressPoint[] {
       reps: 8,
       durationSeconds: null,
       distanceMeters: null,
+      completedAt: 1,
     };
     return {
       dateKey: BASE + i * stepDays * DAY,

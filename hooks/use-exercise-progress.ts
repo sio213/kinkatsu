@@ -2,20 +2,20 @@ import { db } from '@/db/client';
 import { sets, workoutSessionExercises, workoutSessions } from '@/db/schema';
 import type { MeasurementType } from '@/lib/exercises/constants';
 import { buildProgressSeries, type ProgressSeries } from '@/lib/exercises/progress';
-import { and, eq, isNotNull } from 'drizzle-orm';
+import { eq } from 'drizzle-orm';
 import { useLiveQuery } from 'drizzle-orm/expo-sqlite';
 import { useMemo } from 'react';
 
 /**
  * 種目詳細「記録」タブの重量グラフ用の系列を取得する。
  *
- * ✓確定（completedAt が入っている）セットだけを対象にする。進行中セッションのカードも
- * 除外しない——✓を押した時点で保存済みの記録であり、確定した記録と同じ見た目で描くのが
- * 仕様（デザイン案「進行中セッション」）。逆に✓前のセットは含めない。後で外されると
- * 点が下がって「減った」ように見えてしまうため。
+ * 進行中セッションのカードも除外しない——✓を押した時点で保存済みの記録であり、確定した記録と
+ * 同じ見た目で描くのが仕様（デザイン案「進行中セッション」）。getExerciseHistoryEntries
+ * （「過去の記録から読み込み」画面）は進行中セッションを除外するので、そちらとは条件が違う。
  *
- * getExerciseHistoryEntries（「過去の記録から読み込み」画面）は進行中セッションを
- * 除外するので、そちらとは意図的に条件が違う。
+ * ✓未確定のセットも引く。グラフの値・自己ベストには使わない（後で外されると点が下がって
+ * 「減った」ように見えるため）が、内訳カードでは「未実施」として並べる必要があるため。
+ * 値に使うかどうかの絞り込みは buildProgressSeries 側で行う。
  *
  * 1種目あたりの行数は「週4回×5年×3セット」でも数千行に収まる規模なので、SQL側で
  * 日ごとに集計せず全行を引いてJS側（buildProgressSeries）でまとめている。集計をSQLに
@@ -37,11 +37,12 @@ export function useExerciseProgress(
         reps: sets.reps,
         durationSeconds: sets.durationSeconds,
         distanceMeters: sets.distanceMeters,
+        completedAt: sets.completedAt,
       })
       .from(sets)
       .innerJoin(workoutSessionExercises, eq(sets.workoutSessionExerciseId, workoutSessionExercises.id))
       .innerJoin(workoutSessions, eq(workoutSessionExercises.sessionId, workoutSessions.id))
-      .where(and(eq(sets.exerciseId, exerciseId), isNotNull(sets.completedAt)))
+      .where(eq(sets.exerciseId, exerciseId))
       // buildProgressSeriesが「同じ日の最初のセッションの開始時刻」を先勝ちで拾うため、
       // 開始時刻の昇順であることが前提になる
       .orderBy(workoutSessions.startedAt, workoutSessionExercises.id, sets.setNumber),
