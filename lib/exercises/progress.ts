@@ -68,19 +68,29 @@ function displayScale(measurementType: MeasurementType, unit: ProgressUnit): num
 // 系列
 // ---------------------------------------------------------------------------
 
-/** フックが引いてくる1行（✓確定セットのみ。種目・セッションで絞り込み済み） */
+/**
+ * フックが引いてくる1行（種目で絞り込み済み）。✓未確定のセットも含まれる——グラフの値には
+ * 使わないが、内訳カードでは「未実施」として並べるため（デザイン案の進行中セッションの表示）
+ */
 export type ProgressSetRow = SetLike & {
   sessionId: number;
   workoutSessionExerciseId: number;
   startedAt: number;
   setNumber: number;
+  completedAt: number | null;
 };
 
 export type ProgressSet = SetLike & {
   sessionId: number;
   workoutSessionExerciseId: number;
   setNumber: number;
+  /** nullなら✓未確定。グラフの値・自己ベスト・補助情報の集計からは除く */
+  completedAt: number | null;
 };
+
+export function isCompleted(set: ProgressSet): boolean {
+  return set.completedAt != null;
+}
 
 export type ProgressPoint = {
   /** その日の0時0分（端末のローカル時刻）のepoch ms。X軸の位置に使う */
@@ -89,9 +99,12 @@ export type ProgressPoint = {
   startedAt: number;
   /** 縦軸の値。単位は ProgressSeries.unit に従い、換算済み */
   value: number;
-  /** その日のBest Set。ツールチップの補助情報・内訳カードの星の位置に使う */
+  /** その日のBest Set。必ず✓確定セットの中から選ばれる。内訳カードの星の位置にも使う */
   best: ProgressSet;
-  /** その日に記録した全セット。同じ日に同じ種目を複数カードでやっていれば連結される */
+  /**
+   * その日に記録した全セット。同じ日に同じ種目を複数カードでやっていれば連結される。
+   * ✓未確定のセットも含む（内訳カードで「未実施」として並べるため）
+   */
   sets: ProgressSet[];
 };
 
@@ -112,8 +125,9 @@ export function formatProgressAux(unit: ProgressUnit, point: ProgressPoint): str
     case 'duration':
       return point.best.durationSeconds == null ? null : `×${formatHistoryDuration(point.best.durationSeconds)}`;
     case 'sets':
-      // 回数・時間種目はBest Set自体が回数/時間なので、代わりにその日のセット数を出す
-      return `×${point.sets.length}セット`;
+      // 回数・時間種目はBest Set自体が回数/時間なので、代わりにその日のセット数を出す。
+      // 進行中セッションの✓未確定セットは「まだやっていない」ので数えない
+      return `×${point.sets.filter(isCompleted).length}セット`;
     case 'none':
       return null;
   }
@@ -152,6 +166,7 @@ export function buildProgressSeries(
       reps: row.reps,
       durationSeconds: row.durationSeconds,
       distanceMeters: row.distanceMeters,
+      completedAt: row.completedAt,
     };
     if (day) {
       day.sets.push(set);
@@ -188,12 +203,14 @@ export function buildProgressSeries(
 
 // pickRepresentativeSetと同じ判定（主指標が最大、同値なら副指標が大きい方）だが、
 // 同値のセットが複数あるときに「先にやった方」を採るところだけ違う。自己ベストの
-// 「最初に到達した回を採る」（computePersonalBestIds）と揃えるため
+// 「最初に到達した回を採る」（computePersonalBestIds）と揃えるため。
+// ✓未確定のセットは「まだ確認していない値」なので対象外。後で外されると点が下がって
+// 「減った」ように見えてしまう
 function pickBestSet(measurementType: MeasurementType, sets: ProgressSet[]): ProgressSet | null {
   let best: ProgressSet | null = null;
   let bestPrimary = -Infinity;
   let bestSecondary = -Infinity;
-  for (const s of sets) {
+  for (const s of sets.filter(isCompleted)) {
     const primary = primaryMetric(measurementType, s);
     if (primary == null) continue;
     const secondary = secondaryMetric(measurementType, s) ?? -Infinity;

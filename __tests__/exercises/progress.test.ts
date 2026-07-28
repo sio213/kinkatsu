@@ -23,6 +23,8 @@ function row(overrides: RowOverrides): ProgressSetRow {
     reps: null,
     durationSeconds: null,
     distanceMeters: null,
+    // 既定は✓確定済み。未確定のセットを混ぜたいテストだけ completedAt: null を渡す
+    completedAt: overrides.startedAt,
     ...overrides,
   };
 }
@@ -218,6 +220,7 @@ describe('formatProgressAux: ツールチップの補助情報', () => {
     reps: null,
     durationSeconds: null,
     distanceMeters: null,
+    completedAt: 1,
   };
   const point = (best: Partial<ProgressSetRow>, setCount = 3): ProgressPoint => ({
     dateKey: 0,
@@ -255,5 +258,38 @@ describe('formatProgressAux: ツールチップの補助情報', () => {
   test('値が無ければ出さない（「×」だけが残らないように）', () => {
     expect(formatProgressAux(unit('reps'), point({ reps: null }))).toBeNull();
     expect(formatProgressAux(unit('duration'), point({ durationSeconds: null }))).toBeNull();
+  });
+});
+
+describe('進行中セッションの✓未確定セット', () => {
+  test('✓未確定のセットは点の値・Best Setに使わない（後で外されると「減った」ように見えるため）', () => {
+    const day = at(2026, 7, 26);
+    const { points } = buildProgressSeries('weight_reps', [
+      row({ startedAt: day, setNumber: 1, weight: 72.5, reps: 8 }),
+      row({ startedAt: day, setNumber: 2, weight: 77.5, reps: 6 }),
+      // まだ✓を押していないセット。値は入っているが実施済みではない
+      row({ startedAt: day, setNumber: 3, weight: 100, reps: 5, completedAt: null }),
+    ]);
+
+    expect(points[0].value).toBe(77.5);
+    expect(points[0].best.setNumber).toBe(2);
+  });
+
+  test('✓未確定のセットも内訳カード用にsetsへは残す', () => {
+    const day = at(2026, 7, 26);
+    const { points } = buildProgressSeries('weight_reps', [
+      row({ startedAt: day, setNumber: 1, weight: 72.5, reps: 8 }),
+      row({ startedAt: day, setNumber: 2, weight: null, reps: null, completedAt: null }),
+    ]);
+
+    expect(points[0].sets).toHaveLength(2);
+    expect(points[0].sets[1].completedAt).toBeNull();
+  });
+
+  test('✓が1件も無い日は点にしない', () => {
+    const { points } = buildProgressSeries('weight_reps', [
+      row({ startedAt: at(2026, 7, 26), setNumber: 1, weight: 70, reps: 8, completedAt: null }),
+    ]);
+    expect(points).toEqual([]);
   });
 });

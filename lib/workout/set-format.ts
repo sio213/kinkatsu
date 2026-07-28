@@ -195,6 +195,34 @@ export function formatHistorySetSummary(
     .join('・');
 }
 
+// 主指標に添える単位。durationSecondsだけは formatDurationDisplay が "1:30" と自己説明的なので付けない
+const PRIMARY_FIELD_UNITS: Record<SetFieldKey, string> = {
+  weight: 'kg',
+  reps: '回',
+  durationSeconds: '',
+  distanceMeters: 'km',
+};
+
+/**
+ * 重量グラフの内訳カードのセット行用。主指標の数値だけを太字で見せたいので、
+ * 「値」と「単位＋残りの列」を分けて返す（例: 75kg×7 → { value: '75', rest: 'kg × 7' }）。
+ * 主指標が未入力なら null（そのセットは値として表示できない）。
+ * formatHistorySetSummary は1行に詰めた要約用で、こちらは行内で強弱を付けるためのもの
+ */
+export function splitSetDisplay(
+  columns: SetColumn[],
+  set: Partial<Record<SetFieldKey, number | null | undefined>>,
+): { value: string; rest: string } | null {
+  const [primary, ...others] = columns;
+  const value = primary.toDisplay(set[primary.key]);
+  if (value === '') return null;
+  const trailing = others
+    .map((c) => c.toDisplay(set[c.key]))
+    .filter((v) => v !== '')
+    .map((v) => `× ${v}`);
+  return { value, rest: [PRIMARY_FIELD_UNITS[primary.key], ...trailing].filter(Boolean).join(' ') };
+}
+
 export function parseColumnsWithFallback(
   columns: SetColumn[],
   display: Partial<Record<SetFieldKey, string>>,

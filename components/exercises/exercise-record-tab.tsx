@@ -1,6 +1,8 @@
 import { ExerciseProgressChart } from '@/components/exercises/exercise-progress-chart';
+import { ExerciseRecordDetailCard } from '@/components/exercises/exercise-record-detail-card';
 import { PeriodFilterChips } from '@/components/exercises/period-filter-chips';
 import { Colors, Typography } from '@/constants/theme';
+import { useDebouncedPush } from '@/hooks/use-debounced-push';
 import { useExerciseProgress } from '@/hooks/use-exercise-progress';
 import type { MeasurementType } from '@/lib/exercises/constants';
 import {
@@ -21,6 +23,7 @@ type Props = {
  * の順に縦に並ぶ（デザイン案）。現時点では期間チップまで実装済み。
  */
 export function ExerciseRecordTab({ exerciseId, measurementType }: Props) {
+  const push = useDebouncedPush();
   const [period, setPeriod] = useState<ProgressPeriod>(DEFAULT_PROGRESS_PERIOD);
   const { series, loaded, failed } = useExerciseProgress(exerciseId, measurementType);
 
@@ -43,6 +46,15 @@ export function ExerciseRecordTab({ exerciseId, measurementType }: Props) {
     setSelectedDateKey(points[index]?.dateKey ?? null);
   };
 
+  const selectedPoint = selectedIndex == null ? null : points[selectedIndex];
+  // 前回比は「直前の記録」との差なので、期間で絞ったpointsではなく全期間の系列から1つ前を探す
+  // （表示期間の外にあっても直前の記録であることに変わりはない）
+  const previousPoint = useMemo(() => {
+    if (!selectedPoint) return null;
+    const index = series.points.findIndex((p) => p.dateKey === selectedPoint.dateKey);
+    return index > 0 ? series.points[index - 1] : null;
+  }, [series.points, selectedPoint]);
+
   return (
     <View style={styles.container}>
       <PeriodFilterChips value={period} onChange={setPeriod} />
@@ -52,14 +64,26 @@ export function ExerciseRecordTab({ exerciseId, measurementType }: Props) {
       ) : !loaded ? (
         <Text style={styles.placeholder}>読み込み中</Text>
       ) : (
-        // TODO(重量グラフ): 選択中の点の内訳カード・過去の記録一覧を後続PRで載せる。
-        // 記録0件／1件のときの専用表示も後続PRで入れる
-        <ExerciseProgressChart
-          points={points}
-          unit={series.unit}
-          selectedIndex={selectedIndex}
-          onSelect={handleSelect}
-        />
+        <>
+          <ExerciseProgressChart
+            points={points}
+            unit={series.unit}
+            selectedIndex={selectedIndex}
+            onSelect={handleSelect}
+          />
+          {/* TODO(重量グラフ): この下に過去の記録一覧を後続PRで載せる。
+              記録0件／1件のときの専用表示も後続PRで入れる */}
+          {selectedPoint && (
+            <ExerciseRecordDetailCard
+              // 別の日を選んだら「他N件を見る」の展開状態を持ち越さず畳んだ状態から始める
+              key={selectedPoint.dateKey}
+              point={selectedPoint}
+              measurementType={measurementType}
+              previousPoint={previousPoint}
+              onPressOpen={(sessionId) => push(`/workout/${sessionId}`)}
+            />
+          )}
+        </>
       )}
     </View>
   );
