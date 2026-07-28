@@ -38,6 +38,7 @@ const Palette = {
   amber300: '#FCD34D',
   amber500: '#F59E0B',
   amber600: '#D97706',
+  amber700: '#B45309',
   amber800: '#92400E',
 
   red100: '#FEE2E2',
@@ -91,6 +92,12 @@ export const Colors = {
   warningText: Palette.amber800,
   warningSurface: Palette.amber100,
   warningBorder: Palette.amber300,
+
+  // 重量グラフの自己ベスト表現（デザイン案指定）。点のマーカーはamber500の塗り、
+  // プロット内に置く「ベスト ○kg」チップの文字はamber700。BestBadgeが使うwarningText
+  // (amber800)より一段明るく、白地の上での見え方を優先した値
+  chartBest: Palette.amber500,
+  chartBestText: Palette.amber700,
 
   icon: Palette.slate500,
   tabIconDefault: Palette.slate500,

@@ -1,3 +1,4 @@
+import { ExerciseProgressChart } from '@/components/exercises/exercise-progress-chart';
 import { PeriodFilterChips } from '@/components/exercises/period-filter-chips';
 import { Colors, Typography } from '@/constants/theme';
 import { useExerciseProgress } from '@/hooks/use-exercise-progress';
@@ -33,15 +34,15 @@ export function ExerciseRecordTab({ exerciseId, measurementType }: Props) {
     <View style={styles.container}>
       <PeriodFilterChips value={period} onChange={setPeriod} />
 
-      {/* TODO(重量グラフ): グラフ・内訳カード・過去の記録一覧を後続PRで載せる。
-          この暫定表示は系列が正しく組めているか確認するためのもので、まるごと差し替える */}
-      <Text style={styles.placeholder}>
-        {failed
-          ? '記録を読み込めませんでした'
-          : !loaded
-            ? '読み込み中'
-            : `この期間 ${points.length}点 / 全 ${series.points.length}点（単位: ${series.unit.label}）`}
-      </Text>
+      {failed ? (
+        <Text style={styles.placeholder}>記録を読み込めませんでした</Text>
+      ) : !loaded ? (
+        <Text style={styles.placeholder}>読み込み中</Text>
+      ) : (
+        // TODO(重量グラフ): 点の選択・内訳カード・過去の記録一覧を後続PRで載せる。
+        // 記録0件／1件のときの専用表示も後続PRで入れる
+        <ExerciseProgressChart points={points} unit={series.unit} />
+      )}
     </View>
   );
 }
