@@ -2,6 +2,7 @@ import {
   buildProgressSeries,
   DEFAULT_PROGRESS_PERIOD,
   filterProgressPoints,
+  findBestIndex,
   formatProgressAux,
   progressPeriodStart,
   toDayKey,
@@ -291,5 +292,25 @@ describe('進行中セッションの✓未確定セット', () => {
       row({ startedAt: at(2026, 7, 26), setNumber: 1, weight: 70, reps: 8, completedAt: null }),
     ]);
     expect(points).toEqual([]);
+  });
+});
+
+describe('findBestIndex', () => {
+  const points = (values: number[]) =>
+    buildProgressSeries(
+      'weight_reps',
+      values.map((weight, i) => row({ startedAt: at(2026, 5, i + 1), setNumber: 1, weight, reps: 8 })),
+    ).points;
+
+  test('最大値の点を選ぶ', () => {
+    expect(findBestIndex(points([60, 75, 70]))).toBe(1);
+  });
+
+  test('同じ値が複数回あるときは最初に到達した回に付ける（後からタイしただけの日は選ばない）', () => {
+    expect(findBestIndex(points([60, 75, 70, 75]))).toBe(1);
+  });
+
+  test('点が無ければnull', () => {
+    expect(findBestIndex([])).toBeNull();
   });
 });

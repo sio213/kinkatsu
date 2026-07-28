@@ -1,0 +1,90 @@
+import { ExerciseRecordCard } from '@/components/exercises/exercise-record-card';
+import { IconSymbol } from '@/components/ui/icon-symbol';
+import { Colors, Typography } from '@/constants/theme';
+import type { MeasurementType } from '@/lib/exercises/constants';
+import { findBestIndex, type ProgressPoint } from '@/lib/exercises/progress';
+import { useMemo } from 'react';
+import { StyleSheet, Text, TouchableOpacity, View } from 'react-native';
+
+/** 一覧に固定で出す件数 */
+export const RECENT_RECORD_COUNT = 3;
+
+type Props = {
+  /** 全期間の系列（古い順）。期間チップで絞る前のもの */
+  points: ProgressPoint[];
+  measurementType: MeasurementType;
+  onPressRecord: (sessionId: number) => void;
+  onPressSeeAll: () => void;
+};
+
+/**
+ * グラフ・内訳カードの下に置く「過去の記録」一覧。
+ *
+ * 今日から見た直近3件を固定で出し、グラフで選択中の点には連動させない。連動させると点を
+ * タップするたびに一覧が入れ替わり、参照点として機能しなくなるため（選択中の回の詳細は
+ * 真上の内訳カードが担うので情報は失われない）。期間チップにも連動させない。
+ */
+export function ExerciseRecordHistoryList({
+  points,
+  measurementType,
+  onPressRecord,
+  onPressSeeAll,
+}: Props) {
+  const bestIndex = useMemo(() => findBestIndex(points), [points]);
+  // 新しい順に3件
+  const recent = useMemo(
+    () =>
+      points
+        .map((point, index) => ({ point, index }))
+        .slice(-RECENT_RECORD_COUNT)
+        .reverse(),
+    [points],
+  );
+
+  return (
+    <View style={styles.container}>
+      <View style={styles.heading}>
+        <Text style={styles.headingText}>過去の記録</Text>
+        <Text style={styles.count}>全{points.length}件</Text>
+      </View>
+
+      <View style={styles.cards}>
+        {recent.map(({ point, index }) => (
+          <ExerciseRecordCard
+            key={point.dateKey}
+            point={point}
+            measurementType={measurementType}
+            isBest={index === bestIndex}
+            onPress={onPressRecord}
+          />
+        ))}
+      </View>
+
+      {/* 3件以下ならリンクを出しても同じ一覧が出るだけなので出さない */}
+      {points.length > RECENT_RECORD_COUNT && (
+        <TouchableOpacity
+          style={styles.seeAll}
+          onPress={onPressSeeAll}
+          accessibilityRole="button"
+          accessibilityLabel={`この種目のすべての記録（全${points.length}件）を見る`}
+        >
+          <Text style={styles.seeAllText}>すべての記録を見る</Text>
+          <IconSymbol name="chevron.right" size={16} color={Colors.accent} />
+        </TouchableOpacity>
+      )}
+    </View>
+  );
+}
+
+const styles = StyleSheet.create({
+  container: { gap: 8 },
+  // 右の余白はカードの内側パディング(12px)＋枠(1px)ぶん。件数の右端と、下のカードのchevronの
+  // 縦のラインを揃えるため
+  heading: { flexDirection: 'row', alignItems: 'baseline', gap: 6, paddingRight: 13 },
+  headingText: { ...Typography.caption, fontWeight: '700', color: Colors.textSecondary },
+  count: { marginLeft: 'auto', ...Typography.caption, color: Colors.textMuted },
+  cards: { gap: 8 },
+  // 面も枠も持たないテキストリンク。カードと同列の選択肢に見えないようにする
+  seeAll: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 4, paddingVertical: 9 },
+  seeAllText: { ...Typography.caption, fontWeight: '600', color: Colors.accent },
+});

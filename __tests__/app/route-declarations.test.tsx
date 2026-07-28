@@ -140,8 +140,12 @@ describe('app/(tabs)/(library)/_layout.tsx の宣言と実ファイルの整合'
   const libraryStack = renderLayout('@/app/(tabs)/(library)/_layout', 'Stack');
   const libraryDir = path.join(appDir, '(tabs)', '(library)');
 
-  test('種目タブ配下は一覧と詳細の2画面', () => {
-    expect(libraryStack.getNames()).toEqual(['exercises/index', 'exercises/[id]']);
+  test('種目タブ配下は一覧・詳細・その種目の過去の記録の3画面', () => {
+    expect(libraryStack.getNames()).toEqual([
+      'exercises/index',
+      'exercises/[id]',
+      'exercises/history/[id]',
+    ]);
   });
 
   test('宣言されたnameは全て実ファイルとして存在する', () => {
@@ -152,6 +156,25 @@ describe('app/(tabs)/(library)/_layout.tsx の宣言と実ファイルの整合'
 
   test('ディープリンク時の戻る導線のためanchorが一覧に設定されている', () => {
     expect(libraryStack.unstableSettings?.anchor).toBe('exercises/index');
+  });
+});
+
+describe('その種目の「過去の記録」も2箇所からマウントされる（種目詳細と同じ理由）', () => {
+  test('タブ配下版とルートStack版の両方の経路が存在し、実体は共有コンポーネント', () => {
+    const inTab = path.join(appDir, '(tabs)', '(library)', 'exercises', 'history', '[id].tsx');
+    const inRoot = path.join(appDir, 'exercise', 'history', '[id].tsx');
+    expect({ inTab: fs.existsSync(inTab), inRoot: fs.existsSync(inRoot) }).toEqual({
+      inTab: true,
+      inRoot: true,
+    });
+
+    const shared = 'components/exercises/exercise-history-screen';
+    for (const file of [inTab, inRoot]) {
+      expect({ file, usesShared: fs.readFileSync(file, 'utf8').includes(shared) }).toEqual({
+        file,
+        usesShared: true,
+      });
+    }
   });
 });
 

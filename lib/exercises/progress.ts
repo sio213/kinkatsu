@@ -229,6 +229,20 @@ function resolveUnit(measurementType: MeasurementType, rawValues: number[]): Pro
   return max >= MINUTE_SWITCH_SECONDS ? MINUTES_UNIT : SECONDS_UNIT;
 }
 
+/**
+ * 自己ベストの点の添字。同じ値が複数回あるときは最初に到達した回に付ける
+ * （computePersonalBestIds が「後からタイしただけの日ではなく最初に達成した日」を選ぶのと同じ）。
+ * グラフのアンバーの点と、過去の記録一覧のベストバッジで同じ判定を使う
+ */
+export function findBestIndex(points: ProgressPoint[]): number | null {
+  if (points.length === 0) return null;
+  let best = 0;
+  for (let i = 1; i < points.length; i++) {
+    if (points[i].value > points[best].value) best = i;
+  }
+  return best;
+}
+
 // ---------------------------------------------------------------------------
 // 期間
 // ---------------------------------------------------------------------------

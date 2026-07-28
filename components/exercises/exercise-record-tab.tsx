@@ -1,5 +1,6 @@
 import { ExerciseProgressChart } from '@/components/exercises/exercise-progress-chart';
 import { ExerciseRecordDetailCard } from '@/components/exercises/exercise-record-detail-card';
+import { ExerciseRecordHistoryList } from '@/components/exercises/exercise-record-history-list';
 import { PeriodFilterChips } from '@/components/exercises/period-filter-chips';
 import { Colors, Typography } from '@/constants/theme';
 import { useDebouncedPush } from '@/hooks/use-debounced-push';
@@ -16,13 +17,18 @@ import { StyleSheet, Text, View } from 'react-native';
 type Props = {
   exerciseId: number;
   measurementType: MeasurementType;
+  /**
+   * 種目詳細がタブ配下のStack（/exercises/[id]）から表示されているか。
+   * 「すべての記録を見る」の遷移先をタブバーありのURLにするかどうかの判断に使う
+   */
+  insideTabBar: boolean;
 };
 
 /**
  * 種目詳細「記録」タブの中身。期間チップ → グラフ → 選択中の内訳カード → 過去の記録一覧、
- * の順に縦に並ぶ（デザイン案）。現時点では期間チップまで実装済み。
+ * の順に縦に並ぶ（デザイン案）。記録0件／1件のときの専用表示だけ未実装。
  */
-export function ExerciseRecordTab({ exerciseId, measurementType }: Props) {
+export function ExerciseRecordTab({ exerciseId, measurementType, insideTabBar }: Props) {
   const push = useDebouncedPush();
   const [period, setPeriod] = useState<ProgressPeriod>(DEFAULT_PROGRESS_PERIOD);
   const { series, loaded, failed } = useExerciseProgress(exerciseId, measurementType);
@@ -71,8 +77,7 @@ export function ExerciseRecordTab({ exerciseId, measurementType }: Props) {
             selectedIndex={selectedIndex}
             onSelect={handleSelect}
           />
-          {/* TODO(重量グラフ): この下に過去の記録一覧を後続PRで載せる。
-              記録0件／1件のときの専用表示も後続PRで入れる */}
+          {/* TODO(重量グラフ): 記録0件／1件のときの専用表示を後続PRで入れる */}
           {selectedPoint && (
             <ExerciseRecordDetailCard
               // 別の日を選んだら「他N件を見る」の展開状態を持ち越さず畳んだ状態から始める
@@ -81,6 +86,19 @@ export function ExerciseRecordTab({ exerciseId, measurementType }: Props) {
               measurementType={measurementType}
               previousPoint={previousPoint}
               onPressOpen={(sessionId) => push(`/workout/${sessionId}`)}
+            />
+          )}
+
+          {/* 記録が1件だけのときは、真上の内訳カードと同じ内容が並ぶだけなので出さない。
+              一覧は期間チップにも選択中の点にも連動させず、常に今日から見た直近3件 */}
+          {series.points.length > 1 && (
+            <ExerciseRecordHistoryList
+              points={series.points}
+              measurementType={measurementType}
+              onPressRecord={(sessionId) => push(`/workout/${sessionId}`)}
+              onPressSeeAll={() =>
+                push(insideTabBar ? `/exercises/history/${exerciseId}` : `/exercise/history/${exerciseId}`)
+              }
             />
           )}
         </>

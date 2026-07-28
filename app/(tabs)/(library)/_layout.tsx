@@ -8,8 +8,9 @@ import { Stack } from 'expo-router';
 export const unstable_settings = { anchor: 'exercises/index' };
 
 /**
- * 種目タブ配下のStack。種目一覧（/exercises）と種目詳細（/exercises/[id]）を持つ。
- * どちらも「閲覧・ドリルダウン」なのでタブバーを出したままにする
+ * 種目タブ配下のStack。種目一覧（/exercises）・種目詳細（/exercises/[id]）・その種目の
+ * 過去の記録一覧（/exercises/history/[id]）を持つ。いずれも「閲覧・ドリルダウン」なので
+ * タブバーを出したままにする
  * （CLAUDE.md「ナビゲーション・タブバーの表示範囲」）。
  *
  * 種目詳細の実体と、2つのURLがある理由は components/exercises/exercise-detail-screen.tsx を参照。
@@ -30,6 +31,8 @@ export default function LibraryStackLayout() {
       <Stack.Screen name="exercises/index" options={{ title: '種目ライブラリ' }} />
       {/* タイトルは種目名を動的に出すため画面側でStack.Screen optionsを上書きする */}
       <Stack.Screen name="exercises/[id]" options={{ title: '' }} />
+      {/* タイトルはHeaderTitleで種目名つきに差し替えるため画面側で上書きする */}
+      <Stack.Screen name="exercises/history/[id]" options={{ title: '' }} />
     </Stack>
   );
 }
