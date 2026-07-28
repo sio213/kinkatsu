@@ -6,6 +6,7 @@ const mockRemoveExercise = jest.fn();
 const mockPlayerPlay = jest.fn();
 const mockPlayerPause = jest.fn();
 const mockUseExerciseRecordCount = jest.fn();
+const mockUseExerciseProgress = jest.fn();
 
 jest.mock('expo-router', () => ({
   useRouter: () => ({ push: mockPush, back: mockBack }),
@@ -32,9 +33,14 @@ jest.mock('@/hooks/use-exercises', () => ({
   }),
 }));
 
-// 記録件数はdb/client（expo-sqlite）に触るため、useExercisesと同じ流儀でフックごと差し替える
+// 記録件数・グラフの系列はdb/client（expo-sqlite）に触るため、useExercisesと同じ流儀で
+// フックごと差し替える
 jest.mock('@/hooks/use-exercise-record-count', () => ({
   useExerciseRecordCount: (...args: unknown[]) => mockUseExerciseRecordCount(...args),
+}));
+
+jest.mock('@/hooks/use-exercise-progress', () => ({
+  useExerciseProgress: (...args: unknown[]) => mockUseExerciseProgress(...args),
 }));
 
 jest.mock('expo-video', () => ({
@@ -111,6 +117,10 @@ beforeEach(() => {
   jest.clearAllMocks();
   // 既存のテストはすべて解説タブの中身を見るため、既定は「記録0件＝解説タブが初期表示」にしておく
   mockUseExerciseRecordCount.mockReturnValue({ count: 0, loaded: true });
+  mockUseExerciseProgress.mockReturnValue({
+    series: { unit: { label: 'kg', step: 5, minRange: 10, auxKind: 'reps' }, points: [] },
+    loaded: true,
+  });
   mockToggleFavorite.mockResolvedValue(undefined);
   mockRemoveExercise.mockResolvedValue(undefined);
   jest.spyOn(Alert, 'alert').mockImplementation(() => {});
@@ -320,12 +330,14 @@ describe('記録／解説タブ', () => {
     expect(allTexts(root)).toContain('使う筋肉');
   });
 
-  test('記録1件以上のときは記録タブが初期表示になる', () => {
+  test('記録1件以上のときは記録タブが初期表示になり、期間チップが出る', () => {
     mockUseExercise.mockReturnValue(presetExercise());
     mockUseExerciseRecordCount.mockReturnValue({ count: 1, loaded: true });
 
     const root = render();
-    expect(allTexts(root)).not.toContain('使う筋肉');
+    const texts = allTexts(root);
+    expect(texts).not.toContain('使う筋肉');
+    expect(texts).toContain('3ヶ月');
   });
 
   test('記録件数がまだ読み込めていないうちは、タブが確定しないので何も描かない', () => {
