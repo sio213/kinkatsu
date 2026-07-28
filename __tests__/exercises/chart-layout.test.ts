@@ -3,9 +3,12 @@ import {
   computeChartLayout,
   estimateTextWidth,
   findBestIndex,
+  findNearestPointIndex,
+  formatTooltipDate,
   pickMarkerIndices,
   pickXTickIndices,
   placeBestChip,
+  placeTooltip,
   starPoints,
 } from '@/lib/exercises/chart-layout';
 import type { ProgressPoint, ProgressUnit } from '@/lib/exercises/progress';
@@ -230,5 +233,93 @@ describe('starPoints', () => {
     expect(points).toHaveLength(10);
     // 先頭の頂点は真上（外接半径ぶん上）
     expect(points[0]).toBe('0.00,-10.00');
+  });
+});
+
+describe('タップ位置から最近傍の点にスナップする', () => {
+  const layout = computeChartLayout(makePoints(S3), KG, WIDTH);
+
+  test('点のちょうど上を押せばその点になる', () => {
+    expect(findNearestPointIndex(layout, layout.points[5].x)).toBe(5);
+  });
+
+  test('点と点の間を押しても、近い方の点にスナップする', () => {
+    const between = (layout.points[5].x + layout.points[6].x) / 2;
+    expect(findNearestPointIndex(layout, between - 3)).toBe(5);
+    expect(findNearestPointIndex(layout, between + 3)).toBe(6);
+  });
+
+  test('プロットの外まで指がはみ出しても両端の点に丸める', () => {
+    expect(findNearestPointIndex(layout, -100)).toBe(0);
+    expect(findNearestPointIndex(layout, WIDTH + 100)).toBe(S3.length - 1);
+  });
+
+  test('点が無ければnull', () => {
+    expect(findNearestPointIndex(computeChartLayout([], KG, WIDTH), 100)).toBeNull();
+  });
+});
+
+describe('ツールチップ', () => {
+  const layout = computeChartLayout(makePoints(S3), KG, WIDTH);
+  const texts = { date: '7/23', value: '75', unit: 'kg', aux: '×7' };
+
+  test('基本は選択中の点の真上に、中央揃えで置く', () => {
+    const tip = placeTooltip(layout, 5, texts, null)!;
+    expect(tip.y + tip.height).toBeLessThan(layout.points[5].y);
+    expect(tip.x + tip.width / 2).toBeCloseTo(layout.points[5].x, 5);
+  });
+
+  test('端の点でもプロットの内側に収める', () => {
+    for (const index of [0, S3.length - 1]) {
+      const tip = placeTooltip(layout, index, texts, null)!;
+      expect(tip.x).toBeGreaterThanOrEqual(layout.left);
+      expect(tip.x + tip.width).toBeLessThanOrEqual(layout.right);
+    }
+  });
+
+  test('補助情報があるぶんだけ横に広がる', () => {
+    const withAux = placeTooltip(layout, 5, texts, null)!;
+    const withoutAux = placeTooltip(layout, 5, { ...texts, aux: null }, null)!;
+    expect(withAux.width).toBeGreaterThan(withoutAux.width);
+  });
+
+  test('ベストチップと重なるときは、上のまま横（右）に逃がす', () => {
+    const index = 5;
+    const natural = placeTooltip(layout, index, texts, null)!;
+    // ちょうど重なる位置にベストチップがある状況を作る
+    const chip = { x: natural.x, y: natural.y, width: 80, height: 19, label: 'ベスト 75kg' };
+    const tip = placeTooltip(layout, index, texts, chip)!;
+    expect(tip.y).toBe(natural.y);
+    expect(tip.x).toBeGreaterThanOrEqual(chip.x + chip.width);
+    expect(tip.x + tip.width).toBeLessThanOrEqual(layout.right);
+  });
+
+  test('左右どちらにも逃げ場が無い場合だけ点の下に出す', () => {
+    const index = 5;
+    const natural = placeTooltip(layout, index, texts, null)!;
+    const chip = {
+      x: layout.left,
+      y: natural.y,
+      width: layout.right - layout.left,
+      height: 19,
+      label: 'ベスト 75kg',
+    };
+    const tip = placeTooltip(layout, index, texts, chip)!;
+    expect(tip.y).toBeGreaterThan(layout.points[index].y);
+    expect(tip.y + tip.height).toBeLessThanOrEqual(layout.bottom);
+  });
+
+  test('点が無ければnull', () => {
+    expect(placeTooltip(layout, 99, texts, null)).toBeNull();
+  });
+});
+
+describe('ツールチップの日付', () => {
+  test('1年未満なら月日だけ', () => {
+    expect(formatTooltipDate(new Date(2026, 6, 23).getTime(), false)).toBe('7/23');
+  });
+
+  test('1年以上にまたがるなら年を含める', () => {
+    expect(formatTooltipDate(new Date(2025, 9, 6).getTime(), true)).toBe('2025/10/6');
   });
 });

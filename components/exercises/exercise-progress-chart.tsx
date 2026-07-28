@@ -2,14 +2,22 @@ import { Colors } from '@/constants/theme';
 import {
   CHART_HEIGHT,
   computeChartLayout,
+  findNearestPointIndex,
+  formatTooltipDate,
   placeBestChip,
+  placeTooltip,
   starPoints,
   type ChartLayout,
 } from '@/lib/exercises/chart-layout';
 import { formatTickValue } from '@/lib/exercises/chart-scale';
-import type { ProgressPoint, ProgressUnit } from '@/lib/exercises/progress';
+import { formatProgressAux, type ProgressPoint, type ProgressUnit } from '@/lib/exercises/progress';
 import { useMemo, useState } from 'react';
-import { StyleSheet, View, type LayoutChangeEvent } from 'react-native';
+import {
+  Pressable,
+  StyleSheet,
+  type GestureResponderEvent,
+  type LayoutChangeEvent,
+} from 'react-native';
 import Svg, {
   Circle,
   Defs,
@@ -20,6 +28,7 @@ import Svg, {
   Rect,
   Stop,
   Text as SvgText,
+  TSpan,
 } from 'react-native-svg';
 
 const AREA_GRADIENT_ID = 'progressChartArea';
@@ -34,9 +43,23 @@ const BEST_CHIP_FONT_SIZE = 10.5;
 /** 中間のグリッドは破線、下端の軸線だけ実線にする */
 const GRID_DASH = '3 4';
 
+/** 選択中の点の印。青のハローを下敷きにして、マーカー自体も一回り大きくする */
+const SELECTED_HALO_RADIUS = 9.5;
+const SELECTED_HALO_OPACITY = 0.15;
+const SELECTED_DOT_RADIUS = 4.5;
+const SELECTED_LINE_DASH = '3 3';
+const SELECTED_LINE_OPACITY = 0.55;
+
+const TOOLTIP_DATE_FONT_SIZE = 9.5;
+const TOOLTIP_VALUE_FONT_SIZE = 13;
+const TOOLTIP_SUB_FONT_SIZE = 9.5;
+
 type Props = {
   points: ProgressPoint[];
   unit: ProgressUnit;
+  /** 選択中の点。点が無いときはnull */
+  selectedIndex: number | null;
+  onSelect: (index: number) => void;
 };
 
 function linePath(layout: ChartLayout): string {
@@ -57,7 +80,7 @@ function areaPath(layout: ChartLayout): string {
  * 幅は親から測って渡すのではなく onLayout で自分で測る。種目詳細の本文パディングや将来の
  * 画面幅の違いをこのコンポーネントが知らなくて済むようにするため。
  */
-export function ExerciseProgressChart({ points, unit }: Props) {
+export function ExerciseProgressChart({ points, unit, selectedIndex, onSelect }: Props) {
   const [width, setWidth] = useState(0);
 
   const layout = useMemo(
@@ -66,12 +89,54 @@ export function ExerciseProgressChart({ points, unit }: Props) {
   );
   const bestChip = useMemo(() => (layout ? placeBestChip(layout, unit) : null), [layout, unit]);
 
+  const selected = layout && selectedIndex != null ? layout.points[selectedIndex] : null;
+  const tooltipTexts = useMemo(() => {
+    if (!layout || !selected) return null;
+    return {
+      date: formatTooltipDate(selected.point.dateKey, layout.withYear),
+      value: formatTickValue(selected.point.value),
+      unit: unit.label,
+      aux: formatProgressAux(unit, selected.point),
+    };
+  }, [layout, selected, unit]);
+  const tooltip = useMemo(
+    () =>
+      layout && selected && tooltipTexts
+        ? placeTooltip(layout, selected.index, tooltipTexts, bestChip)
+        : null,
+    [layout, selected, tooltipTexts, bestChip],
+  );
+
   const handleLayout = (event: LayoutChangeEvent) => {
     setWidth(event.nativeEvent.layout.width);
   };
 
+  // 点そのものを狙わせず、押した位置のX座標から最も近い記録にスナップする。
+  // ScrollViewの中に置くため、responderを自前で掴むのではなくPressableに任せる
+  // （自前で掴むと、グラフの上から始めた縦方向のドラッグでスクロールできなくなる）
+  const handlePress = (event: GestureResponderEvent) => {
+    if (!layout) return;
+    const nearest = findNearestPointIndex(layout, event.nativeEvent.locationX);
+    if (nearest != null) onSelect(nearest);
+  };
+
+  const selectionLabel =
+    tooltipTexts &&
+    [tooltipTexts.date, `${tooltipTexts.value}${tooltipTexts.unit}`, tooltipTexts.aux]
+      .filter(Boolean)
+      .join('、');
+
   return (
-    <View style={styles.container} onLayout={handleLayout}>
+    <Pressable
+      style={styles.container}
+      onLayout={handleLayout}
+      onPress={handlePress}
+      accessibilityRole="image"
+      accessibilityLabel={
+        selectionLabel ? `記録の推移グラフ。選択中: ${selectionLabel}` : '記録の推移グラフ'
+      }
+      accessibilityHint="グラフを押すと、その位置に一番近い記録を選びます"
+    >
       {layout && (
         <Svg width={layout.width} height={layout.height}>
           <Defs>
@@ -139,13 +204,50 @@ export function ExerciseProgressChart({ points, unit }: Props) {
             ),
           )}
 
-          {/* ベストの点はマーカーの間引きに関係なく必ず描く（アンバーの塗り・白枠なし） */}
+          {/* 選択の印。縦の破線はプロットの上端まで通し、どの位置を見ているかを一目で分かるようにする */}
+          {selected && (
+            <>
+              <Line
+                x1={selected.x}
+                y1={layout.top - 3}
+                x2={selected.x}
+                y2={layout.bottom}
+                stroke={Colors.accent}
+                strokeWidth={1}
+                strokeDasharray={SELECTED_LINE_DASH}
+                opacity={SELECTED_LINE_OPACITY}
+              />
+              <Circle
+                cx={selected.x}
+                cy={selected.y}
+                r={SELECTED_HALO_RADIUS}
+                fill={Colors.accent}
+                opacity={SELECTED_HALO_OPACITY}
+              />
+              {/* ベストの点が選択されている場合は、この下でアンバーのマーカーを重ねて描く */}
+              {selected.index !== layout.bestIndex && (
+                <Circle
+                  cx={selected.x}
+                  cy={selected.y}
+                  r={SELECTED_DOT_RADIUS}
+                  fill={Colors.accent}
+                  stroke={Colors.surface}
+                  strokeWidth={2}
+                />
+              )}
+            </>
+          )}
+
+          {/* ベストの点はマーカーの間引きに関係なく必ず描く（アンバーの塗り）。
+              選択中は一回り大きくして白枠を付け、青のハローの上に乗せる */}
           {layout.bestIndex != null && (
             <Circle
               cx={layout.points[layout.bestIndex].x}
               cy={layout.points[layout.bestIndex].y}
-              r={BEST_DOT_RADIUS}
+              r={selectedIndex === layout.bestIndex ? SELECTED_DOT_RADIUS : BEST_DOT_RADIUS}
               fill={Colors.chartBest}
+              stroke={selectedIndex === layout.bestIndex ? Colors.surface : undefined}
+              strokeWidth={selectedIndex === layout.bestIndex ? 2 : 0}
             />
           )}
 
@@ -178,6 +280,44 @@ export function ExerciseProgressChart({ points, unit }: Props) {
             </>
           )}
 
+          {tooltip && tooltipTexts && (
+            <>
+              <Rect
+                x={tooltip.x}
+                y={tooltip.y}
+                width={tooltip.width}
+                height={tooltip.height}
+                rx={6}
+                fill={Colors.surface}
+                stroke={Colors.border}
+                strokeWidth={1}
+              />
+              <SvgText
+                x={tooltip.x + tooltip.width / 2}
+                y={tooltip.dateY}
+                textAnchor="middle"
+                fontSize={TOOLTIP_DATE_FONT_SIZE}
+                fill={Colors.textSecondary}
+              >
+                {tooltipTexts.date}
+              </SvgText>
+              {/* 値・単位・補助情報はフォントサイズが違うので、1つのテキストにせず横に並べる */}
+              <SvgText
+                x={tooltip.valueX}
+                y={tooltip.valueY}
+                fontSize={TOOLTIP_VALUE_FONT_SIZE}
+                fontWeight="700"
+                fill={Colors.textPrimary}
+              >
+                {tooltipTexts.value}
+                <TSpan fontSize={TOOLTIP_SUB_FONT_SIZE} fontWeight="600" fill={Colors.textMuted}>
+                  {tooltipTexts.unit}
+                  {tooltipTexts.aux ? ` ${tooltipTexts.aux}` : ''}
+                </TSpan>
+              </SvgText>
+            </>
+          )}
+
           {layout.xTicks.map((tick, i) => (
             <SvgText
               key={`xlabel-${i}`}
@@ -192,7 +332,7 @@ export function ExerciseProgressChart({ points, unit }: Props) {
           ))}
         </Svg>
       )}
-    </View>
+    </Pressable>
   );
 }
 

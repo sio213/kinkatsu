@@ -30,6 +30,19 @@ export function ExerciseRecordTab({ exerciseId, measurementType }: Props) {
     [series.points, period],
   );
 
+  // 選択中の点は添字ではなく日付で覚える。期間を切り替えても同じ日を選び続けられるようにし、
+  // 選んでいた日が期間外に出たときだけ最新の点へ戻す（初期表示も最新の点＝未選択のときの既定）
+  const [selectedDateKey, setSelectedDateKey] = useState<number | null>(null);
+  const selectedIndex = useMemo(() => {
+    if (points.length === 0) return null;
+    const index = selectedDateKey == null ? -1 : points.findIndex((p) => p.dateKey === selectedDateKey);
+    return index >= 0 ? index : points.length - 1;
+  }, [points, selectedDateKey]);
+
+  const handleSelect = (index: number) => {
+    setSelectedDateKey(points[index]?.dateKey ?? null);
+  };
+
   return (
     <View style={styles.container}>
       <PeriodFilterChips value={period} onChange={setPeriod} />
@@ -39,9 +52,14 @@ export function ExerciseRecordTab({ exerciseId, measurementType }: Props) {
       ) : !loaded ? (
         <Text style={styles.placeholder}>読み込み中</Text>
       ) : (
-        // TODO(重量グラフ): 点の選択・内訳カード・過去の記録一覧を後続PRで載せる。
+        // TODO(重量グラフ): 選択中の点の内訳カード・過去の記録一覧を後続PRで載せる。
         // 記録0件／1件のときの専用表示も後続PRで入れる
-        <ExerciseProgressChart points={points} unit={series.unit} />
+        <ExerciseProgressChart
+          points={points}
+          unit={series.unit}
+          selectedIndex={selectedIndex}
+          onSelect={handleSelect}
+        />
       )}
     </View>
   );

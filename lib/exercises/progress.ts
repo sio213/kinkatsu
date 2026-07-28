@@ -1,5 +1,10 @@
 import type { MeasurementType } from '@/lib/exercises/constants';
-import { primaryMetric, secondaryMetric, type SetLike } from '@/lib/workout/set-format';
+import {
+  formatHistoryDuration,
+  primaryMetric,
+  secondaryMetric,
+  type SetLike,
+} from '@/lib/workout/set-format';
 
 /**
  * 種目詳細「記録」タブの重量グラフ用のデータ整形。DBには触らず、フックが引いた行を
@@ -95,6 +100,24 @@ export type ProgressSeries = {
   /** 古い順。X軸が実日付なので間隔は不均等になる */
   points: ProgressPoint[];
 };
+
+/**
+ * ツールチップの2行目に添える補助情報（「×8」「×3セット」など）。単位ごとに意味が変わる。
+ * 距離・長時間の有酸素はセット数に意味が無いためnull（何も出さない）。
+ */
+export function formatProgressAux(unit: ProgressUnit, point: ProgressPoint): string | null {
+  switch (unit.auxKind) {
+    case 'reps':
+      return point.best.reps == null ? null : `×${point.best.reps}`;
+    case 'duration':
+      return point.best.durationSeconds == null ? null : `×${formatHistoryDuration(point.best.durationSeconds)}`;
+    case 'sets':
+      // 回数・時間種目はBest Set自体が回数/時間なので、代わりにその日のセット数を出す
+      return `×${point.sets.length}セット`;
+    case 'none':
+      return null;
+  }
+}
 
 /** その日の0時0分（ローカル）のepoch ms */
 export function toDayKey(timestamp: number): number {

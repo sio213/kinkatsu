@@ -145,10 +145,11 @@ export function parseColumns(
   return parseColumnsWithFallback(columns, display, {});
 }
 
-// 「記録から読み込む」画面の一覧表示専用。1分未満は"45秒"のような素の秒数、1分以上は
-// set-row.tsx等と同じ"mm:ss"（formatDurationDisplay）にする。短いホールド系種目が多い
-// time/weight_time計測で"90秒"のような読みにくい表記になるのを避けつつ、既存の分:秒表記とも矛盾しない
-function formatHistoryDuration(seconds: number): string {
+// 1分未満は"45秒"のような素の秒数、1分以上はset-row.tsx等と同じ"mm:ss"
+// （formatDurationDisplay）にする。短いホールド系種目が多いtime/weight_time計測で
+// "90秒"のような読みにくい表記になるのを避けつつ、既存の分:秒表記とも矛盾しない。
+// 「記録から読み込む」画面の一覧表示と、重量グラフのツールチップの補助情報で共用する
+export function formatHistoryDuration(seconds: number): string {
   return seconds < 60 ? `${seconds}秒` : formatDurationDisplay(seconds);
 }
 
