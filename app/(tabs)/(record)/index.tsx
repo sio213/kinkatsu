@@ -3,7 +3,7 @@ import { IconSymbol } from '@/components/ui/icon-symbol';
 import { PrimaryButton } from '@/components/ui/primary-button';
 import { ResumeWorkoutBanner } from '@/components/workout/resume-workout-banner';
 import { SessionCard } from '@/components/workout/session-card';
-import { Colors, ScreenStyles, Typography } from '@/constants/theme';
+import { Colors, IconSizes, ScreenStyles, Typography } from '@/constants/theme';
 import type { WorkoutSession } from '@/db/schema';
 import { useDebouncedPush } from '@/hooks/use-debounced-push';
 import { useTickingNow } from '@/hooks/use-ticking-now';
@@ -74,7 +74,7 @@ export default function RecordScreen() {
         >
           <IconSymbol name="dumbbell.fill" size={16} color={Colors.textBody} />
           <Text style={styles.routineLinkBannerText}>ルーティン一覧</Text>
-          <IconSymbol name="chevron.right" size={14} color={Colors.textPlaceholder} />
+          <IconSymbol name="chevron.right" size={IconSizes.inlineChevron} color={Colors.textPlaceholder} />
         </TouchableOpacity>
 
         {activeSession ? (
