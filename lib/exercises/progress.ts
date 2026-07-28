@@ -28,6 +28,11 @@ export type ProgressUnit = {
   step: number;
   /** 確保する最小レンジ。わずかな差が急成長のように描かれるのを防ぐ */
   minRange: number;
+  /**
+   * 目盛りに小数を許さない単位か。回数・秒・分は「2.5回」のような目盛りが意味を成さないため、
+   * 刻みの候補を整数だけにする（重量・距離は2.5kg／2.5kmを使う）
+   */
+  integerOnly: boolean;
   auxKind: ProgressAuxKind;
 };
 
@@ -36,15 +41,15 @@ export type ProgressUnit = {
 // この閾値以上なら分に切り替える（デザイン案「秒では桁が大きくなりすぎる種目は分で持つ」）
 const MINUTE_SWITCH_SECONDS = 600;
 
-const SECONDS_UNIT: ProgressUnit = { label: '秒', step: 10, minRange: 20, auxKind: 'sets' };
-const MINUTES_UNIT: ProgressUnit = { label: '分', step: 10, minRange: 10, auxKind: 'none' };
+const SECONDS_UNIT: ProgressUnit = { label: '秒', step: 10, minRange: 20, integerOnly: true, auxKind: 'sets' };
+const MINUTES_UNIT: ProgressUnit = { label: '分', step: 10, minRange: 10, integerOnly: true, auxKind: 'none' };
 
 const UNITS: Record<MeasurementType, ProgressUnit> = {
-  weight_reps: { label: 'kg', step: 5, minRange: 10, auxKind: 'reps' },
-  weight_time: { label: 'kg', step: 5, minRange: 10, auxKind: 'duration' },
-  reps: { label: '回', step: 5, minRange: 5, auxKind: 'sets' },
+  weight_reps: { label: 'kg', step: 5, minRange: 10, integerOnly: false, auxKind: 'reps' },
+  weight_time: { label: 'kg', step: 5, minRange: 10, integerOnly: false, auxKind: 'duration' },
+  reps: { label: '回', step: 5, minRange: 5, integerOnly: true, auxKind: 'sets' },
   time: SECONDS_UNIT,
-  distance_time: { label: 'km', step: 2.5, minRange: 4, auxKind: 'none' },
+  distance_time: { label: 'km', step: 2.5, minRange: 4, integerOnly: false, auxKind: 'none' },
 };
 
 // 縦軸の値をDBの保持単位から表示単位へ換算する係数。距離はm→km、時間は分表示のときだけ秒→分
