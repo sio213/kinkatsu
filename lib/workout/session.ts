@@ -331,6 +331,15 @@ export async function startWorkoutFromRoutine(routineId: number) {
   return createRoutineSession(routineId, Date.now(), null);
 }
 
+// 種目詳細の記録タブ「1回目を記録する」用（記録が0件のときだけ出るボタン）。新規セッションを作り、
+// その種目1つだけを入れた状態で返す。過去の記録が無い種目専用のボタンなので、
+// addExercisesToSessionによる前回値のプリフィルは実質空になる
+export async function startWorkoutWithExercise(exerciseId: number): Promise<{ sessionId: number }> {
+  const session = await startWorkoutSession();
+  await addExercisesToSession(session.id, [exerciseId]);
+  return { sessionId: session.id };
+}
+
 // カレンダー過去日パネル「記録を追加」→「ルーティン」経由用（2026-07-20）。
 // createPastWorkoutSessionと同じくstartedAt=endedAt=pastDateで作成し、ルーティンの種目・
 // 目標セットは通常のstartWorkoutFromRoutineと同じくその場で流し込む

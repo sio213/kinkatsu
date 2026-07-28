@@ -1,21 +1,29 @@
 import { ExerciseProgressChart } from '@/components/exercises/exercise-progress-chart';
+import { ExerciseProgressChartSample } from '@/components/exercises/exercise-progress-chart-sample';
 import { ExerciseRecordDetailCard } from '@/components/exercises/exercise-record-detail-card';
 import { ExerciseRecordHistoryList } from '@/components/exercises/exercise-record-history-list';
 import { PeriodFilterChips } from '@/components/exercises/period-filter-chips';
+import { DesignIcon } from '@/components/ui/design-icon';
+import { PrimaryButton } from '@/components/ui/primary-button';
 import { Colors, Typography } from '@/constants/theme';
 import { useDebouncedPush } from '@/hooks/use-debounced-push';
 import { useExerciseProgress } from '@/hooks/use-exercise-progress';
+import { useStartWithConfirm } from '@/hooks/use-start-with-confirm';
+import { useWorkoutSessions } from '@/hooks/use-workout-session';
 import type { MeasurementType } from '@/lib/exercises/constants';
 import {
   DEFAULT_PROGRESS_PERIOD,
   filterProgressPoints,
   type ProgressPeriod,
 } from '@/lib/exercises/progress';
+import { startWorkoutWithExercise } from '@/lib/workout/session';
 import { useMemo, useState } from 'react';
 import { StyleSheet, Text, View } from 'react-native';
 
 type Props = {
   exerciseId: number;
+  /** 「1回目を記録する」で進行中セッションの終了確認を出すときの文言に使う */
+  exerciseName: string;
   measurementType: MeasurementType;
   /**
    * 種目詳細がタブ配下のStack（/exercises/[id]）から表示されているか。
@@ -26,10 +34,18 @@ type Props = {
 
 /**
  * 種目詳細「記録」タブの中身。期間チップ → グラフ → 選択中の内訳カード → 過去の記録一覧、
- * の順に縦に並ぶ（デザイン案）。記録0件／1件のときの専用表示だけ未実装。
+ * の順に縦に並ぶ（デザイン案）。記録が0件のときは薄い見本グラフと「1回目を記録する」に
+ * 差し替わり、1件のときは点1つ＋「推移は2回目から」を添えて履歴一覧を出さない。
  */
-export function ExerciseRecordTab({ exerciseId, measurementType, insideTabBar }: Props) {
+export function ExerciseRecordTab({ exerciseId, exerciseName, measurementType, insideTabBar }: Props) {
   const push = useDebouncedPush();
+  const { activeSession } = useWorkoutSessions();
+  // 別のトレーニングが進行中なら確認を挟んでから開始する（ルーティン一覧のカードと同じ流儀）
+  const startWithConfirm = useStartWithConfirm(
+    activeSession,
+    (sessionId) => push(`/workout/${sessionId}`),
+    startWorkoutWithExercise,
+  );
   const [period, setPeriod] = useState<ProgressPeriod>(DEFAULT_PROGRESS_PERIOD);
   const { series, loaded, failed } = useExerciseProgress(exerciseId, measurementType);
 
@@ -69,6 +85,27 @@ export function ExerciseRecordTab({ exerciseId, measurementType, insideTabBar }:
         <Text style={styles.placeholder}>記録を読み込めませんでした</Text>
       ) : !loaded ? (
         <Text style={styles.placeholder}>読み込み中</Text>
+      ) : series.points.length === 0 ? (
+        // 記録0件。空白ではなく完成形を薄い見本で予告して、記録する動機にする（デザイン案）
+        <>
+          <ExerciseProgressChartSample />
+          <View style={styles.emptyText}>
+            <Text style={styles.emptyHeading}>記録の推移がここに出ます</Text>
+            <Text style={styles.emptyBody}>まずは今日の1回を記録しましょう</Text>
+          </View>
+          <PrimaryButton
+            style={styles.startButton}
+            label="1回目を記録する"
+            icon={<DesignIcon name="add" size={17} color={Colors.onAccent} />}
+            onPress={() => startWithConfirm(exerciseId, exerciseName)}
+          />
+        </>
+      ) : points.length === 0 ? (
+        // 記録はあるが、選んだ期間には無い。0件と同じ文言にすると誤解を招くので分ける
+        <>
+          <ExerciseProgressChartSample />
+          <Text style={styles.placeholder}>この期間の記録はありません</Text>
+        </>
       ) : (
         <>
           <ExerciseProgressChart
@@ -77,7 +114,10 @@ export function ExerciseRecordTab({ exerciseId, measurementType, insideTabBar }:
             selectedIndex={selectedIndex}
             onSelect={handleSelect}
           />
-          {/* TODO(重量グラフ): 記録0件／1件のときの専用表示を後続PRで入れる */}
+          {/* 1点だけでは線が引けないので、次で推移が見られることを添える */}
+          {points.length === 1 && (
+            <Text style={styles.placeholder}>推移は2回目の記録から見られます</Text>
+          )}
           {selectedPoint && (
             <ExerciseRecordDetailCard
               // 別の日を選んだら「他N件を見る」の展開状態を持ち越さず畳んだ状態から始める
@@ -110,4 +150,9 @@ export function ExerciseRecordTab({ exerciseId, measurementType, insideTabBar }:
 const styles = StyleSheet.create({
   container: { gap: 11 },
   placeholder: { ...Typography.footnote, color: Colors.textMuted, textAlign: 'center', paddingVertical: 24 },
+  emptyText: { alignItems: 'center', gap: 5 },
+  emptyHeading: { ...Typography.cardTitle, color: Colors.textPrimary },
+  emptyBody: { ...Typography.footnote, color: Colors.textMuted },
+  // 全幅のPrimaryButtonだと空状態の中で強すぎるので、文言の幅に合わせて中央に置く
+  startButton: { alignSelf: 'center', paddingHorizontal: 20 },
 });

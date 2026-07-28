@@ -333,6 +333,7 @@ export function ExerciseDetailScreen({ insideTabBar = false }: Props) {
           ) : (
             <ExerciseRecordTab
               exerciseId={exercise.id}
+              exerciseName={exercise.name}
               measurementType={resolveMeasurementType(exercise.measurementType)}
               insideTabBar={insideTabBar}
             />
