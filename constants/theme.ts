@@ -133,6 +133,17 @@ export const Shadows = {
     shadowRadius: 3,
     elevation: 2,
   },
+  /**
+   * SegmentedTabsの選択中タブ（白いピル）に落とす影。0 1px 2px rgba(15,23,42,0.1)相当。
+   * 白いピルがsurfaceSubtleのトラックから浮いて見えるようにするためのもので、switchKnobより弱い
+   */
+  segmentedTab: {
+    shadowColor: Colors.shadow,
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.1,
+    shadowRadius: 2,
+    elevation: 1,
+  },
 } as const;
 
 /**
