@@ -108,6 +108,21 @@ describe('ExerciseRecordTab', () => {
     expect(allTexts(root)).not.toContain('自己ベスト');
   });
 
+  test('グラフに渡す自己ベストも期間チップに連動しない', () => {
+    const root = render(points);
+    const personalBest = () => root.findByType(ExerciseProgressChart).props.personalBest;
+
+    // 既定の3ヶ月では80kgの日（100日前）は表示範囲外だが、自己ベストとしては渡り続ける
+    expect(personalBest().value).toBe(80);
+    expect(root.findByType(ExerciseProgressChart).props.points).toHaveLength(2);
+
+    pressChip(root, '1ヶ月');
+    expect(personalBest().value).toBe(80);
+
+    pressChip(root, '全期間');
+    expect(personalBest().value).toBe(80);
+  });
+
   test('全期間に切り替えて80kgの日を選ぶと自己ベストのバッジが出る', () => {
     const root = render(points);
     pressChip(root, '全期間');

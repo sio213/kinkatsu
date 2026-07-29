@@ -53,6 +53,11 @@ const TOOLTIP_SUB_FONT_SIZE = 9.5;
 type Props = {
   points: ProgressPoint[];
   unit: ProgressUnit;
+  /**
+   * 全期間の自己ベスト（findPersonalBest の結果）。期間で絞ったpointsから求めた値を渡さないこと。
+   * 表示期間の外にあってもチップは値を出し続け、アンバーの点だけが描かれなくなる
+   */
+  personalBest: ProgressPoint | null;
   /** 選択中の点。点が無いときはnull */
   selectedIndex: number | null;
   onSelect: (index: number) => void;
@@ -79,12 +84,12 @@ function areaPath(layout: ChartLayout): string {
  * 幅は親から測って渡すのではなく onLayout で自分で測る。種目詳細の本文パディングや将来の
  * 画面幅の違いをこのコンポーネントが知らなくて済むようにするため。
  */
-export function ExerciseProgressChart({ points, unit, selectedIndex, onSelect }: Props) {
+export function ExerciseProgressChart({ points, unit, personalBest, selectedIndex, onSelect }: Props) {
   const [width, setWidth] = useState(0);
 
   const layout = useMemo(
-    () => (width > 0 ? computeChartLayout(points, unit, width) : null),
-    [points, unit, width],
+    () => (width > 0 ? computeChartLayout(points, unit, width, personalBest) : null),
+    [points, unit, width, personalBest],
   );
   const bestChip = useMemo(() => (layout ? placeBestChip(layout, unit) : null), [layout, unit]);
 
@@ -141,9 +146,15 @@ export function ExerciseProgressChart({ points, unit, selectedIndex, onSelect }:
     [layout],
   );
 
+  // 視覚ではアンバーの点で分かる「自己ベスト」を読み上げにも足す（デザインレビュー指摘）
   const selectionLabel =
     tooltipTexts &&
-    [tooltipTexts.date, `${tooltipTexts.value}${tooltipTexts.unit}`, tooltipTexts.aux]
+    [
+      tooltipTexts.date,
+      `${tooltipTexts.value}${tooltipTexts.unit}`,
+      tooltipTexts.aux,
+      selectedIndex != null && selectedIndex === layout?.bestIndex ? '自己ベスト' : null,
+    ]
       .filter(Boolean)
       .join('、');
 

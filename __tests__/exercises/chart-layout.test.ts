@@ -9,7 +9,7 @@ import {
   placeTooltip,
   starPoints,
 } from '@/lib/exercises/chart-layout';
-import type { ProgressPoint, ProgressUnit } from '@/lib/exercises/progress';
+import { findPersonalBest, type ProgressPoint, type ProgressUnit } from '@/lib/exercises/progress';
 
 const KG: ProgressUnit = { label: 'kg', step: 5, minRange: 10, integerOnly: false, auxKind: 'reps' };
 const KM: ProgressUnit = { label: 'km', step: 2.5, minRange: 4, integerOnly: false, auxKind: 'none' };
@@ -52,16 +52,20 @@ function makePointsOnDays(dayOffsets: number[]): ProgressPoint[] {
 const S3 = [60, 60, 62.5, 62.5, 65, 65, 67.5, 65, 67.5, 70, 70, 72.5, 72.5, 75];
 const WIDTH = 353;
 
+/** 表示中の点＝全期間の系列（期間で絞っていない）という、ほとんどのケースの前提 */
+const layoutOf = (points: ProgressPoint[], unit: ProgressUnit = KG) =>
+  computeChartLayout(points, unit, WIDTH, findPersonalBest(points));
+
 describe('computeChartLayout', () => {
   test('高さ210pxのうち、上30pxがベストチップの帯・下22pxがX軸ラベル・残りがプロット領域', () => {
-    const layout = computeChartLayout(makePoints(S3), KG, WIDTH);
+    const layout = layoutOf(makePoints(S3), KG);
     expect(layout.height).toBe(CHART_HEIGHT);
     expect(layout.top).toBe(30);
     expect(layout.bottom).toBe(188);
   });
 
   test('すべての点がプロット領域の内側に収まる', () => {
-    const layout = computeChartLayout(makePoints(S3), KG, WIDTH);
+    const layout = layoutOf(makePoints(S3), KG);
     for (const p of layout.points) {
       expect(p.y).toBeGreaterThan(layout.top);
       expect(p.y).toBeLessThan(layout.bottom);
@@ -71,7 +75,7 @@ describe('computeChartLayout', () => {
   });
 
   test('値が大きいほど上に描かれる', () => {
-    const layout = computeChartLayout(makePoints([60, 70, 65]), KG, WIDTH);
+    const layout = layoutOf(makePoints([60, 70, 65]), KG);
     expect(layout.points[1].y).toBeLessThan(layout.points[0].y);
     expect(layout.points[2].y).toBeGreaterThan(layout.points[1].y);
   });
@@ -80,14 +84,14 @@ describe('computeChartLayout', () => {
     // 1週・1週・6週の間隔。最後の区間だけ広くなる
     const points = [0, 7, 14, 56].map((offset, i) => makePoints([60 + i], 0)[i]);
     const spaced = points.map((p, i) => ({ ...p, dateKey: BASE + [0, 7, 14, 56][i] * DAY }));
-    const layout = computeChartLayout(spaced, KG, WIDTH);
+    const layout = layoutOf(spaced, KG);
     const gap = (a: number, b: number) => layout.points[b].x - layout.points[a].x;
     expect(gap(0, 1)).toBeCloseTo(gap(1, 2), 5);
     expect(gap(2, 3)).toBeGreaterThan(gap(0, 1) * 5);
   });
 
   test('点が1つだけなら水平中央に置き、X軸ラベルも中央揃えにする', () => {
-    const layout = computeChartLayout(makePoints([60]), KG, WIDTH);
+    const layout = layoutOf(makePoints([60]), KG);
     const center = layout.left + 6 + (layout.right - layout.left - 12) / 2;
     expect(layout.points[0].x).toBeCloseTo(center, 5);
     expect(layout.xTicks).toHaveLength(1);
@@ -95,14 +99,14 @@ describe('computeChartLayout', () => {
   });
 
   test('左ガターは3桁の重量で広がる', () => {
-    const narrow = computeChartLayout(makePoints([60, 75]), KG, WIDTH).left;
-    const wide = computeChartLayout(makePoints([150, 170]), KG, WIDTH).left;
+    const narrow = layoutOf(makePoints([60, 75]), KG).left;
+    const wide = layoutOf(makePoints([150, 170]), KG).left;
     expect(wide).toBeGreaterThan(narrow);
   });
 
   test('左ガターは生データの桁数ではなく、実際に描くラベル（丸め後の値＋単位）の幅で決まる', () => {
     // 生データは1桁（3〜7km）でも、目盛りは「10 km」まで伸びる
-    const layout = computeChartLayout(makePoints([3, 7]), KM, WIDTH);
+    const layout = layoutOf(makePoints([3, 7]), KM);
     const widest = layout.scale.labelIndices
       .map((i, order) => {
         const label = String(layout.scale.ticks[i]);
@@ -126,13 +130,13 @@ describe('X軸ラベル', () => {
   }
 
   test('記録が等間隔なら、X座標を等分した位置に4つ並ぶ', () => {
-    const layout = computeChartLayout(makePoints(S3), KG, WIDTH);
+    const layout = layoutOf(makePoints(S3), KG);
     expect(layout.xTicks.map((t) => t.label)).toEqual(['4/12', '5/10', '6/14', '7/12']);
   });
 
   test('記録が偏っていても、密集した点にはラベルを出さない', () => {
     // 3日連続で記録した後に4週間空くケース。件数で等分すると先頭3点のラベルが数pxに密集する
-    const layout = computeChartLayout(makePointsOnDays([0, 1, 2, 30]), KG, WIDTH);
+    const layout = layoutOf(makePointsOnDays([0, 1, 2, 30]), KG);
     expect(layout.xTicks.map((t) => t.label)).toEqual(['4/12', '5/12']);
   });
 
@@ -145,7 +149,7 @@ describe('X軸ラベル', () => {
       makePoints(new Array(52).fill(60), 3),
     ];
     for (const points of cases) {
-      const { xTicks } = computeChartLayout(points, KG, WIDTH);
+      const { xTicks } = layoutOf(points, KG);
       for (let i = 1; i < xTicks.length; i++) {
         expect(labelRange(xTicks[i]).start).toBeGreaterThanOrEqual(labelRange(xTicks[i - 1]).end);
       }
@@ -154,7 +158,7 @@ describe('X軸ラベル', () => {
 
   test('間引かれても両端のラベルは必ず残す（期間の始まりと終わりが分かるように）', () => {
     for (const points of [makePoints(S3), makePointsOnDays([0, 1, 2, 30])]) {
-      const { xTicks } = computeChartLayout(points, KG, WIDTH);
+      const { xTicks } = layoutOf(points, KG);
       expect(xTicks[0].label).toBe('4/12');
       expect(xTicks[xTicks.length - 1].label).toBe(
         `${new Date(points[points.length - 1].dateKey).getMonth() + 1}/${new Date(points[points.length - 1].dateKey).getDate()}`,
@@ -163,30 +167,30 @@ describe('X軸ラベル', () => {
   });
 
   test('両端は内側に寄せる', () => {
-    const layout = computeChartLayout(makePoints(S3), KG, WIDTH);
+    const layout = layoutOf(makePoints(S3), KG);
     expect(layout.xTicks[0].anchor).toBe('start');
     expect(layout.xTicks[layout.xTicks.length - 1].anchor).toBe('end');
     expect(layout.xTicks[1].anchor).toBe('middle');
   });
 
   test('点が2つなら両端の2つだけ', () => {
-    const layout = computeChartLayout(makePoints([60, 75]), KG, WIDTH);
+    const layout = layoutOf(makePoints([60, 75]), KG);
     expect(layout.xTicks).toHaveLength(2);
   });
 
   test('全点が同じ日なら中央に1つだけ', () => {
-    const layout = computeChartLayout(makePoints([60, 65, 70], 0), KG, WIDTH);
+    const layout = layoutOf(makePoints([60, 65, 70], 0), KG);
     expect(layout.xTicks).toHaveLength(1);
     expect(layout.xTicks[0].anchor).toBe('middle');
   });
 
   test('1年未満なら「7/23」形式', () => {
-    const layout = computeChartLayout(makePoints(S3), KG, WIDTH);
+    const layout = layoutOf(makePoints(S3), KG);
     expect(layout.xTicks[0].label).toMatch(/^\d+\/\d+$/);
   });
 
   test('1年以上にまたがるなら年を含める（月日だけでは年が分からないため）', () => {
-    const layout = computeChartLayout(makePoints([60, 70, 80], 200), KG, WIDTH);
+    const layout = layoutOf(makePoints([60, 70, 80], 200), KG);
     expect(layout.xTicks[0].label).toMatch(/^\d{4}\/\d+$/);
   });
 });
@@ -210,8 +214,8 @@ describe('マーカーの間引き', () => {
   });
 
   test('デザイン案の目安どおり、3ヶ月・週2回（約26点）では間引かれ、6ヶ月（約52点）では消える', () => {
-    const layout3m = computeChartLayout(makePoints(new Array(26).fill(60), 3), KG, WIDTH);
-    const layout6m = computeChartLayout(makePoints(new Array(52).fill(60), 3), KG, WIDTH);
+    const layout3m = layoutOf(makePoints(new Array(26).fill(60), 3), KG);
+    const layout6m = layoutOf(makePoints(new Array(52).fill(60), 3), KG);
     expect(layout3m.markerIndices.length).toBeGreaterThan(0);
     expect(layout3m.markerIndices.length).toBeLessThan(26);
     expect(layout6m.markerIndices).toEqual([]);
@@ -220,7 +224,7 @@ describe('マーカーの間引き', () => {
 
 describe('自己ベスト', () => {
   test('マーカーが間引かれても、ベストの点は描画対象として残る', () => {
-    const layout = computeChartLayout(makePoints(new Array(52).fill(60).concat([80]), 3), KG, WIDTH);
+    const layout = layoutOf(makePoints(new Array(52).fill(60).concat([80]), 3), KG);
     expect(layout.markerIndices).toEqual([]);
     expect(layout.bestIndex).toBe(52);
   });
@@ -228,7 +232,7 @@ describe('自己ベスト', () => {
 
 describe('ベストチップの配置', () => {
   test('右肩上がりなら左上に置く', () => {
-    const layout = computeChartLayout(makePoints(S3), KG, WIDTH);
+    const layout = layoutOf(makePoints(S3), KG);
     const chip = placeBestChip(layout, KG)!;
     expect(chip.label).toBe('ベスト 75kg');
     expect(chip.x).toBe(layout.left + 6);
@@ -237,7 +241,7 @@ describe('ベストチップの配置', () => {
 
   test('右肩下がりで左上に線と点が通るときは右上に逃がす', () => {
     // デザイン案Y-3（ベストが期間の先頭にある）
-    const layout = computeChartLayout(makePoints([85, 82.5, 80, 80, 77.5, 75, 72.5, 72.5, 70]), KG, WIDTH);
+    const layout = layoutOf(makePoints([85, 82.5, 80, 80, 77.5, 75, 72.5, 72.5, 70]), KG);
     const chip = placeBestChip(layout, KG)!;
     expect(chip.x).toBeGreaterThan(layout.left + 6);
     expect(chip.x + chip.width).toBeLessThanOrEqual(layout.right - 6);
@@ -245,7 +249,7 @@ describe('ベストチップの配置', () => {
 
   test('チップは常にプロットの横幅に収まる', () => {
     for (const values of [S3, [85, 70], [150, 170], [7.5, 12.5]]) {
-      const layout = computeChartLayout(makePoints(values), KG, WIDTH);
+      const layout = layoutOf(makePoints(values), KG);
       const chip = placeBestChip(layout, KG)!;
       expect(chip.x).toBeGreaterThanOrEqual(layout.left);
       expect(chip.x + chip.width).toBeLessThanOrEqual(layout.right);
@@ -253,12 +257,46 @@ describe('ベストチップの配置', () => {
   });
 
   test('単位に応じたラベルになる', () => {
-    const layout = computeChartLayout(makePoints([3, 7]), KM, WIDTH);
+    const layout = layoutOf(makePoints([3, 7]), KM);
     expect(placeBestChip(layout, KM)!.label).toBe('ベスト 7km');
   });
 
   test('点が無ければチップを出さない', () => {
-    expect(placeBestChip(computeChartLayout([], KG, WIDTH), KG)).toBeNull();
+    expect(placeBestChip(layoutOf([], KG), KG)).toBeNull();
+  });
+});
+
+describe('自己ベストが表示期間の外にあるとき', () => {
+  // 全期間は8点（先頭の80kgが自己ベスト）。表示するのは後ろ3点だけ、という期間の絞り込みを模す
+  const all = makePoints([80, 70, 70, 72.5, 70, 67.5, 70, 72.5]);
+  const shown = all.slice(-3);
+  const layout = () => computeChartLayout(shown, KG, WIDTH, findPersonalBest(all));
+
+  test('アンバーの点は描かない（表示中の点列に自己ベストの日が無い）', () => {
+    expect(layout().bestIndex).toBeNull();
+  });
+
+  test('チップは全期間の自己ベストの値を出し続ける（期間内最大に書き換わらない）', () => {
+    // 表示中の最大は72.5kgだが、チップは全期間の80kgのまま
+    expect(placeBestChip(layout(), KG)!.label).toMatch(/^ベスト 80kg・/);
+  });
+
+  test('チップに日付を添える（点が無いまま値だけ浮くのを避ける）', () => {
+    expect(placeBestChip(layout(), KG)!.label).toBe('ベスト 80kg・4/12');
+  });
+
+  test('自己ベストが表示期間内にあるときは日付を添えない', () => {
+    expect(placeBestChip(layoutOf(all, KG), KG)!.label).toBe('ベスト 80kg');
+  });
+
+  test('自己ベストが表示中の記録と別の年なら年も出す（4/12だけでは去年と区別できない）', () => {
+    const older = makePoints([80]).map((p) => ({
+      ...p,
+      dateKey: new Date(2025, 9, 6).getTime(),
+      startedAt: new Date(2025, 9, 6).getTime(),
+    }));
+    const layoutAcrossYears = computeChartLayout(shown, KG, WIDTH, older[0]);
+    expect(placeBestChip(layoutAcrossYears, KG)!.label).toBe('ベスト 80kg・2025/10/6');
   });
 });
 
@@ -279,7 +317,7 @@ describe('starPoints', () => {
 });
 
 describe('タップ位置から最近傍の点にスナップする', () => {
-  const layout = computeChartLayout(makePoints(S3), KG, WIDTH);
+  const layout = layoutOf(makePoints(S3), KG);
 
   test('点のちょうど上を押せばその点になる', () => {
     expect(findNearestPointIndex(layout, layout.points[5].x)).toBe(5);
@@ -297,12 +335,12 @@ describe('タップ位置から最近傍の点にスナップする', () => {
   });
 
   test('点が無ければnull', () => {
-    expect(findNearestPointIndex(computeChartLayout([], KG, WIDTH), 100)).toBeNull();
+    expect(findNearestPointIndex(layoutOf([], KG), 100)).toBeNull();
   });
 });
 
 describe('ツールチップ', () => {
-  const layout = computeChartLayout(makePoints(S3), KG, WIDTH);
+  const layout = layoutOf(makePoints(S3), KG);
   const texts = { date: '7/23', value: '75', unit: 'kg', aux: '×7' };
 
   test('基本は選択中の点の真上に、中央揃えで置く', () => {

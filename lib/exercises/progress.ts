@@ -243,6 +243,18 @@ export function findBestIndex(points: ProgressPoint[]): number | null {
   return best;
 }
 
+/**
+ * 自己ベストの点そのもの。**期間で絞る前の全期間の系列を渡すこと**。
+ *
+ * 「自己ベスト」は期間チップで意味が変わってはいけない値なので、絞り込み後の配列を渡さない
+ * ことを名前で示すために findBestIndex とは別の入口を用意している（グラフのアンバーの点・
+ * ベストチップ、内訳カードのバッジ、過去の記録一覧のバッジがすべてこの1つの判定を共有する）。
+ */
+export function findPersonalBest(allPoints: ProgressPoint[]): ProgressPoint | null {
+  const index = findBestIndex(allPoints);
+  return index == null ? null : allPoints[index];
+}
+
 // ---------------------------------------------------------------------------
 // 期間
 // ---------------------------------------------------------------------------

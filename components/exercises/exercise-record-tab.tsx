@@ -14,7 +14,7 @@ import type { MeasurementType } from '@/lib/exercises/constants';
 import {
   DEFAULT_PROGRESS_PERIOD,
   filterProgressPoints,
-  findBestIndex,
+  findPersonalBest,
   type ProgressPeriod,
 } from '@/lib/exercises/progress';
 import { startWorkoutWithExercise } from '@/lib/workout/session';
@@ -78,13 +78,10 @@ export function ExerciseRecordTab({ exerciseId, exerciseName, measurementType, i
     return index > 0 ? series.points[index - 1] : null;
   }, [series.points, selectedPoint]);
 
-  // 内訳カードのアンバーのバッジは「全期間の自己ベストの日」だけに出す。期間で絞ったpointsで
-  // 判定すると1ヶ月表示のたびにその月の最大がベスト扱いになってしまうため全期間の系列で見る
-  // （過去の記録一覧のベストバッジと同じ findBestIndex）
-  const bestDateKey = useMemo(() => {
-    const index = findBestIndex(series.points);
-    return index == null ? null : series.points[index].dateKey;
-  }, [series.points]);
+  // アンバー（グラフの点・ベストチップ・内訳カードのバッジ）は「全期間の自己ベスト」だけを指す。
+  // 期間で絞ったpointsから求めると1ヶ月表示のたびにその月の最大がベスト扱いになり、内訳カード・
+  // 過去の記録一覧のバッジと食い違うため、ここで1回だけ全期間の系列から求めて配る
+  const personalBest = useMemo(() => findPersonalBest(series.points), [series.points]);
 
   return (
     <View style={styles.container}>
@@ -120,6 +117,7 @@ export function ExerciseRecordTab({ exerciseId, exerciseName, measurementType, i
           <ExerciseProgressChart
             points={points}
             unit={series.unit}
+            personalBest={personalBest}
             selectedIndex={selectedIndex}
             onSelect={handleSelect}
           />
@@ -130,7 +128,7 @@ export function ExerciseRecordTab({ exerciseId, exerciseName, measurementType, i
               point={selectedPoint}
               measurementType={measurementType}
               previousPoint={previousPoint}
-              isPersonalBest={selectedPoint.dateKey === bestDateKey}
+              isPersonalBest={selectedPoint.dateKey === personalBest?.dateKey}
               onPressOpen={(sessionId) => push(`/workout/${sessionId}`)}
             />
           )}
