@@ -6,9 +6,13 @@ import type { ProgressPoint, ProgressUnit } from '@/lib/exercises/progress';
  * ここに置き、テストできるようにしている。
  */
 
-/** SVG全体の高さ。上30pxはベストチップの帯、下22pxはX軸ラベル、残り158pxがプロット領域 */
+/**
+ * SVG全体の高さ。上24pxは最上段の点に出すツールチップの逃げ場、下22pxはX軸ラベル、
+ * 残り164pxがプロット領域。ベストチップ（実寸19px）は最上段のグリッド線の「下」に置くので、
+ * 上の帯はチップぶんを取っておく必要が無い（30pxでは期間チップとの間が空きすぎていた）
+ */
 export const CHART_HEIGHT = 210;
-const PAD_TOP = 30;
+const PAD_TOP = 24;
 const PAD_BOTTOM = 22;
 const PAD_RIGHT = 6;
 /** 左ガターの下限。ラベルが短くてもこれ以上は詰めない */
@@ -353,6 +357,8 @@ const TOOLTIP_SUB_FONT_SIZE = 9.5;
 /** 点とチップの間隔。上に出す場合と下に逃がす場合で少し違う */
 const TOOLTIP_GAP_ABOVE = 9;
 const TOOLTIP_GAP_BELOW = 10;
+/** SVGの上端からの最小マージン。これ以上は上げない（上げるとチップが切れる） */
+const TOOLTIP_MIN_TOP = 2;
 
 export type TooltipBox = {
   x: number;
@@ -390,7 +396,9 @@ export function placeTooltip(
   const height = TOOLTIP_HEIGHT;
 
   let x = Math.min(Math.max(point.x - width / 2, layout.left + 2), layout.right - width - 2);
-  let y = point.y - height - TOOLTIP_GAP_ABOVE;
+  // グリッド線が最大本数まで引かれると最上段の点はプロットの上端すれすれに来るため、
+  // 点との間隔よりSVGに収まることを優先する（はみ出したぶんは描画されずに切れる）
+  let y = Math.max(point.y - height - TOOLTIP_GAP_ABOVE, TOOLTIP_MIN_TOP);
 
   if (bestChip && overlapsChip(x, y, width, height, bestChip)) {
     const rightX = bestChip.x + bestChip.width + 6;

@@ -114,13 +114,17 @@ export function ExerciseRecordTab({ exerciseId, exerciseName, measurementType, i
         </>
       ) : (
         <>
-          <ExerciseProgressChart
-            points={points}
-            unit={series.unit}
-            personalBest={personalBest}
-            selectedIndex={selectedIndex}
-            onSelect={handleSelect}
-          />
+          {/* グラフのSVGは上端に余白を持っているぶん、期間チップとの間が実際より空いて見える。
+              gapは他の間隔（グラフ↔内訳カード等）にも効くので、ここだけ負のマージンで詰める */}
+          <View style={styles.chartWrap}>
+            <ExerciseProgressChart
+              points={points}
+              unit={series.unit}
+              personalBest={personalBest}
+              selectedIndex={selectedIndex}
+              onSelect={handleSelect}
+            />
+          </View>
           {selectedPoint && (
             <ExerciseRecordDetailCard
               // 別の日を選んだら「他N件を見る」の展開状態を持ち越さず畳んだ状態から始める
@@ -153,6 +157,8 @@ export function ExerciseRecordTab({ exerciseId, exerciseName, measurementType, i
 
 const styles = StyleSheet.create({
   container: { gap: 11 },
+  // 期間チップとグラフの間だけ11px→6pxにする（グラフ自体の上余白があるぶんの取り消し）
+  chartWrap: { marginTop: -5 },
   placeholder: { ...Typography.footnote, color: Colors.textMuted, textAlign: 'center', paddingVertical: 24 },
   emptyText: { alignItems: 'center', gap: 5 },
   emptyHeading: { ...Typography.cardTitle, color: Colors.textPrimary },

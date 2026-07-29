@@ -58,10 +58,10 @@ const layoutOf = (points: ProgressPoint[], unit: ProgressUnit) =>
   computeChartLayout(points, unit, WIDTH, findPersonalBest(points));
 
 describe('computeChartLayout', () => {
-  test('高さ210pxのうち、上30pxがベストチップの帯・下22pxがX軸ラベル・残りがプロット領域', () => {
+  test('高さ210pxのうち、上24pxがツールチップの逃げ場・下22pxがX軸ラベル・残りがプロット領域', () => {
     const layout = layoutOf(makePoints(S3), KG);
     expect(layout.height).toBe(CHART_HEIGHT);
-    expect(layout.top).toBe(30);
+    expect(layout.top).toBe(24);
     expect(layout.bottom).toBe(188);
   });
 
@@ -241,8 +241,9 @@ describe('ベストチップの配置', () => {
   });
 
   test('右肩下がりで左上に線と点が通るときは右上に逃がす', () => {
-    // デザイン案Y-3（ベストが期間の先頭にある）
-    const layout = layoutOf(makePoints([85, 82.5, 80, 80, 77.5, 75, 72.5, 72.5, 70]), KG);
+    // デザイン案Y-3（ベストが期間の先頭にある）。最上段のグリッド線のすぐ下から下がるので、
+    // 既定の置き場所（左上）に先頭の点がかかる
+    const layout = layoutOf(makePoints([82.5, 80, 77.5, 75, 72.5, 72.5, 70]), KG);
     const chip = placeBestChip(layout, KG)!;
     expect(chip.x).toBeGreaterThan(layout.left + 6);
     expect(chip.x + chip.width).toBeLessThanOrEqual(layout.right - 6);
