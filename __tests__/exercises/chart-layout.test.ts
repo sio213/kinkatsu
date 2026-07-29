@@ -5,7 +5,6 @@ import {
   findNearestPointIndex,
   formatTooltipDate,
   pickMarkerIndices,
-  pickXTickIndices,
   placeBestChip,
   placeTooltip,
   starPoints,
@@ -38,6 +37,15 @@ function makePoints(values: number[], stepDays = 7): ProgressPoint[] {
       sets: [set],
     };
   });
+}
+
+/** 記録の間隔がばらつくケース用。BASEからの経過日数で点を作る */
+function makePointsOnDays(dayOffsets: number[]): ProgressPoint[] {
+  return makePoints(dayOffsets.map((_, i) => 60 + i * 2.5), 0).map((point, i) => ({
+    ...point,
+    dateKey: BASE + dayOffsets[i] * DAY,
+    startedAt: BASE + dayOffsets[i] * DAY,
+  }));
 }
 
 // デザイン案の標準データ（S3）と同じ14点
@@ -109,14 +117,49 @@ describe('computeChartLayout', () => {
 });
 
 describe('X軸ラベル', () => {
-  test('等間隔に4つ取る', () => {
-    expect(pickXTickIndices(14)).toEqual([0, 4, 9, 13]);
+  /** ラベルが実際に占める横方向の区間。アンカーによって基準点の左右どちらに伸びるかが変わる */
+  function labelRange(tick: { x: number; label: string; anchor: string }) {
+    const width = estimateTextWidth(tick.label, 9.5);
+    const start =
+      tick.anchor === 'start' ? tick.x : tick.anchor === 'end' ? tick.x - width : tick.x - width / 2;
+    return { start, end: start + width };
+  }
+
+  test('記録が等間隔なら、X座標を等分した位置に4つ並ぶ', () => {
+    const layout = computeChartLayout(makePoints(S3), KG, WIDTH);
+    expect(layout.xTicks.map((t) => t.label)).toEqual(['4/12', '5/10', '6/14', '7/12']);
   });
 
-  test('点が少なければ重複を落とす', () => {
-    expect(pickXTickIndices(2)).toEqual([0, 1]);
-    expect(pickXTickIndices(1)).toEqual([0]);
-    expect(pickXTickIndices(0)).toEqual([]);
+  test('記録が偏っていても、密集した点にはラベルを出さない', () => {
+    // 3日連続で記録した後に4週間空くケース。件数で等分すると先頭3点のラベルが数pxに密集する
+    const layout = computeChartLayout(makePointsOnDays([0, 1, 2, 30]), KG, WIDTH);
+    expect(layout.xTicks.map((t) => t.label)).toEqual(['4/12', '5/12']);
+  });
+
+  test('どの並びでもラベル同士は重ならない', () => {
+    const cases = [
+      makePoints(S3),
+      makePointsOnDays([0, 1, 2, 30]),
+      makePointsOnDays([0, 20, 21, 22]),
+      makePointsOnDays([0, 1, 2, 3, 4, 400]),
+      makePoints(new Array(52).fill(60), 3),
+    ];
+    for (const points of cases) {
+      const { xTicks } = computeChartLayout(points, KG, WIDTH);
+      for (let i = 1; i < xTicks.length; i++) {
+        expect(labelRange(xTicks[i]).start).toBeGreaterThanOrEqual(labelRange(xTicks[i - 1]).end);
+      }
+    }
+  });
+
+  test('間引かれても両端のラベルは必ず残す（期間の始まりと終わりが分かるように）', () => {
+    for (const points of [makePoints(S3), makePointsOnDays([0, 1, 2, 30])]) {
+      const { xTicks } = computeChartLayout(points, KG, WIDTH);
+      expect(xTicks[0].label).toBe('4/12');
+      expect(xTicks[xTicks.length - 1].label).toBe(
+        `${new Date(points[points.length - 1].dateKey).getMonth() + 1}/${new Date(points[points.length - 1].dateKey).getDate()}`,
+      );
+    }
   });
 
   test('両端は内側に寄せる', () => {
@@ -124,6 +167,17 @@ describe('X軸ラベル', () => {
     expect(layout.xTicks[0].anchor).toBe('start');
     expect(layout.xTicks[layout.xTicks.length - 1].anchor).toBe('end');
     expect(layout.xTicks[1].anchor).toBe('middle');
+  });
+
+  test('点が2つなら両端の2つだけ', () => {
+    const layout = computeChartLayout(makePoints([60, 75]), KG, WIDTH);
+    expect(layout.xTicks).toHaveLength(2);
+  });
+
+  test('全点が同じ日なら中央に1つだけ', () => {
+    const layout = computeChartLayout(makePoints([60, 65, 70], 0), KG, WIDTH);
+    expect(layout.xTicks).toHaveLength(1);
+    expect(layout.xTicks[0].anchor).toBe('middle');
   });
 
   test('1年未満なら「7/23」形式', () => {
