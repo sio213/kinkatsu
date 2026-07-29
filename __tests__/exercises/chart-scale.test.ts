@@ -12,14 +12,15 @@ const labelsOf = (values: number[], unit: ProgressUnit) => {
 };
 
 // デザイン案「要相談1：縦軸のスケールと目盛り（採用形＋データパターン11種）」のY-1〜Y-11を
-// そのままテストケースにしている。デザイン案が本文で明示している結論（Y-1は6本・ラベル3つ、
-// Y-7は25kg刻みで25/75/125、Y-9は10kgへ自動で上がる、Y-10は2.5kgへ落とす）が崩れないようにする
+// そのままテストケースにしている。デザイン案が本文で明示している結論（Y-7は25kg刻みで
+// 25/75/125、Y-9は10kgへ自動で上がる、Y-10は2.5kgへ落とす）が崩れないようにする。
+// 窓の下端は「データの最小値を含むきりのいい目盛り」で止める（余裕は上端だけに足す）
 describe('computeChartScale: デザイン案のデータパターン11種', () => {
-  test('Y-1 標準的なデータは5kg刻み・6本・ラベルは1つおきに3つ', () => {
+  test('Y-1 標準的なデータは5kg刻み・5本・ラベルは1つおきに3つ', () => {
     const scale = computeChartScale([60, 60, 62.5, 62.5, 65, 65, 67.5, 65, 67.5, 70, 70, 72.5, 72.5, 75], KG);
     expect(scale.step).toBe(5);
-    expect(scale.ticks).toEqual([55, 60, 65, 70, 75, 80]);
-    expect(scale.labelIndices.map((i) => scale.ticks[i])).toEqual([55, 65, 75]);
+    expect(scale.ticks).toEqual([60, 65, 70, 75, 80]);
+    expect(scale.labelIndices.map((i) => scale.ticks[i])).toEqual([60, 70, 80]);
   });
 
   test('Y-2 変化が小さくても最小レンジ10kgを確保する（差を拡大して見せない）', () => {
@@ -31,7 +32,7 @@ describe('computeChartScale: デザイン案のデータパターン11種', () =
 
   test('Y-3 右肩下がりでも同じ刻みで窓を取る', () => {
     expect(computeChartScale([85, 82.5, 80, 80, 77.5, 75, 72.5, 72.5, 70], KG).ticks).toEqual([
-      65, 70, 75, 80, 85, 90,
+      70, 75, 80, 85, 90,
     ]);
   });
 
@@ -39,14 +40,16 @@ describe('computeChartScale: デザイン案のデータパターン11種', () =
     expect(computeChartScale([70, 70, 70, 70, 70, 70, 70], KG).ticks).toEqual([65, 70, 75]);
   });
 
-  test('Y-5 2件でも成立する', () => {
-    expect(computeChartScale([65, 72.5], KG).ticks).toEqual([60, 65, 70, 75]);
+  test('Y-5 2件でも成立する（窓は最小レンジの10kgぶん）', () => {
+    const scale = computeChartScale([65, 72.5], KG);
+    expect(scale.ticks).toEqual([65, 67.5, 70, 72.5, 75]);
+    expect(scale.ticks[scale.ticks.length - 1] - scale.ticks[0]).toBe(10);
   });
 
   test('Y-6 外れ値があると、その1点に合わせて刻みが上がる', () => {
     const scale = computeChartScale([60, 62.5, 62.5, 65, 90, 65, 67.5, 67.5], KG);
     expect(scale.step).toBe(10);
-    expect(scale.ticks).toEqual([50, 60, 70, 80, 90, 100]);
+    expect(scale.ticks).toEqual([60, 70, 80, 90, 100]);
   });
 
   test('Y-7 レンジが広いと刻みが段階的に上がり、目盛りはきりのいい値のまま', () => {
@@ -56,13 +59,13 @@ describe('computeChartScale: デザイン案のデータパターン11種', () =
   });
 
   test('Y-8 間隔がまばらでも縦軸の決め方は変わらない（X軸だけの話）', () => {
-    expect(computeChartScale([60, 62.5, 65, 67.5, 70], KG).ticks).toEqual([55, 60, 65, 70, 75]);
+    expect(computeChartScale([60, 62.5, 65, 67.5, 70], KG).ticks).toEqual([60, 65, 70, 75]);
   });
 
   test('Y-9 3桁の重量は刻みが自動で10kgに上がる', () => {
     const scale = computeChartScale([150, 155, 157.5, 160, 162.5, 165, 167.5, 170], KG);
     expect(scale.step).toBe(10);
-    expect(scale.ticks).toEqual([140, 150, 160, 170, 180]);
+    expect(scale.ticks).toEqual([150, 160, 170, 180]);
   });
 
   test('Y-10 軽い重量は刻みを2.5kgまで落とす（5kg刻みだと線が3本しか引けない）', () => {
@@ -75,7 +78,7 @@ describe('computeChartScale: デザイン案のデータパターン11種', () =
 
   test('Y-11 停滞のあとに更新があるデータ', () => {
     expect(computeChartScale([70, 72.5, 72.5, 72.5, 72.5, 72.5, 72.5, 75], KG).ticks).toEqual([
-      65, 70, 75, 80,
+      70, 75, 80,
     ]);
   });
 });
@@ -98,6 +101,33 @@ describe('computeChartScale: 0起点にしない', () => {
     const scale = computeChartScale([60, 75], KG);
     expect(scale.min).toBeLessThan(scale.ticks[0]);
     expect(scale.max).toBeGreaterThan(scale.ticks[scale.ticks.length - 1]);
+  });
+});
+
+describe('computeChartScale: 窓の下端', () => {
+  test('下端はデータの最小値を含むきりのいい目盛りで止める（下に1段足さない）', () => {
+    const cases: [number[], ProgressUnit][] = [
+      [[60, 62.5, 65, 67.5, 70, 72.5, 75], KG],
+      [[85, 82.5, 80, 77.5, 75, 72.5, 70], KG],
+      [[150, 157.5, 162.5, 170], KG],
+      [[8, 9, 10, 11, 12, 13, 14, 16], REPS],
+      [[30, 35, 40, 50, 55, 60, 70], SECONDS],
+      [[3, 3.5, 4, 5, 5.5, 6, 7], KM],
+    ];
+    for (const [values, unit] of cases) {
+      const scale = computeChartScale(values, unit);
+      const lo = Math.min(...values);
+      expect(scale.ticks[0]).toBe(Math.floor(lo / scale.step) * scale.step);
+    }
+  });
+
+  test('伸びが小さい種目でも、データが窓の1/4以上の高さを占める（傾きが読める）', () => {
+    // 直近が 72.5→75kg のように2.5kg幅で伸びている種目。下に1段足していた頃は
+    // 窓が65〜80（15kg）まで広がり、2.5kgの伸びが1/6の高さに潰れていた
+    const values = [72.5, 73, 74, 75];
+    const scale = computeChartScale(values, KG);
+    const window = scale.ticks[scale.ticks.length - 1] - scale.ticks[0];
+    expect((Math.max(...values) - Math.min(...values)) / window).toBeGreaterThanOrEqual(0.25);
   });
 });
 
