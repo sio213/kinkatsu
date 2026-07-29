@@ -455,6 +455,40 @@ describe('種目追加後の自動スクロール・自動フォーカス(過去
     expect(focusSpy).not.toHaveBeenCalled();
   });
 
+  test('フォーカスでキーボードが出切ったところで、追加されたカードの位置へスクロールし直す(キーボード分だけ表示領域が縮み、追加直後に合わせた位置からカードがはみ出すため)', () => {
+    jest.useFakeTimers();
+    try {
+      act(() => {
+        useRoutineDraftStore.getState().hydrate([makeExercise(1)]);
+      });
+      const root = render();
+      fireTransitionEnd();
+      act(() => {
+        root.findByProps({ testID: 'exercise-list' }).props.onLayout({ nativeEvent: { layout: { y: 0 } } });
+        root.findByProps({ testID: 'exercise-item-0' }).props.onLayout({ nativeEvent: { layout: { y: 0 } } });
+      });
+      const scrollTo = jest.spyOn(root.findByType(ScrollView).instance, 'scrollTo');
+
+      act(() => {
+        useRoutineDraftStore.getState().addExercises([makeExercise(2)]);
+      });
+      act(() => {
+        root.findByProps({ testID: 'exercise-item-1' }).props.onLayout({ nativeEvent: { layout: { y: 100 } } });
+      });
+      // 1回目は追加直後(キーボードが出る前)のスクロール
+      expect(scrollTo).toHaveBeenCalledTimes(1);
+
+      act(() => {
+        jest.advanceTimersByTime(400);
+      });
+      // itemY(100) - contentのpaddingTop(12) = 88 へ合わせ直す
+      expect(scrollTo).toHaveBeenCalledTimes(2);
+      expect(scrollTo).toHaveBeenLastCalledWith({ y: 88, animated: true });
+    } finally {
+      jest.useRealTimers();
+    }
+  });
+
   test('同じ画面インスタンス内で複数回追加されても、その都度スクロールする(一度きりのフラグではない)', () => {
     act(() => {
       useRoutineDraftStore.getState().hydrate([makeExercise(1)]);

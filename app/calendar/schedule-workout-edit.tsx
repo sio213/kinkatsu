@@ -242,6 +242,10 @@ export default function ScheduleWorkoutEditScreen() {
           style={styles.scroll}
           contentContainerStyle={exercises.length === 0 ? styles.contentEmpty : styles.content}
           keyboardShouldPersistTaps="handled"
+          // キーボードが開いている間は表示領域がキーボードとフッター（「戻る」）に挟まれて狭くなる。
+          // 他の種目を見るためにスクロールを始めた時点で入力は中断しているはずなので、
+          // ドラッグでキーボードを閉じて一覧を広く見せる
+          keyboardDismissMode="on-drag"
         >
           {exercises.length === 0 ? (
             // 種目0件は、ルーティン削除等の稀なケースに加え、⋮「削除」で最後の1件を消した場合にも
