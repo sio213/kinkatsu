@@ -204,23 +204,25 @@ const PRIMARY_FIELD_UNITS: Record<SetFieldKey, string> = {
 };
 
 /**
- * 重量グラフの内訳カードのセット行用。主指標の数値だけを太字で見せたいので、
- * 「値」と「単位＋残りの列」を分けて返す（例: 75kg×7 → { value: '75', rest: 'kg × 7' }）。
+ * 重量グラフの内訳カードのセット行用。行が「セット番号／値／単位／残りの列」の4列グリッドで、
+ * 桁が違っても値の右端・単位・×回数が縦に揃うようにしているため、値・単位・残りを別々に返す
+ * （例: 75kg×7 → { value: '75', unit: 'kg', trailing: '× 7' }）。
  * 主指標が未入力なら null（そのセットは値として表示できない）。
  * formatHistorySetSummary は1行に詰めた要約用で、こちらは行内で強弱を付けるためのもの
  */
 export function splitSetDisplay(
   columns: SetColumn[],
   set: Partial<Record<SetFieldKey, number | null | undefined>>,
-): { value: string; rest: string } | null {
+): { value: string; unit: string; trailing: string } | null {
   const [primary, ...others] = columns;
   const value = primary.toDisplay(set[primary.key]);
   if (value === '') return null;
   const trailing = others
     .map((c) => c.toDisplay(set[c.key]))
     .filter((v) => v !== '')
-    .map((v) => `× ${v}`);
-  return { value, rest: [PRIMARY_FIELD_UNITS[primary.key], ...trailing].filter(Boolean).join(' ') };
+    .map((v) => `× ${v}`)
+    .join(' ');
+  return { value, unit: PRIMARY_FIELD_UNITS[primary.key], trailing };
 }
 
 export function parseColumnsWithFallback(

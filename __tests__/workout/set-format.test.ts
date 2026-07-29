@@ -414,37 +414,49 @@ describe('splitSetDisplay（重量グラフの内訳カードのセット行）'
     ...values,
   });
 
-  test('重量種目は値と「単位 × 回数」に分かれる', () => {
+  test('重量種目は値・単位・「× 回数」の3つに分かれる', () => {
     expect(splitSetDisplay(MEASUREMENT_COLUMNS.weight_reps, setOf({ weight: 75, reps: 7 }))).toEqual({
       value: '75',
-      rest: 'kg × 7',
+      unit: 'kg',
+      trailing: '× 7',
     });
   });
 
   test('回数種目は単位だけが残る', () => {
     expect(splitSetDisplay(MEASUREMENT_COLUMNS.reps, setOf({ reps: 16 }))).toEqual({
       value: '16',
-      rest: '回',
+      unit: '回',
+      trailing: '',
     });
   });
 
   test('時間種目は"分:秒"が自己説明的なので単位を付けない', () => {
     expect(splitSetDisplay(MEASUREMENT_COLUMNS.time, setOf({ durationSeconds: 90 }))).toEqual({
       value: '1:30',
-      rest: '',
+      unit: '',
+      trailing: '',
     });
   });
 
   test('距離種目は距離が主指標で、時間が後ろに続く', () => {
     expect(
       splitSetDisplay(MEASUREMENT_COLUMNS.distance_time, setOf({ distanceMeters: 3500, durationSeconds: 1500 })),
-    ).toEqual({ value: '3.5', rest: 'km × 25:00' });
+    ).toEqual({ value: '3.5', unit: 'km', trailing: '× 25:00' });
+  });
+
+  test('加重ホールド種目は重量が主指標で、時間が後ろに続く', () => {
+    expect(splitSetDisplay(MEASUREMENT_COLUMNS.weight_time, setOf({ weight: 20, durationSeconds: 45 }))).toEqual({
+      value: '20',
+      unit: 'kg',
+      trailing: '× 0:45',
+    });
   });
 
   test('副指標が未入力なら値と単位だけになる', () => {
     expect(splitSetDisplay(MEASUREMENT_COLUMNS.weight_reps, setOf({ weight: 60 }))).toEqual({
       value: '60',
-      rest: 'kg',
+      unit: 'kg',
+      trailing: '',
     });
   });
 
