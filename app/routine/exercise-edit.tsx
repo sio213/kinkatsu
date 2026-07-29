@@ -5,6 +5,7 @@ import {
   type RoutineTemplateExerciseCardHandle,
 } from '@/components/routines/routine-template-exercise-card';
 import { HeaderMenu, type DropdownMenuItem } from '@/components/ui/dropdown-menu';
+import { FocusedInputScrollProvider } from '@/components/ui/focused-input-scroll-context';
 import { KeyboardAvoidingScreen } from '@/components/ui/keyboard-avoiding-screen';
 import { PrimaryButton } from '@/components/ui/primary-button';
 import { ExerciseEmptyState } from '@/components/workout/exercise-empty-state';
@@ -190,46 +191,48 @@ export default function RoutineExerciseEditScreen() {
         }}
       />
       <KeyboardAvoidingScreen>
-        <ScrollView
-          ref={scrollRef}
-          style={styles.scroll}
-          contentContainerStyle={exercises.length === 0 ? styles.contentEmpty : styles.content}
-          keyboardShouldPersistTaps="handled"
-          // キーボードが開いている間は表示領域がキーボードとフッター（「戻る」）に挟まれて狭くなる。
-          // 他の種目を見るためにスクロールを始めた時点で入力は中断しているはずなので、
-          // ドラッグでキーボードを閉じて一覧を広く見せる
-          keyboardDismissMode="on-drag"
-        >
-          {exercises.length === 0 ? (
-            // トレーニング画面(app/workout/[id].tsx)と同じ空状態デザインに統一する（2026-07-22、
-            // @ユーザー指摘。一度RoutineAddExerciseButtonのvariant="empty"（破線ボックス）へ
-            // 寄せてしまったのを逆方向に修正した）
-            <ExerciseEmptyState onPress={handleAddExercise} />
-          ) : (
-            <View testID="exercise-list" style={styles.list} onLayout={handleListLayout}>
-              {exercises.map((exercise, index) => (
-                <View key={`${exercise.exerciseId}-${index}`} testID={`exercise-item-${index}`} onLayout={handleItemLayout(index)}>
-                  <RoutineTemplateExerciseCard
-                    ref={(handle) => {
-                      if (handle) {
-                        cardRefsRef.current.set(index, handle);
-                        if (lastAddedAt?.index === index) tryFocusAdded();
-                      } else {
-                        cardRefsRef.current.delete(index);
-                      }
-                    }}
-                    exercise={exercise}
-                    index={index}
-                    isFirst={index === 0}
-                    isLast={index === exercises.length - 1}
-                    hasHistory={historyExerciseIds.has(exercise.exerciseId)}
-                  />
-                </View>
-              ))}
-              <RoutineAddExerciseButton variant="ghost" onPress={handleAddExercise} />
-            </View>
-          )}
-        </ScrollView>
+        <FocusedInputScrollProvider scrollRef={scrollRef}>
+          <ScrollView
+            ref={scrollRef}
+            style={styles.scroll}
+            contentContainerStyle={exercises.length === 0 ? styles.contentEmpty : styles.content}
+            keyboardShouldPersistTaps="handled"
+            // キーボードが開いている間は表示領域がキーボードとフッター（「戻る」）に挟まれて狭くなる。
+            // 他の種目を見るためにスクロールを始めた時点で入力は中断しているはずなので、
+            // ドラッグでキーボードを閉じて一覧を広く見せる
+            keyboardDismissMode="on-drag"
+          >
+            {exercises.length === 0 ? (
+              // トレーニング画面(app/workout/[id].tsx)と同じ空状態デザインに統一する（2026-07-22、
+              // @ユーザー指摘。一度RoutineAddExerciseButtonのvariant="empty"（破線ボックス）へ
+              // 寄せてしまったのを逆方向に修正した）
+              <ExerciseEmptyState onPress={handleAddExercise} />
+            ) : (
+              <View testID="exercise-list" style={styles.list} onLayout={handleListLayout}>
+                {exercises.map((exercise, index) => (
+                  <View key={`${exercise.exerciseId}-${index}`} testID={`exercise-item-${index}`} onLayout={handleItemLayout(index)}>
+                    <RoutineTemplateExerciseCard
+                      ref={(handle) => {
+                        if (handle) {
+                          cardRefsRef.current.set(index, handle);
+                          if (lastAddedAt?.index === index) tryFocusAdded();
+                        } else {
+                          cardRefsRef.current.delete(index);
+                        }
+                      }}
+                      exercise={exercise}
+                      index={index}
+                      isFirst={index === 0}
+                      isLast={index === exercises.length - 1}
+                      hasHistory={historyExerciseIds.has(exercise.exerciseId)}
+                    />
+                  </View>
+                ))}
+                <RoutineAddExerciseButton variant="ghost" onPress={handleAddExercise} />
+              </View>
+            )}
+          </ScrollView>
+        </FocusedInputScrollProvider>
         <ScreenFooter>
           <PrimaryButton label="戻る" onPress={() => router.back()} />
         </ScreenFooter>

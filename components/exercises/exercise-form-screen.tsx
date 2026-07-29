@@ -1,4 +1,5 @@
 import { ExerciseForm, type ExerciseFormHandle } from '@/components/exercises/exercise-form';
+import { FocusedInputScrollProvider } from '@/components/ui/focused-input-scroll-context';
 import { FormScrollProvider } from '@/components/ui/form-scroll-context';
 import { KeyboardAvoidingScreen } from '@/components/ui/keyboard-avoiding-screen';
 import { PrimaryButton } from '@/components/ui/primary-button';
@@ -40,14 +41,16 @@ export const ExerciseFormScreen = forwardRef<ExerciseFormScreenHandle, Props>(fu
     <SafeAreaView style={ScreenStyles.safeArea} edges={['bottom']}>
       <KeyboardAvoidingScreen>
         <FormScrollProvider scrollRef={scrollRef}>
-          <ScrollView ref={scrollRef} contentContainerStyle={styles.content} keyboardShouldPersistTaps="handled">
-            <ExerciseForm
-              ref={formRef}
-              initial={initial}
-              onSubmit={onSubmit}
-              onSubmitDisabledChange={setSubmitDisabled}
-            />
-          </ScrollView>
+          <FocusedInputScrollProvider scrollRef={scrollRef}>
+            <ScrollView ref={scrollRef} contentContainerStyle={styles.content} keyboardShouldPersistTaps="handled">
+              <ExerciseForm
+                ref={formRef}
+                initial={initial}
+                onSubmit={onSubmit}
+                onSubmitDisabledChange={setSubmitDisabled}
+              />
+            </ScrollView>
+          </FocusedInputScrollProvider>
         </FormScrollProvider>
         <ScreenFooter>
           <PrimaryButton

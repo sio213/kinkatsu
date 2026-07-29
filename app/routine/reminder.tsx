@@ -1,4 +1,5 @@
 import { ReminderForm, type ReminderFormHandle } from '@/components/reminders/reminder-form';
+import { FocusedInputScrollProvider } from '@/components/ui/focused-input-scroll-context';
 import { FormScrollProvider } from '@/components/ui/form-scroll-context';
 import { KeyboardAvoidingScreen } from '@/components/ui/keyboard-avoiding-screen';
 import { PrimaryButton } from '@/components/ui/primary-button';
@@ -55,18 +56,20 @@ export default function RoutineReminderScreen() {
     <SafeAreaView style={ScreenStyles.safeArea} edges={['bottom']}>
       <KeyboardAvoidingScreen>
         <FormScrollProvider scrollRef={scrollRef}>
-          <ScrollView ref={scrollRef} contentContainerStyle={styles.content} keyboardShouldPersistTaps="handled">
-            <ReminderForm
-              ref={formRef}
-              initial={reminder ?? DEFAULT_INPUT}
-              onSubmit={handleSubmit}
-              onCancel={handleCancel}
-              onSubmitDisabledChange={setSubmitDisabled}
-              submitLabel="保存"
-              showTitleBody={false}
-              hideButtons
-            />
-          </ScrollView>
+          <FocusedInputScrollProvider scrollRef={scrollRef}>
+            <ScrollView ref={scrollRef} contentContainerStyle={styles.content} keyboardShouldPersistTaps="handled">
+              <ReminderForm
+                ref={formRef}
+                initial={reminder ?? DEFAULT_INPUT}
+                onSubmit={handleSubmit}
+                onCancel={handleCancel}
+                onSubmitDisabledChange={setSubmitDisabled}
+                submitLabel="保存"
+                showTitleBody={false}
+                hideButtons
+              />
+            </ScrollView>
+          </FocusedInputScrollProvider>
         </FormScrollProvider>
         <ScreenFooter>
           <PrimaryButton label="保存" onPress={() => formRef.current?.submit()} disabled={submitDisabled} />

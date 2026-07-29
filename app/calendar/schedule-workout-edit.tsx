@@ -1,6 +1,7 @@
 import { ScheduledWorkoutExerciseCard } from '@/components/calendar/scheduled-workout-exercise-card';
 import { RoutineAddExerciseButton } from '@/components/routines/routine-add-exercise-button';
 import { HeaderMenu, type DropdownMenuItem } from '@/components/ui/dropdown-menu';
+import { FocusedInputScrollProvider } from '@/components/ui/focused-input-scroll-context';
 import { HeaderTitle } from '@/components/ui/header-title';
 import { KeyboardAvoidingScreen } from '@/components/ui/keyboard-avoiding-screen';
 import { NotFoundScreen } from '@/components/ui/not-found-screen';
@@ -237,48 +238,50 @@ export default function ScheduleWorkoutEditScreen() {
         }}
       />
       <KeyboardAvoidingScreen>
-        <ScrollView
-          ref={scrollRef}
-          style={styles.scroll}
-          contentContainerStyle={exercises.length === 0 ? styles.contentEmpty : styles.content}
-          keyboardShouldPersistTaps="handled"
-          // キーボードが開いている間は表示領域がキーボードとフッター（「戻る」）に挟まれて狭くなる。
-          // 他の種目を見るためにスクロールを始めた時点で入力は中断しているはずなので、
-          // ドラッグでキーボードを閉じて一覧を広く見せる
-          keyboardDismissMode="on-drag"
-        >
-          {exercises.length === 0 ? (
-            // 種目0件は、ルーティン削除等の稀なケースに加え、⋮「削除」で最後の1件を消した場合にも
-            // 到達するようになった（2026-07-22、@ユーザー指摘で安全網を撤廃）。トレーニング画面
-            // (app/workout/[id].tsx)と同じ空状態デザインに統一する（2026-07-22、@ユーザー指摘。
-            // 一度RoutineAddExerciseButtonのvariant="empty"（破線ボックス）へ寄せてしまったのを
-            // 逆方向に修正した）
-            <ExerciseEmptyState onPress={handleAddExercise} />
-          ) : (
-            <View style={styles.list}>
-              {exercises.map((exercise, index) => (
-                <ScheduledWorkoutExerciseCard
-                  key={exercise.scheduledWorkoutExerciseId}
-                  exercise={exercise}
-                  isFirst={index === 0}
-                  isLast={index === exercises.length - 1}
-                  onSwap={() =>
-                    handleSwap(
-                      exercise.scheduledWorkoutExerciseId,
-                      exercise.exerciseId,
-                      exercise.name,
-                      exercise.sets.some(hasAnyValue),
-                    )
-                  }
-                  onDelete={() => handleDelete(exercise.scheduledWorkoutExerciseId)}
-                  onMoveUp={() => handleMove(exercise.scheduledWorkoutExerciseId, 'up')}
-                  onMoveDown={() => handleMove(exercise.scheduledWorkoutExerciseId, 'down')}
-                />
-              ))}
-              <RoutineAddExerciseButton variant="ghost" onPress={handleAddExercise} />
-            </View>
-          )}
-        </ScrollView>
+        <FocusedInputScrollProvider scrollRef={scrollRef}>
+          <ScrollView
+            ref={scrollRef}
+            style={styles.scroll}
+            contentContainerStyle={exercises.length === 0 ? styles.contentEmpty : styles.content}
+            keyboardShouldPersistTaps="handled"
+            // キーボードが開いている間は表示領域がキーボードとフッター（「戻る」）に挟まれて狭くなる。
+            // 他の種目を見るためにスクロールを始めた時点で入力は中断しているはずなので、
+            // ドラッグでキーボードを閉じて一覧を広く見せる
+            keyboardDismissMode="on-drag"
+          >
+            {exercises.length === 0 ? (
+              // 種目0件は、ルーティン削除等の稀なケースに加え、⋮「削除」で最後の1件を消した場合にも
+              // 到達するようになった（2026-07-22、@ユーザー指摘で安全網を撤廃）。トレーニング画面
+              // (app/workout/[id].tsx)と同じ空状態デザインに統一する（2026-07-22、@ユーザー指摘。
+              // 一度RoutineAddExerciseButtonのvariant="empty"（破線ボックス）へ寄せてしまったのを
+              // 逆方向に修正した）
+              <ExerciseEmptyState onPress={handleAddExercise} />
+            ) : (
+              <View style={styles.list}>
+                {exercises.map((exercise, index) => (
+                  <ScheduledWorkoutExerciseCard
+                    key={exercise.scheduledWorkoutExerciseId}
+                    exercise={exercise}
+                    isFirst={index === 0}
+                    isLast={index === exercises.length - 1}
+                    onSwap={() =>
+                      handleSwap(
+                        exercise.scheduledWorkoutExerciseId,
+                        exercise.exerciseId,
+                        exercise.name,
+                        exercise.sets.some(hasAnyValue),
+                      )
+                    }
+                    onDelete={() => handleDelete(exercise.scheduledWorkoutExerciseId)}
+                    onMoveUp={() => handleMove(exercise.scheduledWorkoutExerciseId, 'up')}
+                    onMoveDown={() => handleMove(exercise.scheduledWorkoutExerciseId, 'down')}
+                  />
+                ))}
+                <RoutineAddExerciseButton variant="ghost" onPress={handleAddExercise} />
+              </View>
+            )}
+          </ScrollView>
+        </FocusedInputScrollProvider>
         <ScreenFooter>
           <PrimaryButton label="戻る" onPress={() => router.back()} />
         </ScreenFooter>
