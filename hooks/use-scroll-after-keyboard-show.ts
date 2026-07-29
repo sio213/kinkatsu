@@ -31,6 +31,17 @@ export function useScrollAfterKeyboardShow() {
       cancelRef.current?.();
       scroll();
     };
+    // 既にキーボードが出ている（＝入力欄から別の入力欄へフォーカスを移した）場合は
+    // keyboardDidShowが来ないうえ、レイアウトも縮み終わっているので待つ必要がない。
+    // ただしUIKitの自動スクロールより後に効かせたいので1フレームだけ遅らせる
+    if (Keyboard.isVisible()) {
+      const frame = requestAnimationFrame(run);
+      cancelRef.current = () => {
+        cancelAnimationFrame(frame);
+        cancelRef.current = null;
+      };
+      return;
+    }
     const subscription = Keyboard.addListener('keyboardDidShow', run);
     const timer = setTimeout(run, FALLBACK_DELAY_MS);
     cancelRef.current = () => {

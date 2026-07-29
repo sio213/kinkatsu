@@ -1,3 +1,4 @@
+import { useScrollFocusedInputIntoView } from '@/components/ui/focused-input-scroll-context';
 import { Colors } from '@/constants/theme';
 import { forwardRef, useRef, type ForwardedRef } from 'react';
 import {
@@ -45,10 +46,11 @@ type Props = TextInputProps & {
 // になっているため既定値として持たせ、呼び出し側はradius・paddingHorizontal・ghost時の色など
 // 実際に異なる差分だけをboxStyle/styleで上書きする。
 export const BoxedTextInput = forwardRef<TextInput, Props>(function BoxedTextInput(
-  { height, boxStyle, bare, style, ...rest }: Props,
+  { height, boxStyle, bare, style, onFocus, ...rest }: Props,
   ref,
 ) {
   const innerRef = useRef<TextInput | null>(null);
+  const scrollFocusedInputIntoView = useScrollFocusedInputIntoView();
   return (
     // 箱をPressableにして、文字が無い余白部分（左右padding・上下の空き）をタップしても
     // 入力欄にフォーカスできるようにする。TextInput自身は文字の自然高さ・幅ぶんしか当たり判定を
@@ -72,6 +74,12 @@ export const BoxedTextInput = forwardRef<TextInput, Props>(function BoxedTextInp
           assignRef(ref, node);
         }}
         style={[styles.text, style as StyleProp<TextStyle>, styles.forced]}
+        // キーボードと下部固定フッターに隠れる位置なら、見える位置までスクロールする
+        // （FocusedInputScrollProviderで包まれた画面のみ。それ以外では何も起きない）
+        onFocus={(e) => {
+          scrollFocusedInputIntoView(innerRef.current);
+          onFocus?.(e);
+        }}
         {...rest}
       />
     </Pressable>

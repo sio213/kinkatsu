@@ -1,5 +1,6 @@
 import { ContextBar } from '@/components/ui/context-bar';
 import { HeaderMenu, type DropdownMenuItem } from '@/components/ui/dropdown-menu';
+import { FocusedInputScrollProvider } from '@/components/ui/focused-input-scroll-context';
 import { HeaderTitle } from '@/components/ui/header-title';
 import { IconSymbol } from '@/components/ui/icon-symbol';
 import { KeyboardAvoidingScreen } from '@/components/ui/keyboard-avoiding-screen';
@@ -300,54 +301,56 @@ export default function WorkoutScreen() {
         {sessionExercises.length === 0 ? (
           <ExerciseEmptyState onPress={handleAddExercise} />
         ) : (
-          <FlatList
-            ref={listRef}
-            style={styles.exerciseList}
-            contentContainerStyle={styles.exerciseListContent}
-            data={sessionExercises}
-            keyExtractor={(item) => String(item.sessionExerciseId)}
-            renderItem={({ item, index }) => {
-              const prefilledEntry = prefilledByCardId.get(item.sessionExerciseId);
-              return (
-                <ListErrorBoundary>
-                  <SessionExerciseCard
-                    ref={(handle) => {
-                      if (handle) {
-                        cardRefsRef.current.set(item.sessionExerciseId, handle);
-                        if (pendingFocusIdRef.current === item.sessionExerciseId) tryFocus();
-                      } else {
-                        cardRefsRef.current.delete(item.sessionExerciseId);
-                      }
-                    }}
-                    exercise={item}
-                    sessionId={sessionId}
-                    sets={sessionSets.get(item.sessionExerciseId) ?? EMPTY_SETS}
-                    collapsed={collapsedIds.has(item.sessionExerciseId)}
-                    isFirst={index === 0}
-                    isLast={index === sessionExercises.length - 1}
-                    previousSessionExerciseId={sessionExercises[index - 1]?.sessionExerciseId ?? null}
-                    nextSessionExerciseId={sessionExercises[index + 1]?.sessionExerciseId ?? null}
-                    onToggleCollapsed={handleToggleCollapsed}
-                    onInteract={handleInteract}
-                    prefilledSetIds={prefilledEntry?.prefilledSetIds ?? EMPTY_PREFILLED_SET_IDS}
-                    hasHistory={exercisesWithHistory.has(item.id)}
-                  />
-                </ListErrorBoundary>
-              );
-            }}
-            ListFooterComponent={
-              <AddExerciseButton onPress={handleAddExercise} style={styles.addExerciseBtnInline} />
-            }
-            keyboardShouldPersistTaps="handled"
-            // キーボードが開いている間は表示領域がキーボードとフッター（「トレーニングを終了」）に
-            // 挟まれて狭くなる。他の種目を見るためにスクロールを始めた時点で入力は中断しているはず
-            // なので、ドラッグでキーボードを閉じて一覧を広く見せる
-            keyboardDismissMode="on-drag"
-            // scrollToIndexは対象がまだ描画されていないと失敗する（未指定だと例外になる）。
-            // 追加された種目は必ず末尾側のため、末尾送りで代用する。ここで再度scrollToIndexを
-            // 呼ぶと失敗が連鎖しうるので試みない
-            onScrollToIndexFailed={() => listRef.current?.scrollToEnd({ animated: true })}
-          />
+          <FocusedInputScrollProvider scrollRef={listRef}>
+            <FlatList
+              ref={listRef}
+              style={styles.exerciseList}
+              contentContainerStyle={styles.exerciseListContent}
+              data={sessionExercises}
+              keyExtractor={(item) => String(item.sessionExerciseId)}
+              renderItem={({ item, index }) => {
+                const prefilledEntry = prefilledByCardId.get(item.sessionExerciseId);
+                return (
+                  <ListErrorBoundary>
+                    <SessionExerciseCard
+                      ref={(handle) => {
+                        if (handle) {
+                          cardRefsRef.current.set(item.sessionExerciseId, handle);
+                          if (pendingFocusIdRef.current === item.sessionExerciseId) tryFocus();
+                        } else {
+                          cardRefsRef.current.delete(item.sessionExerciseId);
+                        }
+                      }}
+                      exercise={item}
+                      sessionId={sessionId}
+                      sets={sessionSets.get(item.sessionExerciseId) ?? EMPTY_SETS}
+                      collapsed={collapsedIds.has(item.sessionExerciseId)}
+                      isFirst={index === 0}
+                      isLast={index === sessionExercises.length - 1}
+                      previousSessionExerciseId={sessionExercises[index - 1]?.sessionExerciseId ?? null}
+                      nextSessionExerciseId={sessionExercises[index + 1]?.sessionExerciseId ?? null}
+                      onToggleCollapsed={handleToggleCollapsed}
+                      onInteract={handleInteract}
+                      prefilledSetIds={prefilledEntry?.prefilledSetIds ?? EMPTY_PREFILLED_SET_IDS}
+                      hasHistory={exercisesWithHistory.has(item.id)}
+                    />
+                  </ListErrorBoundary>
+                );
+              }}
+              ListFooterComponent={
+                <AddExerciseButton onPress={handleAddExercise} style={styles.addExerciseBtnInline} />
+              }
+              keyboardShouldPersistTaps="handled"
+              // キーボードが開いている間は表示領域がキーボードとフッター（「トレーニングを終了」）に
+              // 挟まれて狭くなる。他の種目を見るためにスクロールを始めた時点で入力は中断しているはず
+              // なので、ドラッグでキーボードを閉じて一覧を広く見せる
+              keyboardDismissMode="on-drag"
+              // scrollToIndexは対象がまだ描画されていないと失敗する（未指定だと例外になる）。
+              // 追加された種目は必ず末尾側のため、末尾送りで代用する。ここで再度scrollToIndexを
+              // 呼ぶと失敗が連鎖しうるので試みない
+              onScrollToIndexFailed={() => listRef.current?.scrollToEnd({ animated: true })}
+            />
+          </FocusedInputScrollProvider>
         )}
 
         {isActive ? (

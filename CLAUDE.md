@@ -96,6 +96,9 @@ kinkatsu用のGoogle Driveフォルダが `仕事 > Webサービス > 🏋️ ki
 - TextInputを含み、かつ下部に固定フッター（保存・決定・戻る・追加などのボタン）を持つ画面は、`SafeAreaView`の内側・スクロール本体＋フッターの外側を `components/ui/keyboard-avoiding-screen.tsx` の `KeyboardAvoidingScreen` で包む。これでキーボードが開いてもフッターがキーボードの上に乗り、閉じずに押せる
 - **素の`KeyboardAvoidingView`をそのまま置いても直らない。** `keyboardVerticalOffset`にヘッダー高さを渡す必要がある（KeyboardAvoidingViewは自身のonLayout＝親からの相対座標とキーボードの画面座標を突き合わせて余白を計算するため、ヘッダー＋ステータスバーの分だけ余白が足りない）。`KeyboardAvoidingScreen`が`HeaderHeightContext`からこれを補っている
 - `KeyboardAvoidingScreen`で包んだスクロールビューに `contentInset={{ bottom: keyboardInset }}`（`hooks/use-keyboard-inset.ts`）を併用しない。スクロール領域自体がキーボードの上に収まるため二重に効いてしまう。`useKeyboardInset`は**固定フッターを持たない**一覧画面（種目一覧・リマインダー一覧）専用
+- **`KeyboardAvoidingScreen`で包んだ画面は、スクロールビューをさらに `components/ui/focused-input-scroll-context.tsx` の `FocusedInputScrollProvider` で包み、`scrollRef` を渡す。** これが無いと、入力欄をタップしてもキーボードとフッターの裏に隠れたままになる。iOSにはフォーカスした入力欄をキーボードの上へ出すUIKit自身の自動スクロールがあるが、`KeyboardAvoidingScreen`でスクロールビュー自体がキーボードの上に収まる構成ではUIKitから見て「隠れていない」ため何もしてくれない（実際には表示領域が縮んだ分だけフッターの裏へはみ出す）。入力欄が `BoxedTextInput` なら配線はこれだけで済む（`onFocus`で自動的に呼ばれる）。レイアウトには手を入れないので既存の余白・スクロール挙動は変わらない
+- フォーカス後のスクロールは必ず `hooks/use-scroll-after-keyboard-show.ts` の `useScrollAfterKeyboardShow` を通す。`focus()`と同じフレームで`scrollTo`しても、UIKitの自動スクロールと`KeyboardAvoidingScreen`の高さ縮小に上書きされて効かない
+- 種目カードが縦に並ぶ画面（トレーニング中・ルーティンの種目編集・予定の種目編集）は `keyboardDismissMode="on-drag"`。キーボードが開いている間は表示領域がキーボードとフッターに挟まれて狭いため、スクロールを始めたらキーボードを閉じて一覧を広く見せる
 
 ### ナビゲーション・タブバーの表示範囲
 下部タブは4本（記録／カレンダー／種目／設定）で確定。当面再編しない。
