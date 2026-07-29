@@ -17,8 +17,10 @@ const MIN_GUTTER = 30;
 const INSET = 6;
 
 const TICK_FONT_SIZE = 9.5;
-/** X軸に出す日付ラベルの数 */
+/** X軸に出す日付ラベルの数（重なる場合はここから間引かれる） */
 const X_TICK_COUNT = 4;
+/** X軸ラベル同士に最低限空ける隙間。これを確保できない中間ラベルは落とす */
+const X_LABEL_GAP = 8;
 
 /** マーカーを全点に描く下限の平均間隔。これ未満だと間引き、8px未満で消す */
 const DOT_FULL_SPACING = 14;
@@ -52,6 +54,8 @@ export type ChartPoint = {
   index: number;
 };
 
+export type XTick = { x: number; label: string; anchor: 'start' | 'middle' | 'end' };
+
 export type ChartLayout = {
   width: number;
   height: number;
@@ -72,7 +76,7 @@ export type ChartLayout = {
   /** 自己ベストの点の添字。同値なら最初に到達した回。点が無ければnull */
   bestIndex: number | null;
   /** X軸ラベル（位置と文字列） */
-  xTicks: { x: number; label: string; anchor: 'start' | 'middle' | 'end' }[];
+  xTicks: XTick[];
 };
 
 /**
@@ -153,23 +157,61 @@ export function computeChartLayout(
     points: chartPoints,
     markerIndices: pickMarkerIndices(points.length, spacing),
     bestIndex: findBestIndex(points),
-    xTicks: pickXTickIndices(points.length).map((i) => ({
-      x: chartPoints[i].x,
-      label: formatDateLabel(points[i].dateKey, withYear),
-      anchor: points.length < 2 ? 'middle' : i === 0 ? 'start' : i === points.length - 1 ? 'end' : 'middle',
-    })),
+    xTicks: pickXTicks(chartPoints, withYear),
   };
 }
 
-/** X軸ラベルを出す点の添字。等間隔に4つ取り、点が少ないときは重複を落とす */
-export function pickXTickIndices(count: number): number[] {
-  if (count === 0) return [];
-  const indices: number[] = [];
-  for (let k = 0; k < X_TICK_COUNT; k++) {
-    const i = Math.round(((count - 1) * k) / (X_TICK_COUNT - 1));
-    if (!indices.includes(i)) indices.push(i);
+/** ラベルが実際に占める横方向の区間。アンカーによって基準点の左右どちらに伸びるかが変わる */
+type PlacedTick = { tick: XTick; start: number; end: number };
+
+function placeXTick(points: ChartPoint[], index: number, withYear: boolean): PlacedTick {
+  const x = points[index].x;
+  const label = formatDateLabel(points[index].point.dateKey, withYear);
+  const anchor: XTick['anchor'] =
+    index === 0 ? 'start' : index === points.length - 1 ? 'end' : 'middle';
+  const width = estimateTextWidth(label, TICK_FONT_SIZE);
+  const start = anchor === 'start' ? x : anchor === 'end' ? x - width : x - width / 2;
+  return { tick: { x, label, anchor }, start, end: start + width };
+}
+
+/**
+ * X軸に出す日付ラベル。
+ *
+ * 件数ではなくX座標を等分し、その目標位置に最も近い記録を選ぶ。件数で等分すると、記録が
+ * 偏っている期間（例: 3日連続で記録した後に3週間空く）で選ばれた点のX座標が数pxに密集し、
+ * ラベル同士が重なってしまうため。
+ *
+ * それでも近すぎる場合は、文字幅の見積もりから重なる中間ラベルを落とす。期間の始まりと
+ * 終わりが分かるように両端のラベルは必ず残す（両端は常にプロットの左右端にあり重ならない）。
+ */
+function pickXTicks(points: ChartPoint[], withYear: boolean): XTick[] {
+  if (points.length === 0) return [];
+
+  const leftX = points[0].x;
+  const rightX = points[points.length - 1].x;
+  // 点が1つだけ、または全点が同じ日なら横に並ばないので中央に1つだけ出す
+  if (leftX === rightX) {
+    return [{ ...placeXTick(points, 0, withYear).tick, anchor: 'middle' }];
   }
-  return indices;
+
+  const candidates: number[] = [];
+  for (let k = 0; k < X_TICK_COUNT; k++) {
+    const targetX = leftX + ((rightX - leftX) * k) / (X_TICK_COUNT - 1);
+    const index = nearestIndexByX(points, targetX);
+    if (!candidates.includes(index)) candidates.push(index);
+  }
+
+  const placed = candidates.map((index) => placeXTick(points, index, withYear));
+  const last = placed[placed.length - 1];
+  const kept = [placed[0]];
+  for (const tick of placed.slice(1, -1)) {
+    const prev = kept[kept.length - 1];
+    if (tick.start - prev.end >= X_LABEL_GAP && last.start - tick.end >= X_LABEL_GAP) {
+      kept.push(tick);
+    }
+  }
+  kept.push(last);
+  return kept.map((p) => p.tick);
 }
 
 export type BestChipBox = { x: number; y: number; width: number; height: number; label: string };
@@ -227,9 +269,13 @@ export function placeBestChip(layout: ChartLayout, unit: ProgressUnit): BestChip
  */
 export function findNearestPointIndex(layout: ChartLayout, x: number): number | null {
   if (layout.points.length === 0) return null;
+  return nearestIndexByX(layout.points, x);
+}
+
+function nearestIndexByX(points: ChartPoint[], x: number): number {
   let nearest = 0;
   let minDistance = Infinity;
-  for (const p of layout.points) {
+  for (const p of points) {
     const distance = Math.abs(p.x - x);
     if (distance < minDistance) {
       minDistance = distance;
