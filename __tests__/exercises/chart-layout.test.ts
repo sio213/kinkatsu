@@ -8,6 +8,7 @@ import {
   placeBestChip,
   placeTooltip,
   starPoints,
+  type ChartLayout,
 } from '@/lib/exercises/chart-layout';
 import { findPersonalBest, type ProgressPoint, type ProgressUnit } from '@/lib/exercises/progress';
 
@@ -53,7 +54,7 @@ const S3 = [60, 60, 62.5, 62.5, 65, 65, 67.5, 65, 67.5, 70, 70, 72.5, 72.5, 75];
 const WIDTH = 353;
 
 /** 表示中の点＝全期間の系列（期間で絞っていない）という、ほとんどのケースの前提 */
-const layoutOf = (points: ProgressPoint[], unit: ProgressUnit = KG) =>
+const layoutOf = (points: ProgressPoint[], unit: ProgressUnit) =>
   computeChartLayout(points, unit, WIDTH, findPersonalBest(points));
 
 describe('computeChartLayout', () => {
@@ -256,13 +257,31 @@ describe('ベストチップの配置', () => {
     }
   });
 
+  test('最長のラベル（3桁＋小数の重量に年つきの日付）でも、狭い端末ではみ出さない', () => {
+    // 「ベスト 102.5kg・2025/10/6」。日付が付くぶんチップはプロット幅の7割近くを占める
+    const best = makePoints([102.5]).map((p) => ({
+      ...p,
+      dateKey: new Date(2025, 9, 6).getTime(),
+      startedAt: new Date(2025, 9, 6).getTime(),
+    }))[0];
+    for (const width of [280, 320, 353]) {
+      const layout = computeChartLayout(makePoints([60, 70, 65]), KG, width, best);
+      const chip = placeBestChip(layout, KG)!;
+      expect(chip.label + chip.date).toBe('ベスト 102.5kg・2025/10/6');
+      expect(chip.x).toBeGreaterThanOrEqual(layout.left);
+      expect(chip.x + chip.width).toBeLessThanOrEqual(layout.right);
+    }
+  });
+
   test('単位に応じたラベルになる', () => {
     const layout = layoutOf(makePoints([3, 7]), KM);
     expect(placeBestChip(layout, KM)!.label).toBe('ベスト 7km');
   });
 
-  test('点が無ければチップを出さない', () => {
-    expect(placeBestChip(layoutOf([], KG), KG)).toBeNull();
+  test('点が無ければ、自己ベストがあってもチップを出さない', () => {
+    // 期間チップで表示が空になった状態。値だけのチップが宙に浮くのを避ける
+    const all = makePoints([80, 70]);
+    expect(placeBestChip(computeChartLayout([], KG, WIDTH, findPersonalBest(all)), KG)).toBeNull();
   });
 });
 
@@ -271,6 +290,10 @@ describe('自己ベストが表示期間の外にあるとき', () => {
   const all = makePoints([80, 70, 70, 72.5, 70, 67.5, 70, 72.5]);
   const shown = all.slice(-3);
   const layout = () => computeChartLayout(shown, KG, WIDTH, findPersonalBest(all));
+  const chipText = (l: ChartLayout) => {
+    const chip = placeBestChip(l, KG)!;
+    return chip.label + chip.date;
+  };
 
   test('アンバーの点は描かない（表示中の点列に自己ベストの日が無い）', () => {
     expect(layout().bestIndex).toBeNull();
@@ -278,25 +301,58 @@ describe('自己ベストが表示期間の外にあるとき', () => {
 
   test('チップは全期間の自己ベストの値を出し続ける（期間内最大に書き換わらない）', () => {
     // 表示中の最大は72.5kgだが、チップは全期間の80kgのまま
-    expect(placeBestChip(layout(), KG)!.label).toMatch(/^ベスト 80kg・/);
+    expect(chipText(layout())).toContain('80kg');
+    expect(chipText(layout())).not.toContain('72.5');
   });
 
   test('チップに日付を添える（点が無いまま値だけ浮くのを避ける）', () => {
-    expect(placeBestChip(layout(), KG)!.label).toBe('ベスト 80kg・4/12');
+    expect(chipText(layout())).toBe('ベスト 80kg・4/12');
+  });
+
+  test('日付は本体と分けて返す（描画で一段弱くするため）', () => {
+    const chip = placeBestChip(layout(), KG)!;
+    expect(chip.label).toBe('ベスト 80kg');
+    expect(chip.date).toBe('・4/12');
   });
 
   test('自己ベストが表示期間内にあるときは日付を添えない', () => {
-    expect(placeBestChip(layoutOf(all, KG), KG)!.label).toBe('ベスト 80kg');
+    const chip = placeBestChip(layoutOf(all, KG), KG)!;
+    expect(chip.label).toBe('ベスト 80kg');
+    expect(chip.date).toBe('');
+  });
+
+  test('自己ベストが表示範囲の最初の点と同日なら期間内扱いになる', () => {
+    const layoutFromBest = computeChartLayout(all.slice(0, 3), KG, WIDTH, findPersonalBest(all));
+    expect(layoutFromBest.bestIndex).toBe(0);
+    expect(placeBestChip(layoutFromBest, KG)!.date).toBe('');
+  });
+
+  test('同値タイが期間内外にまたがっても、期間内の同値の点にアンバーを付けない', () => {
+    // 全期間の先頭2点が同値80kg。自己ベストは先に到達した方（＝期間外）
+    const tied = [{ ...all[0] }, { ...all[1], value: 80 }, ...all.slice(2)];
+    const layoutTied = computeChartLayout(tied.slice(1), KG, WIDTH, findPersonalBest(tied));
+    // 値だけで探すと2点目にアンバーが付いてしまう。日付で突き合わせているので付かない
+    expect(layoutTied.bestIndex).toBeNull();
   });
 
   test('自己ベストが表示中の記録と別の年なら年も出す（4/12だけでは去年と区別できない）', () => {
-    const older = makePoints([80]).map((p) => ({
+    const older = [
+      { ...all[0], dateKey: new Date(2025, 9, 6).getTime(), startedAt: new Date(2025, 9, 6).getTime() },
+      ...all.slice(1),
+    ];
+    expect(chipText(computeChartLayout(shown, KG, WIDTH, findPersonalBest(older)))).toBe(
+      'ベスト 80kg・2025/10/6',
+    );
+  });
+
+  test('年末年始をまたぐと暦日が近くても年を出す', () => {
+    const dec31 = { ...all[0], dateKey: new Date(2025, 11, 31).getTime(), startedAt: new Date(2025, 11, 31).getTime() };
+    const jan = makePoints([70, 72.5]).map((p, i) => ({
       ...p,
-      dateKey: new Date(2025, 9, 6).getTime(),
-      startedAt: new Date(2025, 9, 6).getTime(),
+      dateKey: new Date(2026, 0, 1 + i).getTime(),
+      startedAt: new Date(2026, 0, 1 + i).getTime(),
     }));
-    const layoutAcrossYears = computeChartLayout(shown, KG, WIDTH, older[0]);
-    expect(placeBestChip(layoutAcrossYears, KG)!.label).toBe('ベスト 80kg・2025/10/6');
+    expect(chipText(computeChartLayout(jan, KG, WIDTH, dec31))).toBe('ベスト 80kg・2025/12/31');
   });
 });
 
@@ -367,7 +423,7 @@ describe('ツールチップ', () => {
     const index = 5;
     const natural = placeTooltip(layout, index, texts, null)!;
     // ちょうど重なる位置にベストチップがある状況を作る
-    const chip = { x: natural.x, y: natural.y, width: 80, height: 19, label: 'ベスト 75kg' };
+    const chip = { x: natural.x, y: natural.y, width: 80, height: 19, label: 'ベスト 75kg', date: '' };
     const tip = placeTooltip(layout, index, texts, chip)!;
     expect(tip.y).toBe(natural.y);
     expect(tip.x).toBeGreaterThanOrEqual(chip.x + chip.width);
@@ -383,6 +439,7 @@ describe('ツールチップ', () => {
       width: layout.right - layout.left,
       height: 19,
       label: 'ベスト 75kg',
+      date: '',
     };
     const tip = placeTooltip(layout, index, texts, chip)!;
     expect(tip.y).toBeGreaterThan(layout.points[index].y);

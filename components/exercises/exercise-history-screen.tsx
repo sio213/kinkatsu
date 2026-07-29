@@ -8,7 +8,7 @@ import { useDebouncedPush } from '@/hooks/use-debounced-push';
 import { useExercise } from '@/hooks/use-exercises';
 import { useExerciseProgress } from '@/hooks/use-exercise-progress';
 import { resolveMeasurementType } from '@/lib/exercises/constants';
-import { findBestIndex, type ProgressPoint } from '@/lib/exercises/progress';
+import { findPersonalBest, type ProgressPoint } from '@/lib/exercises/progress';
 import { toMonthSections } from '@/lib/workout/summary';
 import { Stack, useLocalSearchParams, useRouter } from 'expo-router';
 import { useMemo } from 'react';
@@ -40,12 +40,10 @@ export function ExerciseHistoryScreen({ insideTabBar = false }: Props) {
   const measurementType = resolveMeasurementType(exercise?.measurementType);
   const { series, loaded, failed } = useExerciseProgress(exerciseId, measurementType);
 
-  const bestIndex = useMemo(() => findBestIndex(series.points), [series.points]);
+  // ベストの判定は全期間の系列で行う（グラフのアンバー・内訳カードのバッジと同じ入口）
+  const personalBest = useMemo(() => findPersonalBest(series.points), [series.points]);
   // 系列は古い順なので、一覧は新しい順に並べ替えてから月でまとめる
-  const sections = useMemo(
-    () => toMonthSections(series.points.map((point, index) => ({ ...point, index })).reverse()),
-    [series.points],
-  );
+  const sections = useMemo(() => toMonthSections([...series.points].reverse()), [series.points]);
 
   const safeAreaEdges = insideTabBar ? ([] as const) : (['bottom'] as const);
   // 件数はサブタイトルではなく一覧の見出し行に置く（デザイン案の採用案4-2）。
@@ -75,13 +73,13 @@ export function ExerciseHistoryScreen({ insideTabBar = false }: Props) {
           style={styles.list}
           sections={sections}
           keyExtractor={(item) => String(item.dateKey)}
-          renderItem={({ item }: { item: ProgressPoint & { index: number } }) => (
+          renderItem={({ item }: { item: ProgressPoint }) => (
             // 他の一覧と同じく、1行の描画例外で画面全体を落とさないよう行単位で囲う
             <ListErrorBoundary>
               <ExerciseRecordCard
                 point={item}
                 measurementType={measurementType}
-                isBest={item.index === bestIndex}
+                isBest={item.dateKey === personalBest?.dateKey}
                 onPress={(sessionId) => push(`/workout/${sessionId}`)}
               />
             </ListErrorBoundary>

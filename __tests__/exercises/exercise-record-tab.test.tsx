@@ -131,4 +131,39 @@ describe('ExerciseRecordTab', () => {
     expect(allTexts(root)).toContain('80');
     expect(allTexts(root)).toContain('自己ベスト');
   });
+
+  describe('グラフの読み上げ', () => {
+    // グラフはSVGなので、チップやアンバーの点は読み上げに乗らない。コンテナのラベルが頼り。
+    // 幅はonLayoutで自分で測る作りなので、読む前に一度レイアウトを流す
+    const chartLabel = (root: ReactTestInstance) => {
+      const container = root.findAll((n) => n.props.accessibilityRole === 'image')[0];
+      act(() => {
+        container.props.onLayout({ nativeEvent: { layout: { width: 353 } } });
+      });
+      return root.findAll((n) => n.props.accessibilityRole === 'image')[0].props
+        .accessibilityLabel as string;
+    };
+
+    test('自己ベストの点を選んでいれば「自己ベスト」と読み上げる', () => {
+      const root = render(points);
+      pressChip(root, '全期間');
+      selectPoint(root, 0);
+      expect(chartLabel(root)).toContain('自己ベスト');
+    });
+
+    test('自己ベストでない点を選んでいるときは言わない', () => {
+      const root = render(points);
+      pressChip(root, '全期間');
+      selectPoint(root, 1);
+      expect(chartLabel(root)).not.toContain('自己ベスト');
+    });
+
+    test('自己ベストが表示期間の外にあることを、選択と関係なく伝える', () => {
+      const root = render(points);
+      pressChip(root, '1ヶ月');
+      // 晴眼者にはチップの文字で見えている情報が、読み上げから消えないようにする
+      expect(chartLabel(root)).toContain('自己ベストは表示期間の外');
+      expect(chartLabel(root)).toContain('80kg');
+    });
+  });
 });

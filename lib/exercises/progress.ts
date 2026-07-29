@@ -234,7 +234,7 @@ function resolveUnit(measurementType: MeasurementType, rawValues: number[]): Pro
  * （computePersonalBestIds が「後からタイしただけの日ではなく最初に達成した日」を選ぶのと同じ）。
  * グラフのアンバーの点と、過去の記録一覧のベストバッジで同じ判定を使う
  */
-export function findBestIndex(points: ProgressPoint[]): number | null {
+function findBestIndex(points: ProgressPoint[]): number | null {
   if (points.length === 0) return null;
   let best = 0;
   for (let i = 1; i < points.length; i++) {
@@ -247,8 +247,8 @@ export function findBestIndex(points: ProgressPoint[]): number | null {
  * 自己ベストの点そのもの。**期間で絞る前の全期間の系列を渡すこと**。
  *
  * 「自己ベスト」は期間チップで意味が変わってはいけない値なので、絞り込み後の配列を渡さない
- * ことを名前で示すために findBestIndex とは別の入口を用意している（グラフのアンバーの点・
- * ベストチップ、内訳カードのバッジ、過去の記録一覧のバッジがすべてこの1つの判定を共有する）。
+ * ことを名前で強制するため、添字を返す findBestIndex は非exportにしてこちらを唯一の入口にしている
+ * （グラフのアンバーの点・ベストチップ、内訳カードのバッジ、過去の記録一覧のバッジが全てこれを使う）。
  */
 export function findPersonalBest(allPoints: ProgressPoint[]): ProgressPoint | null {
   const index = findBestIndex(allPoints);

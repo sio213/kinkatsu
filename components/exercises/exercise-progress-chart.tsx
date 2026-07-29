@@ -1,5 +1,6 @@
 import { Colors } from '@/constants/theme';
 import {
+  BEST_CHIP_FONT_SIZE,
   CHART_HEIGHT,
   computeChartLayout,
   findNearestPointIndex,
@@ -35,7 +36,6 @@ const DOT_RADIUS = 3;
 const DOT_STROKE_WIDTH = 2;
 const BEST_DOT_RADIUS = 4;
 const TICK_FONT_SIZE = 9.5;
-const BEST_CHIP_FONT_SIZE = 10.5;
 /** 中間のグリッドは破線、下端の軸線だけ実線にする */
 const GRID_DASH = '3 4';
 
@@ -153,10 +153,21 @@ export function ExerciseProgressChart({ points, unit, personalBest, selectedInde
       tooltipTexts.date,
       `${tooltipTexts.value}${tooltipTexts.unit}`,
       tooltipTexts.aux,
-      selectedIndex != null && selectedIndex === layout?.bestIndex ? '自己ベスト' : null,
+      selected != null && selected.index === layout?.bestIndex ? '自己ベスト' : null,
     ]
       .filter(Boolean)
       .join('、');
+
+  // 自己ベストが表示期間の外にあると、晴眼者にはチップの文字で見えているのに読み上げでは
+  // 存在ごと消えてしまう。選択と関係なく1文で添える
+  const outOfRangeBestLabel =
+    layout && layout.bestIndex == null && bestChip
+      ? `自己ベストは表示期間の外（${bestChip.label.replace('ベスト ', '')}${bestChip.date}）。`
+      : '';
+
+  const chartLabel = selectionLabel
+    ? `記録の推移グラフ。${outOfRangeBestLabel}選択中: ${selectionLabel}`
+    : `記録の推移グラフ。${outOfRangeBestLabel}`.trimEnd();
 
   return (
     <GestureDetector gesture={gesture}>
@@ -164,9 +175,7 @@ export function ExerciseProgressChart({ points, unit, personalBest, selectedInde
         style={styles.container}
         onLayout={handleLayout}
         accessibilityRole="image"
-        accessibilityLabel={
-          selectionLabel ? `記録の推移グラフ。選択中: ${selectionLabel}` : '記録の推移グラフ'
-        }
+        accessibilityLabel={chartLabel}
         accessibilityHint="グラフを押すか横になぞると、その位置に一番近い記録を選びます"
       >
         {layout && (
@@ -308,6 +317,12 @@ export function ExerciseProgressChart({ points, unit, personalBest, selectedInde
                   fill={Colors.chartBestText}
                 >
                   {bestChip.label}
+                  {/* 期間外の日付は補足なので、ツールチップの補助情報と同じく一段弱くする */}
+                  {bestChip.date !== '' && (
+                    <TSpan fontWeight="600" fillOpacity={0.75}>
+                      {bestChip.date}
+                    </TSpan>
+                  )}
                 </SvgText>
               </>
             )}

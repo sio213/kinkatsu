@@ -32,7 +32,7 @@ type Props = {
   previousPoint: ProgressPoint | null;
   /**
    * この日が全期間の自己ベストか。trueのときだけ区切り線の直下にアンバーのバッジを出す。
-   * 判定は過去の記録一覧のベストバッジと同じ findBestIndex（同値タイは最初に到達した日）
+   * 判定は過去の記録一覧のベストバッジと同じ findPersonalBest（同値タイは最初に到達した日）
    */
   isPersonalBest: boolean;
   /** 見出し右端の > を押したとき。その日の記録編集画面へ遷移する */

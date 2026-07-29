@@ -3,7 +3,7 @@ import { DesignIcon } from '@/components/ui/design-icon';
 import { RecordListHeading } from '@/components/workout/record-list-heading';
 import { Colors, IconSizes, Typography } from '@/constants/theme';
 import type { MeasurementType } from '@/lib/exercises/constants';
-import { findBestIndex, type ProgressPoint } from '@/lib/exercises/progress';
+import { findPersonalBest, type ProgressPoint } from '@/lib/exercises/progress';
 import { useMemo } from 'react';
 import { StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 
@@ -31,28 +31,22 @@ export function ExerciseRecordHistoryList({
   onPressRecord,
   onPressSeeAll,
 }: Props) {
-  const bestIndex = useMemo(() => findBestIndex(points), [points]);
+  // ベストの判定は全期間の系列で行う（グラフのアンバー・内訳カードのバッジと同じ入口）
+  const personalBest = useMemo(() => findPersonalBest(points), [points]);
   // 新しい順に3件
-  const recent = useMemo(
-    () =>
-      points
-        .map((point, index) => ({ point, index }))
-        .slice(-RECENT_RECORD_COUNT)
-        .reverse(),
-    [points],
-  );
+  const recent = useMemo(() => [...points].slice(-RECENT_RECORD_COUNT).reverse(), [points]);
 
   return (
     <View style={styles.container}>
       <RecordListHeading label="過去の記録" count={points.length} style={styles.heading} />
 
       <View style={styles.cards}>
-        {recent.map(({ point, index }) => (
+        {recent.map((point) => (
           <ExerciseRecordCard
             key={point.dateKey}
             point={point}
             measurementType={measurementType}
-            isBest={index === bestIndex}
+            isBest={point.dateKey === personalBest?.dateKey}
             onPress={onPressRecord}
           />
         ))}

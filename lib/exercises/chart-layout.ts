@@ -30,7 +30,8 @@ const DOT_MIN_SPACING = 8;
 /** ベストチップの寸法と、点との衝突判定に使うマーカーの実効半径 */
 const BEST_CHIP_HEIGHT = 19;
 const BEST_CHIP_PAD = 28;
-const BEST_CHIP_FONT_SIZE = 10.5;
+/** チップの文字サイズ。幅の見積もりと実際の描画（exercise-progress-chart.tsx）がズレないよう共有する */
+export const BEST_CHIP_FONT_SIZE = 10.5;
 const COLLISION_RADIUS = 11;
 
 const DAY_MS = 86_400_000;
@@ -233,7 +234,16 @@ function pickXTicks(points: ChartPoint[], withYear: boolean): XTick[] {
   return kept.map((p) => p.tick);
 }
 
-export type BestChipBox = { x: number; y: number; width: number; height: number; label: string };
+export type BestChipBox = {
+  x: number;
+  y: number;
+  width: number;
+  height: number;
+  /** 本体（「ベスト 80kg」）。太字のアンバーで描く */
+  label: string;
+  /** 自己ベストが表示期間の外にあるときだけの補足（「・4/12」）。本体より弱く描く。無ければ空文字 */
+  date: string;
+};
 
 /**
  * 自己ベストが表示期間の外にあるとき、チップに添える日付。
@@ -261,11 +271,18 @@ function outOfRangeDate(layout: ChartLayout, best: ProgressPoint): string {
  */
 export function placeBestChip(layout: ChartLayout, unit: ProgressUnit): BestChipBox | null {
   const best = layout.personalBest;
-  if (best == null) return null;
-  const value = `ベスト ${formatTickValue(best.value)}${unit.label}`;
-  const label = layout.bestIndex == null ? `${value}・${outOfRangeDate(layout, best)}` : value;
-  const width = Math.round(estimateTextWidth(label, BEST_CHIP_FONT_SIZE) + BEST_CHIP_PAD);
+  // 点が1つも無いグラフにチップだけ浮かせない。personalBestは表示期間と無関係に非nullに
+  // なり得るので、bestIndexのnullチェックではこの条件を兼ねられない
+  if (best == null || layout.points.length === 0) return null;
+  const label = `ベスト ${formatTickValue(best.value)}${unit.label}`;
+  // 期間外の日付は本体の値より一段弱く描くので、幅の見積もりだけ合算して別々に返す
+  const date = layout.bestIndex == null ? `・${outOfRangeDate(layout, best)}` : '';
+  const width = Math.round(estimateTextWidth(label + date, BEST_CHIP_FONT_SIZE) + BEST_CHIP_PAD);
   const height = BEST_CHIP_HEIGHT;
+
+  // 3桁＋小数の重量に年つきの日付が付くと（「ベスト 102.5kg・2025/10/6」）チップは
+  // プロット幅の7割を超える。どの候補位置を選んでもプロットからはみ出さないよう最後に丸める
+  const clampX = (x: number) => Math.max(layout.left + 2, Math.min(x, layout.right - width - 2));
 
   const overlaps = (x: number, y: number) =>
     layout.points.filter(
@@ -278,11 +295,11 @@ export function placeBestChip(layout: ChartLayout, unit: ProgressUnit): BestChip
 
   // 既定は最上段のグリッド線のすぐ下
   const topRow = layout.tickYs[layout.tickYs.length - 1] + 4;
-  const leftX = layout.left + 6;
-  const rightX = layout.right - 6 - width;
+  const leftX = clampX(layout.left + 6);
+  const rightX = clampX(layout.right - 6 - width);
 
-  if (overlaps(leftX, topRow) === 0) return { x: leftX, y: topRow, width, height, label };
-  if (overlaps(rightX, topRow) === 0) return { x: rightX, y: topRow, width, height, label };
+  if (overlaps(leftX, topRow) === 0) return { x: leftX, y: topRow, width, height, label, date };
+  if (overlaps(rightX, topRow) === 0) return { x: rightX, y: topRow, width, height, label, date };
 
   // 左右とも塞がっていれば、上の段から順に「点が最も少ない段」を探す
   let bestBox = { x: leftX, y: topRow, score: overlaps(leftX, topRow) };
@@ -297,7 +314,7 @@ export function placeBestChip(layout: ChartLayout, unit: ProgressUnit): BestChip
     if (bestBox.score === 0) break;
   }
 
-  return { x: bestBox.x, y: bestBox.y, width, height, label };
+  return { x: bestBox.x, y: bestBox.y, width, height, label, date };
 }
 
 /**
