@@ -14,6 +14,7 @@ import { Colors, ScreenStyles, Typography } from '@/constants/theme';
 import { useAutoCollapseCompletedExercises } from '@/hooks/use-auto-collapse-completed-exercises';
 import { useDebouncedPush } from '@/hooks/use-debounced-push';
 import { useRoutines } from '@/hooks/use-routines';
+import { useScrollAfterKeyboardShow } from '@/hooks/use-scroll-after-keyboard-show';
 import { useTickingNow } from '@/hooks/use-ticking-now';
 import {
   EMPTY_PREFILLED_SET_IDS,
@@ -23,6 +24,7 @@ import {
   useSessionSetCount,
   useSessionSets,
   useWorkoutSession,
+  type SessionExercise,
 } from '@/hooks/use-workout-session';
 import { subscribePrefilled } from '@/lib/workout/prefill-feedback';
 import { deleteSession, endWorkoutSession, type PrefilledCard } from '@/lib/workout/session';
@@ -67,6 +69,22 @@ export default function WorkoutScreen() {
   const cardRefsRef = useRef<Map<number, SessionExerciseCardHandle>>(new Map());
   const pendingFocusIdRef = useRef<number | null>(null);
   const readyToFocusRef = useRef(false);
+  // 追加されたカードの頭出しはフォーカス（＝キーボード表示）と同時に行っても効かないため、
+  // キーボードが出切ってから実行する（理由はhooks/use-scroll-after-keyboard-show.ts）
+  const listRef = useRef<FlatList<SessionExercise>>(null);
+  const scrollAfterKeyboardShow = useScrollAfterKeyboardShow();
+  // スクロールはキーボード表示後（=このコールバックの生成時点より後）に実行するため、
+  // その時点の最新の並びをrefで参照する。tryFocusをsessionExercisesに依存させると
+  // transitionEndリスナの張り直しが種目の更新ごとに起きてしまう
+  const sessionExercisesRef = useRef(sessionExercises);
+  sessionExercisesRef.current = sessionExercises;
+  const scrollToCard = useCallback((sessionExerciseId: number) => {
+    const index = sessionExercisesRef.current.findIndex((e) => e.sessionExerciseId === sessionExerciseId);
+    if (index < 0) return;
+    // カードの上端を表示領域の上端に合わせる。キーボードで表示領域が縮んでいても、
+    // 入力するのはカード上部の1セット目なので確実に見える位置になる
+    listRef.current?.scrollToIndex({ index, viewPosition: 0, animated: true });
+  }, []);
   const tryFocus = useCallback(() => {
     const targetId = pendingFocusIdRef.current;
     if (targetId == null || !readyToFocusRef.current) return;
@@ -74,7 +92,8 @@ export default function WorkoutScreen() {
     if (!handle) return;
     handle.focusFirstSet();
     pendingFocusIdRef.current = null;
-  }, []);
+    scrollAfterKeyboardShow(() => scrollToCard(targetId));
+  }, [scrollAfterKeyboardShow, scrollToCard]);
   useEffect(() => {
     return navigation.addListener('transitionEnd', (e) => {
       if (!e.data.closing) {
@@ -282,6 +301,7 @@ export default function WorkoutScreen() {
           <ExerciseEmptyState onPress={handleAddExercise} />
         ) : (
           <FlatList
+            ref={listRef}
             style={styles.exerciseList}
             contentContainerStyle={styles.exerciseListContent}
             data={sessionExercises}
@@ -319,6 +339,14 @@ export default function WorkoutScreen() {
               <AddExerciseButton onPress={handleAddExercise} style={styles.addExerciseBtnInline} />
             }
             keyboardShouldPersistTaps="handled"
+            // キーボードが開いている間は表示領域がキーボードとフッター（「トレーニングを終了」）に
+            // 挟まれて狭くなる。他の種目を見るためにスクロールを始めた時点で入力は中断しているはず
+            // なので、ドラッグでキーボードを閉じて一覧を広く見せる
+            keyboardDismissMode="on-drag"
+            // scrollToIndexは対象がまだ描画されていないと失敗する（未指定だと例外になる）。
+            // 追加された種目は必ず末尾側のため、末尾送りで代用する。ここで再度scrollToIndexを
+            // 呼ぶと失敗が連鎖しうるので試みない
+            onScrollToIndexFailed={() => listRef.current?.scrollToEnd({ animated: true })}
           />
         )}
 

@@ -9,6 +9,7 @@ import { KeyboardAvoidingScreen } from '@/components/ui/keyboard-avoiding-screen
 import { PrimaryButton } from '@/components/ui/primary-button';
 import { ExerciseEmptyState } from '@/components/workout/exercise-empty-state';
 import { ScreenStyles } from '@/constants/theme';
+import { useScrollAfterKeyboardShow } from '@/hooks/use-scroll-after-keyboard-show';
 import { useExercisesWithHistory } from '@/hooks/use-workout-session';
 import { useRoutineDraftStore } from '@/lib/routines/draft-store';
 import { NO_SESSION_TO_EXCLUDE } from '@/lib/workout/history';
@@ -43,19 +44,24 @@ export default function RoutineExerciseEditScreen() {
   const itemOffsetsRef = useRef<Record<number, number>>({});
   const scrolledToFocusRef = useRef(false);
 
+  // 対象カードの上端をそのまま画面上端に合わせるとcontentのpaddingTop分だけ他の画面より
+  // 詰まって見えるため、通常スクロール時と同じ見た目のリズムになるよう差し引く。
+  // list・対象カードのどちらかがまだ測れていなければ何もしない
+  const scrollToCard = useCallback((index: number, animated: boolean) => {
+    const listY = listOffsetRef.current;
+    const itemY = itemOffsetsRef.current[index];
+    if (listY == null || itemY == null) return false;
+    scrollRef.current?.scrollTo({ y: Math.max(0, listY + itemY - styles.content.paddingTop), animated });
+    return true;
+  }, []);
+
   const tryScrollToFocus = useCallback(() => {
     if (scrolledToFocusRef.current || focusIndex == null) return;
-    const listY = listOffsetRef.current;
-    const itemY = itemOffsetsRef.current[focusIndex];
-    if (listY == null || itemY == null) return;
-    scrolledToFocusRef.current = true;
     // 画面遷移のスライドが終わる前に確定させ、遷移完了時には既にその位置にいるように見せる
-    // (遷移後に改めてスクロールするとジャンプが二重に見えてしまう)。
-    // 対象カードの上端をそのまま画面上端に合わせるとcontentのpaddingTop分だけ他の画面より
-    // 詰まって見えるため、通常スクロール時と同じ見た目のリズムになるよう差し引く
-    const y = Math.max(0, listY + itemY - styles.content.paddingTop);
-    scrollRef.current?.scrollTo({ y, animated: false });
-  }, [focusIndex]);
+    // (遷移後に改めてスクロールするとジャンプが二重に見えてしまう)
+    if (!scrollToCard(focusIndex, false)) return;
+    scrolledToFocusRef.current = true;
+  }, [focusIndex, scrollToCard]);
 
   // 種目追加ピッカー・過去の記録から読み込む(セッション単位)画面から戻った直後、追加された
   // 最初のカードまで自動スクロールする。focusIndexと違いこの画面を離れず何度でも起こりうるため、
@@ -66,6 +72,7 @@ export default function RoutineExerciseEditScreen() {
   // に安定id(DBのidに相当するもの)が無いため配列indexを使うが、追加直後の一度きりの参照にしか
   // 使わないため、その後の並び替え・削除でindexがズレても影響しない
   const cardRefsRef = useRef<Map<number, RoutineTemplateExerciseCardHandle>>(new Map());
+  const scrollAfterKeyboardShow = useScrollAfterKeyboardShow();
   // フォーカス(=キーボード表示)はスクロールと違い、画面遷移のスライドアニメーション中に起きると
   // キーボードがせり出しながらレイアウトが動く見た目のジャンクになる（トレーニング中画面
   // (app/workout/[id].tsx)がtransitionEndを待ってからfocusFirstSet()する理由と同じ）。
@@ -76,13 +83,9 @@ export default function RoutineExerciseEditScreen() {
 
   const tryScrollToAdded = useCallback(() => {
     if (lastAddedAt == null || lastAddedAt.token === lastHandledScrollTokenRef.current) return;
-    const listY = listOffsetRef.current;
-    const itemY = itemOffsetsRef.current[lastAddedAt.index];
-    if (listY == null || itemY == null) return;
+    if (!scrollToCard(lastAddedAt.index, true)) return;
     lastHandledScrollTokenRef.current = lastAddedAt.token;
-    const y = Math.max(0, listY + itemY - styles.content.paddingTop);
-    scrollRef.current?.scrollTo({ y, animated: true });
-  }, [lastAddedAt]);
+  }, [lastAddedAt, scrollToCard]);
 
   const tryFocusAdded = useCallback(() => {
     if (
@@ -96,8 +99,13 @@ export default function RoutineExerciseEditScreen() {
     const handle = cardRefsRef.current.get(lastAddedAt.index);
     if (!handle) return;
     lastHandledFocusTokenRef.current = lastAddedAt.token;
+    const index = lastAddedAt.index;
     handle.focusFirstSet();
-  }, [lastAddedAt]);
+    // フォーカスでキーボードが開くと表示領域が縮み、tryScrollToAddedで合わせた位置から
+    // 対象カードがはみ出してしまうため、出切ったところで合わせ直す
+    // （理由はhooks/use-scroll-after-keyboard-show.ts）
+    scrollAfterKeyboardShow(() => scrollToCard(index, true));
+  }, [lastAddedAt, scrollAfterKeyboardShow, scrollToCard]);
 
   // ルーティンフォームからexercise-editへの初回遷移(push/replace)・種目追加ピッカーや
   // 過去の記録から読み込む画面からexercise-editへ戻る遷移(pop/dismiss)のどちらでも、
@@ -187,6 +195,10 @@ export default function RoutineExerciseEditScreen() {
           style={styles.scroll}
           contentContainerStyle={exercises.length === 0 ? styles.contentEmpty : styles.content}
           keyboardShouldPersistTaps="handled"
+          // キーボードが開いている間は表示領域がキーボードとフッター（「戻る」）に挟まれて狭くなる。
+          // 他の種目を見るためにスクロールを始めた時点で入力は中断しているはずなので、
+          // ドラッグでキーボードを閉じて一覧を広く見せる
+          keyboardDismissMode="on-drag"
         >
           {exercises.length === 0 ? (
             // トレーニング画面(app/workout/[id].tsx)と同じ空状態デザインに統一する（2026-07-22、

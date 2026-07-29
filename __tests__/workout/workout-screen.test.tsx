@@ -987,3 +987,102 @@ test('同じカードに複数回プリフィル/読み込みイベントが来�
     .find((c) => c.props.exercise.sessionExerciseId === 100)!;
   expect(card.props.prefilledSetIds).toEqual([3, 4]);
 });
+
+describe('種目追加後の頭出し', () => {
+  const bench = {
+    id: 10,
+    name: 'ベンチプレス',
+    category: 'chest',
+    measurementType: 'weight_reps',
+    orderIndex: 0,
+    sessionExerciseId: 100,
+  };
+  const squat = {
+    id: 20,
+    name: 'スクワット',
+    category: 'legs',
+    measurementType: 'weight_reps',
+    orderIndex: 1,
+    sessionExerciseId: 101,
+  };
+
+  // 戻り遷移の完了（app/workout/[id].tsxはこれを待ってからフォーカスする）
+  function fireTransitionEnd() {
+    for (const [event, handler] of mockAddListener.mock.calls) {
+      if (event === 'transitionEnd') (handler as (e: unknown) => void)({ data: { closing: false } });
+    }
+  }
+
+  // 種目追加ピッカーはDBへ書き込んだ直後にpub/subで通知してrouter.back()する
+  function addSquatAndReturn(instance: ReturnType<typeof create>) {
+    act(() => {
+      notifyPrefilled([
+        { sessionId: 1, exerciseId: 20, sessionExerciseId: 101, kind: 'new', prefilledSetIds: [1] },
+      ]);
+    });
+    mockUseSessionExercises.mockReturnValue([bench, squat]);
+    act(() => {
+      instance.update(React.createElement(WorkoutScreen));
+    });
+    act(() => {
+      fireTransitionEnd();
+    });
+  }
+
+  test('追加された種目カードの頭出しは、キーボードが出切ってから行う（フォーカスと同時に動かすとUIKitの自動スクロールとKeyboardAvoidingScreenの縮小に上書きされるため）', () => {
+    mockUseWorkoutSession.mockReturnValue({ session: activeSession, loaded: true });
+    mockUseSessionExercises.mockReturnValue([bench]);
+    let instance!: ReturnType<typeof create>;
+    act(() => {
+      instance = create(React.createElement(WorkoutScreen));
+    });
+    const scrollToIndex = jest.spyOn(instance.root.findByType(FlatList).instance, 'scrollToIndex');
+
+    addSquatAndReturn(instance);
+    expect(scrollToIndex).not.toHaveBeenCalled();
+
+    act(() => {
+      jest.advanceTimersByTime(400);
+    });
+    expect(scrollToIndex).toHaveBeenCalledWith({ index: 1, viewPosition: 0, animated: true });
+  });
+
+  test('種目を追加していないときはスクロールしない（閲覧中に勝手に位置が動かない）', () => {
+    mockUseWorkoutSession.mockReturnValue({ session: activeSession, loaded: true });
+    mockUseSessionExercises.mockReturnValue([bench, squat]);
+    let instance!: ReturnType<typeof create>;
+    act(() => {
+      instance = create(React.createElement(WorkoutScreen));
+    });
+    const scrollToIndex = jest.spyOn(instance.root.findByType(FlatList).instance, 'scrollToIndex');
+
+    act(() => {
+      fireTransitionEnd();
+    });
+    act(() => {
+      jest.advanceTimersByTime(400);
+    });
+
+    expect(scrollToIndex).not.toHaveBeenCalled();
+  });
+
+  test('スクロールの予約中に画面が閉じられてもスクロールしない（アンマウント後のFlatList操作を避ける）', () => {
+    mockUseWorkoutSession.mockReturnValue({ session: activeSession, loaded: true });
+    mockUseSessionExercises.mockReturnValue([bench]);
+    let instance!: ReturnType<typeof create>;
+    act(() => {
+      instance = create(React.createElement(WorkoutScreen));
+    });
+    const scrollToIndex = jest.spyOn(instance.root.findByType(FlatList).instance, 'scrollToIndex');
+
+    addSquatAndReturn(instance);
+    act(() => {
+      instance.unmount();
+    });
+    act(() => {
+      jest.advanceTimersByTime(400);
+    });
+
+    expect(scrollToIndex).not.toHaveBeenCalled();
+  });
+});
