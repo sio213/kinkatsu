@@ -2,7 +2,7 @@ import {
   buildProgressSeries,
   DEFAULT_PROGRESS_PERIOD,
   filterProgressPoints,
-  findBestIndex,
+  findPersonalBest,
   formatProgressAux,
   progressPeriodStart,
   toDayKey,
@@ -295,7 +295,7 @@ describe('進行中セッションの✓未確定セット', () => {
   });
 });
 
-describe('findBestIndex', () => {
+describe('findPersonalBest', () => {
   const points = (values: number[]) =>
     buildProgressSeries(
       'weight_reps',
@@ -303,14 +303,16 @@ describe('findBestIndex', () => {
     ).points;
 
   test('最大値の点を選ぶ', () => {
-    expect(findBestIndex(points([60, 75, 70]))).toBe(1);
+    const p = points([60, 75, 70]);
+    expect(findPersonalBest(p)).toBe(p[1]);
   });
 
   test('同じ値が複数回あるときは最初に到達した回に付ける（後からタイしただけの日は選ばない）', () => {
-    expect(findBestIndex(points([60, 75, 70, 75]))).toBe(1);
+    const p = points([60, 75, 70, 75]);
+    expect(findPersonalBest(p)).toBe(p[1]);
   });
 
   test('点が無ければnull', () => {
-    expect(findBestIndex([])).toBeNull();
+    expect(findPersonalBest([])).toBeNull();
   });
 });

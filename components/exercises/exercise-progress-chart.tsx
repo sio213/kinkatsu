@@ -1,5 +1,6 @@
 import { Colors } from '@/constants/theme';
 import {
+  BEST_CHIP_FONT_SIZE,
   CHART_HEIGHT,
   computeChartLayout,
   findNearestPointIndex,
@@ -35,7 +36,6 @@ const DOT_RADIUS = 3;
 const DOT_STROKE_WIDTH = 2;
 const BEST_DOT_RADIUS = 4;
 const TICK_FONT_SIZE = 9.5;
-const BEST_CHIP_FONT_SIZE = 10.5;
 /** 中間のグリッドは破線、下端の軸線だけ実線にする */
 const GRID_DASH = '3 4';
 
@@ -53,6 +53,11 @@ const TOOLTIP_SUB_FONT_SIZE = 9.5;
 type Props = {
   points: ProgressPoint[];
   unit: ProgressUnit;
+  /**
+   * 全期間の自己ベスト（findPersonalBest の結果）。期間で絞ったpointsから求めた値を渡さないこと。
+   * 表示期間の外にあってもチップは値を出し続け、アンバーの点だけが描かれなくなる
+   */
+  personalBest: ProgressPoint | null;
   /** 選択中の点。点が無いときはnull */
   selectedIndex: number | null;
   onSelect: (index: number) => void;
@@ -79,12 +84,12 @@ function areaPath(layout: ChartLayout): string {
  * 幅は親から測って渡すのではなく onLayout で自分で測る。種目詳細の本文パディングや将来の
  * 画面幅の違いをこのコンポーネントが知らなくて済むようにするため。
  */
-export function ExerciseProgressChart({ points, unit, selectedIndex, onSelect }: Props) {
+export function ExerciseProgressChart({ points, unit, personalBest, selectedIndex, onSelect }: Props) {
   const [width, setWidth] = useState(0);
 
   const layout = useMemo(
-    () => (width > 0 ? computeChartLayout(points, unit, width) : null),
-    [points, unit, width],
+    () => (width > 0 ? computeChartLayout(points, unit, width, personalBest) : null),
+    [points, unit, width, personalBest],
   );
   const bestChip = useMemo(() => (layout ? placeBestChip(layout, unit) : null), [layout, unit]);
 
@@ -141,11 +146,28 @@ export function ExerciseProgressChart({ points, unit, selectedIndex, onSelect }:
     [layout],
   );
 
+  // 視覚ではアンバーの点で分かる「自己ベスト」を読み上げにも足す（デザインレビュー指摘）
   const selectionLabel =
     tooltipTexts &&
-    [tooltipTexts.date, `${tooltipTexts.value}${tooltipTexts.unit}`, tooltipTexts.aux]
+    [
+      tooltipTexts.date,
+      `${tooltipTexts.value}${tooltipTexts.unit}`,
+      tooltipTexts.aux,
+      selected != null && selected.index === layout?.bestIndex ? '自己ベスト' : null,
+    ]
       .filter(Boolean)
       .join('、');
+
+  // 自己ベストが表示期間の外にあると、晴眼者にはチップの文字で見えているのに読み上げでは
+  // 存在ごと消えてしまう。選択と関係なく1文で添える
+  const outOfRangeBestLabel =
+    layout && layout.bestIndex == null && bestChip
+      ? `自己ベストは表示期間の外（${bestChip.label.replace('ベスト ', '')}${bestChip.date}）。`
+      : '';
+
+  const chartLabel = selectionLabel
+    ? `記録の推移グラフ。${outOfRangeBestLabel}選択中: ${selectionLabel}`
+    : `記録の推移グラフ。${outOfRangeBestLabel}`.trimEnd();
 
   return (
     <GestureDetector gesture={gesture}>
@@ -153,9 +175,7 @@ export function ExerciseProgressChart({ points, unit, selectedIndex, onSelect }:
         style={styles.container}
         onLayout={handleLayout}
         accessibilityRole="image"
-        accessibilityLabel={
-          selectionLabel ? `記録の推移グラフ。選択中: ${selectionLabel}` : '記録の推移グラフ'
-        }
+        accessibilityLabel={chartLabel}
         accessibilityHint="グラフを押すか横になぞると、その位置に一番近い記録を選びます"
       >
         {layout && (
@@ -297,6 +317,12 @@ export function ExerciseProgressChart({ points, unit, selectedIndex, onSelect }:
                   fill={Colors.chartBestText}
                 >
                   {bestChip.label}
+                  {/* 期間外の日付は補足なので、ツールチップの補助情報と同じく一段弱くする */}
+                  {bestChip.date !== '' && (
+                    <TSpan fontWeight="600" fillOpacity={0.75}>
+                      {bestChip.date}
+                    </TSpan>
+                  )}
                 </SvgText>
               </>
             )}

@@ -1,5 +1,5 @@
 import { computeChartScale, formatTickValue, type ChartScale } from '@/lib/exercises/chart-scale';
-import { findBestIndex, type ProgressPoint, type ProgressUnit } from '@/lib/exercises/progress';
+import type { ProgressPoint, ProgressUnit } from '@/lib/exercises/progress';
 
 /**
  * 重量グラフの座標計算。SVGの描画そのもの（exercise-progress-chart.tsx）から切り離して
@@ -30,7 +30,8 @@ const DOT_MIN_SPACING = 8;
 /** ベストチップの寸法と、点との衝突判定に使うマーカーの実効半径 */
 const BEST_CHIP_HEIGHT = 19;
 const BEST_CHIP_PAD = 28;
-const BEST_CHIP_FONT_SIZE = 10.5;
+/** チップの文字サイズ。幅の見積もりと実際の描画（exercise-progress-chart.tsx）がズレないよう共有する */
+export const BEST_CHIP_FONT_SIZE = 10.5;
 const COLLISION_RADIUS = 11;
 
 const DAY_MS = 86_400_000;
@@ -73,7 +74,15 @@ export type ChartLayout = {
   points: ChartPoint[];
   /** マーカーを描く点の添字。密なときは間引かれ、8px未満では空になる */
   markerIndices: number[];
-  /** 自己ベストの点の添字。同値なら最初に到達した回。点が無ければnull */
+  /**
+   * 全期間の自己ベストの点。期間チップで絞っても変わらない。表示期間の外にある場合も
+   * ここには入る（チップは値を出し続け、点だけが描かれない）
+   */
+  personalBest: ProgressPoint | null;
+  /**
+   * 自己ベストの点の、表示中の点列における添字。自己ベストが表示期間の外にあるときはnull
+   * （アンバーの点は描けない。値は personalBest から読む）
+   */
   bestIndex: number | null;
   /** X軸ラベル（位置と文字列） */
   xTicks: XTick[];
@@ -114,6 +123,12 @@ export function computeChartLayout(
   points: ProgressPoint[],
   unit: ProgressUnit,
   width: number,
+  /**
+   * 全期間の自己ベスト（findPersonalBest の結果）。期間で絞った points から求めては**いけない**——
+   * 1ヶ月表示のたびにその月の最大が「ベスト」になり、内訳カード・過去の記録一覧のバッジと
+   * 食い違うため（アンバーは全期間の自己ベスト専用の色）
+   */
+  personalBest: ProgressPoint | null,
 ): ChartLayout {
   const scale = computeChartScale(points.map((p) => p.value), unit);
   const top = PAD_TOP;
@@ -144,6 +159,10 @@ export function computeChartLayout(
   const spacing = innerWidth / Math.max(points.length - 1, 1);
   const withYear = span >= YEAR_LABEL_SPAN_MS;
 
+  // 自己ベストの日が表示期間に含まれていなければ描く点が無い。チップだけが値を出し続ける
+  const bestAt = personalBest == null ? -1 : points.findIndex((p) => p.dateKey === personalBest.dateKey);
+  const bestIndex = bestAt < 0 ? null : bestAt;
+
   return {
     width,
     height: CHART_HEIGHT,
@@ -156,7 +175,8 @@ export function computeChartLayout(
     tickYs: scale.ticks.map(toY),
     points: chartPoints,
     markerIndices: pickMarkerIndices(points.length, spacing),
-    bestIndex: findBestIndex(points),
+    personalBest,
+    bestIndex,
     xTicks: pickXTicks(chartPoints, withYear),
   };
 }
@@ -214,21 +234,55 @@ function pickXTicks(points: ChartPoint[], withYear: boolean): XTick[] {
   return kept.map((p) => p.tick);
 }
 
-export type BestChipBox = { x: number; y: number; width: number; height: number; label: string };
+export type BestChipBox = {
+  x: number;
+  y: number;
+  width: number;
+  height: number;
+  /** 本体（「ベスト 80kg」）。太字のアンバーで描く */
+  label: string;
+  /** 自己ベストが表示期間の外にあるときだけの補足（「・4/12」）。本体より弱く描く。無ければ空文字 */
+  date: string;
+};
 
 /**
- * ベストチップ（「★ ベスト 75kg」）の置き場所。
+ * 自己ベストが表示期間の外にあるとき、チップに添える日付。
+ *
+ * 点が無い状態で値だけ浮いていると「今どこかにこの値の点があるはず」と誤読されるため、
+ * 「過去のある1日の記録」だと分かるように日付を出す（デザイン相談での採用案）。
+ * 表示中の最新の記録と年が違えば年も出す——「4/12」だけでは去年のベストと区別できないため。
+ */
+function outOfRangeDate(layout: ChartLayout, best: ProgressPoint): string {
+  const latest = layout.points[layout.points.length - 1];
+  const withYear =
+    layout.withYear ||
+    (latest != null && new Date(best.dateKey).getFullYear() !== new Date(latest.point.dateKey).getFullYear());
+  return formatTooltipDate(best.dateKey, withYear);
+}
+
+/**
+ * ベストチップ（「★ ベスト 75kg」）の置き場所。値は**全期間の自己ベスト**で、期間チップを
+ * 切り替えても書き換わらない（アンバー＝自己ベストを画面全体で1つの意味に揃えるため）。
+ * 自己ベストの日が表示期間の外にあるときは「★ ベスト 80kg・4/12」と日付を添える。
  *
  * 基本は右肩上がりのグラフを想定してプロット内の左上に置くが、右肩下がりだとそこに線と点が
  * 通るため、点と重なるなら右上へ、それも塞がっていれば点も数字も無い段を探して逃がす。
  * 衝突判定にはマーカーの実効半径（11px）を含める。
  */
 export function placeBestChip(layout: ChartLayout, unit: ProgressUnit): BestChipBox | null {
-  if (layout.bestIndex == null) return null;
-  const best = layout.points[layout.bestIndex].point.value;
-  const label = `ベスト ${formatTickValue(best)}${unit.label}`;
-  const width = Math.round(estimateTextWidth(label, BEST_CHIP_FONT_SIZE) + BEST_CHIP_PAD);
+  const best = layout.personalBest;
+  // 点が1つも無いグラフにチップだけ浮かせない。personalBestは表示期間と無関係に非nullに
+  // なり得るので、bestIndexのnullチェックではこの条件を兼ねられない
+  if (best == null || layout.points.length === 0) return null;
+  const label = `ベスト ${formatTickValue(best.value)}${unit.label}`;
+  // 期間外の日付は本体の値より一段弱く描くので、幅の見積もりだけ合算して別々に返す
+  const date = layout.bestIndex == null ? `・${outOfRangeDate(layout, best)}` : '';
+  const width = Math.round(estimateTextWidth(label + date, BEST_CHIP_FONT_SIZE) + BEST_CHIP_PAD);
   const height = BEST_CHIP_HEIGHT;
+
+  // 3桁＋小数の重量に年つきの日付が付くと（「ベスト 102.5kg・2025/10/6」）チップは
+  // プロット幅の7割を超える。どの候補位置を選んでもプロットからはみ出さないよう最後に丸める
+  const clampX = (x: number) => Math.max(layout.left + 2, Math.min(x, layout.right - width - 2));
 
   const overlaps = (x: number, y: number) =>
     layout.points.filter(
@@ -241,11 +295,11 @@ export function placeBestChip(layout: ChartLayout, unit: ProgressUnit): BestChip
 
   // 既定は最上段のグリッド線のすぐ下
   const topRow = layout.tickYs[layout.tickYs.length - 1] + 4;
-  const leftX = layout.left + 6;
-  const rightX = layout.right - 6 - width;
+  const leftX = clampX(layout.left + 6);
+  const rightX = clampX(layout.right - 6 - width);
 
-  if (overlaps(leftX, topRow) === 0) return { x: leftX, y: topRow, width, height, label };
-  if (overlaps(rightX, topRow) === 0) return { x: rightX, y: topRow, width, height, label };
+  if (overlaps(leftX, topRow) === 0) return { x: leftX, y: topRow, width, height, label, date };
+  if (overlaps(rightX, topRow) === 0) return { x: rightX, y: topRow, width, height, label, date };
 
   // 左右とも塞がっていれば、上の段から順に「点が最も少ない段」を探す
   let bestBox = { x: leftX, y: topRow, score: overlaps(leftX, topRow) };
@@ -260,7 +314,7 @@ export function placeBestChip(layout: ChartLayout, unit: ProgressUnit): BestChip
     if (bestBox.score === 0) break;
   }
 
-  return { x: bestBox.x, y: bestBox.y, width, height, label };
+  return { x: bestBox.x, y: bestBox.y, width, height, label, date };
 }
 
 /**

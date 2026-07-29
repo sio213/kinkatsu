@@ -1,4 +1,5 @@
 import { DesignIcon } from '@/components/ui/design-icon';
+import { BestBadge } from '@/components/workout/best-badge';
 import { Colors, IconSizes, Typography } from '@/constants/theme';
 import type { MeasurementType } from '@/lib/exercises/constants';
 import type { ProgressPoint } from '@/lib/exercises/progress';
@@ -13,7 +14,13 @@ import { compareToPrevious } from '@/lib/workout/comparison';
 import { MEASUREMENT_COLUMNS, splitSetDisplay } from '@/lib/workout/set-format';
 import { formatRelativeDaysAgo, formatSessionDateGroup } from '@/lib/workout/summary';
 import { useMemo, useState } from 'react';
-import { StyleSheet, Text, TouchableOpacity, View } from 'react-native';
+import { StyleSheet, Text, TouchableOpacity, View, type LayoutChangeEvent } from 'react-native';
+
+/** 列と列の間隔。セット番号↔値の間だけは numberCell の marginRight ぶん広い12px（デザイン案） */
+const COLUMN_GAP = 6;
+
+/** 「他N件を見る」の当たり判定。行の見た目は変えずに44pt相当まで広げる */
+const EXPAND_HIT_SLOP = { top: 10, bottom: 10, left: 10, right: 10 };
 
 type Props = {
   point: ProgressPoint;
@@ -23,41 +30,120 @@ type Props = {
    * （表示期間の外にあっても「直前の記録」であることに変わりはないため）。最初の記録ならnull
    */
   previousPoint: ProgressPoint | null;
+  /**
+   * この日が全期間の自己ベストか。trueのときだけ区切り線の直下にアンバーのバッジを出す。
+   * 判定は過去の記録一覧のベストバッジと同じ findPersonalBest（同値タイは最初に到達した日）
+   */
+  isPersonalBest: boolean;
   /** 見出し右端の > を押したとき。その日の記録編集画面へ遷移する */
   onPressOpen: (sessionId: number) => void;
 };
 
+/**
+ * 1セルぶんの配線。styleは幅を配るセルのView、onLayoutはその中のText（自然幅を測るため、
+ * minWidthを受けたView自身ではなく中身を測る）に渡す
+ */
+type ColumnCell = { style: { minWidth: number }; onLayout: (e: LayoutChangeEvent) => void };
+
+/**
+ * カード内で列幅を揃えるためのフック。
+ *
+ * デザイン案のセット行は内訳ブロック全体で一つのグリッド（列は max-content）だが、RNには
+ * gridの max-content が無いため、各行のセルの自然幅をonLayoutで集めて最大値をminWidthに配る。
+ * 幅は「いま表示している行」だけから決めるので、「他N件を見る」を畳めば元の幅に戻る。
+ *
+ * 測るのはセル内のTextなので、セル側にpaddingを持たせてはいけない。minWidthはborder-boxに効く
+ * ため、最大幅の行だけpaddingぶん広くなって列が揃わなくなる（列間はmarginかgapで取ること）
+ */
+function useColumnWidth(keys: number[]): (key: number) => ColumnCell {
+  const [widths, setWidths] = useState<Record<number, number>>({});
+  const width = keys.reduce((max, key) => Math.max(max, widths[key] ?? 0), 0);
+
+  return (key: number) => ({
+    style: { minWidth: width },
+    onLayout: (e: LayoutChangeEvent) => {
+      const measured = e.nativeEvent.layout.width;
+      setWidths((prev) => (prev[key] === measured ? prev : { ...prev, [key]: measured }));
+    },
+  });
+}
+
+/**
+ * 1行ぶんの表示内容。✓未確定のセットは display を持たない（値があっても「確定した記録」では
+ * ないので数値は出さず、その日にやり残しがあることだけを示す）
+ */
+type SetCell = { row: DetailSetRow; display: ReturnType<typeof splitSetDisplay> };
+
+function buildSetCells(rows: DetailSetRow[], measurementType: MeasurementType): SetCell[] {
+  return rows.map((row) => ({
+    row,
+    display:
+      row.set.completedAt == null ? null : splitSetDisplay(MEASUREMENT_COLUMNS[measurementType], row.set),
+  }));
+}
+
+/**
+ * カード全体が1つの読み上げ単位（TouchableOpacityのaccessible）なので、セット行のTextは
+ * 個別には読まれない。晴眼者が見ている内訳と同じ情報を親のラベルに畳んで渡す
+ */
+function describeSets(cells: SetCell[], comparisonLabel: string | null): string {
+  return cells
+    .map(({ row, display }) => {
+      if (display == null) return `${row.position}セット目 未実施`;
+      const value = [`${display.value}${display.unit}`, display.trailing].filter(Boolean).join(' ');
+      // ★を廃止して視覚的な強弱だけにしたぶん、読み上げでは言葉で補う
+      const best = row.isBest ? '、この日の最大' : '';
+      const delta = row.isBest && comparisonLabel ? `、前回比 ${comparisonLabel}` : '';
+      return `${row.position}セット目 ${value}${best}${delta}`;
+    })
+    .join('、');
+}
+
 function SetRow({
   row,
-  measurementType,
+  display,
   comparisonLabel,
   comparisonIsIncrease,
-}: {
-  row: DetailSetRow;
-  measurementType: MeasurementType;
+  numberCell,
+  valueCell,
+}: SetCell & {
   comparisonLabel: string | null;
   comparisonIsIncrease: boolean;
+  numberCell: ColumnCell;
+  valueCell: ColumnCell;
 }) {
-  const display = splitSetDisplay(MEASUREMENT_COLUMNS[measurementType], row.set);
-  const isUnfinished = row.set.completedAt == null;
-
   return (
     <View style={styles.setRow}>
-      <Text style={styles.setNumber}>{row.position}セット</Text>
-      {display == null || isUnfinished ? (
-        // 進行中セッションでまだ✓を押していないセット。値があっても「確定した記録」ではないので
-        // 数値は出さず、その日にやり残しがあることだけを示す
-        <Text style={styles.unfinished}>未実施</Text>
-      ) : (
-        <>
-          <Text style={styles.setValue}>{display.value}</Text>
-          {display.rest !== '' && <Text style={styles.setRest}>{display.rest}</Text>}
-        </>
-      )}
-      {row.isBest && (
-        <>
-          <DesignIcon name="star" size={14} color={Colors.chartBest} />
-          {comparisonLabel && (
+      <View style={[styles.numberCell, numberCell.style]}>
+        <Text style={styles.setNumber} onLayout={numberCell.onLayout}>
+          {row.position}セット
+        </Text>
+      </View>
+
+      {/* 未実施も値の列に右揃えで置く。列の規則を崩さず上の行の数字と右端が揃う（デザイン案 未-1）。
+          列幅はそのカードで一番長い値が決めるので、未実施の日は「未実施」ぶんまで広がる */}
+      <View style={[styles.valueCell, valueCell.style]}>
+        {display == null ? (
+          <Text style={styles.unfinished} onLayout={valueCell.onLayout}>
+            未実施
+          </Text>
+        ) : (
+          // その日の最大セットは記号を持たず、桁の揃った列の中で一番大きい太い数字で示す。
+          // 旧形のアンバーの★はグラフの自己ベストの点と色も記号も同じで混同するため廃止した
+          <Text style={row.isBest ? styles.bestValue : styles.setValue} onLayout={valueCell.onLayout}>
+            {display.value}
+          </Text>
+        )}
+      </View>
+
+      {display != null && display.unit !== '' && <Text style={styles.unit}>{display.unit}</Text>}
+
+      {display != null && (
+        <View style={styles.trailingCell}>
+          {display.trailing !== '' && <Text style={styles.trailing}>{display.trailing}</Text>}
+          {/* 前回比はその日の最大セットの行に、回数の直後に置く。見出しには置かない
+              （日付が長い月で1行に収まらなくなるため。デザイン案） */}
+          {row.isBest && comparisonLabel && (
             <>
               <Text style={styles.comparisonLabel}>前回比</Text>
               <Text
@@ -70,7 +156,7 @@ function SetRow({
               </Text>
             </>
           )}
-        </>
+        </View>
       )}
     </View>
   );
@@ -90,6 +176,7 @@ export function ExerciseRecordDetailCard({
   point,
   measurementType,
   previousPoint,
+  isPersonalBest,
   onPressOpen,
 }: Props) {
   const [expanded, setExpanded] = useState(false);
@@ -107,9 +194,20 @@ export function ExerciseRecordDetailCard({
     [measurementType, point, previousPoint],
   );
 
-  const rows = useMemo(() => buildDetailSetRows(point, expanded), [point, expanded]);
+  const cells = useMemo(
+    () => buildSetCells(buildDetailSetRows(point, expanded), measurementType),
+    [point, expanded, measurementType],
+  );
   const hidden = hiddenSetCount(point, false);
   const collapsible = point.sets.length >= COLLAPSE_THRESHOLD;
+
+  const positions = cells.map((cell) => cell.row.position);
+  const numberCell = useColumnWidth(positions);
+  const valueCell = useColumnWidth(positions);
+
+  const headerLabel = [dateLabel, relativeLabel, isPersonalBest && '自己ベスト']
+    .filter(Boolean)
+    .join('、');
 
   return (
     // 見出しの > だけでなくカード全体をタップ領域にする。「他N件を見る」は入れ子の
@@ -118,7 +216,7 @@ export function ExerciseRecordDetailCard({
       style={styles.card}
       onPress={() => onPressOpen(point.best.sessionId)}
       accessibilityRole="button"
-      accessibilityLabel={`${dateLabel}${relativeLabel ? `、${relativeLabel}` : ''}の記録`}
+      accessibilityLabel={`${headerLabel}の記録。${describeSets(cells, comparison?.label ?? null)}`}
       accessibilityHint="タップするとこの日の記録を編集できます"
     >
       <View style={styles.header}>
@@ -131,13 +229,23 @@ export function ExerciseRecordDetailCard({
       </View>
 
       <View style={styles.sets}>
-        {rows.map((row) => (
+        {/* アンバーは自己ベスト専用にする。区切り線の直下に独立した行で置き、見出しには入れない
+            （日付が長い月で1行に収まらなくなるため。デザイン案） */}
+        {isPersonalBest && (
+          <View style={styles.personalBestRow}>
+            <BestBadge label="自己ベスト" />
+          </View>
+        )}
+
+        {cells.map((cell) => (
           <SetRow
-            key={row.position}
-            row={row}
-            measurementType={measurementType}
+            key={cell.row.position}
+            row={cell.row}
+            display={cell.display}
             comparisonLabel={comparison?.label ?? null}
             comparisonIsIncrease={(comparison?.delta ?? 0) > 0}
+            numberCell={numberCell(cell.row.position)}
+            valueCell={valueCell(cell.row.position)}
           />
         ))}
 
@@ -146,6 +254,9 @@ export function ExerciseRecordDetailCard({
         {collapsible && (
           <TouchableOpacity
             style={styles.expandRow}
+            // カード全体もタップ領域（記録編集へ遷移）なので、狙って外すと意図しない画面が開く。
+            // 行自体は薄いままタップ判定だけ広げて誤爆を防ぐ
+            hitSlop={EXPAND_HIT_SLOP}
             onPress={() => setExpanded(!expanded)}
             accessibilityRole="button"
             accessibilityState={{ expanded }}
@@ -175,15 +286,29 @@ const styles = StyleSheet.create({
   headerSpacer: { flex: 1 },
 
   // セット内訳は見出しから細い線で区切る
-  sets: { borderTopWidth: 1, borderTopColor: Colors.surfaceSubtle, paddingTop: 3 },
-  setRow: { flexDirection: 'row', alignItems: 'center', gap: 9, paddingVertical: 4 },
+  sets: { borderTopWidth: 1, borderTopColor: Colors.surfaceSubtle, paddingTop: 5 },
+  personalBestRow: { alignItems: 'flex-start', paddingTop: 1, paddingBottom: 4 },
+
+  // 「セット番号 / 値 / 単位 / 回数・前回比」の4列。値は右揃えなので、桁数が違っても
+  // 数値の右端・単位・×回数の左端が縦に揃う（列幅は useColumnWidth が行から決める）
+  setRow: { flexDirection: 'row', alignItems: 'baseline', gap: COLUMN_GAP, paddingVertical: 2 },
+  // 番号↔値の間だけ12px。paddingではなくmarginで取ること——minWidthはborder-boxに効くので、
+  // paddingにすると測った最大幅の行だけ6px広くなって列が揃わなくなる
+  numberCell: { alignItems: 'flex-end', marginRight: COLUMN_GAP },
+  valueCell: { alignItems: 'flex-end' },
+  trailingCell: { flex: 1, flexDirection: 'row', alignItems: 'baseline' },
+
   setNumber: { ...Typography.caption, fontWeight: '600', color: Colors.textSecondary },
-  setValue: { ...Typography.metric, color: Colors.textPrimary },
-  setRest: { ...Typography.footnote, color: Colors.textMuted },
-  unfinished: { ...Typography.footnote, color: Colors.textSecondary },
+  setValue: { ...Typography.caption, fontWeight: '600', color: Colors.textSecondary },
+  // その日の最大セットだけ一段大きい太字にして、他の行との強弱で「この日の最大」を示す。
+  // letterSpacingはデザイン案が14pxの数字に指定している詰め幅（-.2px）
+  bestValue: { ...Typography.metric, fontWeight: '700', color: Colors.textPrimary, letterSpacing: -0.2 },
+  unit: { ...Typography.caption, color: Colors.textMuted },
+  trailing: { ...Typography.caption, color: Colors.textMuted },
+  unfinished: { ...Typography.caption, color: Colors.textSecondary },
   // 「前回比」ラベルと差分は BestBadge・カレンダー選択日パネルと同じ「バッジ的な強調テキスト」の役割
-  comparisonLabel: { ...Typography.badge, fontWeight: '600', color: Colors.textSecondary },
-  comparisonValue: { ...Typography.badge },
+  comparisonLabel: { ...Typography.badge, fontWeight: '600', color: Colors.textSecondary, marginLeft: 8 },
+  comparisonValue: { ...Typography.badge, marginLeft: 3 },
 
   expandRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 4, paddingTop: 4 },
   expandText: { ...Typography.caption, fontWeight: '600', color: Colors.accent },
