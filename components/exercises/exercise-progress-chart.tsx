@@ -47,6 +47,24 @@ const SELECTED_DOT_RADIUS = 4.5;
 const SELECTED_LINE_DASH = '3 3';
 const SELECTED_LINE_OPACITY = 0.55;
 
+/**
+ * ハイライト点の見た目。属性ごとに「選択が優先」「種類が優先」と条件が違って読めなくなるため、
+ * 4通りを表にして持つ。アンバーの塗りは実測の自己ベスト専用（FIX-10）
+ */
+const HIGHLIGHT_DOT: Record<
+  HighlightKind,
+  Record<'base' | 'selected', { r: number; fill: string; stroke?: string; strokeWidth: number }>
+> = {
+  'personal-best': {
+    base: { r: BEST_DOT_RADIUS, fill: Colors.chartBest, strokeWidth: 0 },
+    selected: { r: SELECTED_DOT_RADIUS, fill: Colors.chartBest, stroke: Colors.surface, strokeWidth: 2 },
+  },
+  'metric-max': {
+    base: { r: DOT_RADIUS, fill: Colors.surface, stroke: Colors.accent, strokeWidth: DOT_STROKE_WIDTH },
+    selected: { r: SELECTED_DOT_RADIUS, fill: Colors.accent, stroke: Colors.surface, strokeWidth: 2 },
+  },
+};
+
 const TOOLTIP_DATE_FONT_SIZE = 9.5;
 const TOOLTIP_VALUE_FONT_SIZE = 13;
 const TOOLTIP_SUB_FONT_SIZE = 9.5;
@@ -110,6 +128,7 @@ export function ExerciseProgressChart({
     [layout, unit, highlightKind],
   );
   const isPersonalBest = highlightKind === 'personal-best';
+  const highlightSelected = selectedIndex != null && selectedIndex === layout?.highlightIndex;
 
   const selected = layout && selectedIndex != null ? layout.points[selectedIndex] : null;
   const tooltipTexts = useMemo(() => {
@@ -171,7 +190,7 @@ export function ExerciseProgressChart({
       tooltipTexts.date,
       `${tooltipTexts.value}${tooltipTexts.unit}`,
       tooltipTexts.aux,
-      selected != null && selected.index === layout?.bestIndex
+      selected != null && selected.index === layout?.highlightIndex
         ? isPersonalBest
           ? '自己ベスト'
           : '最高値'
@@ -183,8 +202,8 @@ export function ExerciseProgressChart({
   // ハイライトが表示期間の外にあると、晴眼者にはチップの文字で見えているのに読み上げでは
   // 存在ごと消えてしまう。選択と関係なく1文で添える
   const outOfRangeBestLabel =
-    layout && layout.bestIndex == null && bestChip
-      ? `${isPersonalBest ? '自己ベスト' : '最高値'}は表示期間の外（${bestChip.label.replace(/^(ベスト|最高) /, '')}${bestChip.date}）。`
+    layout && layout.highlightIndex == null && bestChip
+      ? `${isPersonalBest ? '自己ベスト' : '最高値'}は表示期間の外（${bestChip.value}${bestChip.date}）。`
       : '';
 
   const chartLabel = selectionLabel
@@ -254,7 +273,7 @@ export function ExerciseProgressChart({
             )}
 
             {layout.markerIndices.map((i) =>
-              i === layout.bestIndex ? null : (
+              i === layout.highlightIndex ? null : (
                 <Circle
                   key={`dot-${i}`}
                   cx={layout.points[i].x}
@@ -287,8 +306,8 @@ export function ExerciseProgressChart({
                   fill={Colors.accent}
                   opacity={SELECTED_HALO_OPACITY}
                 />
-                {/* ベストの点が選択されている場合は、この下でアンバーのマーカーを重ねて描く */}
-                {selected.index !== layout.bestIndex && (
+                {/* ハイライトの点が選択されている場合は、この下で改めてマーカーを描く */}
+                {selected.index !== layout.highlightIndex && (
                   <Circle
                     cx={selected.x}
                     cy={selected.y}
@@ -303,35 +322,13 @@ export function ExerciseProgressChart({
 
             {/* ハイライトの点はマーカーの間引きに関係なく必ず描く。「最高の日がどこか」は
                 点が密になっても消してはいけないため、これは指標に関係なく守る。
-                自己ベストのときだけアンバーの塗りにし、他の指標では通常のマーカーと同じ見た目で
-                置く（アンバーは自己ベスト専用の色。FIX-10）。
-                選択中は一回り大きくして白枠を付け、青のハローの上に乗せる */}
-            {layout.bestIndex != null && (
+                見た目は HIGHLIGHT_DOT の表のとおり——アンバーの塗りは自己ベスト専用で、
+                他の指標では通常のマーカーと同じ見た目で置く（FIX-10） */}
+            {layout.highlightIndex != null && (
               <Circle
-                cx={layout.points[layout.bestIndex].x}
-                cy={layout.points[layout.bestIndex].y}
-                r={
-                  selectedIndex === layout.bestIndex
-                    ? SELECTED_DOT_RADIUS
-                    : isPersonalBest
-                      ? BEST_DOT_RADIUS
-                      : DOT_RADIUS
-                }
-                fill={
-                  isPersonalBest
-                    ? Colors.chartBest
-                    : selectedIndex === layout.bestIndex
-                      ? Colors.accent
-                      : Colors.surface
-                }
-                stroke={
-                  selectedIndex === layout.bestIndex
-                    ? Colors.surface
-                    : isPersonalBest
-                      ? undefined
-                      : Colors.accent
-                }
-                strokeWidth={selectedIndex === layout.bestIndex ? 2 : isPersonalBest ? 0 : DOT_STROKE_WIDTH}
+                cx={layout.points[layout.highlightIndex].x}
+                cy={layout.points[layout.highlightIndex].y}
+                {...HIGHLIGHT_DOT[highlightKind][highlightSelected ? 'selected' : 'base']}
               />
             )}
 

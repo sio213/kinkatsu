@@ -137,6 +137,7 @@ beforeEach(() => {
     series: emptySeries,
     bestSeries: emptySeries,
     chartMeasurementType: 'weight_reps',
+    metric: 'best',
     loaded: true,
     failed: false,
   });
@@ -424,6 +425,7 @@ describe('記録タブ: 記録0件／1件のとき', () => {
       series,
       bestSeries: series,
       chartMeasurementType: 'weight_reps',
+      metric: 'best',
       loaded: true,
       failed: false,
     });

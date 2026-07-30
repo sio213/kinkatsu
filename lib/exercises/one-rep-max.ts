@@ -1,3 +1,5 @@
+import { isEnteredWeight } from '@/lib/workout/set-format';
+
 /**
  * 推定1RM（1回だけ挙げられる最大重量の推定値）の算出。
  *
@@ -21,6 +23,10 @@
  */
 export const ONE_REP_MAX_REP_LIMIT = 12;
 
+// 重量が入力されているかの判定は set-format と共有する。総重量・最大重量と食い違うと、
+// 同じ日が指標によって出たり消えたりする
+
+
 /**
  * 1セットぶんの推定1RM。算出できないセットは null（グラフの点としては単に存在しなくなる）。
  *
@@ -31,7 +37,7 @@ export const ONE_REP_MAX_REP_LIMIT = 12;
  * 「加重なし」を 0 と打つ人と空欄にする人が同じ意図であり、扱いを揃える必要があるため。
  */
 export function estimateOneRepMax(weight: number | null, reps: number | null): number | null {
-  if (weight == null || weight <= 0) return null;
+  if (!isEnteredWeight(weight)) return null;
   if (reps == null || reps < 1 || reps > ONE_REP_MAX_REP_LIMIT) return null;
   if (reps === 1) return weight;
   // 同値タイの判定と chart-scale の EPS 比較を安定させるため、小数第1位で丸めて持つ

@@ -84,15 +84,16 @@ export type ChartLayout = {
   /** マーカーを描く点の添字。密なときは間引かれ、8px未満では空になる */
   markerIndices: number[];
   /**
-   * 全期間の自己ベストの点。期間チップで絞っても変わらない。表示期間の外にある場合も
-   * ここには入る（チップは値を出し続け、点だけが描かれない）
+   * ハイライトする点（選択中の指標の全期間の最高点）。期間チップで絞っても変わらない。
+   * 表示期間の外にある場合もここには入る（チップは値を出し続け、点だけが描かれない）。
+   * 最大○○指標のときだけこれが実測の自己ベストと一致する（HighlightKind 参照）
    */
-  personalBest: ProgressPoint | null;
+  highlight: ProgressPoint | null;
   /**
-   * 自己ベストの点の、表示中の点列における添字。自己ベストが表示期間の外にあるときはnull
-   * （アンバーの点は描けない。値は personalBest から読む）
+   * ハイライトの点の、表示中の点列における添字。表示期間の外にあるときはnull
+   * （印は描けない。値は highlight から読む）
    */
-  bestIndex: number | null;
+  highlightIndex: number | null;
   /** X軸ラベル（位置と文字列） */
   xTicks: XTick[];
 };
@@ -133,11 +134,10 @@ export function computeChartLayout(
   unit: ProgressUnit,
   width: number,
   /**
-   * 全期間の自己ベスト（findPersonalBest の結果）。期間で絞った points から求めては**いけない**——
-   * 1ヶ月表示のたびにその月の最大が「ベスト」になり、内訳カード・過去の記録一覧のバッジと
-   * 食い違うため（アンバーは全期間の自己ベスト専用の色）
+   * ハイライトする点。期間で絞った points から求めては**いけない**——1ヶ月表示のたびに
+   * その月の最大が「最高」になり、内訳カード・過去の記録一覧のバッジと食い違うため
    */
-  personalBest: ProgressPoint | null,
+  highlight: ProgressPoint | null,
 ): ChartLayout {
   const scale = computeChartScale(points.map((p) => p.value), unit);
   const top = PAD_TOP;
@@ -169,8 +169,8 @@ export function computeChartLayout(
   const withYear = span >= YEAR_LABEL_SPAN_MS;
 
   // 自己ベストの日が表示期間に含まれていなければ描く点が無い。チップだけが値を出し続ける
-  const bestAt = personalBest == null ? -1 : points.findIndex((p) => p.dateKey === personalBest.dateKey);
-  const bestIndex = bestAt < 0 ? null : bestAt;
+  const highlightAt = highlight == null ? -1 : points.findIndex((p) => p.dateKey === highlight.dateKey);
+  const highlightIndex = highlightAt < 0 ? null : highlightAt;
 
   return {
     width,
@@ -184,8 +184,8 @@ export function computeChartLayout(
     tickYs: scale.ticks.map(toY),
     points: chartPoints,
     markerIndices: pickMarkerIndices(points.length, spacing),
-    personalBest,
-    bestIndex,
+    highlight,
+    highlightIndex,
     xTicks: pickXTicks(chartPoints, withYear),
   };
 }
@@ -256,7 +256,11 @@ export type BestChipBox = {
   y: number;
   width: number;
   height: number;
-  /** 本体（「ベスト 80kg」）。太字のアンバーで描く */
+  /** 「ベスト」/「最高」の語。値と分けて持つ——読み上げは値だけを使うため */
+  prefix: string;
+  /** 値と単位（「80kg」）。太字で描く */
+  value: string;
+  /** 描画に使う結合済みの文字列（「ベスト 80kg」） */
   label: string;
   /** 自己ベストが表示期間の外にあるときだけの補足（「・4/12」）。本体より弱く描く。無ければ空文字 */
   date: string;
@@ -295,13 +299,15 @@ export function placeBestChip(
    */
   kind: HighlightKind = 'personal-best',
 ): BestChipBox | null {
-  const best = layout.personalBest;
+  const best = layout.highlight;
   // 点が1つも無いグラフにチップだけ浮かせない。personalBestは表示期間と無関係に非nullに
-  // なり得るので、bestIndexのnullチェックではこの条件を兼ねられない
+  // なり得るので、highlightIndexのnullチェックではこの条件を兼ねられない
   if (best == null || layout.points.length === 0) return null;
-  const label = `${kind === 'personal-best' ? 'ベスト' : '最高'} ${formatTickValue(best.value)}${unit.label}`;
+  const prefix = kind === 'personal-best' ? 'ベスト' : '最高';
+  const value = `${formatTickValue(best.value)}${unit.label}`;
+  const label = `${prefix} ${value}`;
   // 期間外の日付は本体の値より一段弱く描くので、幅の見積もりだけ合算して別々に返す
-  const date = layout.bestIndex == null ? `・${outOfRangeDate(layout, best)}` : '';
+  const date = layout.highlightIndex == null ? `・${outOfRangeDate(layout, best)}` : '';
   const width = Math.round(estimateTextWidth(label + date, BEST_CHIP_FONT_SIZE) + BEST_CHIP_PAD);
   const height = BEST_CHIP_HEIGHT;
 
@@ -323,8 +329,9 @@ export function placeBestChip(
   const leftX = clampX(layout.left + 6);
   const rightX = clampX(layout.right - 6 - width);
 
-  if (overlaps(leftX, topRow) === 0) return { x: leftX, y: topRow, width, height, label, date };
-  if (overlaps(rightX, topRow) === 0) return { x: rightX, y: topRow, width, height, label, date };
+  const box = { width, height, prefix, value, label, date };
+  if (overlaps(leftX, topRow) === 0) return { x: leftX, y: topRow, ...box };
+  if (overlaps(rightX, topRow) === 0) return { x: rightX, y: topRow, ...box };
 
   // 左右とも塞がっていれば、上の段から順に「点が最も少ない段」を探す
   let bestBox = { x: leftX, y: topRow, score: overlaps(leftX, topRow) };
@@ -339,7 +346,7 @@ export function placeBestChip(
     if (bestBox.score === 0) break;
   }
 
-  return { x: bestBox.x, y: bestBox.y, width, height, label, date };
+  return { x: bestBox.x, y: bestBox.y, ...box };
 }
 
 /**

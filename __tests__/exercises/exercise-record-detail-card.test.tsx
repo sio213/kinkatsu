@@ -39,7 +39,7 @@ function renderCard(props: {
   measurementType?: MeasurementType;
   previousPoint?: ProgressPoint | null;
   isPersonalBest?: boolean;
-  metricRow?: { label: string; value: string } | null;
+  metricRow?: { label: string; value: string; unit: string } | null;
 }) {
   const onPressOpen = jest.fn();
   let instance!: ReturnType<typeof create>;

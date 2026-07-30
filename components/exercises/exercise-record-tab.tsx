@@ -1,6 +1,7 @@
 import { ExerciseProgressChart } from '@/components/exercises/exercise-progress-chart';
 import { ExerciseProgressChartSample } from '@/components/exercises/exercise-progress-chart-sample';
 import { ExerciseRecordDetailCard } from '@/components/exercises/exercise-record-detail-card';
+import { MetricFilterChips } from '@/components/exercises/metric-filter-chips';
 import { ExerciseRecordHistoryList } from '@/components/exercises/exercise-record-history-list';
 import { PeriodFilterChips } from '@/components/exercises/period-filter-chips';
 import { DesignIcon } from '@/components/ui/design-icon';
@@ -11,8 +12,8 @@ import { useExerciseProgress } from '@/hooks/use-exercise-progress';
 import { useStartWithConfirm } from '@/hooks/use-start-with-confirm';
 import { useWorkoutSessions } from '@/hooks/use-workout-session';
 import type { MeasurementType } from '@/lib/exercises/constants';
-import { MetricFilterChips } from '@/components/exercises/metric-filter-chips';
 import { formatTickValue } from '@/lib/exercises/chart-scale';
+import { ONE_REP_MAX_REP_LIMIT } from '@/lib/exercises/one-rep-max';
 import {
   availableProgressMetrics,
   DEFAULT_PROGRESS_PERIOD,
@@ -53,11 +54,12 @@ export function ExerciseRecordTab({ exerciseId, exerciseName, measurementType, i
     startWorkoutWithExercise,
   );
   const [period, setPeriod] = useState<ProgressPeriod>(DEFAULT_PROGRESS_PERIOD);
-  const [metric, setMetric] = useState<ProgressMetric>('best');
-  const { series, bestSeries, chartMeasurementType, loaded, failed } = useExerciseProgress(
+  const [requestedMetric, setRequestedMetric] = useState<ProgressMetric>('best');
+  // metricはフックが「その種目で実際に選べる値」に丸めて返したもの。選択状態の表示にも使う
+  const { series, bestSeries, chartMeasurementType, metric, loaded, failed } = useExerciseProgress(
     exerciseId,
     measurementType,
-    metric,
+    requestedMetric,
   );
 
   // 種目によって選べる指標が変わる。1件しか無い（加重ホールド系）ならチップ列ごと出さない
@@ -128,10 +130,25 @@ export function ExerciseRecordTab({ exerciseId, exerciseName, measurementType, i
           />
         </>
       ) : points.length === 0 ? (
-        // 記録はあるが、選んだ期間には無い。0件と同じ文言にすると誤解を招くので分ける
+        // 記録はあるが描く点が無い。理由が2つあるので文言を分ける——期間で絞って0件なのか、
+        // 指標を出せる記録が無いのか（推定1RMは12回以下のセットが1つも無い日を落とすため、
+        // 全期間を選んでいても0件になり得る）。同じ文言だと原因が画面から読み取れない
         <>
           <ExerciseProgressChartSample />
-          <Text style={styles.placeholder}>この期間の記録はありません</Text>
+          <Text style={styles.placeholder}>
+            {metric === 'e1rm'
+              ? `推定1RMを計算できる記録（${ONE_REP_MAX_REP_LIMIT}回以下のセット）がありません`
+              : 'この期間の記録はありません'}
+          </Text>
+          {/* 指標を戻せるようにチップは出し続ける。出さないと操作の手掛かりが消える */}
+          {metrics.length > 1 && (
+            <MetricFilterChips
+              measurementType={chartMeasurementType}
+              metrics={metrics}
+              value={metric}
+              onChange={setRequestedMetric}
+            />
+          )}
         </>
       ) : (
         <>
@@ -156,13 +173,13 @@ export function ExerciseRecordTab({ exerciseId, exerciseName, measurementType, i
               measurementType={chartMeasurementType}
               metrics={metrics}
               value={metric}
-              onChange={setMetric}
+              onChange={setRequestedMetric}
             />
           )}
           {metric === 'e1rm' && (
             <Text style={styles.caption}>
               <Text style={styles.captionLead}>推定1RM＝</Text>
-              挙げた重量と回数からの計算値です（12回以下のセットから算出／実測ではありません）
+              {`挙げた重量と回数からの計算値です（${ONE_REP_MAX_REP_LIMIT}回以下のセットから算出／実測ではありません）`}
             </Text>
           )}
 
@@ -171,14 +188,20 @@ export function ExerciseRecordTab({ exerciseId, exerciseName, measurementType, i
               // 別の日を選んだら「他N件を見る」の展開状態を持ち越さず畳んだ状態から始める
               key={selectedPoint.dateKey}
               point={selectedPoint}
-              measurementType={measurementType}
+              // 系列を組んだのと同じ計測タイプを渡すこと。生のmeasurementTypeを渡すと、
+              // 重量なしのweight_reps種目でセット行が全部「未実施」になる（主指標がnullのため）
+              measurementType={chartMeasurementType}
               previousPoint={previousPoint}
               isPersonalBest={selectedPoint.dateKey === personalBest?.dateKey}
               // 最大○○のときは出さない——値はセット行の太字と自己ベストバッジで既に読めるため
               metricRow={
                 metric === 'best' || metricLabel == null
                   ? null
-                  : { label: metricLabel, value: `${formatTickValue(selectedPoint.value)} ${series.unit.label}` }
+                  : {
+                      label: metricLabel,
+                      value: formatTickValue(selectedPoint.value),
+                      unit: series.unit.label,
+                    }
               }
               onPressOpen={(sessionId) => push(`/workout/${sessionId}`)}
             />
@@ -189,7 +212,7 @@ export function ExerciseRecordTab({ exerciseId, exerciseName, measurementType, i
           {bestSeries.points.length > 1 && (
             <ExerciseRecordHistoryList
               points={bestSeries.points}
-              measurementType={measurementType}
+              measurementType={chartMeasurementType}
               onPressRecord={(sessionId) => push(`/workout/${sessionId}`)}
               onPressSeeAll={() =>
                 push(insideTabBar ? `/exercises/history/${exerciseId}` : `/exercise/history/${exerciseId}`)
@@ -209,7 +232,7 @@ const styles = StyleSheet.create({
   placeholder: { ...Typography.footnote, color: Colors.textMuted, textAlign: 'center', paddingVertical: 24 },
   // 推定1RMの注記。面・罫線・アイコンは持たない（?アイコン＋ポップオーバーは不採用）。
   // 幅290pxでは2行になる想定で、チップ列との間隔と合わせて内訳カードが45px下がる
-  caption: { ...Typography.caption, fontSize: 11, lineHeight: 17, color: Colors.textSecondary },
+  caption: { ...Typography.captionCompact, color: Colors.textSecondary },
   captionLead: { color: Colors.textPrimary, fontWeight: '700' },
   emptyText: { alignItems: 'center', gap: 5 },
   emptyHeading: { ...Typography.cardTitle, color: Colors.textPrimary },

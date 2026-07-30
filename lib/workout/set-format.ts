@@ -248,6 +248,19 @@ export type SetLike = {
 // 計測タイプごとの「代表セットを決める指標」。weight_reps/weight_timeは重量が主指標、
 // reps/time/distance_timeはそれぞれ回数・時間・距離が唯一の指標になる
 // （lib/workout/comparison.tsの前回比較でも同じ指標定義を使うためexportしている）
+/**
+ * 重量として実際に入力された値か。`0` を弾くのが要点。
+ *
+ * 加重種目で「加重なしの日」を記録するとき、重量欄を空にする人と `0` と打つ人がいる。意図は
+ * 同じなのに、null は値が無いものとして扱われ、`0` は有効値として通る——書き方の違いだけで
+ * グラフの点が消えたり 0kg の点が立って縦軸のスケールが潰れたりする。両者を同じに扱う。
+ *
+ * グラフの3指標（最大重量・総重量・推定1RM）が全てこれを通ることで判定が1箇所に揃う。
+ */
+export function isEnteredWeight(weight: number | null | undefined): weight is number {
+  return weight != null && weight > 0;
+}
+
 export function primaryMetric(measurementType: MeasurementType, s: SetLike): number | null {
   switch (measurementType) {
     case 'weight_reps':

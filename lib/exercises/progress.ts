@@ -2,6 +2,7 @@ import type { MeasurementType } from '@/lib/exercises/constants';
 import { estimateOneRepMax } from '@/lib/exercises/one-rep-max';
 import {
   formatHistoryDuration,
+  isEnteredWeight,
   primaryMetric,
   secondaryMetric,
   type SetLike,
@@ -138,7 +139,7 @@ export function availableProgressMetrics(measurementType: MeasurementType): Prog
  * ——書き方の違いだけで縦軸のスケールが潰れてしまう。両者を同じ「未入力」として扱う。
  */
 function hasWeight(set: SetLike): boolean {
-  return set.weight != null && set.weight > 0;
+  return isEnteredWeight(set.weight);
 }
 
 /**
@@ -205,11 +206,6 @@ export type ProgressPoint = {
    * 指標ごとの「値を出したセット」は metricSet の方に持つ
    */
   best: ProgressSet;
-  /**
-   * その日の値を出したセット。推定1RMのように「特定の1セット由来」の指標で、内訳カードが
-   * どのセットの値かを示すのに使う。合計指標のように日全体から求まる値ではnull
-   */
-  metricSet?: ProgressSet | null;
   /**
    * その日に記録した全セット。同じ日に同じ種目を複数カードでやっていれば連結される。
    * ✓未確定のセットも含む（内訳カードで「未実施」として並べるため）
@@ -289,21 +285,14 @@ export function buildProgressSeries(
   // 値の置けない日は落とす。落ちる条件は指標ごとに違う——主指標が全セットnullの日（値の無い
   // セットだけを✓した）はどの指標でも落ちるが、推定1RMは13回以上のセットしか無い日も落ちる。
   // つまり series.points.length は指標で変わるので、空状態・履歴一覧の判定にこの系列を使わないこと
-  type Day = {
-    dateKey: number;
-    startedAt: number;
-    best: ProgressSet;
-    metricSet: ProgressSet | null;
-    sets: ProgressSet[];
-    raw: number;
-  };
+  type Day = { dateKey: number; startedAt: number; best: ProgressSet; sets: ProgressSet[]; raw: number };
   const days: Day[] = [];
   for (const [dateKey, day] of byDay) {
     const best = pickBestSet(measurementType, day.sets);
     if (!best) continue;
-    const value = computeMetricValue(measurementType, metric, best, day.sets);
-    if (!value) continue;
-    days.push({ dateKey, startedAt: day.startedAt, best, metricSet: value.metricSet, sets: day.sets, raw: value.raw });
+    const raw = computeMetricValue(measurementType, metric, best, day.sets);
+    if (raw == null) continue;
+    days.push({ dateKey, startedAt: day.startedAt, best, sets: day.sets, raw });
   }
   days.sort((a, b) => a.dateKey - b.dateKey);
 
@@ -318,14 +307,13 @@ export function buildProgressSeries(
       // 秒→分・m→kmの換算で 3.4000000000000004 のような誤差が出るため、小数第2位で丸める
       value: Math.round(d.raw * scale * 100) / 100,
       best: d.best,
-      metricSet: d.metricSet,
       sets: d.sets,
     })),
   };
 }
 
 /**
- * その日の値と、値を出したセット。置ける値が無ければnull（＝その日は点にしない）。
+ * その日の値。置ける値が無ければnull（＝その日は点にしない）。
  *
  * 合計は「その日の全セット」を足す。同じ日に複数セッションがあれば byDay で既に連結されて
  * いるので合算されるし、ウォームアップ用に分けたカードも区別せず足す（スキーマに warmup の
@@ -336,23 +324,19 @@ function computeMetricValue(
   metric: ProgressMetric,
   best: ProgressSet,
   sets: ProgressSet[],
-): { raw: number; metricSet: ProgressSet | null } | null {
-  if (metric === 'best') {
-    return { raw: primaryValue(measurementType, best)!, metricSet: best };
-  }
+): number | null {
+  if (metric === 'best') return primaryValue(measurementType, best);
 
   if (metric === 'e1rm') {
-    let top: { raw: number; metricSet: ProgressSet } | null = null;
+    let top: number | null = null;
     for (const set of sets.filter(isCompleted)) {
       const estimate = estimateOneRepMax(set.weight, set.reps);
       if (estimate == null) continue;
-      // 同値なら先にやったセットを採る（自己ベストの「最初に到達した回」と同じ考え方）
-      if (top == null || estimate > top.raw) top = { raw: estimate, metricSet: set };
+      if (top == null || estimate > top) top = estimate;
     }
     return top;
   }
 
-  // 合計。日全体から求まる値なので metricSet は持たない
   let total = 0;
   let counted = 0;
   for (const set of sets.filter(isCompleted)) {
@@ -361,7 +345,7 @@ function computeMetricValue(
     total += contribution;
     counted++;
   }
-  return counted === 0 ? null : { raw: total, metricSet: null };
+  return counted === 0 ? null : total;
 }
 
 /** 合計に足す1セットぶんの量。足せる量が無い（未入力・そもそも定義できない）ならnull */

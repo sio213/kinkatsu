@@ -1,4 +1,5 @@
-import { formatTickLabel, formatTickValue } from '@/lib/exercises/chart-scale';
+import { computeChartLayout, placeBestChip } from '@/lib/exercises/chart-layout';
+import { computeChartScale, formatTickLabel, formatTickValue } from '@/lib/exercises/chart-scale';
 import { estimateOneRepMax, ONE_REP_MAX_REP_LIMIT } from '@/lib/exercises/one-rep-max';
 import {
   availableProgressMetrics,
@@ -90,8 +91,6 @@ describe('buildProgressSeries: 総重量', () => {
     expect(unit.auxKind).toBe('none');
     expect(points).toHaveLength(1);
     expect(points[0].value).toBe(60 * 10 + 60 * 10 + 40 * 12);
-    // 合計は日全体から求まるので、値を出したセットは持たない
-    expect(points[0].metricSet).toBeNull();
   });
 
   test('✓未確定のセットは足さない', () => {
@@ -138,7 +137,6 @@ describe('buildProgressSeries: 推定1RM', () => {
     expect(unit.label).toBe('kg');
     // 100×(1+3/30)=110 と 90×(1+8/30)=114 → 後者が勝つ（レップレンジをまたいだ比較ができる）
     expect(points[0].value).toBe(114);
-    expect(points[0].metricSet?.weight).toBe(90);
   });
 
   test('13回以上のセットしか無い日は点を落とす（偽の高値を作らない）', () => {
@@ -213,5 +211,58 @@ describe('目盛りラベルの書式', () => {
     expect(formatTickLabel(999, kg, true)).toBe('999 kg');
     expect(formatTickLabel(1900, kg, true)).toBe('1,900');
     expect(formatTickLabel(12000, kg, true)).toBe('12,000');
+  });
+});
+
+describe('刻みの選び方（総重量・合計回数の値域）', () => {
+  const totalKg = { label: 'kg', step: 100, minRange: 200, integerOnly: false, auxKind: 'none' } as const;
+  const totalReps = { label: '回', step: 20, minRange: 20, integerOnly: true, auxKind: 'none' } as const;
+
+  const scaleOf = (values: number[], unit: typeof totalKg | typeof totalReps) =>
+    computeChartScale(values, unit);
+
+  test('総重量の常用レンジ（1,500〜1,900kg）でグリッドが増えすぎず、下端も0に落ちない', () => {
+    const s = scaleOf([1500, 1620, 1740, 1900], totalKg);
+    expect(s.ticks.length).toBeLessThanOrEqual(6);
+    expect(s.ticks[0]).toBeGreaterThan(0);
+    // 100の次を500にすると窓が1,500〜2,500まで広がってデータが下半分に潰れる。
+    // 250を挟んでいるので刻みはここまでしか上がらない
+    expect(s.step).toBeLessThanOrEqual(250);
+  });
+
+  test('5桁（8,000〜12,500kg）でもラダーが上がりきり、線が数十本にならない', () => {
+    const s = scaleOf([8000, 9500, 11000, 12500], totalKg);
+    expect(s.ticks.length).toBeLessThanOrEqual(6);
+    expect(s.step).toBeGreaterThanOrEqual(1000);
+  });
+
+  test('合計回数（200〜1,000回）でも整数側のラダーが上がりきる', () => {
+    const s = scaleOf([200, 500, 800, 1000], totalReps);
+    expect(s.ticks.length).toBeLessThanOrEqual(6);
+    // 整数の刻みしか選ばない
+    expect(Number.isInteger(s.step)).toBe(true);
+  });
+});
+
+describe('placeBestChip: ハイライトの呼称', () => {
+  const unit = { label: 'kg', step: 5, minRange: 10, integerOnly: false, auxKind: 'reps' } as const;
+  const points = [
+    { dateKey: day(0), startedAt: day(0), value: 70, best: {} as never, sets: [] },
+    { dateKey: day(1), startedAt: day(1), value: 75, best: {} as never, sets: [] },
+  ];
+
+  test('自己ベストは「ベスト」、他の指標は「最高」。値は前置詞と分けて持つ', () => {
+    const layout = computeChartLayout(points, unit, 353, points[1]);
+
+    const best = placeBestChip(layout, unit, 'personal-best')!;
+    expect(best.prefix).toBe('ベスト');
+    expect(best.value).toBe('75kg');
+    expect(best.label).toBe('ベスト 75kg');
+
+    const max = placeBestChip(layout, unit, 'metric-max')!;
+    expect(max.prefix).toBe('最高');
+    expect(max.value).toBe('75kg');
+    // 語が1文字短いぶんチップも狭くなる
+    expect(max.width).toBeLessThan(best.width);
   });
 });

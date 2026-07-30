@@ -2,6 +2,7 @@ import { db } from '@/db/client';
 import { sets, workoutSessionExercises, workoutSessions } from '@/db/schema';
 import type { MeasurementType } from '@/lib/exercises/constants';
 import {
+  availableProgressMetrics,
   buildProgressSeries,
   resolveChartMeasurementType,
   type ProgressMetric,
@@ -46,6 +47,12 @@ export function useExerciseProgress(
    * 重量を1度も記録していない加重種目は 'reps' が返る（resolveChartMeasurementType 参照）
    */
   chartMeasurementType: MeasurementType;
+  /**
+   * 実際に描いている指標。呼び出し側が渡した metric が、記録の変化で選べなくなった場合
+   * （推定1RMを選んだまま最後の重量を消すと種目が reps 扱いになる）に左端へ戻したもの。
+   * チップの選択状態・ハイライトの種類・内訳カードの値行はこちらを見ること
+   */
+  metric: ProgressMetric;
   loaded: boolean;
   failed: boolean;
 } {
@@ -85,19 +92,30 @@ export function useExerciseProgress(
     [measurementType, rows],
   );
 
+  // 選べない指標が選ばれたまま残らないようにする。stateを書き換えるのではなく派生値にするのは、
+  // 記録が戻れば元の指標に復帰させたいのと、書き戻すと再レンダーが1往復増えるため
+  const effectiveMetric = useMemo(
+    () => (availableProgressMetrics(chartMeasurementType).includes(metric) ? metric : 'best'),
+    [chartMeasurementType, metric],
+  );
+
   const bestSeries = useMemo(
     () => buildProgressSeries(chartMeasurementType, rows, 'best'),
     [chartMeasurementType, rows],
   );
   const series = useMemo(
-    () => (metric === 'best' ? bestSeries : buildProgressSeries(chartMeasurementType, rows, metric)),
-    [metric, bestSeries, chartMeasurementType, rows],
+    () =>
+      effectiveMetric === 'best'
+        ? bestSeries
+        : buildProgressSeries(chartMeasurementType, rows, effectiveMetric),
+    [effectiveMetric, bestSeries, chartMeasurementType, rows],
   );
 
   return {
     series,
     bestSeries,
     chartMeasurementType,
+    metric: effectiveMetric,
     // useLiveQueryのdataは解決前から[]で、undefinedにはならない。`data !== undefined`だと
     // 常に読み込み完了扱いになり、記録があるのに一瞬「0件」の空状態が描かれてしまう。
     // 最初の解決時にだけ入るupdatedAtで判定する（use-exercise-record-count.tsと同じ理由）

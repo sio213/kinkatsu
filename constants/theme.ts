@@ -222,6 +222,11 @@ export const Typography = {
    * （前身のmetricLabelトークンをここに統合したため、太字での使用頻度が高い）。
    */
   caption: { fontSize: 12, lineHeight: 16, fontWeight: '500' },
+  /**
+   * 2行以上に折り返す注記・脚注（グラフ下の「推定1RM＝…」など）。captionより1段小さく、
+   * 行間を広く取って読ませる。1行に収まるラベル用途にはcaptionを使うこと
+   */
+  captionCompact: { fontSize: 11, lineHeight: 17, fontWeight: '400' },
   /** NEW/BESTなどの小バッジ */
   badge: { fontSize: 11, fontWeight: '700' },
   /**
