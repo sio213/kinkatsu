@@ -9,8 +9,9 @@ import {
   placeTooltip,
   starPoints,
   type ChartLayout,
+  type HighlightKind,
 } from '@/lib/exercises/chart-layout';
-import { formatTickValue } from '@/lib/exercises/chart-scale';
+import { formatTickLabel, formatTickValue } from '@/lib/exercises/chart-scale';
 import { formatProgressAux, type ProgressPoint, type ProgressUnit } from '@/lib/exercises/progress';
 import { useMemo, useState } from 'react';
 import { StyleSheet, View, type LayoutChangeEvent } from 'react-native';
@@ -46,6 +47,24 @@ const SELECTED_DOT_RADIUS = 4.5;
 const SELECTED_LINE_DASH = '3 3';
 const SELECTED_LINE_OPACITY = 0.55;
 
+/**
+ * ハイライト点の見た目。属性ごとに「選択が優先」「種類が優先」と条件が違って読めなくなるため、
+ * 4通りを表にして持つ。アンバーの塗りは実測の自己ベスト専用（FIX-10）
+ */
+const HIGHLIGHT_DOT: Record<
+  HighlightKind,
+  Record<'base' | 'selected', { r: number; fill: string; stroke?: string; strokeWidth: number }>
+> = {
+  'personal-best': {
+    base: { r: BEST_DOT_RADIUS, fill: Colors.chartBest, strokeWidth: 0 },
+    selected: { r: SELECTED_DOT_RADIUS, fill: Colors.chartBest, stroke: Colors.surface, strokeWidth: 2 },
+  },
+  'metric-max': {
+    base: { r: DOT_RADIUS, fill: Colors.surface, stroke: Colors.accent, strokeWidth: DOT_STROKE_WIDTH },
+    selected: { r: SELECTED_DOT_RADIUS, fill: Colors.accent, stroke: Colors.surface, strokeWidth: 2 },
+  },
+};
+
 const TOOLTIP_DATE_FONT_SIZE = 9.5;
 const TOOLTIP_VALUE_FONT_SIZE = 13;
 const TOOLTIP_SUB_FONT_SIZE = 9.5;
@@ -54,10 +73,16 @@ type Props = {
   points: ProgressPoint[];
   unit: ProgressUnit;
   /**
-   * 全期間の自己ベスト（findPersonalBest の結果）。期間で絞ったpointsから求めた値を渡さないこと。
-   * 表示期間の外にあってもチップは値を出し続け、アンバーの点だけが描かれなくなる
+   * ハイライトする点。全期間の系列から求めた値（findPersonalBest の結果）で、期間で絞った
+   * pointsから求めた値を渡さないこと。表示期間の外にあってもチップは値を出し続け、
+   * グラフ上の印だけが描かれなくなる
    */
-  personalBest: ProgressPoint | null;
+  highlight: ProgressPoint | null;
+  /**
+   * ハイライトの意味。最大○○（ベスト）指標のときだけ実測の自己ベストなので、アンバーの点と
+   * ★のチップにする。総重量・推定1RMでは単なる最高値なので色も★も持たない（FIX-10）
+   */
+  highlightKind: HighlightKind;
   /** 選択中の点。点が無いときはnull */
   selectedIndex: number | null;
   onSelect: (index: number) => void;
@@ -84,14 +109,26 @@ function areaPath(layout: ChartLayout): string {
  * 幅は親から測って渡すのではなく onLayout で自分で測る。種目詳細の本文パディングや将来の
  * 画面幅の違いをこのコンポーネントが知らなくて済むようにするため。
  */
-export function ExerciseProgressChart({ points, unit, personalBest, selectedIndex, onSelect }: Props) {
+export function ExerciseProgressChart({
+  points,
+  unit,
+  highlight,
+  highlightKind,
+  selectedIndex,
+  onSelect,
+}: Props) {
   const [width, setWidth] = useState(0);
 
   const layout = useMemo(
-    () => (width > 0 ? computeChartLayout(points, unit, width, personalBest) : null),
-    [points, unit, width, personalBest],
+    () => (width > 0 ? computeChartLayout(points, unit, width, highlight) : null),
+    [points, unit, width, highlight],
   );
-  const bestChip = useMemo(() => (layout ? placeBestChip(layout, unit) : null), [layout, unit]);
+  const bestChip = useMemo(
+    () => (layout ? placeBestChip(layout, unit, highlightKind) : null),
+    [layout, unit, highlightKind],
+  );
+  const isPersonalBest = highlightKind === 'personal-best';
+  const highlightSelected = selectedIndex != null && selectedIndex === layout?.highlightIndex;
 
   const selected = layout && selectedIndex != null ? layout.points[selectedIndex] : null;
   const tooltipTexts = useMemo(() => {
@@ -153,16 +190,20 @@ export function ExerciseProgressChart({ points, unit, personalBest, selectedInde
       tooltipTexts.date,
       `${tooltipTexts.value}${tooltipTexts.unit}`,
       tooltipTexts.aux,
-      selected != null && selected.index === layout?.bestIndex ? '自己ベスト' : null,
+      selected != null && selected.index === layout?.highlightIndex
+        ? isPersonalBest
+          ? '自己ベスト'
+          : '最高値'
+        : null,
     ]
       .filter(Boolean)
       .join('、');
 
-  // 自己ベストが表示期間の外にあると、晴眼者にはチップの文字で見えているのに読み上げでは
+  // ハイライトが表示期間の外にあると、晴眼者にはチップの文字で見えているのに読み上げでは
   // 存在ごと消えてしまう。選択と関係なく1文で添える
   const outOfRangeBestLabel =
-    layout && layout.bestIndex == null && bestChip
-      ? `自己ベストは表示期間の外（${bestChip.label.replace('ベスト ', '')}${bestChip.date}）。`
+    layout && layout.highlightIndex == null && bestChip
+      ? `${isPersonalBest ? '自己ベスト' : '最高値'}は表示期間の外（${bestChip.value}${bestChip.date}）。`
       : '';
 
   const chartLabel = selectionLabel
@@ -211,8 +252,8 @@ export function ExerciseProgressChart({ points, unit, personalBest, selectedInde
                   fontSize={TICK_FONT_SIZE}
                   fill={Colors.textSecondary}
                 >
-                  {/* 単位は最上段のラベルにだけ付ける（全段に付けると数字が読み取りにくくなる） */}
-                  {formatTickValue(layout.scale.ticks[tickIndex]) + (isLast ? ` ${unit.label}` : '')}
+                  {/* 単位は最上段のラベルにだけ付ける。ただし4桁以上（12,000）では落とす */}
+                  {formatTickLabel(layout.scale.ticks[tickIndex], unit, isLast)}
                 </SvgText>
               );
             })}
@@ -232,7 +273,7 @@ export function ExerciseProgressChart({ points, unit, personalBest, selectedInde
             )}
 
             {layout.markerIndices.map((i) =>
-              i === layout.bestIndex ? null : (
+              i === layout.highlightIndex ? null : (
                 <Circle
                   key={`dot-${i}`}
                   cx={layout.points[i].x}
@@ -265,8 +306,8 @@ export function ExerciseProgressChart({ points, unit, personalBest, selectedInde
                   fill={Colors.accent}
                   opacity={SELECTED_HALO_OPACITY}
                 />
-                {/* ベストの点が選択されている場合は、この下でアンバーのマーカーを重ねて描く */}
-                {selected.index !== layout.bestIndex && (
+                {/* ハイライトの点が選択されている場合は、この下で改めてマーカーを描く */}
+                {selected.index !== layout.highlightIndex && (
                   <Circle
                     cx={selected.x}
                     cy={selected.y}
@@ -279,16 +320,15 @@ export function ExerciseProgressChart({ points, unit, personalBest, selectedInde
               </>
             )}
 
-            {/* ベストの点はマーカーの間引きに関係なく必ず描く（アンバーの塗り）。
-                選択中は一回り大きくして白枠を付け、青のハローの上に乗せる */}
-            {layout.bestIndex != null && (
+            {/* ハイライトの点はマーカーの間引きに関係なく必ず描く。「最高の日がどこか」は
+                点が密になっても消してはいけないため、これは指標に関係なく守る。
+                見た目は HIGHLIGHT_DOT の表のとおり——アンバーの塗りは自己ベスト専用で、
+                他の指標では通常のマーカーと同じ見た目で置く（FIX-10） */}
+            {layout.highlightIndex != null && (
               <Circle
-                cx={layout.points[layout.bestIndex].x}
-                cy={layout.points[layout.bestIndex].y}
-                r={selectedIndex === layout.bestIndex ? SELECTED_DOT_RADIUS : BEST_DOT_RADIUS}
-                fill={Colors.chartBest}
-                stroke={selectedIndex === layout.bestIndex ? Colors.surface : undefined}
-                strokeWidth={selectedIndex === layout.bestIndex ? 2 : 0}
+                cx={layout.points[layout.highlightIndex].x}
+                cy={layout.points[layout.highlightIndex].y}
+                {...HIGHLIGHT_DOT[highlightKind][highlightSelected ? 'selected' : 'base']}
               />
             )}
 
@@ -302,19 +342,22 @@ export function ExerciseProgressChart({ points, unit, personalBest, selectedInde
                   rx={6}
                   fill={Colors.surface}
                   fillOpacity={0.94}
-                  stroke={Colors.warningBorder}
+                  stroke={isPersonalBest ? Colors.warningBorder : Colors.border}
                   strokeWidth={1}
                 />
-                <Polygon
-                  points={starPoints(bestChip.x + 13, bestChip.y + bestChip.height / 2, 5.2, 2.3)}
-                  fill={Colors.chartBest}
-                />
+                {/* ★も自己ベスト専用。他の指標では記号を持たず、文字だけの控えめなチップにする */}
+                {isPersonalBest && (
+                  <Polygon
+                    points={starPoints(bestChip.x + 13, bestChip.y + bestChip.height / 2, 5.2, 2.3)}
+                    fill={Colors.chartBest}
+                  />
+                )}
                 <SvgText
-                  x={bestChip.x + 22}
+                  x={bestChip.x + (isPersonalBest ? 22 : 10)}
                   y={bestChip.y + bestChip.height / 2 + 3.6}
                   fontSize={BEST_CHIP_FONT_SIZE}
                   fontWeight="700"
-                  fill={Colors.chartBestText}
+                  fill={isPersonalBest ? Colors.chartBestText : Colors.textBody}
                 >
                   {bestChip.label}
                   {/* 期間外の日付は補足なので、ツールチップの補助情報と同じく一段弱くする */}

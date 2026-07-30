@@ -8,9 +8,16 @@ import type { ProgressUnit } from '@/lib/exercises/progress';
  * 2.5kg差が急成長のように描かれてしまうため、その中間を取っている（デザイン案「要相談1」）。
  */
 
-// 刻みの候補。重量・距離は2.5から、回数・秒・分は整数のみ
-const DECIMAL_LADDER = [2.5, 5, 10, 20, 25, 50, 100];
-const INTEGER_LADDER = [1, 2, 5, 10, 20, 50, 100];
+// 刻みの候補。重量・距離は2.5から、回数・秒・分は整数のみ。
+//
+// 100より上の段は指標切り替え（総重量・合計回数）で必要になったもの。総重量は 1,500〜12,500kg、
+// 合計回数は数百回に達するため、100で頭打ちだと pickStep が上がりきらずグリッド線が数十本
+// 引かれてしまう（`ladder.find(v => v > step)` が undefined で break するため）
+// 100の次を500にすると飛びが大きすぎる。総重量で最も普通の 1,500〜1,900kg が500kg刻みに
+// 上がってしまい、窓が1,500〜2,500まで広がってデータが下半分に潰れる（このグラフが避けている
+// 「0起点にすると伸びが画面のごく一部に潰れる」のと同じ状態）。250を挟むと8割を使える
+const DECIMAL_LADDER = [2.5, 5, 10, 20, 25, 50, 100, 250, 500, 1000, 2500];
+const INTEGER_LADDER = [1, 2, 5, 10, 20, 50, 100, 200, 500, 1000];
 
 /** グリッド線の上限。これを超えるようなら刻みを1段上げる */
 const MAX_GRID_LINES = 6;
@@ -163,7 +170,39 @@ function roundValue(value: number): number {
   return Math.round(value * 100) / 100;
 }
 
-/** 目盛りラベルの表示文字列（小数第1位まで。整数なら小数点を出さない） */
+/**
+ * 目盛りラベルの表示文字列（小数第1位まで。整数なら小数点を出さない）。
+ *
+ * 整数部は3桁区切りにする。総重量は容易に4〜5桁（12,500kg）に達し、区切りが無いと目盛り・
+ * ツールチップ・最高値チップのどこでも一目で読み取れないため。t（トン）表記は採らない——
+ * 筋トレ文脈で馴染みが薄く、切り替え閾値の判定を新たに抱えることになる。
+ *
+ * 縦軸・ツールチップ・チップの3か所すべてがこの関数を通るので、ここだけで揃う。
+ */
 export function formatTickValue(value: number): string {
-  return String(Math.round(value * 10) / 10);
+  const rounded = Math.round(value * 10) / 10;
+  const [int, frac] = String(rounded).split('.');
+  const grouped = int.replace(/\B(?=(\d{3})+(?!\d))/g, ',');
+  return frac == null ? grouped : `${grouped}.${frac}`;
+}
+
+/** 単位を省略し始める整数部の桁数。1,900・12,000のような値がこれに当たる */
+const UNIT_OMIT_DIGITS = 4;
+
+/**
+ * 縦軸に描く目盛りラベル1つぶんの文字列。単位は最上段のラベルにだけ付ける
+ * （全段に付けると数字が読み取りにくくなる）。
+ *
+ * ただし整数部が4桁以上のときは単位も落とす。「12,000 kg」は左ガターを大きく食い、
+ * そのぶんプロットが狭くなるため。3桁までは従来どおり付ける（80 kg / 120 kg / 40 回）。
+ * 単位はツールチップと最高値チップに出ているので、軸から落としても読み取れなくならない。
+ *
+ * 幅の見積もり（chart-layout の gutterWidth）と実際の描画が同じ文字列を使うよう、
+ * 組み立てをここに1本化している。
+ */
+export function formatTickLabel(value: number, unit: ProgressUnit, isTopLabel: boolean): string {
+  const text = formatTickValue(value);
+  if (!isTopLabel) return text;
+  const digits = Math.floor(Math.abs(value)).toString().length;
+  return digits >= UNIT_OMIT_DIGITS ? text : `${text} ${unit.label}`;
 }

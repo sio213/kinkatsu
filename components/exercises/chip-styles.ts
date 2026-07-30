@@ -29,6 +29,13 @@ export const chipStyles = StyleSheet.create({
     flex: 1,
     alignItems: 'center',
   },
+  /**
+   * 指標チップ（グラフ直下の 最大重量／総重量／推定1RM）。小サイズと違い**等幅にしない**
+   * ——真上の期間チップと同じ見た目の丸ボタンが2段とも等幅で並ぶと、どちらが時間軸で
+   * どちらが指標かが区別できなくなるため、幅の付き方で見分けさせる（FIX-08）。
+   * 角丸を16→14に落として一段控えめにし、上下paddingは高さ28pxに収まる5pxを使う
+   */
+  chipMetric: { borderRadius: 14, paddingHorizontal: 10, paddingVertical: 5 },
   chipActive: { backgroundColor: Colors.accent, borderColor: Colors.accent },
   chipText: { ...Typography.footnote, color: Colors.textMuted, fontWeight: '500' },
   // 未選択の文字色は標準チップのtextMuted(slate500)より一段濃いtextSecondary(slate600)にする。

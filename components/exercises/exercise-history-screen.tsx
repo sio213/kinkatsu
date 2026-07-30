@@ -38,7 +38,9 @@ export function ExerciseHistoryScreen({ insideTabBar = false }: Props) {
   const exerciseId = Number(id);
   const { exercise, loaded: exerciseLoaded } = useExercise(exerciseId);
   const measurementType = resolveMeasurementType(exercise?.measurementType);
-  const { series, loaded, failed } = useExerciseProgress(exerciseId, measurementType);
+  // chartMeasurementType を使うこと。重量を1度も記録していない加重種目は reps 種目として
+  // 系列が組まれるので、生の measurementType で描くとセットの値が全て空になる
+  const { series, chartMeasurementType, loaded, failed } = useExerciseProgress(exerciseId, measurementType);
 
   // ベストの判定は全期間の系列で行う（グラフのアンバー・内訳カードのバッジと同じ入口）
   const personalBest = useMemo(() => findPersonalBest(series.points), [series.points]);
@@ -78,7 +80,7 @@ export function ExerciseHistoryScreen({ insideTabBar = false }: Props) {
             <ListErrorBoundary>
               <ExerciseRecordCard
                 point={item}
-                measurementType={measurementType}
+                measurementType={chartMeasurementType}
                 isBest={item.dateKey === personalBest?.dateKey}
                 onPress={(sessionId) => push(`/workout/${sessionId}`)}
               />

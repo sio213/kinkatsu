@@ -227,7 +227,7 @@ describe('自己ベスト', () => {
   test('マーカーが間引かれても、ベストの点は描画対象として残る', () => {
     const layout = layoutOf(makePoints(new Array(52).fill(60).concat([80]), 3), KG);
     expect(layout.markerIndices).toEqual([]);
-    expect(layout.bestIndex).toBe(52);
+    expect(layout.highlightIndex).toBe(52);
   });
 });
 
@@ -297,7 +297,7 @@ describe('自己ベストが表示期間の外にあるとき', () => {
   };
 
   test('アンバーの点は描かない（表示中の点列に自己ベストの日が無い）', () => {
-    expect(layout().bestIndex).toBeNull();
+    expect(layout().highlightIndex).toBeNull();
   });
 
   test('チップは全期間の自己ベストの値を出し続ける（期間内最大に書き換わらない）', () => {
@@ -324,7 +324,7 @@ describe('自己ベストが表示期間の外にあるとき', () => {
 
   test('自己ベストが表示範囲の最初の点と同日なら期間内扱いになる', () => {
     const layoutFromBest = computeChartLayout(all.slice(0, 3), KG, WIDTH, findPersonalBest(all));
-    expect(layoutFromBest.bestIndex).toBe(0);
+    expect(layoutFromBest.highlightIndex).toBe(0);
     expect(placeBestChip(layoutFromBest, KG)!.date).toBe('');
   });
 
@@ -333,7 +333,7 @@ describe('自己ベストが表示期間の外にあるとき', () => {
     const tied = [{ ...all[0] }, { ...all[1], value: 80 }, ...all.slice(2)];
     const layoutTied = computeChartLayout(tied.slice(1), KG, WIDTH, findPersonalBest(tied));
     // 値だけで探すと2点目にアンバーが付いてしまう。日付で突き合わせているので付かない
-    expect(layoutTied.bestIndex).toBeNull();
+    expect(layoutTied.highlightIndex).toBeNull();
   });
 
   test('自己ベストが表示中の記録と別の年なら年も出す（4/12だけでは去年と区別できない）', () => {
@@ -424,7 +424,16 @@ describe('ツールチップ', () => {
     const index = 5;
     const natural = placeTooltip(layout, index, texts, null)!;
     // ちょうど重なる位置にベストチップがある状況を作る
-    const chip = { x: natural.x, y: natural.y, width: 80, height: 19, label: 'ベスト 75kg', date: '' };
+    const chip = {
+      x: natural.x,
+      y: natural.y,
+      width: 80,
+      height: 19,
+      prefix: 'ベスト',
+      value: '75kg',
+      label: 'ベスト 75kg',
+      date: '',
+    };
     const tip = placeTooltip(layout, index, texts, chip)!;
     expect(tip.y).toBe(natural.y);
     expect(tip.x).toBeGreaterThanOrEqual(chip.x + chip.width);
@@ -439,6 +448,8 @@ describe('ツールチップ', () => {
       y: natural.y,
       width: layout.right - layout.left,
       height: 19,
+      prefix: 'ベスト',
+      value: '75kg',
       label: 'ベスト 75kg',
       date: '',
     };

@@ -7,6 +7,10 @@
 // グラフ側の分岐（0点・1点・2点・停滞・下降・ベストが最新でない・軽量時の2.5kg刻み・
 // ✓未確定セット・同日2セッション・期間チップで空になる古いデータ）を網羅するように作ってある。
 //
+// 14以降は指標切り替え（Phase 2 / FIX-08〜FIX-14）用。総重量の5桁・推定1RMが落ちる日・
+// 推定1RMが丸ごと空になる種目・重量なしの加重種目（reps種目へのフォールバック）・
+// 0kgと加重の混在・合計回数が数百回になる種目を足してある。
+//
 // idは900000番台に固定してあるので、sample-data-cleanup.sql で丸ごと消せる。
 
 import { writeFileSync } from 'node:fs';
@@ -295,6 +299,110 @@ function weightRepsSets(weight, topReps, { step = 2.5 } = {}) {
 }
 
 // ---------------------------------------------------------------------------
+// 指標切り替え（Phase 2 / FIX-08〜FIX-14）の確認用
+// ---------------------------------------------------------------------------
+
+// 14. ハックスクワット — 総重量が5桁（12,000kg超）に届く高ボリューム種目。
+//     3桁区切り・4桁以上で単位を落とす規則・大きい刻み（1,000/2,500kg）の確認用
+{
+  const days = schedule({ fromDaysAgo: 100, intervalDays: 6 });
+  days.forEach((d, i) => {
+    const weight = roundTo(140 + i * 4 + noise(5), 5);
+    // 6セット×12〜15回。140kg×13×6 ≒ 11,000kg から始まり、終盤で12,500kgを超える
+    const setSpecs = [];
+    for (let k = 0; k < 6; k++) {
+      setSpecs.push({ weight, reps: 12 + Math.round(rand() * 3) });
+    }
+    pushSession('hack_squat', daysAgo(d, 20), setSpecs, { durationMinutes: 40 });
+  });
+}
+
+// 15. レッグエクステンション — メインは8〜10回だが、3回に1回はデロード日で15〜20回だけ。
+//     推定1RMでその日の点が落ち（13回以上は算出対象外）、グラフに空白ができることの確認
+{
+  const days = schedule({ fromDaysAgo: 90, intervalDays: 5 });
+  days.forEach((d, i) => {
+    const weight = roundTo(45 + i * 1.5 + noise(2), 2.5);
+    const deload = i % 3 === 2;
+    pushSession(
+      'leg_extension',
+      daysAgo(d, 19, 30),
+      deload
+        ? [
+            { weight: roundTo(weight * 0.6, 2.5), reps: 18 },
+            { weight: roundTo(weight * 0.6, 2.5), reps: 16 },
+            { weight: roundTo(weight * 0.6, 2.5), reps: 15 },
+          ]
+        : weightRepsSets(weight, 8 + Math.round(rand() * 2)),
+    );
+  });
+}
+
+// 16. レッグカール — 全ての日が15回以上。推定1RMの系列が**丸ごと空**になるケース。
+//     「この期間の記録はありません」ではなく理由を出す分岐（12回以下のセットが無い）の確認
+{
+  const days = schedule({ fromDaysAgo: 45, intervalDays: 5 });
+  days.forEach((d, i) => {
+    const weight = roundTo(30 + i * 1.5, 2.5);
+    pushSession('leg_curl', daysAgo(d, 20, 30), [
+      { weight, reps: 16 },
+      { weight, reps: 15 },
+      { weight, reps: 15 },
+    ]);
+  });
+}
+
+// 17. 加重チンニング — 重量を1度も入れずに記録し続けている種目。
+//     グラフが reps 種目へフォールバックし、チップが「最大回数／合計回数」の2つになることの確認。
+//     空欄(null)と「0」と打った日の両方を混ぜてある（どちらも未入力として同じ扱いになる）
+{
+  const days = schedule({ fromDaysAgo: 80, intervalDays: 5 });
+  days.forEach((d, i) => {
+    const reps = 6 + Math.round(i * 0.35);
+    pushSession('weighted_chin_up', daysAgo(d, 20), [
+      { weight: null, reps },
+      { weight: i % 2 === 0 ? null : 0, reps: Math.max(1, reps - 1) },
+      { weight: null, reps: Math.max(1, reps - 2) },
+    ]);
+  });
+}
+
+// 18. 加重ディップス — 自重の日（0kg）と加重の日が混在する種目。
+//     ベスト線が0kgに落ちないこと、総重量で自重の日の点だけが落ちること（0の谷を作らない）の確認
+{
+  const days = schedule({ fromDaysAgo: 70, intervalDays: 6 });
+  days.forEach((d, i) => {
+    const bodyweightDay = i % 3 === 0;
+    pushSession(
+      'weighted_dips',
+      daysAgo(d, 19),
+      bodyweightDay
+        ? [
+            { weight: 0, reps: 12 },
+            { weight: 0, reps: 10 },
+          ]
+        : weightRepsSets(10 + i * 0.8, 8),
+    );
+  });
+}
+
+// 19. プッシュアップ — 合計回数が数百回に達する。整数側の刻み（200/500）が効かないと
+//     グリッド線が増えすぎるケースの確認
+{
+  const days = schedule({ fromDaysAgo: 60, intervalDays: 4 });
+  days.forEach((d, i) => {
+    const top = 35 + i * 4;
+    pushSession('push_up', daysAgo(d, 7, 30), [
+      { reps: top },
+      { reps: top - 5 },
+      { reps: top - 8 },
+      { reps: top - 10 },
+      { reps: top - 12 },
+    ]);
+  });
+}
+
+// ---------------------------------------------------------------------------
 // SQL出力
 // ---------------------------------------------------------------------------
 
@@ -331,20 +439,29 @@ ${sessionExercises
   .join(',\n')};
 `;
 
+// セット行は数が多いため、session_id と exercise_id を行ごとに書かず、
+// 種目カード(workout_session_exercises)から JOIN で引く。VALUES を派生テーブルとして
+// 使うとSQLiteが列に column1.. と名前を付けるので、それを並べ替えて INSERT する
+// （UNION ALL で並べる書き方だと SQLITE_MAX_COMPOUND_SELECT の500件上限に当たる）
 const setSql = `INSERT INTO sets
   (id, session_id, exercise_id, workout_session_exercise_id, set_number,
    weight, reps, duration_seconds, distance_meters, completed_at, created_at)
-VALUES
+SELECT v.column1, wse.session_id, wse.exercise_id, v.column2, v.column3,
+       v.column4, v.column5, v.column6, v.column7, v.column8, v.column9
+FROM (VALUES
 ${sets
   .map(
     (s) =>
-      `  (${s.id}, ${s.sessionId}, ${s.exerciseId}, ${s.workoutSessionExerciseId}, ${s.setNumber}, ` +
-      `${num(s.weight)}, ${num(s.reps)}, ${num(s.durationSeconds)}, ${num(s.distanceMeters)}, ` +
-      `${s.completedAt ?? 'NULL'}, ${s.createdAt})`,
+      `  (${s.id},${s.workoutSessionExerciseId},${s.setNumber},` +
+      `${num(s.weight)},${num(s.reps)},${num(s.durationSeconds)},${num(s.distanceMeters)},` +
+      `${s.completedAt ?? 'NULL'},${s.createdAt})`,
   )
-  .join(',\n')};
+  .join(',\n')}
+) v
+JOIN workout_session_exercises wse ON wse.id = v.column2;
 `;
 
+// sqlite3 CLI（apply-sample-data.sh）用のまとめたファイル
 writeFileSync(
   join(OUT_DIR, 'sample-data.sql'),
   [
@@ -358,9 +475,22 @@ writeFileSync(
   ].join('\n'),
 );
 
+// Drizzle Studioのクエリ実行用。プラグインは prepareAsync でSQLを1文しかコンパイルしない
+// （node_modules/expo-drizzle-studio-plugin/src/useDrizzleStudio.tsx）ため、複数文をまとめて
+// 貼ると最初の1文しか実行されない。1ファイル＝1文にして番号順に流せるようにする
+const studioFiles = [
+  ['sample-data-step1-sessions.sql', sessionSql],
+  ['sample-data-step2-exercises.sql', sessionExerciseSql],
+  ['sample-data-step3-sets.sql', setSql],
+];
+for (const [name, sql] of studioFiles) {
+  writeFileSync(join(OUT_DIR, name), `${header}\n${sql}`);
+}
+
 writeFileSync(
   join(OUT_DIR, 'sample-data-cleanup.sql'),
-  `-- サンプル記録の削除。外部キーの向きに合わせて子から消す
+  `-- サンプル記録の削除。外部キーの向きに合わせて子から消す。
+-- Drizzle Studioで実行するときは、この3行を上から1行ずつ流すこと（1回に1文しか実行されない）。
 DELETE FROM sets WHERE id >= ${ID_BASE};
 DELETE FROM workout_session_exercises WHERE id >= ${ID_BASE};
 DELETE FROM workout_sessions WHERE id >= ${ID_BASE};

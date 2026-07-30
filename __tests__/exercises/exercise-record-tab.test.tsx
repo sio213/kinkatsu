@@ -46,11 +46,16 @@ function makePoint(daysAgo: number, weight: number): ProgressPoint {
 }
 
 function render(points: ProgressPoint[]) {
+  const series = {
+    unit: { label: 'kg', step: 5, minRange: 10, integerOnly: false, auxKind: 'reps' },
+    points,
+  };
   mockUseExerciseProgress.mockReturnValue({
-    series: {
-      unit: { label: 'kg', step: 5, minRange: 10, integerOnly: false, auxKind: 'reps' },
-      points,
-    },
+    series,
+    // 既定は最大重量（ベスト）指標なので、選択中の系列とベスト系列は同じもの
+    bestSeries: series,
+    chartMeasurementType: 'weight_reps',
+    metric: 'best',
     loaded: true,
     failed: false,
   });
@@ -110,7 +115,7 @@ describe('ExerciseRecordTab', () => {
 
   test('グラフに渡す自己ベストも期間チップに連動しない', () => {
     const root = render(points);
-    const personalBest = () => root.findByType(ExerciseProgressChart).props.personalBest;
+    const personalBest = () => root.findByType(ExerciseProgressChart).props.highlight;
 
     // 既定の3ヶ月では80kgの日（100日前）は表示範囲外だが、自己ベストとしては渡り続ける
     expect(personalBest().value).toBe(80);
@@ -165,5 +170,92 @@ describe('ExerciseRecordTab', () => {
       expect(chartLabel(root)).toContain('自己ベストは表示期間の外');
       expect(chartLabel(root)).toContain('80kg');
     });
+  });
+});
+
+describe('指標の切り替え', () => {
+  const points = [makePoint(40, 60), makePoint(20, 70), makePoint(3, 65)];
+
+  // フックは「渡された指標で組んだ系列」を返す。ここでは best と total の2系列を用意し、
+  // 呼び出し時の引数に応じて出し分ける（本物のフックと同じ契約）
+  const renderWithMetrics = (chartMeasurementType = 'weight_reps') => {
+    const bestSeries = {
+      unit: { label: 'kg', step: 5, minRange: 10, integerOnly: false, auxKind: 'reps' },
+      points,
+    };
+    const totalSeries = {
+      unit: { label: 'kg', step: 100, minRange: 200, integerOnly: false, auxKind: 'none' },
+      points: points.map((p) => ({ ...p, value: p.value * 24 })),
+    };
+    mockUseExerciseProgress.mockImplementation((_id, _type, metric) => ({
+      series: metric === 'total' ? totalSeries : bestSeries,
+      bestSeries,
+      chartMeasurementType,
+      metric,
+      loaded: true,
+      failed: false,
+    }));
+    let instance!: ReturnType<typeof create>;
+    act(() => {
+      instance = create(
+        <ExerciseRecordTab
+          exerciseId={1}
+          exerciseName="ベンチプレス"
+          measurementType="weight_reps"
+          insideTabBar={false}
+        />,
+      );
+    });
+    return instance.root;
+  };
+
+  test('計測タイプに応じたチップが出る', () => {
+    const root = renderWithMetrics();
+    const labels = root
+      .findAllByType(TouchableOpacity)
+      .map((t) => t.props.accessibilityLabel as string);
+    expect(labels).toEqual(expect.arrayContaining(['最大重量', '総重量', '推定1RM']));
+  });
+
+  test('加重ホールド系は選べる指標が1つなのでチップ列を出さない', () => {
+    const root = renderWithMetrics('weight_time');
+    const labels = root
+      .findAllByType(TouchableOpacity)
+      .map((t) => t.props.accessibilityLabel as string);
+    expect(labels).not.toContain('最大重量');
+  });
+
+  test('総重量に切り替えるとハイライトの意味が変わり、内訳カードに値行が出る', () => {
+    const root = renderWithMetrics();
+    expect(root.findByType(ExerciseProgressChart).props.highlightKind).toBe('personal-best');
+
+    pressChip(root, '総重量');
+
+    expect(root.findByType(ExerciseProgressChart).props.highlightKind).toBe('metric-max');
+    // 「最大○○」では値行を出さないが、総重量では出す（FIX-13）
+    expect(allTexts(root)).toContain('総重量');
+    expect(allTexts(root)).toContain('1,560');
+  });
+
+  test('推定1RMを選んだときだけ注記が出る', () => {
+    const root = renderWithMetrics();
+    const hasCaption = () => allTexts(root).some((t) => t.includes('実測ではありません'));
+    expect(hasCaption()).toBe(false);
+
+    pressChip(root, '推定1RM');
+    expect(hasCaption()).toBe(true);
+
+    pressChip(root, '最大重量');
+    expect(hasCaption()).toBe(false);
+  });
+
+  test('指標を切り替えても選択していた日は変わらない', () => {
+    const root = renderWithMetrics();
+    pressChip(root, '全期間');
+    selectPoint(root, 0);
+    const before = root.findByType(ExerciseProgressChart).props.selectedIndex;
+
+    pressChip(root, '総重量');
+    expect(root.findByType(ExerciseProgressChart).props.selectedIndex).toBe(before);
   });
 });
