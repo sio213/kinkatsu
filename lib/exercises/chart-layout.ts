@@ -1,4 +1,9 @@
-import { computeChartScale, formatTickValue, type ChartScale } from '@/lib/exercises/chart-scale';
+import {
+  computeChartScale,
+  formatTickLabel,
+  formatTickValue,
+  type ChartScale,
+} from '@/lib/exercises/chart-scale';
 import type { ProgressPoint, ProgressUnit } from '@/lib/exercises/progress';
 
 /**
@@ -117,7 +122,7 @@ function gutterWidth(scale: ChartScale, unit: ProgressUnit): number {
   let max = 0;
   const lastLabeled = scale.labelIndices[scale.labelIndices.length - 1];
   for (const i of scale.labelIndices) {
-    const text = formatTickValue(scale.ticks[i]) + (i === lastLabeled ? ` ${unit.label}` : '');
+    const text = formatTickLabel(scale.ticks[i], unit, i === lastLabeled);
     max = Math.max(max, estimateTextWidth(text, TICK_FONT_SIZE));
   }
   return Math.max(MIN_GUTTER, Math.ceil(max) + 8);
@@ -238,6 +243,14 @@ function pickXTicks(points: ChartPoint[], withYear: boolean): XTick[] {
   return kept.map((p) => p.tick);
 }
 
+/**
+ * グラフ上でハイライトする点の意味。
+ *
+ * `personal-best` … 実測の自己ベスト。アンバーの点＋★のチップ（最大○○指標のときだけ）
+ * `metric-max` … 選択中の指標の最高値。色も★も持たない。アンバーと★は自己ベスト専用
+ */
+export type HighlightKind = 'personal-best' | 'metric-max';
+
 export type BestChipBox = {
   x: number;
   y: number;
@@ -273,12 +286,20 @@ function outOfRangeDate(layout: ChartLayout, best: ProgressPoint): string {
  * 通るため、点と重なるなら右上へ、それも塞がっていれば点も数字も無い段を探して逃がす。
  * 衝突判定にはマーカーの実効半径（11px）を含める。
  */
-export function placeBestChip(layout: ChartLayout, unit: ProgressUnit): BestChipBox | null {
+export function placeBestChip(
+  layout: ChartLayout,
+  unit: ProgressUnit,
+  /**
+   * ハイライトが「実測の自己ベスト」か「選択中の指標の最高値」か。アンバーと★は前者専用で、
+   * 総重量・推定1RMでは「最高 1,860kg」と呼称を変える（FIX-10）
+   */
+  kind: HighlightKind = 'personal-best',
+): BestChipBox | null {
   const best = layout.personalBest;
   // 点が1つも無いグラフにチップだけ浮かせない。personalBestは表示期間と無関係に非nullに
   // なり得るので、bestIndexのnullチェックではこの条件を兼ねられない
   if (best == null || layout.points.length === 0) return null;
-  const label = `ベスト ${formatTickValue(best.value)}${unit.label}`;
+  const label = `${kind === 'personal-best' ? 'ベスト' : '最高'} ${formatTickValue(best.value)}${unit.label}`;
   // 期間外の日付は本体の値より一段弱く描くので、幅の見積もりだけ合算して別々に返す
   const date = layout.bestIndex == null ? `・${outOfRangeDate(layout, best)}` : '';
   const width = Math.round(estimateTextWidth(label + date, BEST_CHIP_FONT_SIZE) + BEST_CHIP_PAD);

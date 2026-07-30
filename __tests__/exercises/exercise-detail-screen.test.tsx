@@ -129,11 +129,14 @@ beforeEach(() => {
   jest.clearAllMocks();
   // 既存のテストはすべて解説タブの中身を見るため、既定は「記録0件＝解説タブが初期表示」にしておく
   mockUseExerciseRecordCount.mockReturnValue({ count: 0, loaded: true });
+  const emptySeries = {
+    unit: { label: 'kg', step: 5, minRange: 10, integerOnly: false, auxKind: 'reps' },
+    points: [],
+  };
   mockUseExerciseProgress.mockReturnValue({
-    series: {
-      unit: { label: 'kg', step: 5, minRange: 10, integerOnly: false, auxKind: 'reps' },
-      points: [],
-    },
+    series: emptySeries,
+    bestSeries: emptySeries,
+    chartMeasurementType: 'weight_reps',
     loaded: true,
     failed: false,
   });
@@ -416,8 +419,11 @@ describe('記録タブ: 記録0件／1件のとき', () => {
     return { dateKey, startedAt: dateKey, value: weight, best: set, sets: [set] };
   };
   const withPoints = (weights: number[]) => {
+    const series = { unit, points: weights.map((w, i) => makePoint(i, w)) };
     mockUseExerciseProgress.mockReturnValue({
-      series: { unit, points: weights.map((w, i) => makePoint(i, w)) },
+      series,
+      bestSeries: series,
+      chartMeasurementType: 'weight_reps',
       loaded: true,
       failed: false,
     });

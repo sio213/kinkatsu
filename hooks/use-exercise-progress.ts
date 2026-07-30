@@ -1,7 +1,12 @@
 import { db } from '@/db/client';
 import { sets, workoutSessionExercises, workoutSessions } from '@/db/schema';
 import type { MeasurementType } from '@/lib/exercises/constants';
-import { buildProgressSeries, type ProgressSeries } from '@/lib/exercises/progress';
+import {
+  buildProgressSeries,
+  resolveChartMeasurementType,
+  type ProgressMetric,
+  type ProgressSeries,
+} from '@/lib/exercises/progress';
 import { eq } from 'drizzle-orm';
 import { useLiveQuery } from 'drizzle-orm/expo-sqlite';
 import { useMemo } from 'react';
@@ -25,7 +30,25 @@ import { useMemo } from 'react';
 export function useExerciseProgress(
   exerciseId: number,
   measurementType: MeasurementType,
-): { series: ProgressSeries; loaded: boolean; failed: boolean } {
+  /** グラフに出す指標。省略時はその日の最強セット（Phase 1 と同じ系列） */
+  metric: ProgressMetric = 'best',
+): {
+  /** 選択中の指標の系列。グラフと点の選択はこちらを使う */
+  series: ProgressSeries;
+  /**
+   * 最大○○（ベスト）指標の系列。**空状態・履歴一覧・自己ベストの判定はこちらを使うこと。**
+   * 点を落とす条件は指標ごとに違い（推定1RMは13回以上のセットしか無い日も落ちる）、選択中の
+   * 指標の系列で「記録が0件か」を判定すると、記録があるのに空状態が出てしまう
+   */
+  bestSeries: ProgressSeries;
+  /**
+   * グラフ上でこの種目を何の計測タイプとして扱っているか。指標チップの文言もこれで決まる。
+   * 重量を1度も記録していない加重種目は 'reps' が返る（resolveChartMeasurementType 参照）
+   */
+  chartMeasurementType: MeasurementType;
+  loaded: boolean;
+  failed: boolean;
+} {
   const { data, updatedAt, error } = useLiveQuery(
     db
       .select({
@@ -51,13 +74,30 @@ export function useExerciseProgress(
 
   if (error) console.error('[exercise progress]', error);
 
+  // `?? []` をそのまま置くと、dataが未解決の間は毎レンダーで新しい配列になり、下の3つの
+  // useMemoが毎回作り直される（系列の再計算はグラフ全体の再レイアウトを伴うので効く）
+  const rows = useMemo(() => data ?? [], [data]);
+
+  // 重量を1度も記録していない加重種目は reps 種目として描く。判定は種目単位で1回だけ行い、
+  // 系列にも指標チップにも同じ値を配る（画面の中で扱いが割れないようにするため）
+  const chartMeasurementType = useMemo(
+    () => resolveChartMeasurementType(measurementType, rows),
+    [measurementType, rows],
+  );
+
+  const bestSeries = useMemo(
+    () => buildProgressSeries(chartMeasurementType, rows, 'best'),
+    [chartMeasurementType, rows],
+  );
   const series = useMemo(
-    () => buildProgressSeries(measurementType, data ?? []),
-    [measurementType, data],
+    () => (metric === 'best' ? bestSeries : buildProgressSeries(chartMeasurementType, rows, metric)),
+    [metric, bestSeries, chartMeasurementType, rows],
   );
 
   return {
     series,
+    bestSeries,
+    chartMeasurementType,
     // useLiveQueryのdataは解決前から[]で、undefinedにはならない。`data !== undefined`だと
     // 常に読み込み完了扱いになり、記録があるのに一瞬「0件」の空状態が描かれてしまう。
     // 最初の解決時にだけ入るupdatedAtで判定する（use-exercise-record-count.tsと同じ理由）

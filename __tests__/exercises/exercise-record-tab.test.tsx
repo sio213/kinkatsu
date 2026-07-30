@@ -46,11 +46,15 @@ function makePoint(daysAgo: number, weight: number): ProgressPoint {
 }
 
 function render(points: ProgressPoint[]) {
+  const series = {
+    unit: { label: 'kg', step: 5, minRange: 10, integerOnly: false, auxKind: 'reps' },
+    points,
+  };
   mockUseExerciseProgress.mockReturnValue({
-    series: {
-      unit: { label: 'kg', step: 5, minRange: 10, integerOnly: false, auxKind: 'reps' },
-      points,
-    },
+    series,
+    // 既定は最大重量（ベスト）指標なので、選択中の系列とベスト系列は同じもの
+    bestSeries: series,
+    chartMeasurementType: 'weight_reps',
     loaded: true,
     failed: false,
   });
@@ -110,7 +114,7 @@ describe('ExerciseRecordTab', () => {
 
   test('グラフに渡す自己ベストも期間チップに連動しない', () => {
     const root = render(points);
-    const personalBest = () => root.findByType(ExerciseProgressChart).props.personalBest;
+    const personalBest = () => root.findByType(ExerciseProgressChart).props.highlight;
 
     // 既定の3ヶ月では80kgの日（100日前）は表示範囲外だが、自己ベストとしては渡り続ける
     expect(personalBest().value).toBe(80);

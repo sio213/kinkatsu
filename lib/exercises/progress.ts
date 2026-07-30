@@ -1,4 +1,5 @@
 import type { MeasurementType } from '@/lib/exercises/constants';
+import { estimateOneRepMax } from '@/lib/exercises/one-rep-max';
 import {
   formatHistoryDuration,
   primaryMetric,
@@ -48,8 +49,13 @@ const MINUTE_SWITCH_SECONDS = 600;
 
 const SECONDS_UNIT: ProgressUnit = { label: '秒', step: 10, minRange: 20, integerOnly: true, auxKind: 'sets' };
 const MINUTES_UNIT: ProgressUnit = { label: '分', step: 10, minRange: 10, integerOnly: true, auxKind: 'none' };
+// 合計側は1日ぶんを足した値なので桁が一段上がる。刻みと最小レンジもそれに合わせる。
+// 補助情報を持たないのは、合計が「その日全体」の値で、特定のセットに紐づく情報
+// （「×8」「×3セット」）を添える理由が無いため（FIX-14）
+const TOTAL_SECONDS_UNIT: ProgressUnit = { label: '秒', step: 30, minRange: 60, integerOnly: true, auxKind: 'none' };
+const TOTAL_MINUTES_UNIT: ProgressUnit = { label: '分', step: 10, minRange: 10, integerOnly: true, auxKind: 'none' };
 
-const UNITS: Record<MeasurementType, ProgressUnit> = {
+const BEST_UNITS: Record<MeasurementType, ProgressUnit> = {
   weight_reps: { label: 'kg', step: 5, minRange: 10, integerOnly: false, auxKind: 'reps' },
   weight_time: { label: 'kg', step: 5, minRange: 10, integerOnly: false, auxKind: 'duration' },
   reps: { label: '回', step: 5, minRange: 5, integerOnly: true, auxKind: 'sets' },
@@ -57,11 +63,102 @@ const UNITS: Record<MeasurementType, ProgressUnit> = {
   distance_time: { label: 'km', step: 2.5, minRange: 4, integerOnly: false, auxKind: 'none' },
 };
 
+/**
+ * 合計指標の単位。weight_reps だけ Σ(重量×回数) で桁が跳ね上がる（1,500〜12,500kg）ため、
+ * 刻みの基準を100kgに置く。他は主指標をそのまま足すだけなので、ベスト側より一段粗い程度。
+ * weight_time は足せる量が無いので持たない（この計測タイプでは合計指標を出さない）
+ */
+const TOTAL_UNITS: Partial<Record<MeasurementType, ProgressUnit>> = {
+  weight_reps: { label: 'kg', step: 100, minRange: 200, integerOnly: false, auxKind: 'none' },
+  reps: { label: '回', step: 20, minRange: 20, integerOnly: true, auxKind: 'none' },
+  time: TOTAL_SECONDS_UNIT,
+  distance_time: { label: 'km', step: 2.5, minRange: 4, integerOnly: false, auxKind: 'none' },
+};
+
+/** 推定1RMは重量×回数の種目でしか定義できない。値域はベスト重量と同程度なので刻みも揃える */
+const E1RM_UNIT: ProgressUnit = { label: 'kg', step: 5, minRange: 10, integerOnly: false, auxKind: 'none' };
+
 // 縦軸の値をDBの保持単位から表示単位へ換算する係数。距離はm→km、時間は分表示のときだけ秒→分
 function displayScale(measurementType: MeasurementType, unit: ProgressUnit): number {
   if (measurementType === 'distance_time') return 1 / 1000;
-  if (unit === MINUTES_UNIT) return 1 / 60;
+  if (unit === MINUTES_UNIT || unit === TOTAL_MINUTES_UNIT) return 1 / 60;
   return 1;
+}
+
+// ---------------------------------------------------------------------------
+// 指標
+// ---------------------------------------------------------------------------
+
+export const PROGRESS_METRICS = ['best', 'total', 'e1rm'] as const;
+/** グラフの縦軸に何を出すか。'best'＝その日の最強セット、'total'＝その日の合計、'e1rm'＝推定1RM */
+export type ProgressMetric = (typeof PROGRESS_METRICS)[number];
+
+/**
+ * 指標チップの文言。計測タイプごとに語が変わる（合計は「総重量／合計回数／合計時間／合計距離」）。
+ * ここに載っていない組み合わせはその種目で選べない指標で、チップにも出さない。
+ *
+ * 「1RM」ではなく必ず「推定1RM」と書くこと。1RM という略語自体が初心者に通じない上、
+ * 「推定」を落とすと実測値と誤解され、その重量に挑戦して怪我をしかねない（FIX-09）。
+ */
+const METRIC_LABELS: Record<MeasurementType, Partial<Record<ProgressMetric, string>>> = {
+  weight_reps: { best: '最大重量', total: '総重量', e1rm: '推定1RM' },
+  // 加重ホールドは合計も推定1RMも定義できない。1つしか無いのでチップ列自体が出ない
+  weight_time: { best: '最大重量' },
+  reps: { best: '最大回数', total: '合計回数' },
+  time: { best: '最大時間', total: '合計時間' },
+  distance_time: { best: '最大距離', total: '合計距離' },
+};
+
+/** 指標チップに出す文言。選べない組み合わせならnull */
+export function progressMetricLabel(
+  measurementType: MeasurementType,
+  metric: ProgressMetric,
+): string | null {
+  return METRIC_LABELS[measurementType][metric] ?? null;
+}
+
+/**
+ * その種目で選べる指標。並び順は PROGRESS_METRICS（最大○○ → 合計 → 推定1RM）で固定。
+ *
+ * 返り値が1件のときは切り替えの余地が無いので、呼び出し側はチップ列ごと出さないこと
+ * （空の列を残さない。加重ホールド系がこれに当たる）。
+ *
+ * 渡すのは resolveChartMeasurementType を通した「グラフ上の計測タイプ」であること。
+ * 重量を1度も記録していない加重種目は reps 種目として扱うので、チップも「最大回数／合計回数」になる。
+ */
+export function availableProgressMetrics(measurementType: MeasurementType): ProgressMetric[] {
+  return PROGRESS_METRICS.filter((metric) => METRIC_LABELS[measurementType][metric] != null);
+}
+
+/**
+ * 重量として有効な値か。`0` を弾くのが要点。
+ *
+ * 加重種目で「加重なしの日」を記録するとき、重量欄を空にする人と `0` と打つ人がいる。意図は
+ * 同じなのに、null は主指標が無いものとして点が落ち、`0` は有効値として通って 0kg の点が立つ
+ * ——書き方の違いだけで縦軸のスケールが潰れてしまう。両者を同じ「未入力」として扱う。
+ */
+function hasWeight(set: SetLike): boolean {
+  return set.weight != null && set.weight > 0;
+}
+
+/**
+ * グラフ上でその種目を何の計測タイプとして扱うか。
+ *
+ * weight_reps なのに✓確定セットの重量が1つも無い種目（加重チンニングをずっと自重でやっている、
+ * カスタム種目を weight_reps で作って回数だけ入れている）は、主指標が全セットnullになるため
+ * **全ての日が落ちてグラフが空になる**。記録が何十件あっても「まだ記録がありません／1回目を
+ * 記録する」が出てしまうので、実質 reps 種目として扱い、最高回数・合計回数を描く。
+ *
+ * 判定は種目単位・全期間のデータで1回だけ行う。重量が1つでも入った時点で重量種目に戻るため、
+ * 初めて加重した日に縦軸が「回」から「kg」に変わり、過去の自重日の点は落ちる。同じ縦軸に
+ * 「回」と「kg」は混ぜられないので回避できないが、起きるのは1回きり。
+ */
+export function resolveChartMeasurementType(
+  measurementType: MeasurementType,
+  rows: ProgressSetRow[],
+): MeasurementType {
+  if (measurementType !== 'weight_reps') return measurementType;
+  return rows.some((row) => row.completedAt != null && hasWeight(row)) ? 'weight_reps' : 'reps';
 }
 
 // ---------------------------------------------------------------------------
@@ -99,8 +196,20 @@ export type ProgressPoint = {
   startedAt: number;
   /** 縦軸の値。単位は ProgressSeries.unit に従い、換算済み */
   value: number;
-  /** その日のBest Set。必ず✓確定セットの中から選ばれる。内訳カードの星の位置にも使う */
+  /**
+   * その日のBest Set。必ず✓確定セットの中から選ばれる。内訳カードの星の位置にも使う。
+   *
+   * **指標を切り替えても意味を変えないこと。** `best.sessionId` は内訳カードの遷移先・
+   * 折りたたみ窓の中心（buildDetailSetRows）・ExerciseRecordCard が使っており、
+   * 指標で動くと同じ日を選んでいるのに飛び先が変わるなど挙動が読めなくなる。
+   * 指標ごとの「値を出したセット」は metricSet の方に持つ
+   */
   best: ProgressSet;
+  /**
+   * その日の値を出したセット。推定1RMのように「特定の1セット由来」の指標で、内訳カードが
+   * どのセットの値かを示すのに使う。合計指標のように日全体から求まる値ではnull
+   */
+  metricSet?: ProgressSet | null;
   /**
    * その日に記録した全セット。同じ日に同じ種目を複数カードでやっていれば連結される。
    * ✓未確定のセットも含む（内訳カードで「未実施」として並べるため）
@@ -153,6 +262,7 @@ export function toDayKey(timestamp: number): number {
 export function buildProgressSeries(
   measurementType: MeasurementType,
   rows: ProgressSetRow[],
+  metric: ProgressMetric = 'best',
 ): ProgressSeries {
   const byDay = new Map<number, { startedAt: number; sets: ProgressSet[] }>();
   for (const row of rows) {
@@ -176,16 +286,28 @@ export function buildProgressSeries(
     }
   }
 
-  // 主指標が全セットnull（値の無いセットだけを✓した）日は、点として置く値が無いので落とす
-  const days: { dateKey: number; startedAt: number; best: ProgressSet; sets: ProgressSet[]; raw: number }[] = [];
+  // 値の置けない日は落とす。落ちる条件は指標ごとに違う——主指標が全セットnullの日（値の無い
+  // セットだけを✓した）はどの指標でも落ちるが、推定1RMは13回以上のセットしか無い日も落ちる。
+  // つまり series.points.length は指標で変わるので、空状態・履歴一覧の判定にこの系列を使わないこと
+  type Day = {
+    dateKey: number;
+    startedAt: number;
+    best: ProgressSet;
+    metricSet: ProgressSet | null;
+    sets: ProgressSet[];
+    raw: number;
+  };
+  const days: Day[] = [];
   for (const [dateKey, day] of byDay) {
     const best = pickBestSet(measurementType, day.sets);
     if (!best) continue;
-    days.push({ dateKey, startedAt: day.startedAt, best, sets: day.sets, raw: primaryMetric(measurementType, best)! });
+    const value = computeMetricValue(measurementType, metric, best, day.sets);
+    if (!value) continue;
+    days.push({ dateKey, startedAt: day.startedAt, best, metricSet: value.metricSet, sets: day.sets, raw: value.raw });
   }
   days.sort((a, b) => a.dateKey - b.dateKey);
 
-  const unit = resolveUnit(measurementType, days.map((d) => d.raw));
+  const unit = resolveUnit(measurementType, metric, days.map((d) => d.raw));
   const scale = displayScale(measurementType, unit);
 
   return {
@@ -196,9 +318,62 @@ export function buildProgressSeries(
       // 秒→分・m→kmの換算で 3.4000000000000004 のような誤差が出るため、小数第2位で丸める
       value: Math.round(d.raw * scale * 100) / 100,
       best: d.best,
+      metricSet: d.metricSet,
       sets: d.sets,
     })),
   };
+}
+
+/**
+ * その日の値と、値を出したセット。置ける値が無ければnull（＝その日は点にしない）。
+ *
+ * 合計は「その日の全セット」を足す。同じ日に複数セッションがあれば byDay で既に連結されて
+ * いるので合算されるし、ウォームアップ用に分けたカードも区別せず足す（スキーマに warmup の
+ * 区別が無く、別カードに分ける運用でしか表現されていないため）。✓確定セットのみが対象。
+ */
+function computeMetricValue(
+  measurementType: MeasurementType,
+  metric: ProgressMetric,
+  best: ProgressSet,
+  sets: ProgressSet[],
+): { raw: number; metricSet: ProgressSet | null } | null {
+  if (metric === 'best') {
+    return { raw: primaryValue(measurementType, best)!, metricSet: best };
+  }
+
+  if (metric === 'e1rm') {
+    let top: { raw: number; metricSet: ProgressSet } | null = null;
+    for (const set of sets.filter(isCompleted)) {
+      const estimate = estimateOneRepMax(set.weight, set.reps);
+      if (estimate == null) continue;
+      // 同値なら先にやったセットを採る（自己ベストの「最初に到達した回」と同じ考え方）
+      if (top == null || estimate > top.raw) top = { raw: estimate, metricSet: set };
+    }
+    return top;
+  }
+
+  // 合計。日全体から求まる値なので metricSet は持たない
+  let total = 0;
+  let counted = 0;
+  for (const set of sets.filter(isCompleted)) {
+    const contribution = totalContribution(measurementType, set);
+    if (contribution == null) continue;
+    total += contribution;
+    counted++;
+  }
+  return counted === 0 ? null : { raw: total, metricSet: null };
+}
+
+/** 合計に足す1セットぶんの量。足せる量が無い（未入力・そもそも定義できない）ならnull */
+function totalContribution(measurementType: MeasurementType, set: ProgressSet): number | null {
+  // 重量×回数だけは主指標（＝重量）の合計では意味を成さないので専用の式にする。
+  // 他の計測タイプは主指標をそのまま足したものが合計回数・合計時間・合計距離になる
+  if (measurementType === 'weight_reps') {
+    return hasWeight(set) && set.reps != null ? set.weight! * set.reps : null;
+  }
+  // 加重ホールドは足せる量が無い（重量を足しても無意味、時間を足すと加重量が消える）
+  if (measurementType === 'weight_time') return null;
+  return primaryValue(measurementType, set);
 }
 
 // pickRepresentativeSetと同じ判定（主指標が最大、同値なら副指標が大きい方）だが、
@@ -211,7 +386,7 @@ function pickBestSet(measurementType: MeasurementType, sets: ProgressSet[]): Pro
   let bestPrimary = -Infinity;
   let bestSecondary = -Infinity;
   for (const s of sets.filter(isCompleted)) {
-    const primary = primaryMetric(measurementType, s);
+    const primary = primaryValue(measurementType, s);
     if (primary == null) continue;
     const secondary = secondaryMetric(measurementType, s) ?? -Infinity;
     if (primary > bestPrimary || (primary === bestPrimary && secondary > bestSecondary)) {
@@ -223,9 +398,36 @@ function pickBestSet(measurementType: MeasurementType, sets: ProgressSet[]): Pro
   return best;
 }
 
-function resolveUnit(measurementType: MeasurementType, rawValues: number[]): ProgressUnit {
-  if (measurementType !== 'time') return UNITS[measurementType];
+/**
+ * 主指標の値。重量の種目だけ `0` と null を同じ「未入力」として扱うのが primaryMetric との違い
+ * （hasWeight のコメント参照）。ベストの選定にも合計にもこちらを通す
+ */
+function primaryValue(measurementType: MeasurementType, set: SetLike): number | null {
+  if ((measurementType === 'weight_reps' || measurementType === 'weight_time') && !hasWeight(set)) {
+    return null;
+  }
+  return primaryMetric(measurementType, set);
+}
+
+function resolveUnit(
+  measurementType: MeasurementType,
+  metric: ProgressMetric,
+  rawValues: number[],
+): ProgressUnit {
+  if (metric === 'e1rm') return E1RM_UNIT;
+
   const max = rawValues.length > 0 ? Math.max(...rawValues) : 0;
+  if (metric === 'total') {
+    // 合計は1日ぶんを足した値なので、秒のままだと桁が大きくなりやすい。分への切り替えは
+    // ベスト側と同じ閾値で判定する（合計時間が10分以上なら分）
+    if (measurementType === 'time') {
+      return max >= MINUTE_SWITCH_SECONDS ? TOTAL_MINUTES_UNIT : TOTAL_SECONDS_UNIT;
+    }
+    // 合計を持たない計測タイプはそもそも選べない（availableProgressMetrics が返さない）
+    return TOTAL_UNITS[measurementType] ?? BEST_UNITS[measurementType];
+  }
+
+  if (measurementType !== 'time') return BEST_UNITS[measurementType];
   return max >= MINUTE_SWITCH_SECONDS ? MINUTES_UNIT : SECONDS_UNIT;
 }
 

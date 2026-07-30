@@ -11,10 +11,15 @@ import { useExerciseProgress } from '@/hooks/use-exercise-progress';
 import { useStartWithConfirm } from '@/hooks/use-start-with-confirm';
 import { useWorkoutSessions } from '@/hooks/use-workout-session';
 import type { MeasurementType } from '@/lib/exercises/constants';
+import { MetricFilterChips } from '@/components/exercises/metric-filter-chips';
+import { formatTickValue } from '@/lib/exercises/chart-scale';
 import {
+  availableProgressMetrics,
   DEFAULT_PROGRESS_PERIOD,
   filterProgressPoints,
   findPersonalBest,
+  progressMetricLabel,
+  type ProgressMetric,
   type ProgressPeriod,
 } from '@/lib/exercises/progress';
 import { startWorkoutWithExercise } from '@/lib/workout/session';
@@ -48,7 +53,16 @@ export function ExerciseRecordTab({ exerciseId, exerciseName, measurementType, i
     startWorkoutWithExercise,
   );
   const [period, setPeriod] = useState<ProgressPeriod>(DEFAULT_PROGRESS_PERIOD);
-  const { series, loaded, failed } = useExerciseProgress(exerciseId, measurementType);
+  const [metric, setMetric] = useState<ProgressMetric>('best');
+  const { series, bestSeries, chartMeasurementType, loaded, failed } = useExerciseProgress(
+    exerciseId,
+    measurementType,
+    metric,
+  );
+
+  // 種目によって選べる指標が変わる。1件しか無い（加重ホールド系）ならチップ列ごと出さない
+  const metrics = useMemo(() => availableProgressMetrics(chartMeasurementType), [chartMeasurementType]);
+  const metricLabel = progressMetricLabel(chartMeasurementType, metric);
 
   // 単位は全期間のデータで決めたものを使い、期間の切り替えで縦軸の単位が変わらないようにする
   const points = useMemo(
@@ -71,17 +85,22 @@ export function ExerciseRecordTab({ exerciseId, exerciseName, measurementType, i
 
   const selectedPoint = selectedIndex == null ? null : points[selectedIndex];
   // 前回比は「直前の記録」との差なので、期間で絞ったpointsではなく全期間の系列から1つ前を探す
-  // （表示期間の外にあっても直前の記録であることに変わりはない）
+  // （表示期間の外にあっても直前の記録であることに変わりはない）。指標を切り替えても比較の中身は
+  // セット同士なので、点の落ち方が指標で変わらないベスト系列から辿る
   const previousPoint = useMemo(() => {
     if (!selectedPoint) return null;
-    const index = series.points.findIndex((p) => p.dateKey === selectedPoint.dateKey);
-    return index > 0 ? series.points[index - 1] : null;
-  }, [series.points, selectedPoint]);
+    const index = bestSeries.points.findIndex((p) => p.dateKey === selectedPoint.dateKey);
+    return index > 0 ? bestSeries.points[index - 1] : null;
+  }, [bestSeries.points, selectedPoint]);
 
-  // アンバー（グラフの点・ベストチップ・内訳カードのバッジ）は「全期間の自己ベスト」だけを指す。
-  // 期間で絞ったpointsから求めると1ヶ月表示のたびにその月の最大がベスト扱いになり、内訳カード・
-  // 過去の記録一覧のバッジと食い違うため、ここで1回だけ全期間の系列から求めて配る
-  const personalBest = useMemo(() => findPersonalBest(series.points), [series.points]);
+  // グラフ上でハイライトする点。期間で絞ったpointsから求めると1ヶ月表示のたびにその月の最大が
+  // ベスト扱いになり、内訳カード・過去の記録一覧のバッジと食い違うため、全期間の系列から求める。
+  //
+  // 最大○○（ベスト）指標のときだけ、これが「自己ベスト」——アンバーの点と★のチップになる。
+  // 総重量・推定1RMでは単にその指標の最高値なので、色も★も持たせない（FIX-10）
+  const highlight = useMemo(() => findPersonalBest(series.points), [series.points]);
+  // 内訳カードのバッジは選択中の指標に関係なく、実測の自己ベスト（ベスト系列の最高点）を指す
+  const personalBest = useMemo(() => findPersonalBest(bestSeries.points), [bestSeries.points]);
 
   return (
     <View style={styles.container}>
@@ -91,8 +110,10 @@ export function ExerciseRecordTab({ exerciseId, exerciseName, measurementType, i
         <Text style={styles.placeholder}>記録を読み込めませんでした</Text>
       ) : !loaded ? (
         <Text style={styles.placeholder}>読み込み中</Text>
-      ) : series.points.length === 0 ? (
-        // 記録0件。空白ではなく完成形を薄い見本で予告して、記録する動機にする（デザイン案）
+      ) : bestSeries.points.length === 0 ? (
+        // 記録0件。空白ではなく完成形を薄い見本で予告して、記録する動機にする（デザイン案）。
+        // 判定に選択中の指標の系列を使わないこと——推定1RMは13回以上のセットしか無い日が落ちるので、
+        // 記録が何十件あっても「まだ記録がありません」が出てしまう
         <>
           <ExerciseProgressChartSample />
           <View style={styles.emptyText}>
@@ -120,11 +141,31 @@ export function ExerciseRecordTab({ exerciseId, exerciseName, measurementType, i
             <ExerciseProgressChart
               points={points}
               unit={series.unit}
-              personalBest={personalBest}
+              highlight={highlight}
+              // アンバーと★は実測の自己ベスト専用。他の指標では色も記号も持たせない（FIX-10）
+              highlightKind={metric === 'best' ? 'personal-best' : 'metric-max'}
               selectedIndex={selectedIndex}
               onSelect={handleSelect}
             />
           </View>
+
+          {/* 切り替えチップはグラフの真下。キャプションはさらにその下に置く——間に挟むと、
+              推定1RMを選ぶたびにチップの位置が動いてしまう（FIX-12） */}
+          {metrics.length > 1 && (
+            <MetricFilterChips
+              measurementType={chartMeasurementType}
+              metrics={metrics}
+              value={metric}
+              onChange={setMetric}
+            />
+          )}
+          {metric === 'e1rm' && (
+            <Text style={styles.caption}>
+              <Text style={styles.captionLead}>推定1RM＝</Text>
+              挙げた重量と回数からの計算値です（12回以下のセットから算出／実測ではありません）
+            </Text>
+          )}
+
           {selectedPoint && (
             <ExerciseRecordDetailCard
               // 別の日を選んだら「他N件を見る」の展開状態を持ち越さず畳んだ状態から始める
@@ -133,15 +174,21 @@ export function ExerciseRecordTab({ exerciseId, exerciseName, measurementType, i
               measurementType={measurementType}
               previousPoint={previousPoint}
               isPersonalBest={selectedPoint.dateKey === personalBest?.dateKey}
+              // 最大○○のときは出さない——値はセット行の太字と自己ベストバッジで既に読めるため
+              metricRow={
+                metric === 'best' || metricLabel == null
+                  ? null
+                  : { label: metricLabel, value: `${formatTickValue(selectedPoint.value)} ${series.unit.label}` }
+              }
               onPressOpen={(sessionId) => push(`/workout/${sessionId}`)}
             />
           )}
 
           {/* 記録が1件だけのときは、真上の内訳カードと同じ内容が並ぶだけなので出さない。
               一覧は期間チップにも選択中の点にも連動させず、常に今日から見た直近3件 */}
-          {series.points.length > 1 && (
+          {bestSeries.points.length > 1 && (
             <ExerciseRecordHistoryList
-              points={series.points}
+              points={bestSeries.points}
               measurementType={measurementType}
               onPressRecord={(sessionId) => push(`/workout/${sessionId}`)}
               onPressSeeAll={() =>
@@ -160,6 +207,10 @@ const styles = StyleSheet.create({
   // 期間チップとグラフの間だけ11px→6pxにする（グラフ自体の上余白があるぶんの取り消し）
   chartWrap: { marginTop: -5 },
   placeholder: { ...Typography.footnote, color: Colors.textMuted, textAlign: 'center', paddingVertical: 24 },
+  // 推定1RMの注記。面・罫線・アイコンは持たない（?アイコン＋ポップオーバーは不採用）。
+  // 幅290pxでは2行になる想定で、チップ列との間隔と合わせて内訳カードが45px下がる
+  caption: { ...Typography.caption, fontSize: 11, lineHeight: 17, color: Colors.textSecondary },
+  captionLead: { color: Colors.textPrimary, fontWeight: '700' },
   emptyText: { alignItems: 'center', gap: 5 },
   emptyHeading: { ...Typography.cardTitle, color: Colors.textPrimary },
   emptyBody: { ...Typography.footnote, color: Colors.textMuted },

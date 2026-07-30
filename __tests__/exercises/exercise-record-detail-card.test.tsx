@@ -39,6 +39,7 @@ function renderCard(props: {
   measurementType?: MeasurementType;
   previousPoint?: ProgressPoint | null;
   isPersonalBest?: boolean;
+  metricRow?: { label: string; value: string } | null;
 }) {
   const onPressOpen = jest.fn();
   let instance!: ReturnType<typeof create>;
@@ -49,6 +50,7 @@ function renderCard(props: {
         measurementType={props.measurementType ?? 'weight_reps'}
         previousPoint={props.previousPoint ?? null}
         isPersonalBest={props.isPersonalBest ?? false}
+        metricRow={props.metricRow ?? null}
         onPressOpen={onPressOpen}
       />,
     );
