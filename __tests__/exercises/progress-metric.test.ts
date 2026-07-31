@@ -270,6 +270,17 @@ describe('刻みの選び方（総重量・合計回数の値域）', () => {
     expect((s.max - hi) / (s.max - s.min)).toBeLessThan(0.2);
   });
 
+  test('スパイクが1つあっても線が窓の下に張り付かない（全期間表示）', () => {
+    // 同日2セッションの日が合算されて 4,135kg のスパイクになるデータ。刻みの見積もりが
+    // 厳しめなせいで2,500kg刻みが選ばれ、窓が0〜7,500まで広がって線が下2割に張り付いていた
+    const v = [450, 1255, 1540, 1810, 2000, 2935, 4135, 1752.5];
+    const s = scaleOf(v, totalKg);
+    const lo = Math.min(...v);
+    const hi = Math.max(...v);
+    expect(s.ticks.length).toBeLessThanOrEqual(6);
+    expect((hi - lo) / (s.max - s.min)).toBeGreaterThan(0.6);
+  });
+
   test('合計回数（200〜1,000回）でも整数側のラダーが上がりきる', () => {
     const s = scaleOf([200, 500, 800, 1000], totalReps);
     expect(s.ticks.length).toBeLessThanOrEqual(6);

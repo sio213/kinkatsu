@@ -135,6 +135,36 @@ function pickStep(lo: number, hi: number, unit: ProgressUnit, allowZeroBase: boo
   return step;
 }
 
+/**
+ * 刻みを1段ずつ細かくして、窓が実際に狭くなるあいだだけ下げる。
+ *
+ * pickStep が使う estimateLineCount は「余裕2段を常に足す」厳しめの見積もりなので、実際には
+ * 6本に収まる刻みでも粗い方が選ばれることがある。全期間のベンチプレス総重量（450〜4,135kg）が
+ * これで、1,000kg刻みなら 0〜5,000 の6本に収まるのに 2,500kg刻みが選ばれ、窓が 0〜7,500 まで
+ * 広がって線が下2割に張り付いていた。
+ *
+ * 窓が狭くならないなら下げない。呼ぶのは0起点へ落とした経路だけで、通常の経路の刻みは
+ * デザイン案の11パターンで決まっているため触らない。
+ */
+function refineStep(lo: number, hi: number, unit: ProgressUnit, step: number): number {
+  const ladder = unit.integerOnly ? INTEGER_LADDER : DECIMAL_LADDER;
+  let current = step;
+  let currentSpan = spanOf(roundedWindow(lo, hi, current, unit.minRange));
+  for (;;) {
+    const finer = [...ladder].reverse().find((v) => v < current);
+    if (finer == null) return current;
+    const span = spanOf(roundedWindow(lo, hi, finer, unit.minRange));
+    if (span >= currentSpan - EPS) return current;
+    if (Math.round(span / finer) + 1 > MAX_GRID_LINES) return current;
+    current = finer;
+    currentSpan = span;
+  }
+}
+
+function spanOf({ lower, upper }: { lower: number; upper: number }): number {
+  return upper - lower;
+}
+
 // 丸めをやめて素の自動スケールに戻すときの3本のグリッド。目盛りはきりのいい値にならない
 function rawScale(lo: number, hi: number, unit: ProgressUnit): ChartScale {
   const range = Math.max(hi - lo, unit.minRange);
@@ -160,7 +190,10 @@ function buildRoundedScale(
   unit: ProgressUnit,
   allowZeroBase: boolean,
 ): ChartScale | null {
-  const step = pickStep(lo, hi, unit, allowZeroBase);
+  const picked = pickStep(lo, hi, unit, allowZeroBase);
+  // 刻みの練り直しは0起点へ落とした経路でだけ行う。通常の経路の刻みはデザイン案の11パターンで
+  // 決まっているので触らない（Y-8・Y-9のように、窓が狭くなっても案が示した刻みを採る例がある）
+  const step = allowZeroBase ? refineStep(lo, hi, unit, picked) : picked;
   const { lower, upper } = roundedWindow(lo, hi, step, unit.minRange);
 
   // 丸めた窓がデータ範囲に対して広すぎる／0起点に落ちた場合は、丸めを諦めて素の自動スケールに戻す
