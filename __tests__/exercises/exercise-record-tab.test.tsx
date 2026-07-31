@@ -251,6 +251,45 @@ describe('指標の切り替え', () => {
     expect(hasCaption()).toBe(false);
   });
 
+  test('推定1RMの点が1つも無くても、グラフ・チップ・過去の記録は消さない', () => {
+    const bestSeries = {
+      unit: { label: 'kg', step: 5, minRange: 10, integerOnly: false, auxKind: 'reps' },
+      points: [makePoint(20, 40), makePoint(3, 45)],
+    };
+    // 全日15回以上の種目。推定1RMは算出対象のセットが無く0点になる
+    const emptySeries = { unit: bestSeries.unit, points: [] as ProgressPoint[] };
+    mockUseExerciseProgress.mockImplementation((_id, _type, metric) => ({
+      series: metric === 'e1rm' ? emptySeries : bestSeries,
+      bestSeries,
+      recordDays: bestSeries.points,
+      chartMeasurementType: 'weight_reps',
+      metric,
+      loaded: true,
+      failed: false,
+    }));
+    let instance!: ReturnType<typeof create>;
+    act(() => {
+      instance = create(
+        <ExerciseRecordTab
+          exerciseId={1}
+          exerciseName="レッグカール"
+          measurementType="weight_reps"
+          insideTabBar={false}
+        />,
+      );
+    });
+    const root = instance.root;
+    pressChip(root, '推定1RM');
+
+    // 見本グラフに差し替えず、枠だけのグラフを残す
+    expect(root.findAllByType(ExerciseProgressChart)).toHaveLength(1);
+    expect(root.findByType(ExerciseProgressChart).props.points).toEqual([]);
+    // 理由は他の注記と同じ形で出す
+    expect(allTexts(root).some((t) => t.includes('回を超えるセットは誤差が大きいため'))).toBe(true);
+    // 過去の記録は消さない
+    expect(allTexts(root)).toContain('過去の記録');
+  });
+
   test('自重の日の注記は、表示中の期間に抜けがあるときだけ出す', () => {
     const bestSeries = {
       unit: { label: 'kg', step: 5, minRange: 10, integerOnly: false, auxKind: 'reps' },
