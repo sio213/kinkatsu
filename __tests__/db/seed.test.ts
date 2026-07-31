@@ -177,6 +177,25 @@ describe('seed', () => {
     expect(inserted.find((e) => e.slug === 'bench_press')?.pairedWeights).toBeUndefined();
   });
 
+  // ケーブルは「スタックをいくつ使うか」で割れる。同じ「ケーブル」の名前で対象が分かれるので、
+  // 3グループそれぞれの代表を押さえる（db/seed.tsのpairedWeights参照）
+  it('ケーブルは対面2本引きだけが対象になる', async () => {
+    await seed();
+    const inserted = mockValues.mock.calls[0][0] as { slug: string; pairedWeights?: boolean }[];
+    const paired = (slug: string) => inserted.find((e) => e.slug === slug)?.pairedWeights;
+
+    // 左右のスタックを1つずつ使う
+    expect(paired('cable_crossover')).toBe(true);
+    expect(paired('low_cable_fly')).toBe(true);
+    expect(paired('cable_rear_delt_fly')).toBe(true);
+    // 1本のバー・ロープを両手で持つ（スタックは1つ）
+    expect(paired('cable_curl')).toBeUndefined();
+    expect(paired('seated_cable_row')).toBeUndefined();
+    // 片手ずつ引く
+    expect(paired('single_arm_cable_fly')).toBeUndefined();
+    expect(paired('cable_lateral_raise')).toBeUndefined();
+  });
+
   it('複数種目がそれぞれ異なるフィールドで差分 → 各々のupdateが独立して発火する', async () => {
     mockSelectResult = [
       {
