@@ -105,3 +105,12 @@ export function resolveMeasurementType(value: string | null | undefined): Measur
     ? (value as MeasurementType)
     : 'weight_reps';
 }
+
+/**
+ * exercises.pairedWeights の種目で総重量を何倍にするか。左右で2つ。
+ *
+ * 定数にしているのは、同じ倍率を2箇所で掛けるため——種目詳細のグラフ（lib/exercises/progress.ts）と
+ * 記録タブのセッションカード（hooks/use-workout-session.tsのSQL）。片方だけ変えると、同じ日の
+ * 総重量が画面によって食い違う
+ */
+export const PAIRED_WEIGHT_SIDES = 2;

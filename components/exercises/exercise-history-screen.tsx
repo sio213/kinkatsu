@@ -43,6 +43,10 @@ export function ExerciseHistoryScreen({ insideTabBar = false }: Props) {
   const { series, recordDays, chartMeasurementType, loaded, failed } = useExerciseProgress(
     exerciseId,
     measurementType,
+    // この画面は指標を切り替えないので最大重量の系列しか使わないが、pairedWeightsは渡しておく。
+    // 総重量を出すようになったときに、ここだけ半分の値になるのを防ぐ
+    'best',
+    exercise?.pairedWeights ?? false,
   );
 
   // ベストの判定は全期間の系列で行う（グラフのアンバー・内訳カードのバッジと同じ入口）

@@ -343,6 +343,7 @@ export function ExerciseDetailScreen({ insideTabBar = false }: Props) {
               exerciseId={exercise.id}
               exerciseName={exercise.name}
               measurementType={resolveMeasurementType(exercise.measurementType)}
+              pairedWeights={exercise.pairedWeights}
               insideTabBar={insideTabBar}
             />
           )}

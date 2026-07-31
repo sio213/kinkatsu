@@ -128,6 +128,44 @@ describe('buildProgressSeries: 総重量', () => {
   });
 });
 
+describe('buildProgressSeries: 左右2つ分の種目（pairedWeights）', () => {
+  const rows: ProgressSetRow[] = [
+    row(0, 1, { weight: 10, reps: 10 }),
+    row(0, 2, { weight: 10, reps: 8 }),
+  ];
+
+  test('総重量が左右2つ分になる', () => {
+    expect(buildProgressSeries('weight_reps', rows, 'total', true).points[0].value).toBe(
+      (10 * 10 + 10 * 8) * 2,
+    );
+  });
+
+  test('省略時は倍にしない（既定はバーベル等の単一器具）', () => {
+    expect(buildProgressSeries('weight_reps', rows, 'total').points[0].value).toBe(180);
+  });
+
+  test('最大重量・推定1RMは倍にしない。ダンベルの刻印・内訳カードのセット行と揃える', () => {
+    expect(buildProgressSeries('weight_reps', rows, 'best', true).points[0].value).toBe(10);
+    const e1rm = buildProgressSeries('weight_reps', rows, 'e1rm', true).points[0].value;
+    expect(e1rm).toBe(buildProgressSeries('weight_reps', rows, 'e1rm', false).points[0].value);
+  });
+
+  test('回数種目には効かない。左右で回数が倍になるわけではない', () => {
+    const repsRows = [row(0, 1, { reps: 20 }), row(0, 2, { reps: 15 })];
+    expect(buildProgressSeries('reps', repsRows, 'total', true).points[0].value).toBe(35);
+  });
+
+  test('重量の無いセットは倍にする以前に合計へ入らない', () => {
+    const { points } = buildProgressSeries(
+      'weight_reps',
+      [row(0, 1, { weight: 10, reps: 10 }), row(0, 2, { weight: 0, reps: 12 })],
+      'total',
+      true,
+    );
+    expect(points[0].value).toBe(200);
+  });
+});
+
 describe('buildProgressSeries: 推定1RM', () => {
   test('その日の全セットで計算して最大値を採る', () => {
     const { unit, points } = buildProgressSeries(

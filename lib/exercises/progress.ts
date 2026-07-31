@@ -1,4 +1,4 @@
-import type { MeasurementType } from '@/lib/exercises/constants';
+import { PAIRED_WEIGHT_SIDES, type MeasurementType } from '@/lib/exercises/constants';
 import { estimateOneRepMax } from '@/lib/exercises/one-rep-max';
 import {
   formatHistoryDuration,
@@ -260,6 +260,8 @@ export function buildProgressSeries(
   measurementType: MeasurementType,
   rows: ProgressSetRow[],
   metric: ProgressMetric = 'best',
+  /** 器具を同時に2つ扱う種目か（exercises.pairedWeights）。総重量だけがこれで2倍になる */
+  pairedWeights = false,
 ): ProgressSeries {
   const byDay = groupByDay(rows);
 
@@ -271,7 +273,7 @@ export function buildProgressSeries(
   for (const [dateKey, day] of byDay) {
     const best = pickBestSet(measurementType, day.sets);
     if (!best) continue;
-    const raw = computeMetricValue(measurementType, metric, best, day.sets);
+    const raw = computeMetricValue(measurementType, metric, best, day.sets, pairedWeights);
     if (raw == null) continue;
     days.push({ dateKey, startedAt: day.startedAt, best, sets: day.sets, raw });
   }
@@ -369,7 +371,11 @@ function computeMetricValue(
   metric: ProgressMetric,
   best: ProgressSet,
   sets: ProgressSet[],
+  pairedWeights: boolean,
 ): number | null {
+  // 最大重量・推定1RMは左右2つ分にしない。「今日は何kgのダンベルを持ったか」「1回なら何kgか」
+  // という問いへの答えは片方の重量そのものであり、2倍にするとダンベルの刻印とも、内訳カードの
+  // セット行に出る値とも食い違う。合計だけが「動かした総量」を問うので2倍になる
   if (metric === 'best') return primaryValue(measurementType, best);
 
   if (metric === 'e1rm') {
@@ -385,7 +391,7 @@ function computeMetricValue(
   let total = 0;
   let counted = 0;
   for (const set of sets.filter(isCompleted)) {
-    const contribution = totalContribution(measurementType, set);
+    const contribution = totalContribution(measurementType, set, pairedWeights);
     if (contribution == null) continue;
     total += contribution;
     counted++;
@@ -393,12 +399,23 @@ function computeMetricValue(
   return counted === 0 ? null : total;
 }
 
-/** 合計に足す1セットぶんの量。足せる量が無い（未入力・そもそも定義できない）ならnull */
-function totalContribution(measurementType: MeasurementType, set: ProgressSet): number | null {
+/**
+ * 合計に足す1セットぶんの量。足せる量が無い（未入力・そもそも定義できない）ならnull。
+ *
+ * pairedWeights の種目（ダンベルベンチプレス等、器具を同時に2つ扱う）は左右2つ分で数える。
+ * 入力する重量はダンベル片方の刻印どおり片手ぶんなので、そのまま足すと実際に動かした量の
+ * 半分になり、バーベル種目と並べたときに不当に低く見える（2026-07-31 決定）。
+ */
+function totalContribution(
+  measurementType: MeasurementType,
+  set: ProgressSet,
+  pairedWeights: boolean,
+): number | null {
   // 重量×回数だけは主指標（＝重量）の合計では意味を成さないので専用の式にする。
   // 他の計測タイプは主指標をそのまま足したものが合計回数・合計時間・合計距離になる
   if (measurementType === 'weight_reps') {
-    return hasWeight(set) && set.reps != null ? set.weight! * set.reps : null;
+    if (!hasWeight(set) || set.reps == null) return null;
+    return set.weight! * set.reps * (pairedWeights ? PAIRED_WEIGHT_SIDES : 1);
   }
   // 加重ホールドは足せる量が無い（重量を足しても無意味、時間を足すと加重量が消える）
   if (measurementType === 'weight_time') return null;

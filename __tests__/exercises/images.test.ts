@@ -5,7 +5,7 @@ function make(overrides: Partial<Exercise> = {}): Exercise {
   return {
     id: 1, name: 'ベンチプレス', slug: 'bench_press', category: '胸',
     favorite: false, note: null, formPoints: null, source: 'preset',
-    measurementType: 'weight_reps',
+    measurementType: 'weight_reps', pairedWeights: false,
     createdAt: 0, updatedAt: 0,
     ...overrides,
   };
