@@ -218,7 +218,7 @@ describe('刻みの選び方（総重量・合計回数の値域）', () => {
   const totalKg = { label: 'kg', step: 100, minRange: 200, integerOnly: false, auxKind: 'none' } as const;
   const totalReps = { label: '回', step: 20, minRange: 20, integerOnly: true, auxKind: 'none' } as const;
 
-  const scaleOf = (values: number[], unit: typeof totalKg | typeof totalReps) =>
+  const scaleOf = (values: number[], unit: Parameters<typeof computeChartScale>[1]) =>
     computeChartScale(values, unit);
 
   test('総重量の常用レンジ（1,500〜1,900kg）でグリッドが増えすぎず、下端も0に落ちない', () => {
@@ -234,6 +234,51 @@ describe('刻みの選び方（総重量・合計回数の値域）', () => {
     const s = scaleOf([8000, 9500, 11000, 12500], totalKg);
     expect(s.ticks.length).toBeLessThanOrEqual(6);
     expect(s.step).toBeGreaterThanOrEqual(1000);
+  });
+
+  test('軽い日が混ざって幅が広くても、線が増えすぎず目盛りはきりのいい値のまま', () => {
+    // ベンチプレスの総重量の実データ。450kgの日が1つ混ざるだけで、0を避けようとして
+    // 刻みが250kgで止まりグリッドが13本引かれていた
+    const s = scaleOf([1540, 1382.5, 2000, 1810, 2935, 1752.5, 450, 1990, 1255], totalKg);
+    expect(s.ticks.length).toBeLessThanOrEqual(6);
+    // 半端な目盛り（素の自動スケール）に落とさず、きりのいい値で刻む
+    expect(s.ticks.every((t) => Number.isInteger(t) && t % s.step === 0)).toBe(true);
+  });
+
+  test('0起点を避けられるデータでは従来どおり下端を0より上に保つ', () => {
+    // 30→102.5kg のような「まっとうな重量の伸び」まで0起点にしないこと（デザイン案Y-7）
+    const s = scaleOf([30, 45, 60, 72.5, 85, 95, 102.5], {
+      label: 'kg',
+      step: 5,
+      minRange: 10,
+      integerOnly: false,
+      auxKind: 'reps',
+    });
+    expect(s.ticks[0]).toBeGreaterThan(0);
+    expect(s.ticks.length).toBeLessThanOrEqual(6);
+  });
+
+  test('刻みが粗くても、上に1段足したせいでグラフが下へ寄らない', () => {
+    // 1,000kg刻みで上に1段（+1,000kg）足すと窓の4割が空き、線が窓の下半分に寄って見える。
+    // 5kg刻みなら+5kgで済む話なので、刻みの粗さではなく「窓のうちデータが乗らない割合」で見る
+    const v = [1540, 1382.5, 2000, 1810, 2935, 1752.5, 450, 1990, 1255];
+    const s = scaleOf(v, totalKg);
+    const lo = Math.min(...v);
+    const hi = Math.max(...v);
+    // データが描画範囲の6割以上を占め、最大値より上の空きが2割を超えない
+    expect((hi - lo) / (s.max - s.min)).toBeGreaterThan(0.6);
+    expect((s.max - hi) / (s.max - s.min)).toBeLessThan(0.2);
+  });
+
+  test('スパイクが1つあっても線が窓の下に張り付かない（全期間表示）', () => {
+    // 同日2セッションの日が合算されて 4,135kg のスパイクになるデータ。刻みの見積もりが
+    // 厳しめなせいで2,500kg刻みが選ばれ、窓が0〜7,500まで広がって線が下2割に張り付いていた
+    const v = [450, 1255, 1540, 1810, 2000, 2935, 4135, 1752.5];
+    const s = scaleOf(v, totalKg);
+    const lo = Math.min(...v);
+    const hi = Math.max(...v);
+    expect(s.ticks.length).toBeLessThanOrEqual(6);
+    expect((hi - lo) / (s.max - s.min)).toBeGreaterThan(0.6);
   });
 
   test('合計回数（200〜1,000回）でも整数側のラダーが上がりきる', () => {

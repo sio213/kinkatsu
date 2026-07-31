@@ -35,6 +35,19 @@ const RANGE_PAD_RATIO = 0.3;
  * 最上段に来た点（白フチつき）とベストチップの置き場所として必要
  */
 const UPPER_PAD_RATIO = 0.35;
+/**
+ * 上に1段足した結果、窓のうちデータが乗らない部分がこの割合を超えるなら足さない。
+ *
+ * 足す目的は「最上段の点が線に張り付かない程度の隙間」というピクセル単位の要求で、5kg刻みなら
+ * +5kgで済む。ところが総重量の1,000kg刻みでは+1,000kg が足され、下端側の端数と合わせて窓の
+ * 4割が空くため、グラフ全体が下へ寄って見える。
+ *
+ * 刻みの粗さだけでは判定できない——60→75kg を5kg刻みで描く場合（デザイン案Y-1）も、
+ * 総重量を1,000kg刻みで描く場合も「窓は3段」で幾何学的には同じ形をしている。違うのは
+ * 窓のうちデータが占める割合の方なので、そちらで見る。描画範囲は RANGE_PAD_RATIO で目盛りの
+ * 外へ既に広がっているので、足すのをやめても点が線に張り付くことはない。
+ */
+const TOP_PAD_MAX_WASTE = 0.3;
 /** 素の自動スケールに戻すときの上下の余白（データ幅に対する割合） */
 const RAW_PAD_RATIO = 0.15;
 /** 丸め後の窓がデータ幅＋刻みこの段数を超えるなら、丸めをやめて素の自動スケールに戻す */
@@ -67,7 +80,13 @@ function roundedWindow(
 ): { lower: number; upper: number } {
   let lower = Math.floor(lo / step) * step;
   let upper = Math.ceil(hi / step) * step;
-  if (upper <= hi + step * UPPER_PAD_RATIO) upper += step;
+  // 既に十分な段数がある窓でだけ、無駄が大きくなる1段の追加を見送る。段数が足りない窓
+  // （全点同じ値・1件のみ）は下の最小レンジの保険が働く前なので、ここで見送ると上端に点が
+  // 張り付いたままになる
+  const paddedSpan = upper + step - lower;
+  const wasteful = (paddedSpan - (hi - lo)) / paddedSpan > TOP_PAD_MAX_WASTE;
+  const enoughSteps = (upper - lower) / step >= MIN_INTERVALS;
+  if (!(enoughSteps && wasteful) && upper <= hi + step * UPPER_PAD_RATIO) upper += step;
   // 全点が同じ値・記録1件のように窓が潰れるときだけ、最小レンジぶんまで下へ広げる保険。
   // わずかな差を画面いっぱいに拡大して見せないため。0以下に落ちるなら広げない
   while (upper - lower < minRange - EPS && lower - step > 0) lower -= step;
@@ -82,7 +101,7 @@ function estimateLineCount(lo: number, hi: number, step: number): number {
   return Math.round(span / step) + PAD_LINES + 1;
 }
 
-function pickStep(lo: number, hi: number, unit: ProgressUnit): number {
+function pickStep(lo: number, hi: number, unit: ProgressUnit, allowZeroBase: boolean): number {
   const ladder = unit.integerOnly ? INTEGER_LADDER : DECIMAL_LADDER;
   let step = ladder.find((v) => v >= unit.step) ?? unit.step;
 
@@ -90,7 +109,7 @@ function pickStep(lo: number, hi: number, unit: ProgressUnit): number {
   while (estimateLineCount(lo, hi, step) > MAX_GRID_LINES) {
     const next = ladder.find((v) => v > step);
     if (next == null) break;
-    if (lo > 0 && Math.floor(lo / next) * next <= 0) break;
+    if (!allowZeroBase && lo > 0 && Math.floor(lo / next) * next <= 0) break;
     step = next;
   }
 
@@ -116,6 +135,36 @@ function pickStep(lo: number, hi: number, unit: ProgressUnit): number {
   return step;
 }
 
+/**
+ * 刻みを1段ずつ細かくして、窓が実際に狭くなるあいだだけ下げる。
+ *
+ * pickStep が使う estimateLineCount は「余裕2段を常に足す」厳しめの見積もりなので、実際には
+ * 6本に収まる刻みでも粗い方が選ばれることがある。全期間のベンチプレス総重量（450〜4,135kg）が
+ * これで、1,000kg刻みなら 0〜5,000 の6本に収まるのに 2,500kg刻みが選ばれ、窓が 0〜7,500 まで
+ * 広がって線が下2割に張り付いていた。
+ *
+ * 窓が狭くならないなら下げない。呼ぶのは0起点へ落とした経路だけで、通常の経路の刻みは
+ * デザイン案の11パターンで決まっているため触らない。
+ */
+function refineStep(lo: number, hi: number, unit: ProgressUnit, step: number): number {
+  const ladder = unit.integerOnly ? INTEGER_LADDER : DECIMAL_LADDER;
+  let current = step;
+  let currentSpan = spanOf(roundedWindow(lo, hi, current, unit.minRange));
+  for (;;) {
+    const finer = [...ladder].reverse().find((v) => v < current);
+    if (finer == null) return current;
+    const span = spanOf(roundedWindow(lo, hi, finer, unit.minRange));
+    if (span >= currentSpan - EPS) return current;
+    if (Math.round(span / finer) + 1 > MAX_GRID_LINES) return current;
+    current = finer;
+    currentSpan = span;
+  }
+}
+
+function spanOf({ lower, upper }: { lower: number; upper: number }): number {
+  return upper - lower;
+}
+
 // 丸めをやめて素の自動スケールに戻すときの3本のグリッド。目盛りはきりのいい値にならない
 function rawScale(lo: number, hi: number, unit: ProgressUnit): ChartScale {
   const range = Math.max(hi - lo, unit.minRange);
@@ -134,24 +183,24 @@ export function pickLabelIndices(tickCount: number): number[] {
   return tickCount >= 5 ? all.filter((i) => i % 2 === 0) : all;
 }
 
-export function computeChartScale(values: number[], unit: ProgressUnit): ChartScale {
-  if (values.length === 0) {
-    // 記録0件のサンプル表示用。描画側が線を引かないので値そのものに意味は無いが、
-    // 枠と目盛りの本数だけデータがある場合と揃うようにしておく
-    const ticks = [0, unit.step, unit.step * 2];
-    return { ticks, min: 0, max: unit.step * 2, step: unit.step, labelIndices: [0, 1, 2] };
-  }
-
-  const lo = Math.min(...values);
-  const hi = Math.max(...values);
-  const step = pickStep(lo, hi, unit);
+/** きりのいい目盛りで組んだスケール。丸めを諦めるべきデータならnull（素の自動スケールに回す） */
+function buildRoundedScale(
+  lo: number,
+  hi: number,
+  unit: ProgressUnit,
+  allowZeroBase: boolean,
+): ChartScale | null {
+  const picked = pickStep(lo, hi, unit, allowZeroBase);
+  // 刻みの練り直しは0起点へ落とした経路でだけ行う。通常の経路の刻みはデザイン案の11パターンで
+  // 決まっているので触らない（Y-8・Y-9のように、窓が狭くなっても案が示した刻みを採る例がある）
+  const step = allowZeroBase ? refineStep(lo, hi, unit, picked) : picked;
   const { lower, upper } = roundedWindow(lo, hi, step, unit.minRange);
 
   // 丸めた窓がデータ範囲に対して広すぎる／0起点に落ちた場合は、丸めを諦めて素の自動スケールに戻す
   const rawSpan = Math.ceil(hi / step) * step - Math.floor(lo / step) * step;
   const wasteful = rawSpan > Math.max(hi - lo, unit.minRange) + WASTEFUL_STEPS * step;
-  const zeroed = lo > 0 && lower <= 0;
-  if (wasteful || zeroed) return rawScale(lo, hi, unit);
+  const zeroed = !allowZeroBase && lo > 0 && lower <= 0;
+  if (wasteful || zeroed) return null;
 
   const count = Math.round((upper - lower) / step);
   const ticks = Array.from({ length: count + 1 }, (_, k) => roundValue(lower + step * k));
@@ -163,6 +212,34 @@ export function computeChartScale(values: number[], unit: ProgressUnit): ChartSc
     step,
     labelIndices: pickLabelIndices(ticks.length),
   };
+}
+
+export function computeChartScale(values: number[], unit: ProgressUnit): ChartScale {
+  if (values.length === 0) {
+    // 記録0件のサンプル表示用。描画側が線を引かないので値そのものに意味は無いが、
+    // 枠と目盛りの本数だけデータがある場合と揃うようにしておく
+    const ticks = [0, unit.step, unit.step * 2];
+    return { ticks, min: 0, max: unit.step * 2, step: unit.step, labelIndices: [0, 1, 2] };
+  }
+
+  const lo = Math.min(...values);
+  const hi = Math.max(...values);
+
+  const strict = buildRoundedScale(lo, hi, unit, false);
+  if (strict == null) return rawScale(lo, hi, unit);
+  if (strict.ticks.length <= MAX_GRID_LINES) return strict;
+
+  // ここに来るのは「0起点を避けたままでは刻みが上がりきらない」データだけ。
+  //
+  // 0起点を避けているのは 60→75kg の伸びが画面のごく一部に潰れるのを防ぐためだが、その前提は
+  // 値に対してデータ幅が狭いこと。総重量のように同じ種目で 450kg の日と 2,935kg の日が同居すると、
+  // 必要な刻みが下端そのものに届き、0を避けようとして刻みが止まりグリッドが13本引かれる
+  // （ベンチプレスの総重量で実際に発生）。この場合だけ下端を0まで許して引き直す。
+  //
+  // 素の自動スケールに落とせば3本にはなるが、目盛りが 77.25 / 1,692.5 のような半端な値になり
+  // 「きりのいい値へ丸める」という方針から外れるため採らない。
+  const relaxed = buildRoundedScale(lo, hi, unit, true);
+  return relaxed != null && relaxed.ticks.length < strict.ticks.length ? relaxed : strict;
 }
 
 // 2.5刻みの積み上げで 67.50000000000001 のような値にならないようにする
