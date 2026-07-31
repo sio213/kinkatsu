@@ -128,8 +128,12 @@ export function ExerciseRecordTab({
       //
       // 生のmeasurementTypeではなくchartMeasurementTypeで判定すること。重量を1度も入れていない
       // 種目は reps 扱いになり、総重量チップの中身が「合計回数」に変わる——回数は左右で2倍に
-      // ならないので、そこにこの注記を出すと誤りになる
-      if (metric === 'total' && pairedWeights && chartMeasurementType === 'weight_reps') {
+      // ならないので、そこにこの注記を出すと誤りになる。
+      //
+      // 点が1つも無い期間では出さない。2倍になった数字がどこにも見えていない場所で数え方だけ
+      // 説明されても手がかりにならず、「この期間＝記録がありません」と並んで3行目まで積み上がる
+      // （@designer指摘）。内訳カードが値行を出さない条件（FIX-13）と同じ考え方
+      if (!nothingToPlot && metric === 'total' && pairedWeights && chartMeasurementType === 'weight_reps') {
         list.push({ lead: '総重量', body: '左右2つ分の合計です（10kg×10回なら200kg）' });
       }
     }

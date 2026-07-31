@@ -266,6 +266,46 @@ describe('指標の切り替え', () => {
     expect(hasPairedNote(root)).toBe(false);
   });
 
+  test('pairedWeightsはフックへそのまま渡す。ここが抜けると系列だけ倍にならない', () => {
+    renderWithMetrics('weight_reps', true);
+    expect(mockUseExerciseProgress).toHaveBeenCalledWith(1, 'weight_reps', 'best', true);
+  });
+
+  test('総重量の点が1つも無い期間では、数え方の注記より「記録がありません」を優先する', () => {
+    const bestSeries = {
+      unit: { label: 'kg', step: 5, minRange: 10, integerOnly: false, auxKind: 'reps' },
+      points,
+    };
+    const emptySeries = { unit: bestSeries.unit, points: [] as ProgressPoint[] };
+    mockUseExerciseProgress.mockImplementation((_id, _type, metric) => ({
+      series: metric === 'total' ? emptySeries : bestSeries,
+      bestSeries,
+      recordDays: points,
+      chartMeasurementType: 'weight_reps',
+      metric,
+      loaded: true,
+      failed: false,
+    }));
+    let instance!: ReturnType<typeof create>;
+    act(() => {
+      instance = create(
+        <ExerciseRecordTab
+          exerciseId={1}
+          exerciseName="ダンベルベンチプレス"
+          measurementType="weight_reps"
+          pairedWeights
+          insideTabBar={false}
+        />,
+      );
+    });
+    const root = instance.root;
+    pressChip(root, '総重量');
+
+    // 2倍になった数字がどこにも見えていないので、数え方だけ説明しても手がかりにならない
+    expect(hasPairedNote(root)).toBe(false);
+    expect(allTexts(root).some((t) => t.includes('記録がありません'))).toBe(true);
+  });
+
   test('重量を1度も入れておらず回数種目として描いている種目では注記を出さない', () => {
     // 合計チップの中身が「合計回数」に変わる。回数は左右で2倍にならない
     const root = renderWithMetrics('reps', true);

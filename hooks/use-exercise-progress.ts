@@ -37,9 +37,14 @@ export function useExerciseProgress(
   metric: ProgressMetric = 'best',
   /**
    * 器具を同時に2つ扱う種目か（exercises.pairedWeights）。総重量だけが左右2つ分になる。
-   * 最大重量・推定1RMは片方の重量のままなので、bestSeries には効かない
+   * 最大重量・推定1RMは片方の重量のままなので、bestSeries には効かない。
+   *
+   * **省略可能にしないこと。** 総重量を選ばない画面（「すべての記録」）では渡し忘れても
+   * 結果が変わらないため、既定値を許すと「その画面は総重量を出さないから」という画面外の
+   * 事情に正しさが依存する。後からそこに指標チップが付いた瞬間、型エラーもテスト失敗も
+   * 出さずに総重量だけが半分になる（@reviewer指摘）
    */
-  pairedWeights = false,
+  pairedWeights: boolean,
 ): {
   /** 選択中の指標の系列。グラフと点の選択はこちらを使う */
   series: ProgressSeries;

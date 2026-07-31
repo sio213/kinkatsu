@@ -149,6 +149,24 @@ describe('seed', () => {
     expect(mockSet).toHaveBeenCalledWith(expect.objectContaining({ pairedWeights: true }));
   });
 
+  // 一度trueにした後、次回起動のたびにupdateが再発火しないこと。差分検知が
+  // `?? false` の正規化を誤ると、毎回22件のUPDATEが走り続ける
+  it('slugが一致しpairedWeightsも一致（true同士）→ updateされない', async () => {
+    mockSelectResult = [
+      {
+        id: 1,
+        slug: 'dumbbell_bench_press',
+        name: 'ダンベルベンチプレス',
+        category: 'chest',
+        source: 'preset',
+        measurementType: 'weight_reps',
+        pairedWeights: true,
+      },
+    ];
+    await seed();
+    expect(mockSet).not.toHaveBeenCalled();
+  });
+
   it('PRESET_EXERCISESでpairedWeightsを省略した種目はfalseとしてinsertされる', async () => {
     await seed();
     const inserted = mockValues.mock.calls[0][0] as { slug: string; pairedWeights?: boolean }[];

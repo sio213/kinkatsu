@@ -48,7 +48,13 @@ export function useWorkoutSession(id: number) {
 // pairedWeightsの種目（ダンベルベンチプレス等）は左右2つ分で数える。種目詳細のグラフ側
 // （lib/exercises/progress.tsのtotalContribution）と同じ倍率を掛けること——片方だけだと
 // 同じ日の総重量がセッションカードと種目詳細で食い違う。exercisesへのjoinはこのためだけに
-// 要る（sets.exerciseIdはnotNullのFKなのでinnerJoinで行は落ちない）
+// 要る（sets.exerciseIdはnotNullのFKなのでinnerJoinで行は落ちない）。
+//
+// なお useLiveQuery が変更を監視するのは from() に渡した sets だけで、joinした exercises への
+// 書き込みではこのクエリは再実行されない。そのため seed() が pairedWeights を更新する
+// アップデート後の初回起動に限り、sets に何か書き込むまでカードの総量が旧値のまま残りうる
+// （次回起動で解消する。監視対象を増やすと記録タブ全体が種目の更新で再取得されるため、
+// from(sets) は維持している）
 export function useSessionStats(): Map<number, SessionSummary> {
   const { data } = useLiveQuery(
     db
