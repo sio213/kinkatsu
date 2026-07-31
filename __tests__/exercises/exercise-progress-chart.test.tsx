@@ -150,7 +150,12 @@ describe('ExerciseProgressChart: 実測ベストは従来どおり（FIX-10）',
     expect(circleWithRadius(root, 6)).toBeUndefined();
     expect(circleWithRadius(root, 3.9)).toBeUndefined();
     expect(root.findAllByType(Polygon)).toHaveLength(1);
-    expect(circleWithRadius(root, 4)).toMatchObject({ fill: Colors.chartBest });
+    // 白フチは付ける。間引きで折れ線だけになったとき、フチが無いと線と地続きに見える
+    expect(circleWithRadius(root, 4)).toMatchObject({
+      fill: Colors.chartBest,
+      stroke: Colors.surface,
+      strokeWidth: 2,
+    });
   });
 
   test('選択中もアンバーのまま', () => {

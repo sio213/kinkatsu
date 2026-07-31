@@ -91,7 +91,10 @@ const HIGHLIGHT_DOT: Record<
   Record<'base' | 'selected', { r: number; fill: string; stroke?: string; strokeWidth: number }>
 > = {
   'personal-best': {
-    base: { r: BEST_DOT_RADIUS, fill: Colors.chartBest, strokeWidth: 0 },
+    // 白フチは選択中と同じ2px。全期間のようにマーカーが間引かれて折れ線だけになる密度だと、
+    // フチの無いアンバーの点は線と地続きに見えて「どの日がベストか」が読み取れなくなる。
+    // 集計系の最高点が輪の下に白い円を敷いているのと同じ狙い（FIX-16）
+    base: { r: BEST_DOT_RADIUS, fill: Colors.chartBest, stroke: Colors.surface, strokeWidth: 2 },
     selected: { r: SELECTED_DOT_RADIUS, fill: Colors.chartBest, stroke: Colors.surface, strokeWidth: 2 },
   },
   'metric-max': {
