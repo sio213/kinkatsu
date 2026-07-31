@@ -32,6 +32,8 @@ type Props = {
   /** 「1回目を記録する」で進行中セッションの終了確認を出すときの文言に使う */
   exerciseName: string;
   measurementType: MeasurementType;
+  /** 器具を同時に2つ扱う種目か（exercises.pairedWeights）。総重量を左右2つ分で数える */
+  pairedWeights: boolean;
   /**
    * 種目詳細がタブ配下のStack（/exercises/[id]）から表示されているか。
    * 「すべての記録を見る」の遷移先をタブバーありのURLにするかどうかの判断に使う
@@ -44,7 +46,13 @@ type Props = {
  * の順に縦に並ぶ（デザイン案）。記録が0件のときは薄い見本グラフと「1回目を記録する」に
  * 差し替わり、1件のときは点1つだけを描いて履歴一覧を出さない（真上の内訳カードと同じ内容になるため）。
  */
-export function ExerciseRecordTab({ exerciseId, exerciseName, measurementType, insideTabBar }: Props) {
+export function ExerciseRecordTab({
+  exerciseId,
+  exerciseName,
+  measurementType,
+  pairedWeights,
+  insideTabBar,
+}: Props) {
   const push = useDebouncedPush();
   const { activeSession } = useWorkoutSessions();
   // 別のトレーニングが進行中なら確認を挟んでから開始する（ルーティン一覧のカードと同じ流儀）
@@ -60,6 +68,7 @@ export function ExerciseRecordTab({ exerciseId, exerciseName, measurementType, i
     exerciseId,
     measurementType,
     requestedMetric,
+    pairedWeights,
   );
 
   // 種目によって選べる指標が変わる。1件しか無い（加重ホールド系）ならチップ列ごと出さない
@@ -112,8 +121,17 @@ export function ExerciseRecordTab({ exerciseId, exerciseName, measurementType, i
           ? `${ONE_REP_MAX_REP_LIMIT}回を超えるセットは誤差が大きいため、算出の対象外です`
           : `1回だけ挙げられる重量の目安です。重量×回数から計算しています（${ONE_REP_MAX_REP_LIMIT}回以下のセットのみ）`,
       });
-    } else if (nothingToPlot) {
-      list.push({ lead: 'この期間', body: '記録がありません' });
+    } else {
+      if (nothingToPlot) list.push({ lead: 'この期間', body: '記録がありません' });
+      // 内訳カードのセット行には「10kg × 10回」と片手の重量が出ているのに、合計だけ2倍になる。
+      // 放置すると計算ミスに見えるので、数え方と具体例の両方を置く。
+      //
+      // 生のmeasurementTypeではなくchartMeasurementTypeで判定すること。重量を1度も入れていない
+      // 種目は reps 扱いになり、総重量チップの中身が「合計回数」に変わる——回数は左右で2倍に
+      // ならないので、そこにこの注記を出すと誤りになる
+      if (metric === 'total' && pairedWeights && chartMeasurementType === 'weight_reps') {
+        list.push({ lead: '総重量', body: '左右2つ分の合計です（10kg×10回なら200kg）' });
+      }
     }
     // 加重種目を加重なしでやった日は点を置けない。一覧の件数とグラフの点数がズレる理由になるので、
     // 「データが抜けている」と誤解されないよう、消えたのではなく一覧に残っていることを伝える。
@@ -131,7 +149,15 @@ export function ExerciseRecordTab({ exerciseId, exerciseName, measurementType, i
       list.push({ lead: '自重の日', body: '加重量が無いので点を出しません' });
     }
     return list;
-  }, [metric, chartMeasurementType, recordDays, bestSeries.points, period, points.length]);
+  }, [
+    metric,
+    chartMeasurementType,
+    pairedWeights,
+    recordDays,
+    bestSeries.points,
+    period,
+    points.length,
+  ]);
 
   const highlight = useMemo(() => findPersonalBest(series.points), [series.points]);
   // 内訳カードのバッジは選択中の指標に関係なく、実測の自己ベスト（ベスト系列の最高点）を指す

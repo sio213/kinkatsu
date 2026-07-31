@@ -10,7 +10,7 @@ import { CATEGORY_ALL, CATEGORY_FAVORITE } from '@/lib/exercises/constants';
 function make(overrides: Partial<Exercise> & { name: string; category: string }): Exercise {
   return {
     id: 1, slug: null, favorite: false, note: null, formPoints: null, source: 'preset',
-    measurementType: 'weight_reps',
+    measurementType: 'weight_reps', pairedWeights: false,
     createdAt: 0, updatedAt: 0, ...overrides,
   };
 }

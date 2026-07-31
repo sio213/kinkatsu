@@ -25,6 +25,17 @@ export const exercises = sqliteTable(
     // 既存preset種目の値はdrizzle/0010_recording_feature_m1.sqlのUPDATE文でdb/seed.tsのデータからバックフィル済み。
     // 以後db/seed.tsの分類を変更した場合はマイグレーションではなくseed()のupdate分岐（差分検知）が自己修復する。
     measurementType: text('measurement_type').notNull().default('weight_reps'),
+    // 入力した重量の器具を**同時に2つ**扱う種目か（ダンベルベンチプレス、ダンベルカール等）。
+    // trueの種目は総重量を左右2つ分で数える（lib/exercises/progress.tsのtotalContribution）。
+    //
+    // 「ダンベル種目か」ではないことに注意。ダンベルプルオーバーは1個を両手で持つのでfalse、
+    // ダンベルワンハンドロウも1個なのでfalse、ダンベルランジは両手に1個ずつ持つのでtrue。
+    // 判定軸を器具名でなく個数にしてあるので、ケーブル（左右のスタックを別々に使う種目）へ
+    // 広げるときも列はそのまま使える。
+    //
+    // preset種目の値はdb/seed.tsが差分検知で自己修復するため、マイグレーションでの
+    // バックフィルは行わない（measurementTypeと同じ方針）。カスタム種目は現状falseのまま
+    pairedWeights: integer('paired_weights', { mode: 'boolean' }).notNull().default(false),
     createdAt: integer('created_at'),
     updatedAt: integer('updated_at'),
   },

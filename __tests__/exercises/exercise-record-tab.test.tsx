@@ -67,6 +67,7 @@ function render(points: ProgressPoint[]) {
         exerciseId={1}
         exerciseName="ベンチプレス"
         measurementType="weight_reps"
+        pairedWeights={false}
         insideTabBar={false}
       />,
     );
@@ -179,7 +180,7 @@ describe('指標の切り替え', () => {
 
   // フックは「渡された指標で組んだ系列」を返す。ここでは best と total の2系列を用意し、
   // 呼び出し時の引数に応じて出し分ける（本物のフックと同じ契約）
-  const renderWithMetrics = (chartMeasurementType = 'weight_reps') => {
+  const renderWithMetrics = (chartMeasurementType = 'weight_reps', pairedWeights = false) => {
     const bestSeries = {
       unit: { label: 'kg', step: 5, minRange: 10, integerOnly: false, auxKind: 'reps' },
       points,
@@ -204,6 +205,7 @@ describe('指標の切り替え', () => {
           exerciseId={1}
           exerciseName="ベンチプレス"
           measurementType="weight_reps"
+          pairedWeights={pairedWeights}
           insideTabBar={false}
         />,
       );
@@ -237,6 +239,38 @@ describe('指標の切り替え', () => {
     // 「最大○○」では値行を出さないが、総重量では出す（FIX-13）
     expect(allTexts(root)).toContain('総重量');
     expect(allTexts(root)).toContain('1,560');
+  });
+
+  // 内訳カードのセット行は片手の重量（10kg）のまま、総重量だけが2倍になる。その食い違いを
+  // 説明する注記なので、総重量を選んでいるときにだけ出す
+  const hasPairedNote = (root: ReactTestInstance) =>
+    allTexts(root).some((t) => t.includes('左右2つ分の合計です'));
+
+  test('左右2つ分の種目で総重量を選んだときだけ、数え方の注記が出る', () => {
+    const root = renderWithMetrics('weight_reps', true);
+    expect(hasPairedNote(root)).toBe(false);
+
+    pressChip(root, '総重量');
+    expect(hasPairedNote(root)).toBe(true);
+
+    // 最大重量・推定1RMは片手の値のまま。ここに出すと逆に誤解させる
+    pressChip(root, '推定1RM');
+    expect(hasPairedNote(root)).toBe(false);
+    pressChip(root, '最大重量');
+    expect(hasPairedNote(root)).toBe(false);
+  });
+
+  test('左右2つ分でない種目では総重量を選んでも注記を出さない', () => {
+    const root = renderWithMetrics('weight_reps', false);
+    pressChip(root, '総重量');
+    expect(hasPairedNote(root)).toBe(false);
+  });
+
+  test('重量を1度も入れておらず回数種目として描いている種目では注記を出さない', () => {
+    // 合計チップの中身が「合計回数」に変わる。回数は左右で2倍にならない
+    const root = renderWithMetrics('reps', true);
+    pressChip(root, '合計回数');
+    expect(hasPairedNote(root)).toBe(false);
   });
 
   test('推定1RMを選んだときだけ注記が出る', () => {
@@ -274,6 +308,7 @@ describe('指標の切り替え', () => {
           exerciseId={1}
           exerciseName="レッグカール"
           measurementType="weight_reps"
+          pairedWeights={false}
           insideTabBar={false}
         />,
       );
@@ -313,6 +348,7 @@ describe('指標の切り替え', () => {
           exerciseId={1}
           exerciseName="加重ディップス"
           measurementType="weight_reps"
+          pairedWeights={false}
           insideTabBar={false}
         />,
       );

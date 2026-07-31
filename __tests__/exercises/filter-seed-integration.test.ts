@@ -19,6 +19,7 @@ function toExercise(preset: (typeof PRESET_EXERCISES)[number], id: number): Exer
     formPoints: null,
     source: 'preset',
     measurementType: preset.measurementType,
+    pairedWeights: preset.pairedWeights ?? false,
     createdAt: 0,
     updatedAt: 0,
   };

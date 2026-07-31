@@ -9,6 +9,7 @@ import {
   type Set,
   type WorkoutSession,
 } from '@/db/schema';
+import { PAIRED_WEIGHT_SIDES } from '@/lib/exercises/constants';
 import type { SessionSummary } from '@/lib/workout/summary';
 import { and, eq, desc, isNotNull, ne, sql, getTableColumns } from 'drizzle-orm';
 import { useLiveQuery } from 'drizzle-orm/expo-sqlite';
@@ -42,16 +43,22 @@ export function useWorkoutSession(id: number) {
 // 全件をJSへ引き上げてから集計するのではなくSQL側でセッションごとにSUM/COUNTする。
 // setCount/totalVolumeとも、✓未タップの自動保存中の値（completedAtがnull。種目追加直後の
 // 空セットや、入力途中でアプリを離れた場合の下書き）を含めず、実際に✓で確定したセットのみを
-// 集計する（そうしないと種目を追加・入力しただけで記録件数・総重量が水増しされる）
+// 集計する（そうしないと種目を追加・入力しただけで記録件数・総重量が水増しされる）。
+//
+// pairedWeightsの種目（ダンベルベンチプレス等）は左右2つ分で数える。種目詳細のグラフ側
+// （lib/exercises/progress.tsのtotalContribution）と同じ倍率を掛けること——片方だけだと
+// 同じ日の総重量がセッションカードと種目詳細で食い違う。exercisesへのjoinはこのためだけに
+// 要る（sets.exerciseIdはnotNullのFKなのでinnerJoinで行は落ちない）
 export function useSessionStats(): Map<number, SessionSummary> {
   const { data } = useLiveQuery(
     db
       .select({
         sessionId: sets.sessionId,
         setCount: sql<number>`sum(case when ${sets.completedAt} is not null then 1 else 0 end)`,
-        totalVolume: sql<number>`coalesce(sum(case when ${sets.completedAt} is not null then ${sets.weight} * ${sets.reps} else 0 end), 0)`,
+        totalVolume: sql<number>`coalesce(sum(case when ${sets.completedAt} is not null then ${sets.weight} * ${sets.reps} * (case when ${exercises.pairedWeights} then ${PAIRED_WEIGHT_SIDES} else 1 end) else 0 end), 0)`,
       })
       .from(sets)
+      .innerJoin(exercises, eq(sets.exerciseId, exercises.id))
       .groupBy(sets.sessionId),
   );
   return new Map(

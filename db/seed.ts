@@ -8,6 +8,15 @@ type PresetExercise = {
   name: string;
   category: ExerciseCategory;
   measurementType: MeasurementType;
+  /**
+   * 入力した重量の器具を**同時に2つ**扱う種目。総重量が左右2つ分になる（db/schema.ts参照）。
+   *
+   * 判定は器具名ではなく個数で行う——ダンベルプルオーバー・ゴブレットスクワットは1個を
+   * 両手で持つのでfalse、ワンハンド系も1個なのでfalse、ダンベルランジは両手に1個ずつ持つのでtrue。
+   * 「ダンベルでもバーベルでも自重でもやる」種目（ランジ・カーフレイズ・シュラッグ等）は、
+   * 器具が確定しないので付けない（付けるとバーベルでやっている人の総重量が倍になる）
+   */
+  pairedWeights?: true;
 };
 
 export const PRESET_EXERCISES: PresetExercise[] = [
@@ -15,18 +24,18 @@ export const PRESET_EXERCISES: PresetExercise[] = [
   { slug: 'bench_press', name: 'ベンチプレス', category: 'chest', measurementType: 'weight_reps' },
   { slug: 'incline_bench_press', name: 'インクラインベンチプレス', category: 'chest', measurementType: 'weight_reps' },
   { slug: 'decline_bench_press', name: 'デクラインベンチプレス', category: 'chest', measurementType: 'weight_reps' },
-  { slug: 'dumbbell_fly', name: 'ダンベルフライ', category: 'chest', measurementType: 'weight_reps' },
-  { slug: 'incline_dumbbell_fly', name: 'インクラインダンベルフライ', category: 'chest', measurementType: 'weight_reps' },
+  { slug: 'dumbbell_fly', name: 'ダンベルフライ', category: 'chest', measurementType: 'weight_reps', pairedWeights: true },
+  { slug: 'incline_dumbbell_fly', name: 'インクラインダンベルフライ', category: 'chest', measurementType: 'weight_reps', pairedWeights: true },
   { slug: 'cable_crossover', name: 'ケーブルクロスオーバー', category: 'chest', measurementType: 'weight_reps' },
   { slug: 'chest_press_machine', name: 'チェストプレス（マシン）', category: 'chest', measurementType: 'weight_reps' },
   { slug: 'push_up', name: 'プッシュアップ', category: 'chest', measurementType: 'reps' },
   { slug: 'smith_bench_press', name: 'スミスマシンベンチプレス', category: 'chest', measurementType: 'weight_reps' },
   { slug: 'close_grip_bench_press', name: 'クローズグリップベンチプレス', category: 'chest', measurementType: 'weight_reps' },
   { slug: 'reverse_grip_bench_press', name: 'リバースグリップベンチプレス', category: 'chest', measurementType: 'weight_reps' },
-  { slug: 'dumbbell_bench_press', name: 'ダンベルベンチプレス', category: 'chest', measurementType: 'weight_reps' },
-  { slug: 'incline_dumbbell_press', name: 'インクラインダンベルプレス', category: 'chest', measurementType: 'weight_reps' },
-  { slug: 'decline_dumbbell_press', name: 'デクラインダンベルプレス', category: 'chest', measurementType: 'weight_reps' },
-  { slug: 'decline_dumbbell_fly', name: 'デクラインダンベルフライ', category: 'chest', measurementType: 'weight_reps' },
+  { slug: 'dumbbell_bench_press', name: 'ダンベルベンチプレス', category: 'chest', measurementType: 'weight_reps', pairedWeights: true },
+  { slug: 'incline_dumbbell_press', name: 'インクラインダンベルプレス', category: 'chest', measurementType: 'weight_reps', pairedWeights: true },
+  { slug: 'decline_dumbbell_press', name: 'デクラインダンベルプレス', category: 'chest', measurementType: 'weight_reps', pairedWeights: true },
+  { slug: 'decline_dumbbell_fly', name: 'デクラインダンベルフライ', category: 'chest', measurementType: 'weight_reps', pairedWeights: true },
   { slug: 'pec_deck', name: 'ペックデック（バタフライマシン）', category: 'chest', measurementType: 'weight_reps' },
   { slug: 'low_cable_fly', name: 'ローケーブルフライ', category: 'chest', measurementType: 'weight_reps' },
   { slug: 'high_cable_fly', name: 'ハイケーブルフライ', category: 'chest', measurementType: 'weight_reps' },
@@ -41,7 +50,7 @@ export const PRESET_EXERCISES: PresetExercise[] = [
   { slug: 'weighted_push_up', name: '加重プッシュアップ', category: 'chest', measurementType: 'weight_reps' },
   { slug: 'single_arm_dumbbell_press', name: 'シングルアームダンベルプレス', category: 'chest', measurementType: 'weight_reps' },
   { slug: 'guillotine_press', name: 'ギロチンプレス', category: 'chest', measurementType: 'weight_reps' },
-  { slug: 'floor_fly', name: 'フロアフライ', category: 'chest', measurementType: 'weight_reps' },
+  { slug: 'floor_fly', name: 'フロアフライ', category: 'chest', measurementType: 'weight_reps', pairedWeights: true },
   { slug: 'incline_smith_press', name: 'インクラインスミスプレス', category: 'chest', measurementType: 'weight_reps' },
   { slug: 'decline_smith_press', name: 'デクラインスミスプレス', category: 'chest', measurementType: 'weight_reps' },
   { slug: 'single_arm_cable_fly', name: 'シングルアームケーブルフライ', category: 'chest', measurementType: 'weight_reps' },
@@ -58,26 +67,26 @@ export const PRESET_EXERCISES: PresetExercise[] = [
   { slug: 'standing_cable_chest_press', name: 'スタンディングケーブルチェストプレス', category: 'chest', measurementType: 'weight_reps' },
   // 肩
   { slug: 'barbell_shoulder_press', name: 'バーベルショルダープレス', category: 'shoulder', measurementType: 'weight_reps' },
-  { slug: 'dumbbell_shoulder_press', name: 'ダンベルショルダープレス', category: 'shoulder', measurementType: 'weight_reps' },
-  { slug: 'side_raise', name: 'サイドレイズ', category: 'shoulder', measurementType: 'weight_reps' },
-  { slug: 'front_raise', name: 'フロントレイズ', category: 'shoulder', measurementType: 'weight_reps' },
-  { slug: 'rear_delt_fly', name: 'リアデルトフライ', category: 'shoulder', measurementType: 'weight_reps' },
+  { slug: 'dumbbell_shoulder_press', name: 'ダンベルショルダープレス', category: 'shoulder', measurementType: 'weight_reps', pairedWeights: true },
+  { slug: 'side_raise', name: 'サイドレイズ', category: 'shoulder', measurementType: 'weight_reps', pairedWeights: true },
+  { slug: 'front_raise', name: 'フロントレイズ', category: 'shoulder', measurementType: 'weight_reps', pairedWeights: true },
+  { slug: 'rear_delt_fly', name: 'リアデルトフライ', category: 'shoulder', measurementType: 'weight_reps', pairedWeights: true },
   { slug: 'face_pull', name: 'フェイスプル', category: 'shoulder', measurementType: 'weight_reps' },
-  { slug: 'arnold_press', name: 'アーノルドプレス', category: 'shoulder', measurementType: 'weight_reps' },
+  { slug: 'arnold_press', name: 'アーノルドプレス', category: 'shoulder', measurementType: 'weight_reps', pairedWeights: true },
   { slug: 'seated_barbell_shoulder_press', name: 'シーテッドバーベルショルダープレス', category: 'shoulder', measurementType: 'weight_reps' },
   { slug: 'single_arm_dumbbell_shoulder_press', name: 'シングルアームダンベルショルダープレス', category: 'shoulder', measurementType: 'weight_reps' },
   { slug: 'plate_front_raise', name: 'プレートフロントレイズ', category: 'shoulder', measurementType: 'weight_reps' },
-  { slug: 'lu_raise', name: 'ルーレイズ', category: 'shoulder', measurementType: 'weight_reps' },
-  { slug: 'y_raise', name: 'Yレイズ', category: 'shoulder', measurementType: 'weight_reps' },
-  { slug: 'cuban_press', name: 'キューバンプレス', category: 'shoulder', measurementType: 'weight_reps' },
-  { slug: 'scott_press', name: 'スコットプレス', category: 'shoulder', measurementType: 'weight_reps' },
+  { slug: 'lu_raise', name: 'ルーレイズ', category: 'shoulder', measurementType: 'weight_reps', pairedWeights: true },
+  { slug: 'y_raise', name: 'Yレイズ', category: 'shoulder', measurementType: 'weight_reps', pairedWeights: true },
+  { slug: 'cuban_press', name: 'キューバンプレス', category: 'shoulder', measurementType: 'weight_reps', pairedWeights: true },
+  { slug: 'scott_press', name: 'スコットプレス', category: 'shoulder', measurementType: 'weight_reps', pairedWeights: true },
   { slug: 'landmine_lateral_raise', name: 'ランドミンサイドレイズ', category: 'shoulder', measurementType: 'weight_reps' },
   { slug: 'band_pull_apart', name: 'バンドプルアパート', category: 'shoulder', measurementType: 'reps' },
   { slug: 'landmine_press', name: 'ランドミンプレス', category: 'shoulder', measurementType: 'weight_reps' },
   { slug: 'upright_row', name: 'アップライトロウ', category: 'shoulder', measurementType: 'weight_reps' },
   { slug: 'cable_upright_row', name: 'ケーブルアップライトロウ', category: 'shoulder', measurementType: 'weight_reps' },
   { slug: 'shrug', name: 'シュラッグ', category: 'shoulder', measurementType: 'weight_reps' },
-  { slug: 'dumbbell_shrug', name: 'ダンベルシュラッグ', category: 'shoulder', measurementType: 'weight_reps' },
+  { slug: 'dumbbell_shrug', name: 'ダンベルシュラッグ', category: 'shoulder', measurementType: 'weight_reps', pairedWeights: true },
   { slug: 'behind_neck_press', name: 'ビハインドネックプレス', category: 'shoulder', measurementType: 'weight_reps' },
   { slug: 'reverse_pec_deck', name: 'リアデルトマシン', category: 'shoulder', measurementType: 'weight_reps' },
   { slug: 'cable_rear_delt_fly', name: 'ケーブルリアデルトフライ', category: 'shoulder', measurementType: 'weight_reps' },
@@ -91,8 +100,8 @@ export const PRESET_EXERCISES: PresetExercise[] = [
   { slug: 'trap_bar_shrug', name: 'トラップバーシュラッグ', category: 'shoulder', measurementType: 'weight_reps' },
   // 腕
   { slug: 'barbell_curl', name: 'バーベルカール', category: 'arm', measurementType: 'weight_reps' },
-  { slug: 'dumbbell_curl', name: 'ダンベルカール', category: 'arm', measurementType: 'weight_reps' },
-  { slug: 'hammer_curl', name: 'ハンマーカール', category: 'arm', measurementType: 'weight_reps' },
+  { slug: 'dumbbell_curl', name: 'ダンベルカール', category: 'arm', measurementType: 'weight_reps', pairedWeights: true },
+  { slug: 'hammer_curl', name: 'ハンマーカール', category: 'arm', measurementType: 'weight_reps', pairedWeights: true },
   { slug: 'preacher_curl', name: 'プリーチャーカール', category: 'arm', measurementType: 'weight_reps' },
   { slug: 'triceps_pushdown', name: 'トライセプスプレスダウン', category: 'arm', measurementType: 'weight_reps' },
   { slug: 'triceps_extension', name: 'トライセプスエクステンション', category: 'arm', measurementType: 'weight_reps' },
@@ -102,9 +111,9 @@ export const PRESET_EXERCISES: PresetExercise[] = [
   { slug: 'ez_bar_curl', name: 'EZバーカール', category: 'arm', measurementType: 'weight_reps' },
   { slug: 'cable_curl', name: 'ケーブルカール', category: 'arm', measurementType: 'weight_reps' },
   { slug: 'concentration_curl', name: 'コンセントレーションカール', category: 'arm', measurementType: 'weight_reps' },
-  { slug: 'incline_dumbbell_curl', name: 'インクラインダンベルカール', category: 'arm', measurementType: 'weight_reps' },
+  { slug: 'incline_dumbbell_curl', name: 'インクラインダンベルカール', category: 'arm', measurementType: 'weight_reps', pairedWeights: true },
   { slug: 'spider_curl', name: 'スパイダーカール', category: 'arm', measurementType: 'weight_reps' },
-  { slug: 'zottman_curl', name: 'ザットマンカール', category: 'arm', measurementType: 'weight_reps' },
+  { slug: 'zottman_curl', name: 'ザットマンカール', category: 'arm', measurementType: 'weight_reps', pairedWeights: true },
   { slug: 'drag_curl', name: 'ドラッグカール', category: 'arm', measurementType: 'weight_reps' },
   { slug: 'reverse_curl', name: 'リバースカール', category: 'arm', measurementType: 'weight_reps' },
   { slug: 'cable_hammer_curl', name: 'ケーブルハンマーカール', category: 'arm', measurementType: 'weight_reps' },
@@ -281,7 +290,7 @@ export const PRESET_EXERCISES: PresetExercise[] = [
   { slug: 'zercher_squat', name: 'ザーチャースクワット', category: 'leg', measurementType: 'weight_reps' },
   { slug: 'pin_squat', name: 'ピンスクワット', category: 'leg', measurementType: 'weight_reps' },
   { slug: 'smith_lunge', name: 'スミスランジ', category: 'leg', measurementType: 'weight_reps' },
-  { slug: 'dumbbell_lunge', name: 'ダンベルランジ', category: 'leg', measurementType: 'weight_reps' },
+  { slug: 'dumbbell_lunge', name: 'ダンベルランジ', category: 'leg', measurementType: 'weight_reps', pairedWeights: true },
   { slug: 'barbell_lunge', name: 'バーベルランジ', category: 'leg', measurementType: 'weight_reps' },
   { slug: 'overhead_squat', name: 'オーバーヘッドスクワット', category: 'leg', measurementType: 'weight_reps' },
   { slug: 'cossack_squat', name: 'コサックスクワット', category: 'leg', measurementType: 'reps' },
@@ -348,7 +357,10 @@ export const seed = async () => {
       const existing = existingBySlug.get(p.slug);
       return (
         existing !== undefined &&
-        (existing.category !== p.category || existing.measurementType !== p.measurementType)
+        (existing.category !== p.category ||
+          existing.measurementType !== p.measurementType ||
+          // 省略時のundefinedとDBのfalseを比べるので、真偽値に正規化してから突き合わせる
+          existing.pairedWeights !== (p.pairedWeights ?? false))
       );
     });
 
@@ -362,7 +374,12 @@ export const seed = async () => {
       const existing = existingBySlug.get(p.slug)!;
       await db
         .update(exercises)
-        .set({ category: p.category, measurementType: p.measurementType, updatedAt: now })
+        .set({
+          category: p.category,
+          measurementType: p.measurementType,
+          pairedWeights: p.pairedWeights ?? false,
+          updatedAt: now,
+        })
         .where(eq(exercises.id, existing.id));
     }
 

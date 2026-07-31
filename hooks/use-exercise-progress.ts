@@ -35,6 +35,11 @@ export function useExerciseProgress(
   measurementType: MeasurementType,
   /** グラフに出す指標。省略時はその日の最強セット（Phase 1 と同じ系列） */
   metric: ProgressMetric = 'best',
+  /**
+   * 器具を同時に2つ扱う種目か（exercises.pairedWeights）。総重量だけが左右2つ分になる。
+   * 最大重量・推定1RMは片方の重量のままなので、bestSeries には効かない
+   */
+  pairedWeights = false,
 ): {
   /** 選択中の指標の系列。グラフと点の選択はこちらを使う */
   series: ProgressSeries;
@@ -119,8 +124,8 @@ export function useExerciseProgress(
     () =>
       effectiveMetric === 'best'
         ? bestSeries
-        : buildProgressSeries(chartMeasurementType, rows, effectiveMetric),
-    [effectiveMetric, bestSeries, chartMeasurementType, rows],
+        : buildProgressSeries(chartMeasurementType, rows, effectiveMetric, pairedWeights),
+    [effectiveMetric, bestSeries, chartMeasurementType, rows, pairedWeights],
   );
 
   return {

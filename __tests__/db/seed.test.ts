@@ -10,6 +10,7 @@ var mockSelectResult: {
   category: string;
   source: string;
   measurementType: string;
+  pairedWeights: boolean;
 }[];
 
 jest.mock('@/db/client', () => {
@@ -38,6 +39,7 @@ jest.mock('@/db/schema', () => ({
     category: 'category',
     source: 'source',
     measurementType: 'measurementType',
+    pairedWeights: 'pairedWeights',
   },
 }));
 
@@ -74,6 +76,7 @@ describe('seed', () => {
         category: 'chest',
         source: 'preset',
         measurementType: 'weight_reps',
+        pairedWeights: false,
       },
     ];
     await seed();
@@ -92,6 +95,7 @@ describe('seed', () => {
         category: 'other',
         source: 'preset',
         measurementType: 'weight_reps',
+        pairedWeights: false,
       },
     ];
     await seed();
@@ -113,6 +117,7 @@ describe('seed', () => {
         category: 'chest',
         source: 'preset',
         measurementType: 'reps',
+        pairedWeights: false,
       },
     ];
     await seed();
@@ -125,6 +130,35 @@ describe('seed', () => {
     );
   });
 
+  // 列の追加時にバックフィルのマイグレーションを書いていないため、既存ユーザーの
+  // ダンベル種目をtrueにするのはこの差分検知だけが担う（db/schema.tsのpairedWeights参照）
+  it('slugが一致しpairedWeightsが異なる → pairedWeightsの差分でupdateされる', async () => {
+    mockSelectResult = [
+      {
+        id: 1,
+        slug: 'dumbbell_bench_press',
+        name: 'ダンベルベンチプレス',
+        category: 'chest',
+        source: 'preset',
+        measurementType: 'weight_reps',
+        pairedWeights: false,
+      },
+    ];
+    await seed();
+    expect(mockSet).toHaveBeenCalledTimes(1);
+    expect(mockSet).toHaveBeenCalledWith(expect.objectContaining({ pairedWeights: true }));
+  });
+
+  it('PRESET_EXERCISESでpairedWeightsを省略した種目はfalseとしてinsertされる', async () => {
+    await seed();
+    const inserted = mockValues.mock.calls[0][0] as { slug: string; pairedWeights?: boolean }[];
+    expect(inserted.find((e) => e.slug === 'dumbbell_bench_press')?.pairedWeights).toBe(true);
+    // 1個を両手で持つ種目・ワンハンド系は付けない（付けると総重量が倍になってしまう）
+    expect(inserted.find((e) => e.slug === 'dumbbell_pullover')?.pairedWeights).toBeUndefined();
+    expect(inserted.find((e) => e.slug === 'dumbbell_one_arm_row')?.pairedWeights).toBeUndefined();
+    expect(inserted.find((e) => e.slug === 'bench_press')?.pairedWeights).toBeUndefined();
+  });
+
   it('複数種目がそれぞれ異なるフィールドで差分 → 各々のupdateが独立して発火する', async () => {
     mockSelectResult = [
       {
@@ -134,6 +168,7 @@ describe('seed', () => {
         category: 'other',
         source: 'preset',
         measurementType: 'weight_reps',
+        pairedWeights: false,
       },
       {
         id: 2,
@@ -142,6 +177,7 @@ describe('seed', () => {
         category: 'chest',
         source: 'preset',
         measurementType: 'weight_reps',
+        pairedWeights: false,
       },
     ];
     await seed();
@@ -164,6 +200,7 @@ describe('seed', () => {
         category: 'other',
         source: 'preset',
         measurementType: 'weight_reps',
+        pairedWeights: false,
       },
     ];
     mockWhere.mockRejectedValueOnce(new Error('update failed'));
