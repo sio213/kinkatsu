@@ -38,6 +38,10 @@ const DOT_MIN_SPACING = 8;
 
 /** ベストチップの寸法と、点との衝突判定に使うマーカーの実効半径 */
 const BEST_CHIP_HEIGHT = 19;
+/**
+ * テキストの左右に足す余白。左端のグリフ（自己ベストは★、集計系の指標は輪）ぶんを含むため、
+ * kindによらず同じ値でよい——どちらの印も同じ位置・同じ幅を占める（FIX-16）
+ */
 const BEST_CHIP_PAD = 28;
 /** チップの文字サイズ。幅の見積もりと実際の描画（exercise-progress-chart.tsx）がズレないよう共有する */
 export const BEST_CHIP_FONT_SIZE = 10.5;
