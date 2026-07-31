@@ -13,7 +13,7 @@ type PresetExercise = {
    *
    * 次の2つを**両方**満たすものだけに付ける。
    *
-   * (a) 器具がダンベルに確定する。名前に「ダンベル」を含む／ダンベルでしかできない種目
+   * (a) 器具が確定する。名前に「ダンベル」「ケーブル」を含む／その器具でしかできない種目
    *     （アーノルドプレス・ザットマンカールは回内回外を伴う）／この表に器具別のエントリが
    *     並んでいて無印がダンベル版と読める（サイドレイズ ↔ ケーブルサイドレイズ、
    *     フロントレイズ ↔ プレートフロントレイズ）。ランジ・カーフレイズ・シュラッグのように
@@ -22,6 +22,13 @@ type PresetExercise = {
    *
    * (b) 左右に1個ずつ、別々の重量を扱う。1個を両手で持つ種目（ダンベルプルオーバー・
    *     ゴブレットスクワット・スパイダーカール）と、1個しか持たないワンハンド系は外れる。
+   *
+   * ケーブルは対面2本引き（左右のスタックを1つずつ使う）の種目だけが(b)を満たす。片側20kgに
+   * 揃えて「20」と入力するのはダンベルの刻印と同じ構造なので、同じ理由で2倍になる。1本のバー・
+   * ロープを両手で持つ種目（ケーブルカール・シーテッドケーブルロウ等）はスタック1つなので対象外、
+   * 片手ずつ引く種目（シングルアーム系・ケーブルサイドレイズ等）も対象外。
+   * なお滑車比でスタック表示と実荷重がずれる機種があるが、そこは追わない——入力するのは
+   * 目盛りの数字であって実荷重ではなく、機種差まで持ち込むと誰にも説明できない数字になる
    *
    * **交互か同時かは問わない。** 一度は「片腕ずつ交互に挙げる種目は回数の意味が曖昧
    * （10回が片腕10回か左右合計10回か分からない）」として外そうとしたが、収録済みの動画を
@@ -43,7 +50,7 @@ export const PRESET_EXERCISES: PresetExercise[] = [
   { slug: 'decline_bench_press', name: 'デクラインベンチプレス', category: 'chest', measurementType: 'weight_reps' },
   { slug: 'dumbbell_fly', name: 'ダンベルフライ', category: 'chest', measurementType: 'weight_reps', pairedWeights: true },
   { slug: 'incline_dumbbell_fly', name: 'インクラインダンベルフライ', category: 'chest', measurementType: 'weight_reps', pairedWeights: true },
-  { slug: 'cable_crossover', name: 'ケーブルクロスオーバー', category: 'chest', measurementType: 'weight_reps' },
+  { slug: 'cable_crossover', name: 'ケーブルクロスオーバー', category: 'chest', measurementType: 'weight_reps', pairedWeights: true },
   { slug: 'chest_press_machine', name: 'チェストプレス（マシン）', category: 'chest', measurementType: 'weight_reps' },
   { slug: 'push_up', name: 'プッシュアップ', category: 'chest', measurementType: 'reps' },
   { slug: 'smith_bench_press', name: 'スミスマシンベンチプレス', category: 'chest', measurementType: 'weight_reps' },
@@ -54,8 +61,8 @@ export const PRESET_EXERCISES: PresetExercise[] = [
   { slug: 'decline_dumbbell_press', name: 'デクラインダンベルプレス', category: 'chest', measurementType: 'weight_reps', pairedWeights: true },
   { slug: 'decline_dumbbell_fly', name: 'デクラインダンベルフライ', category: 'chest', measurementType: 'weight_reps', pairedWeights: true },
   { slug: 'pec_deck', name: 'ペックデック（バタフライマシン）', category: 'chest', measurementType: 'weight_reps' },
-  { slug: 'low_cable_fly', name: 'ローケーブルフライ', category: 'chest', measurementType: 'weight_reps' },
-  { slug: 'high_cable_fly', name: 'ハイケーブルフライ', category: 'chest', measurementType: 'weight_reps' },
+  { slug: 'low_cable_fly', name: 'ローケーブルフライ', category: 'chest', measurementType: 'weight_reps', pairedWeights: true },
+  { slug: 'high_cable_fly', name: 'ハイケーブルフライ', category: 'chest', measurementType: 'weight_reps', pairedWeights: true },
   { slug: 'svend_press', name: 'スベンドプレス', category: 'chest', measurementType: 'weight_reps' },
   { slug: 'floor_press', name: 'フロアプレス', category: 'chest', measurementType: 'weight_reps' },
   { slug: 'resistance_band_chest_press', name: 'バンドチェストプレス', category: 'chest', measurementType: 'reps' },
@@ -71,8 +78,8 @@ export const PRESET_EXERCISES: PresetExercise[] = [
   { slug: 'incline_smith_press', name: 'インクラインスミスプレス', category: 'chest', measurementType: 'weight_reps' },
   { slug: 'decline_smith_press', name: 'デクラインスミスプレス', category: 'chest', measurementType: 'weight_reps' },
   { slug: 'single_arm_cable_fly', name: 'シングルアームケーブルフライ', category: 'chest', measurementType: 'weight_reps' },
-  { slug: 'decline_cable_fly', name: 'デクラインケーブルフライ', category: 'chest', measurementType: 'weight_reps' },
-  { slug: 'incline_cable_fly', name: 'インクラインケーブルフライ', category: 'chest', measurementType: 'weight_reps' },
+  { slug: 'decline_cable_fly', name: 'デクラインケーブルフライ', category: 'chest', measurementType: 'weight_reps', pairedWeights: true },
+  { slug: 'incline_cable_fly', name: 'インクラインケーブルフライ', category: 'chest', measurementType: 'weight_reps', pairedWeights: true },
   { slug: 'dumbbell_pullover', name: 'ダンベルプルオーバー', category: 'chest', measurementType: 'weight_reps' },
   { slug: 'spoto_press', name: 'スポトプレス', category: 'chest', measurementType: 'weight_reps' },
   { slug: 'board_press', name: 'ボードプレス', category: 'chest', measurementType: 'weight_reps' },
@@ -81,7 +88,7 @@ export const PRESET_EXERCISES: PresetExercise[] = [
   { slug: 'hindu_push_up', name: 'ヒンズープッシュアップ', category: 'chest', measurementType: 'reps' },
   { slug: 'archer_push_up', name: 'アーチャープッシュアップ', category: 'chest', measurementType: 'reps' },
   { slug: 'machine_incline_press', name: 'マシンインクラインプレス', category: 'chest', measurementType: 'weight_reps' },
-  { slug: 'standing_cable_chest_press', name: 'スタンディングケーブルチェストプレス', category: 'chest', measurementType: 'weight_reps' },
+  { slug: 'standing_cable_chest_press', name: 'スタンディングケーブルチェストプレス', category: 'chest', measurementType: 'weight_reps', pairedWeights: true },
   // 肩
   { slug: 'barbell_shoulder_press', name: 'バーベルショルダープレス', category: 'shoulder', measurementType: 'weight_reps' },
   { slug: 'dumbbell_shoulder_press', name: 'ダンベルショルダープレス', category: 'shoulder', measurementType: 'weight_reps', pairedWeights: true },
@@ -94,9 +101,8 @@ export const PRESET_EXERCISES: PresetExercise[] = [
   { slug: 'single_arm_dumbbell_shoulder_press', name: 'シングルアームダンベルショルダープレス', category: 'shoulder', measurementType: 'weight_reps' },
   { slug: 'plate_front_raise', name: 'プレートフロントレイズ', category: 'shoulder', measurementType: 'weight_reps' },
   { slug: 'lu_raise', name: 'ルーレイズ', category: 'shoulder', measurementType: 'weight_reps', pairedWeights: true },
-  // 収録済みの動画はケーブル版（左右2本を別々に引く）。ダンベルではないが「左右に1個ずつ
-  // 別々の重量を扱う」点は同じなので付けたままにしてある。ケーブル種目全体を対象にするか
-  // 決めるときに、この1件だけ先行している状態を見直すこと
+  // 収録済みの動画はケーブル版（左右2本を別々に引く）。名前にダンベルもケーブルも無いが、
+  // 対面2本引きのケーブル種目として(a)(b)を満たす
   { slug: 'y_raise', name: 'Yレイズ', category: 'shoulder', measurementType: 'weight_reps', pairedWeights: true },
   { slug: 'cuban_press', name: 'キューバンプレス', category: 'shoulder', measurementType: 'weight_reps', pairedWeights: true },
   { slug: 'scott_press', name: 'スコットプレス', category: 'shoulder', measurementType: 'weight_reps', pairedWeights: true },
@@ -109,7 +115,7 @@ export const PRESET_EXERCISES: PresetExercise[] = [
   { slug: 'dumbbell_shrug', name: 'ダンベルシュラッグ', category: 'shoulder', measurementType: 'weight_reps', pairedWeights: true },
   { slug: 'behind_neck_press', name: 'ビハインドネックプレス', category: 'shoulder', measurementType: 'weight_reps' },
   { slug: 'reverse_pec_deck', name: 'リアデルトマシン', category: 'shoulder', measurementType: 'weight_reps' },
-  { slug: 'cable_rear_delt_fly', name: 'ケーブルリアデルトフライ', category: 'shoulder', measurementType: 'weight_reps' },
+  { slug: 'cable_rear_delt_fly', name: 'ケーブルリアデルトフライ', category: 'shoulder', measurementType: 'weight_reps', pairedWeights: true },
   { slug: 'kettlebell_shoulder_press', name: 'ケトルベルショルダープレス', category: 'shoulder', measurementType: 'weight_reps' },
   { slug: 'push_press', name: 'プッシュプレス', category: 'shoulder', measurementType: 'weight_reps' },
   { slug: 'pike_push_up', name: 'パイクプッシュアップ', category: 'shoulder', measurementType: 'reps' },
