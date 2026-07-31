@@ -285,7 +285,7 @@ describe('指標の切り替え', () => {
     expect(root.findAllByType(ExerciseProgressChart)).toHaveLength(1);
     expect(root.findByType(ExerciseProgressChart).props.points).toEqual([]);
     // 理由は他の注記と同じ形で出す
-    expect(allTexts(root).some((t) => t.includes('回以下のセットの記録が無いため'))).toBe(true);
+    expect(allTexts(root).some((t) => t.includes('回を超えるセットは誤差が大きいため'))).toBe(true);
     // 過去の記録は消さない
     expect(allTexts(root)).toContain('過去の記録');
   });

@@ -109,7 +109,7 @@ export function ExerciseRecordTab({ exerciseId, exerciseName, measurementType, i
       list.push({
         lead: '推定1RM',
         body: nothingToPlot
-          ? `${ONE_REP_MAX_REP_LIMIT}回以下のセットの記録が無いため、点を出せません`
+          ? `${ONE_REP_MAX_REP_LIMIT}回を超えるセットは誤差が大きいため、算出の対象外です`
           : `1回だけ挙げられる重量の目安です。重量×回数から計算しています（${ONE_REP_MAX_REP_LIMIT}回以下のセットのみ）`,
       });
     } else if (nothingToPlot) {
