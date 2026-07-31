@@ -174,6 +174,25 @@ function formatHistoryFieldValue(
   }
 }
 
+/** 加重種目で加重しなかったセットの重量の見せ方。「0kg」だと誤登録された数値のように見える */
+export const BODYWEIGHT_LABEL = '自重';
+
+/**
+ * 加重種目（重量が主指標）で、重量が入っていないセットか。
+ *
+ * 空欄でも `0` でも「加重しなかった」の意味で扱う（isEnteredWeight と同じ基準）。ただし
+ * 全列が空のセット——「セット追加」だけ押して何も入れずに終わった行——は対象外にする。
+ * これを「自重」と書いてしまうと、やっていない行がやったことになる
+ */
+function isBodyweightSet(
+  columns: SetColumn[],
+  set: Partial<Record<SetFieldKey, number | null | undefined>>,
+): boolean {
+  if (columns[0]?.key !== 'weight') return false;
+  if (isEnteredWeight(set.weight)) return false;
+  return columns.slice(1).some((c) => set[c.key] != null);
+}
+
 // 列定義に沿って複数セットを"60kg×10・60kg×8"のような1本の文字列にする。
 // 全列nullのセット（前回「セット追加」だけ押されて未入力のまま終わった等）は、そのまま
 // joinすると"60kg×10・・"のように空のセグメントが挟まってしまうため、要約から除外する
@@ -187,7 +206,11 @@ export function formatHistorySetSummary(
   return setsList
     .map((s) =>
       columns
-        .map((c) => formatHistoryFieldValue(c.key, s[c.key], repsIsSoleColumn))
+        .map((c) =>
+          c.key === 'weight' && isBodyweightSet(columns, s)
+            ? BODYWEIGHT_LABEL
+            : formatHistoryFieldValue(c.key, s[c.key], repsIsSoleColumn),
+        )
         .filter((v): v is string => v != null)
         .join('×'),
     )
@@ -216,12 +239,15 @@ export function splitSetDisplay(
 ): { value: string; unit: string; trailing: string } | null {
   const [primary, ...others] = columns;
   const value = primary.toDisplay(set[primary.key]);
-  if (value === '') return null;
+  const bodyweight = isBodyweightSet(columns, set);
+  if (value === '' && !bodyweight) return null;
   const trailing = others
     .map((c) => c.toDisplay(set[c.key]))
     .filter((v) => v !== '')
     .map((v) => `× ${v}`)
     .join(' ');
+  // 加重しなかったセットは「自重」を値の位置に置く。単位は付けない（「自重kg」にならないように）
+  if (bodyweight) return { value: BODYWEIGHT_LABEL, unit: '', trailing };
   return { value, unit: PRIMARY_FIELD_UNITS[primary.key], trailing };
 }
 

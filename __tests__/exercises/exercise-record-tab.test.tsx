@@ -54,6 +54,7 @@ function render(points: ProgressPoint[]) {
     series,
     // 既定は最大重量（ベスト）指標なので、選択中の系列とベスト系列は同じもの
     bestSeries: series,
+    recordDays: points,
     chartMeasurementType: 'weight_reps',
     metric: 'best',
     loaded: true,
@@ -190,6 +191,7 @@ describe('指標の切り替え', () => {
     mockUseExerciseProgress.mockImplementation((_id, _type, metric) => ({
       series: metric === 'total' ? totalSeries : bestSeries,
       bestSeries,
+      recordDays: points,
       chartMeasurementType,
       metric,
       loaded: true,
@@ -247,6 +249,47 @@ describe('指標の切り替え', () => {
 
     pressChip(root, '最大重量');
     expect(hasCaption()).toBe(false);
+  });
+
+  test('自重の日の注記は、表示中の期間に抜けがあるときだけ出す', () => {
+    const bestSeries = {
+      unit: { label: 'kg', step: 5, minRange: 10, integerOnly: false, auxKind: 'reps' },
+      // グラフに出るのは直近2件だけ。40日前の自重の日は点にできず落ちている
+      points: [makePoint(20, 70), makePoint(3, 65)],
+    };
+    mockUseExerciseProgress.mockReturnValue({
+      series: bestSeries,
+      bestSeries,
+      // 一覧には40日前の自重の日も残っている
+      recordDays: [makePoint(40, 0), makePoint(20, 70), makePoint(3, 65)],
+      chartMeasurementType: 'weight_reps',
+      metric: 'best',
+      loaded: true,
+      failed: false,
+    });
+    let instance!: ReturnType<typeof create>;
+    act(() => {
+      instance = create(
+        <ExerciseRecordTab
+          exerciseId={1}
+          exerciseName="加重ディップス"
+          measurementType="weight_reps"
+          insideTabBar={false}
+        />,
+      );
+    });
+    const root = instance.root;
+    const hasNote = () => allTexts(root).some((t) => t.includes('グラフには点を出しません'));
+
+    // 既定の3ヶ月には40日前が入るので、画面上に抜けがある
+    expect(hasNote()).toBe(true);
+
+    // 1ヶ月に絞ると自重の日は期間の外。抜けが見えないので注記も出さない
+    pressChip(root, '1ヶ月');
+    expect(hasNote()).toBe(false);
+
+    pressChip(root, '全期間');
+    expect(hasNote()).toBe(true);
   });
 
   test('指標を切り替えても選択していた日は変わらない', () => {

@@ -4,6 +4,7 @@ import { estimateOneRepMax, ONE_REP_MAX_REP_LIMIT } from '@/lib/exercises/one-re
 import {
   availableProgressMetrics,
   buildProgressSeries,
+  buildRecordDays,
   progressMetricLabel,
   resolveChartMeasurementType,
   type ProgressSetRow,
@@ -309,5 +310,45 @@ describe('placeBestChip: ハイライトの呼称', () => {
     expect(max.value).toBe('75kg');
     // 語が1文字短いぶんチップも狭くなる
     expect(max.width).toBeLessThan(best.width);
+  });
+});
+
+describe('buildRecordDays: 自重の日も記録一覧に残す', () => {
+  test('加重の日と自重の日が混在していても、全部の日が並ぶ', () => {
+    const rows = [
+      row(0, 1, { weight: 10, reps: 8 }),
+      // ベルト無しでやった日。グラフには点を置けないが、やった事実は消さない
+      row(1, 1, { weight: 0, reps: 12 }),
+      row(2, 1, { weight: 12.5, reps: 8 }),
+      row(3, 1, { weight: null, reps: 14 }),
+    ];
+    // グラフの系列は加重した日だけ
+    expect(buildProgressSeries('weight_reps', rows, 'best').points).toHaveLength(2);
+    // 一覧は4日とも残る
+    const days = buildRecordDays('weight_reps', rows);
+    expect(days.map((d) => d.dateKey)).toEqual([day(0), day(1), day(2), day(3)]);
+  });
+
+  test('自重の日でも遷移先のセッションを持つ（カードをタップして記録を開ける）', () => {
+    const days = buildRecordDays('weight_reps', [row(0, 1, { weight: 0, reps: 12 })]);
+    expect(days[0].best.sessionId).toBe(1);
+    expect(days[0].sets).toHaveLength(1);
+  });
+
+  test('✓確定セットが1つも無い日は並べない', () => {
+    const days = buildRecordDays('weight_reps', [
+      row(0, 1, { weight: 60, reps: 8 }, false),
+      row(1, 1, { weight: 60, reps: 8 }),
+    ]);
+    expect(days.map((d) => d.dateKey)).toEqual([day(1)]);
+  });
+
+  test('同じ日の複数セッションは1日にまとまる（グラフと同じ数え方）', () => {
+    const days = buildRecordDays('weight_reps', [
+      row(0, 1, { weight: 60, reps: 8 }),
+      { ...row(0, 1, { weight: 65, reps: 6 }), sessionId: 99, workoutSessionExerciseId: 99 },
+    ]);
+    expect(days).toHaveLength(1);
+    expect(days[0].sets).toHaveLength(2);
   });
 });

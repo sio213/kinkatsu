@@ -460,7 +460,23 @@ describe('splitSetDisplay（重量グラフの内訳カードのセット行）'
     });
   });
 
-  test('主指標が未入力ならnull（値として表示できない）', () => {
-    expect(splitSetDisplay(MEASUREMENT_COLUMNS.weight_reps, setOf({ reps: 8 }))).toBeNull();
+  test('加重種目で重量が入っていないセットは「自重」を値の位置に置く', () => {
+    // 加重ディップスを加重なしでやった日。「0kg」と書くと誤登録された数値のように見えるため
+    expect(splitSetDisplay(MEASUREMENT_COLUMNS.weight_reps, setOf({ reps: 8 }))).toEqual({
+      value: '自重',
+      unit: '',
+      trailing: '× 8',
+    });
+    // 「0」と打った人も空欄の人と同じ扱いにする
+    expect(splitSetDisplay(MEASUREMENT_COLUMNS.weight_reps, setOf({ weight: 0, reps: 8 }))).toEqual({
+      value: '自重',
+      unit: '',
+      trailing: '× 8',
+    });
+  });
+
+  test('全列が未入力ならnull（やっていない行を「自重」にしない）', () => {
+    expect(splitSetDisplay(MEASUREMENT_COLUMNS.weight_reps, setOf({}))).toBeNull();
+    expect(splitSetDisplay(MEASUREMENT_COLUMNS.reps, setOf({}))).toBeNull();
   });
 });

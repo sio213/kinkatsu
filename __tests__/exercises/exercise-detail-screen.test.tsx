@@ -136,6 +136,7 @@ beforeEach(() => {
   mockUseExerciseProgress.mockReturnValue({
     series: emptySeries,
     bestSeries: emptySeries,
+    recordDays: [],
     chartMeasurementType: 'weight_reps',
     metric: 'best',
     loaded: true,
@@ -424,6 +425,7 @@ describe('記録タブ: 記録0件／1件のとき', () => {
     mockUseExerciseProgress.mockReturnValue({
       series,
       bestSeries: series,
+      recordDays: series.points,
       chartMeasurementType: 'weight_reps',
       metric: 'best',
       loaded: true,

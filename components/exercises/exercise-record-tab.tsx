@@ -56,7 +56,7 @@ export function ExerciseRecordTab({ exerciseId, exerciseName, measurementType, i
   const [period, setPeriod] = useState<ProgressPeriod>(DEFAULT_PROGRESS_PERIOD);
   const [requestedMetric, setRequestedMetric] = useState<ProgressMetric>('best');
   // metricはフックが「その種目で実際に選べる値」に丸めて返したもの。選択状態の表示にも使う
-  const { series, bestSeries, chartMeasurementType, metric, loaded, failed } = useExerciseProgress(
+  const { series, bestSeries, recordDays, chartMeasurementType, metric, loaded, failed } = useExerciseProgress(
     exerciseId,
     measurementType,
     requestedMetric,
@@ -100,6 +100,31 @@ export function ExerciseRecordTab({ exerciseId, exerciseName, measurementType, i
   //
   // 最大○○（ベスト）指標のときだけ、これが「自己ベスト」——アンバーの点と★のチップになる。
   // 総重量・推定1RMでは単にその指標の最高値なので、色も★も持たせない（FIX-10）
+  // グラフ下の注記。「太字の語＝説明」の形に揃え、当てはまるものを上から並べる
+  const captions = useMemo(() => {
+    const list: { lead: string; body: string }[] = [];
+    if (metric === 'e1rm') {
+      list.push({
+        lead: '推定1RM',
+        body: `挙げた重量と回数からの計算値です（${ONE_REP_MAX_REP_LIMIT}回以下のセットから算出／実測ではありません）`,
+      });
+    }
+    // 加重種目を加重なしでやった日は点を置けない。一覧の件数とグラフの点数がズレる理由になるので、
+    // 「データが抜けている」と誤解されないよう、消えたのではなく一覧に残っていることを伝える。
+    //
+    // 判定は**表示中の期間で**行う。全期間で比べると、自重の日が期間の外にしか無いとき——
+    // 画面上はどこにも抜けが無いのに——注記だけが出てしまう
+    const isWeightBased =
+      chartMeasurementType === 'weight_reps' || chartMeasurementType === 'weight_time';
+    const droppedInPeriod =
+      filterProgressPoints(recordDays, period).length >
+      filterProgressPoints(bestSeries.points, period).length;
+    if (isWeightBased && droppedInPeriod) {
+      list.push({ lead: '自重の日', body: 'グラフには点を出しません。記録は下の一覧に残ります' });
+    }
+    return list;
+  }, [metric, chartMeasurementType, recordDays, bestSeries.points, period]);
+
   const highlight = useMemo(() => findPersonalBest(series.points), [series.points]);
   // 内訳カードのバッジは選択中の指標に関係なく、実測の自己ベスト（ベスト系列の最高点）を指す
   const personalBest = useMemo(() => findPersonalBest(bestSeries.points), [bestSeries.points]);
@@ -112,7 +137,7 @@ export function ExerciseRecordTab({ exerciseId, exerciseName, measurementType, i
         <Text style={styles.placeholder}>記録を読み込めませんでした</Text>
       ) : !loaded ? (
         <Text style={styles.placeholder}>読み込み中</Text>
-      ) : bestSeries.points.length === 0 ? (
+      ) : recordDays.length === 0 ? (
         // 記録0件。空白ではなく完成形を薄い見本で予告して、記録する動機にする（デザイン案）。
         // 判定に選択中の指標の系列を使わないこと——推定1RMは13回以上のセットしか無い日が落ちるので、
         // 記録が何十件あっても「まだ記録がありません」が出てしまう
@@ -176,12 +201,12 @@ export function ExerciseRecordTab({ exerciseId, exerciseName, measurementType, i
               onChange={setRequestedMetric}
             />
           )}
-          {metric === 'e1rm' && (
-            <Text style={styles.caption}>
-              <Text style={styles.captionLead}>推定1RM＝</Text>
-              {`挙げた重量と回数からの計算値です（${ONE_REP_MAX_REP_LIMIT}回以下のセットから算出／実測ではありません）`}
+          {captions.map((caption) => (
+            <Text key={caption.lead} style={styles.caption}>
+              <Text style={styles.captionLead}>{caption.lead}＝</Text>
+              {caption.body}
             </Text>
-          )}
+          ))}
 
           {selectedPoint && (
             <ExerciseRecordDetailCard
@@ -209,9 +234,9 @@ export function ExerciseRecordTab({ exerciseId, exerciseName, measurementType, i
 
           {/* 記録が1件だけのときは、真上の内訳カードと同じ内容が並ぶだけなので出さない。
               一覧は期間チップにも選択中の点にも連動させず、常に今日から見た直近3件 */}
-          {bestSeries.points.length > 1 && (
+          {recordDays.length > 1 && (
             <ExerciseRecordHistoryList
-              points={bestSeries.points}
+              points={recordDays}
               measurementType={chartMeasurementType}
               onPressRecord={(sessionId) => push(`/workout/${sessionId}`)}
               onPressSeeAll={() =>

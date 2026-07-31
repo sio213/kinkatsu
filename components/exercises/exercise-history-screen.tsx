@@ -40,12 +40,16 @@ export function ExerciseHistoryScreen({ insideTabBar = false }: Props) {
   const measurementType = resolveMeasurementType(exercise?.measurementType);
   // chartMeasurementType を使うこと。重量を1度も記録していない加重種目は reps 種目として
   // 系列が組まれるので、生の measurementType で描くとセットの値が全て空になる
-  const { series, chartMeasurementType, loaded, failed } = useExerciseProgress(exerciseId, measurementType);
+  const { series, recordDays, chartMeasurementType, loaded, failed } = useExerciseProgress(
+    exerciseId,
+    measurementType,
+  );
 
   // ベストの判定は全期間の系列で行う（グラフのアンバー・内訳カードのバッジと同じ入口）
   const personalBest = useMemo(() => findPersonalBest(series.points), [series.points]);
   // 系列は古い順なので、一覧は新しい順に並べ替えてから月でまとめる
-  const sections = useMemo(() => toMonthSections([...series.points].reverse()), [series.points]);
+  // 一覧は recordDays を使う。加重なしでやった日もやった事実として並べる（グラフには出ない）
+  const sections = useMemo(() => toMonthSections([...recordDays].reverse()), [recordDays]);
 
   const safeAreaEdges = insideTabBar ? ([] as const) : (['bottom'] as const);
   // 件数はサブタイトルではなく一覧の見出し行に置く（デザイン案の採用案4-2）。
@@ -64,7 +68,7 @@ export function ExerciseHistoryScreen({ insideTabBar = false }: Props) {
           actionLabel="戻る"
           onPressAction={() => router.back()}
         />
-      ) : !loaded || !exerciseLoaded ? null : series.points.length === 0 ? (
+      ) : !loaded || !exerciseLoaded ? null : recordDays.length === 0 ? (
         <NotFoundState
           message="この種目の記録がまだありません"
           actionLabel="戻る"
@@ -91,8 +95,9 @@ export function ExerciseHistoryScreen({ insideTabBar = false }: Props) {
               <Text style={styles.monthLabel}>{section.title}</Text>
             </View>
           )}
+          // 件数は一覧に並ぶ日数と一致させる（自重の日も含む。グラフの点数とは一致しない）
           ListHeaderComponent={
-            <RecordListHeading label="記録一覧" count={series.points.length} style={styles.listHeading} />
+            <RecordListHeading label="記録一覧" count={recordDays.length} style={styles.listHeading} />
           }
           ItemSeparatorComponent={() => <View style={styles.cardSeparator} />}
           SectionSeparatorComponent={() => <View style={styles.sectionSeparator} />}
