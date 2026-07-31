@@ -103,19 +103,10 @@ export function ExerciseRecordTab({ exerciseId, exerciseName, measurementType, i
   // グラフ下の注記。「太字の語＝説明」の形に揃え、当てはまるものを上から並べる
   const captions = useMemo(() => {
     const list: { lead: string; body: string }[] = [];
-    // 加重種目なのに重量が1件も無く、回数のグラフに切り替わっている状態。これを説明しないと
-    // 「加重種目を開いたのに縦軸が回」「重量を編集しても何も変わらない」の理由が分からない
-    // （0kgは未入力と同じ扱いなので、0を入れてもグラフは切り替わらない）
-    if (measurementType === 'weight_reps' && chartMeasurementType === 'reps') {
-      list.push({
-        lead: '重量の記録なし',
-        body: '＝回数の推移を出しています。加重して記録すると重量のグラフに切り替わります',
-      });
-    }
     if (metric === 'e1rm') {
       list.push({
         lead: '推定1RM',
-        body: `＝挙げた重量と回数からの計算値です（${ONE_REP_MAX_REP_LIMIT}回以下のセットから算出／実測ではありません）`,
+        body: `挙げた重量と回数からの計算値です（${ONE_REP_MAX_REP_LIMIT}回以下のセットから算出／実測ではありません）`,
       });
     }
     // 加重種目を加重なしでやった日は点を置けない。一覧の件数とグラフの点数がズレる理由になるので、
@@ -129,13 +120,10 @@ export function ExerciseRecordTab({ exerciseId, exerciseName, measurementType, i
       filterProgressPoints(recordDays, period).length >
       filterProgressPoints(bestSeries.points, period).length;
     if (isWeightBased && droppedInPeriod) {
-      list.push({
-        lead: '自重の日',
-        body: '＝グラフには点を出しません。記録は下の一覧に残ります',
-      });
+      list.push({ lead: '自重の日', body: 'グラフには点を出しません。記録は下の一覧に残ります' });
     }
     return list;
-  }, [metric, measurementType, chartMeasurementType, recordDays, bestSeries.points, period]);
+  }, [metric, chartMeasurementType, recordDays, bestSeries.points, period]);
 
   const highlight = useMemo(() => findPersonalBest(series.points), [series.points]);
   // 内訳カードのバッジは選択中の指標に関係なく、実測の自己ベスト（ベスト系列の最高点）を指す
@@ -215,7 +203,7 @@ export function ExerciseRecordTab({ exerciseId, exerciseName, measurementType, i
           )}
           {captions.map((caption) => (
             <Text key={caption.lead} style={styles.caption}>
-              <Text style={styles.captionLead}>{caption.lead}</Text>
+              <Text style={styles.captionLead}>{caption.lead}＝</Text>
               {caption.body}
             </Text>
           ))}

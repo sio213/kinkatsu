@@ -251,61 +251,6 @@ describe('指標の切り替え', () => {
     expect(hasCaption()).toBe(false);
   });
 
-  test('重量を1度も記録していない加重種目は、回数で描いている理由を出す', () => {
-    const series = {
-      unit: { label: '回', step: 5, minRange: 5, integerOnly: true, auxKind: 'sets' },
-      points: [makePoint(20, 8), makePoint(3, 10)],
-    };
-    mockUseExerciseProgress.mockReturnValue({
-      series,
-      bestSeries: series,
-      recordDays: series.points,
-      // 重量が1件も無いので reps 種目として描いている
-      chartMeasurementType: 'reps',
-      metric: 'best',
-      loaded: true,
-      failed: false,
-    });
-    let instance!: ReturnType<typeof create>;
-    act(() => {
-      instance = create(
-        <ExerciseRecordTab
-          exerciseId={1}
-          exerciseName="加重チンニング"
-          measurementType="weight_reps"
-          insideTabBar={false}
-        />,
-      );
-    });
-    const texts = allTexts(instance.root);
-    expect(texts.some((t) => t.includes('重量の記録なし'))).toBe(true);
-    // 0kgでは切り替わらないことが読み取れるよう、加重して記録する必要があると書く
-    expect(texts.some((t) => t.includes('加重して記録すると'))).toBe(true);
-  });
-
-  test('もともと回数種目なら、回数で描いている理由は出さない', () => {
-    const series = {
-      unit: { label: '回', step: 5, minRange: 5, integerOnly: true, auxKind: 'sets' },
-      points: [makePoint(20, 8), makePoint(3, 10)],
-    };
-    mockUseExerciseProgress.mockReturnValue({
-      series,
-      bestSeries: series,
-      recordDays: series.points,
-      chartMeasurementType: 'reps',
-      metric: 'best',
-      loaded: true,
-      failed: false,
-    });
-    let instance!: ReturnType<typeof create>;
-    act(() => {
-      instance = create(
-        <ExerciseRecordTab exerciseId={1} exerciseName="チンニング" measurementType="reps" insideTabBar={false} />,
-      );
-    });
-    expect(allTexts(instance.root).some((t) => t.includes('重量の記録なし'))).toBe(false);
-  });
-
   test('自重の日の注記は、表示中の期間に抜けがあるときだけ出す', () => {
     const bestSeries = {
       unit: { label: 'kg', step: 5, minRange: 10, integerOnly: false, auxKind: 'reps' },
