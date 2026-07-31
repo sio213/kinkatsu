@@ -70,6 +70,9 @@ jest.mock('expo-web-browser', () => ({
 import React from 'react';
 import { act, create, type ReactTestInstance } from 'react-test-renderer';
 import { Alert, Modal, Text, TouchableOpacity } from 'react-native';
+import { Image } from 'expo-image';
+import Svg, { Path } from 'react-native-svg';
+import { Colors } from '@/constants/theme';
 import { openBrowserAsync } from 'expo-web-browser';
 import { getYoutubeSearchUrl } from '@/lib/exercises/youtube';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
@@ -524,5 +527,82 @@ describe('⋮メニュー: YouTubeで検索', () => {
     });
 
     expect(mockPush).toHaveBeenCalledWith('/exercise/edit/1');
+  });
+});
+
+describe('メディア枠: 素材が無い種目のプレースホルダー', () => {
+  // 画面には⋮メニュー等のアイコンも載るため、Svgの総数ではなくプレースホルダーの線画だけを数える。
+  // 総数に依存させると、無関係な場所にアイコンが1つ増えただけでこのテストが赤くなる
+  const placeholders = (root: ReactTestInstance) =>
+    root.findAll((node) => node.type === Path && node.props.fill === 'none');
+  // expo-videoのモックがVideoViewをホスト文字列にしているため、型ではなく名前で拾う
+  const videos = (root: ReactTestInstance) =>
+    root.findAll((node) => String(node.type) === 'VideoView');
+
+  // 以前はカスタム種目にもベンチプレスのサムネイルを流用しており、「自作のスクワット」に
+  // 無関係な写真が出る誤情報になっていた
+  test('素材が無い種目は写真も動画も描かず、プレースホルダーの線画を1つだけ出す', () => {
+    mockUseExercise.mockReturnValue({
+      exercise: makeExercise({ source: 'custom', slug: null }),
+      loaded: true,
+    });
+
+    const root = render();
+    expect(root.findAllByType(Image)).toHaveLength(0);
+    expect(videos(root)).toHaveLength(0);
+    expect(placeholders(root)).toHaveLength(1);
+  });
+
+  test('プレースホルダーは54pxでtextPlaceholder色のstrokeで描く', () => {
+    mockUseExercise.mockReturnValue({
+      exercise: makeExercise({ source: 'custom', slug: null }),
+      loaded: true,
+    });
+
+    const root = render();
+    const path = placeholders(root)[0];
+    expect(path.props.stroke).toBe(Colors.textPlaceholder);
+    expect(path.props.fill).toBe('none');
+    // 線画のプレースホルダーだけがMaterial Symbolsと違う24pxグリッドのviewBoxを持つ
+    const [svg] = root.findAllByType(Svg).filter((s) => s.props.viewBox === '0 0 24 24');
+    expect(svg.props.width).toBe(54);
+    expect(svg.props.height).toBe(54);
+  });
+
+  test('枠内にテキストは置かない（種目名はナビタイトル、カテゴリは本文側にあるため）', () => {
+    mockUseExercise.mockReturnValue({
+      exercise: makeExercise({ source: 'custom', slug: null, name: 'スミスマシンスクワット' }),
+      loaded: true,
+    });
+
+    const root = render();
+    const texts = allTexts(root);
+    expect(texts).not.toContain('スミスマシンスクワット');
+    expect(texts.filter((t) => typeof t === 'string' && t.includes('画像'))).toHaveLength(0);
+  });
+
+  test('動画がある種目はプレースホルダーを出さず、これまでどおり動画を再生する', () => {
+    mockUseExercise.mockReturnValue({
+      exercise: makeExercise({ source: 'preset', slug: 'bench_press' }),
+      loaded: true,
+    });
+
+    const root = render();
+    expect(videos(root)).toHaveLength(1);
+    expect(placeholders(root)).toHaveLength(0);
+    expect(mockPlayerPlay).toHaveBeenCalled();
+  });
+
+  test('お気に入り★ボタンはプレースホルダーのときも従来どおり押せる', () => {
+    mockUseExercise.mockReturnValue({
+      exercise: makeExercise({ source: 'custom', slug: null, favorite: false }),
+      loaded: true,
+    });
+
+    const root = render();
+    act(() => {
+      findButtonByLabel(root, 'お気に入りに追加')!.props.onPress();
+    });
+    expect(mockToggleFavorite).toHaveBeenCalledWith(1, true);
   });
 });

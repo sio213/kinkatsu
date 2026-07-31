@@ -144,5 +144,5 @@ kinkatsu用のGoogle Driveフォルダが `仕事 > Webサービス > 🏋️ ki
 - `lib/exercises/images.ts` の `IMAGES`（動画・サムネイル）: GymVisualの生素材の場所は上記「Google Drive」節を参照（実際に使うのは大抵`~/Downloads`の展開済みフォルダ、例: `1201-01 05 26-male1` が動画本体、`1201-01 05 26-thumbnails-male1` がSTEP1/STEP2静止画）。該当クリップ（英語種目名で検索）を探し、以下で変換・登録する
   - 動画: `ffmpeg -y -i "<raw>.mp4" -vf scale=960:540 -c:v libx264 -crf 18 -pix_fmt yuv420p -movflags +faststart -an assets/exercise-media/<slug>.mp4`
   - サムネ: STEP2の静止画（ピーク収縮側。STEP1/2は目視で選ぶ）に `ffmpeg -y -nostdin -i "<raw>-STEP2.png" -vf "crop=1080:1080,scale=300:300" assets/exercise-media/<slug>_thumb.png`
-  - 該当クリップが無い/複数候補があって名称的に確信が持てない場合はユーザーに確認する。それでも見つからない種目だけ登録を省略してよい（`PLACEHOLDER_THUMBNAIL` にフォールバックする）
+  - 該当クリップが無い/複数候補があって名称的に確信が持てない場合はユーザーに確認する。それでも見つからない種目だけ登録を省略してよい（`IMAGES` 未登録の種目は「画像なし」として扱われ、`DesignIcon` の `dumbbell-outline` プレースホルダーが表示される）
 - 記録機能実装後は `db/schema.ts` の `exercises.measurementType` も分類する

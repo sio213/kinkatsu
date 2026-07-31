@@ -24,6 +24,8 @@ jest.mock('@/lib/routines/draft-store', () => ({
 import React from 'react';
 import { act, create, type ReactTestInstance } from 'react-test-renderer';
 import { Alert, Text, TextInput, TouchableOpacity } from 'react-native';
+import { Image } from 'expo-image';
+import { Path } from 'react-native-svg';
 import {
   RoutineTemplateExerciseCard,
   type RoutineTemplateExerciseCardHandle,
@@ -434,5 +436,24 @@ describe('focusFirstSet()（種目追加ピッカー・過去の記録から読�
     });
 
     expect(focusSpy).toHaveBeenCalledTimes(1);
+  });
+});
+
+describe('サムネイル: 素材の有無', () => {
+  // カードには他のアイコン（塗りのMaterial Symbols）も載るため、線画＝fill無しで絞り込む
+  const placeholders = (root: ReactTestInstance) =>
+    root.findAllByType(Path).filter((p) => p.props.fill === 'none');
+
+  it('preset種目は写真を出す', () => {
+    const root = render(makeExercise({ source: 'preset', slug: 'bench_press' }));
+    expect(root.findAllByType(Image)).toHaveLength(1);
+    expect(placeholders(root)).toHaveLength(0);
+  });
+
+  // カスタム種目に他種目（ベンチプレス）の写真が出ていた回帰の防止
+  it('カスタム種目は写真を出さず、プレースホルダーの線画にする', () => {
+    const root = render(makeExercise({ source: 'custom', slug: null }));
+    expect(root.findAllByType(Image)).toHaveLength(0);
+    expect(placeholders(root)).toHaveLength(1);
   });
 });

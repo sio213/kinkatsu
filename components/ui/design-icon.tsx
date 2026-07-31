@@ -1,10 +1,17 @@
 import type { StyleProp, ViewStyle } from 'react-native';
 import Svg, { G, Path } from 'react-native-svg';
 
-/** viewBoxの中心。rotateを使うアイコンの回転中心（Material Symbolsは 0 -960 960 960 で統一） */
+/**
+ * rotateを使うアイコンの回転中心。Material Symbolsの 0 -960 960 960 の中心を指す固定値なので、
+ * rotateを付けられるのはそのviewBoxのアイコンだけ。別のviewBox（例: 線画の 0 0 24 24）に
+ * rotateを付けると画面外へ飛ぶ。増やすときはここをviewBoxから導出する形に変えること
+ */
 const VIEW_BOX_CENTER = '480, -480';
 
-// Claude Designからダウンロードした Material Symbols のSVGパス（viewBox: 0 -960 960 960 共通）。
+type IconDef = { viewBox: string; d: string; rotate?: number; outline?: boolean };
+
+// 基本は Claude Designからダウンロードした Material Symbols のSVGパス（viewBox: 0 -960 960 960、
+// 塗りで描く）。例外は各エントリのコメントを参照。
 // IconSymbol（SF Symbols/MaterialIconsのクロスプラットフォーム抽象化）で十分な汎用ナビゲーション
 // アイコン（戻る・⋮・検索等）はそちらを使い、DesignIconはデザインとのピクセル一致が必要な
 // ⋮メニュー内アイコンなど限定的な用途にのみ使う。未使用のパスを増やさないよう使う分だけ追加する。
@@ -128,7 +135,22 @@ const ICONS = {
     viewBox: '0 -960 960 960',
     d: 'M560-80q-83 0-156-31.5T277-197q-54-54-85.5-127T160-480q0-83 31.5-156T277-763q54-54 127-85.5T560-880q40 0 78 9.5t75 24.5q9 4 13.5 12t4.5 16q0 7-2.5 12.5T720-795q-74 57-117 139t-43 176q0 94 41.5 176T718-165q6 5 9 10.5t3 12.5q0 8-4.5 16T712-114q-36 15-74.5 24.5T560-80Z',
   },
-} as const;
+  // 素材が無い種目（カスタム種目）のプレースホルダー。種目詳細のメディア枠と一覧サムネイルで
+  // 共通に使う。他のアイコンと違いMaterial Symbolsではなく線画で、塗りではなくstrokeで描く
+  'dumbbell-outline': {
+    viewBox: '0 0 24 24',
+    d: 'M3 9.5v5 M6 7.5v9 M18 7.5v9 M21 9.5v5 M6 12h12',
+    outline: true,
+  },
+  // satisfiesにしているのは、エントリ側のtypo（outline→outlin等）を型エラーにするため。
+  // 型注釈なしのas constだと、未知のキーは推論に素通りして実行時に静かに塗りで描かれる
+} as const satisfies Record<string, IconDef>;
+
+/**
+ * 線画アイコンの線幅。viewBox基準の値なので、表示サイズに比例して太さも変わる（＝どのサイズでも
+ * 線幅と図形の比率は一定）。viewBoxの異なる線画アイコンを足すときはIconDef側へ移すこと
+ */
+const STROKE_WIDTH = 1.7;
 
 export type DesignIconName = keyof typeof ICONS;
 
@@ -143,8 +165,12 @@ export function DesignIcon({
   color: string;
   style?: StyleProp<ViewStyle>;
 }) {
-  const icon: { viewBox: string; d: string; rotate?: number } = ICONS[name];
-  const path = <Path d={icon.d} fill={color} />;
+  const icon: IconDef = ICONS[name];
+  const path = icon.outline ? (
+    <Path d={icon.d} fill="none" stroke={color} strokeWidth={STROKE_WIDTH} strokeLinecap="round" />
+  ) : (
+    <Path d={icon.d} fill={color} />
+  );
   return (
     <Svg width={size} height={size} viewBox={icon.viewBox} style={style}>
       {icon.rotate == null ? (
