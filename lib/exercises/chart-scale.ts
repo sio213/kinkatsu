@@ -35,6 +35,19 @@ const RANGE_PAD_RATIO = 0.3;
  * 最上段に来た点（白フチつき）とベストチップの置き場所として必要
  */
 const UPPER_PAD_RATIO = 0.35;
+/**
+ * 上に1段足した結果、窓のうちデータが乗らない部分がこの割合を超えるなら足さない。
+ *
+ * 足す目的は「最上段の点が線に張り付かない程度の隙間」というピクセル単位の要求で、5kg刻みなら
+ * +5kgで済む。ところが総重量の1,000kg刻みでは+1,000kg が足され、下端側の端数と合わせて窓の
+ * 4割が空くため、グラフ全体が下へ寄って見える。
+ *
+ * 刻みの粗さだけでは判定できない——60→75kg を5kg刻みで描く場合（デザイン案Y-1）も、
+ * 総重量を1,000kg刻みで描く場合も「窓は3段」で幾何学的には同じ形をしている。違うのは
+ * 窓のうちデータが占める割合の方なので、そちらで見る。描画範囲は RANGE_PAD_RATIO で目盛りの
+ * 外へ既に広がっているので、足すのをやめても点が線に張り付くことはない。
+ */
+const TOP_PAD_MAX_WASTE = 0.3;
 /** 素の自動スケールに戻すときの上下の余白（データ幅に対する割合） */
 const RAW_PAD_RATIO = 0.15;
 /** 丸め後の窓がデータ幅＋刻みこの段数を超えるなら、丸めをやめて素の自動スケールに戻す */
@@ -67,7 +80,13 @@ function roundedWindow(
 ): { lower: number; upper: number } {
   let lower = Math.floor(lo / step) * step;
   let upper = Math.ceil(hi / step) * step;
-  if (upper <= hi + step * UPPER_PAD_RATIO) upper += step;
+  // 既に十分な段数がある窓でだけ、無駄が大きくなる1段の追加を見送る。段数が足りない窓
+  // （全点同じ値・1件のみ）は下の最小レンジの保険が働く前なので、ここで見送ると上端に点が
+  // 張り付いたままになる
+  const paddedSpan = upper + step - lower;
+  const wasteful = (paddedSpan - (hi - lo)) / paddedSpan > TOP_PAD_MAX_WASTE;
+  const enoughSteps = (upper - lower) / step >= MIN_INTERVALS;
+  if (!(enoughSteps && wasteful) && upper <= hi + step * UPPER_PAD_RATIO) upper += step;
   // 全点が同じ値・記録1件のように窓が潰れるときだけ、最小レンジぶんまで下へ広げる保険。
   // わずかな差を画面いっぱいに拡大して見せないため。0以下に落ちるなら広げない
   while (upper - lower < minRange - EPS && lower - step > 0) lower -= step;

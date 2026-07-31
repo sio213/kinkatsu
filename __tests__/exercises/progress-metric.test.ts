@@ -258,6 +258,18 @@ describe('刻みの選び方（総重量・合計回数の値域）', () => {
     expect(s.ticks.length).toBeLessThanOrEqual(6);
   });
 
+  test('刻みが粗くても、上に1段足したせいでグラフが下へ寄らない', () => {
+    // 1,000kg刻みで上に1段（+1,000kg）足すと窓の4割が空き、線が窓の下半分に寄って見える。
+    // 5kg刻みなら+5kgで済む話なので、刻みの粗さではなく「窓のうちデータが乗らない割合」で見る
+    const v = [1540, 1382.5, 2000, 1810, 2935, 1752.5, 450, 1990, 1255];
+    const s = scaleOf(v, totalKg);
+    const lo = Math.min(...v);
+    const hi = Math.max(...v);
+    // データが描画範囲の6割以上を占め、最大値より上の空きが2割を超えない
+    expect((hi - lo) / (s.max - s.min)).toBeGreaterThan(0.6);
+    expect((s.max - hi) / (s.max - s.min)).toBeLessThan(0.2);
+  });
+
   test('合計回数（200〜1,000回）でも整数側のラダーが上がりきる', () => {
     const s = scaleOf([200, 500, 800, 1000], totalReps);
     expect(s.ticks.length).toBeLessThanOrEqual(6);
