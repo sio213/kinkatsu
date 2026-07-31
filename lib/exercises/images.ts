@@ -1,7 +1,11 @@
 import type { Exercise } from '@/db/schema';
 import { isPresetExercise } from './constants';
 
-export type ExerciseImages = { source?: number; thumbnail: number };
+// thumbnailがoptionalなのは、素材を持たない種目（ユーザーが追加したカスタム種目）を
+// 「画像なし」として表現するため。以前は他種目のサムネイルを仮に流用していたが、
+// 自作の種目に無関係な写真が出る誤情報になっていた。表示側はundefinedを受けたら
+// プレースホルダー（DesignIconのdumbbell-outline）を描く
+export type ExerciseImages = { source?: number; thumbnail?: number };
 
 const IMAGES: Record<string, { source: number; thumbnail: number }> = {
   dumbbell_curl: {
@@ -1242,13 +1246,13 @@ const IMAGES: Record<string, { source: number; thumbnail: number }> = {
   },
 };
 
-// 種目ごとのサムネイル素材がまだ揃っていないため、未用意の種目はこの画像を仮のサムネイルとして使う
-const PLACEHOLDER_THUMBNAIL = require('@/assets/exercise-media/bench_press_thumb.png');
-
+// presetの309種目はすべてIMAGESに登録済みなので、ここで未ヒットになるのは実質カスタム種目だけ。
+// ただしseed()はinsert/updateのみでdeleteしないため、過去のseedにあって今は消えたslugのpreset行が
+// 手元のDBに残ることがある。呼び出し側はsource/customではなく「画像の有無」で分岐すること
 export function getExerciseImages(exercise: Pick<Exercise, 'source' | 'slug'>): ExerciseImages {
   const entry = isPresetExercise(exercise) && exercise.slug ? IMAGES[exercise.slug] : undefined;
   return {
     source: entry?.source,
-    thumbnail: entry?.thumbnail ?? PLACEHOLDER_THUMBNAIL,
+    thumbnail: entry?.thumbnail,
   };
 }

@@ -1,5 +1,7 @@
 import { act, create } from 'react-test-renderer';
 import { Text, TouchableOpacity } from 'react-native';
+import { Image } from 'expo-image';
+import { Path } from 'react-native-svg';
 import { CalendarExerciseCard } from '@/components/calendar/calendar-exercise-card';
 import { Colors } from '@/constants/theme';
 
@@ -139,5 +141,25 @@ describe('CalendarExerciseCard', () => {
       const label = root.root.findByType(TouchableOpacity).props.accessibilityLabel as string;
       expect(label).toContain('+2.5kg');
     });
+  });
+});
+
+// ExerciseIdentity → ExerciseThumbnail 経由でサムネイルを出しているため、素材の有無の
+// 出し分けがこのカードまで届いていることを押さえる（カスタム種目に他種目の写真が出る回帰の防止）
+describe('サムネイル: 素材の有無', () => {
+  // カードには他のアイコン（塗りのMaterial Symbols）も載るため、線画＝fill無しで絞り込む
+  const placeholders = (root: ReturnType<typeof render>) =>
+    root.root.findAllByType(Path).filter((p) => p.props.fill === 'none');
+
+  it('preset種目は写真を出す', () => {
+    const root = render({ source: 'preset', slug: 'bench_press' });
+    expect(root.root.findAllByType(Image)).toHaveLength(1);
+    expect(placeholders(root)).toHaveLength(0);
+  });
+
+  it('カスタム種目は写真を出さず、プレースホルダーの線画にする', () => {
+    const root = render({ source: 'custom', slug: null });
+    expect(root.root.findAllByType(Image)).toHaveLength(0);
+    expect(placeholders(root)).toHaveLength(1);
   });
 });

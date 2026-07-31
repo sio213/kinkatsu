@@ -1,4 +1,5 @@
 import { ExerciseRecordTab } from '@/components/exercises/exercise-record-tab';
+import { DesignIcon } from '@/components/ui/design-icon';
 import { HeaderMenu, type DropdownMenuItem } from '@/components/ui/dropdown-menu';
 import { NotFoundState } from '@/components/ui/not-found-state';
 import { SectionGroup } from '@/components/ui/section-group';
@@ -31,6 +32,12 @@ const SCREEN_WIDTH = Dimensions.get('window').width;
  * 主要動線が初期状態で見えなくなるため、170pxが上限。
  */
 const MEDIA_HEIGHT = 170;
+
+/**
+ * 素材が無い種目のプレースホルダー。枠の高さに対して控えめな値にしている。
+ * 一覧サムネイル側は枠が小さいので別の値（exercise-thumbnail.tsx の PLACEHOLDER_ICON_SIZE）。
+ */
+const MEDIA_PLACEHOLDER_ICON_SIZE = 54;
 
 function FormPointsList({ points }: { points: string[] }) {
   return (
@@ -297,17 +304,31 @@ export function ExerciseDetailScreen({ insideTabBar = false }: Props) {
 
       <ScrollView contentContainerStyle={styles.content}>
         <View style={styles.mediaBox}>
-          {/* 素材の白背景をmediaBoxと同じ色にするため、乗算ブレンドのオーバーレイを重ねる。
-              isolationでこのViewを合成グループにして、背後のmediaBoxやお気に入りバッジまで
-              巻き込まないようにしている */}
-          <View style={styles.mediaTintGroup}>
-            {images.source != null ? (
-              <Mp4Player source={images.source} />
-            ) : (
-              <Image source={images.thumbnail} style={styles.mediaThumbnail} contentFit="contain" />
-            )}
-            <View style={styles.mediaTint} pointerEvents="none" />
-          </View>
+          {images.source == null && images.thumbnail == null ? (
+            /* 素材が無い種目（カスタム種目）。乗算ブレンドは素材の白背景を枠色に潰すための
+               ものなので、線画のプレースホルダーには掛けない（掛けると色が沈む） */
+            <DesignIcon
+              name="dumbbell-outline"
+              size={MEDIA_PLACEHOLDER_ICON_SIZE}
+              color={Colors.textPlaceholder}
+            />
+          ) : (
+            /* 素材の白背景をmediaBoxと同じ色にするため、乗算ブレンドのオーバーレイを重ねる。
+               isolationでこのViewを合成グループにして、背後のmediaBoxやお気に入りバッジまで
+               巻き込まないようにしている */
+            <View style={styles.mediaTintGroup}>
+              {images.source != null ? (
+                <Mp4Player source={images.source} />
+              ) : (
+                <Image
+                  source={images.thumbnail}
+                  style={styles.mediaThumbnail}
+                  contentFit="contain"
+                />
+              )}
+              <View style={styles.mediaTint} pointerEvents="none" />
+            </View>
+          )}
           <TouchableOpacity
             style={styles.favoriteBadge}
             onPress={handleFavoritePress}

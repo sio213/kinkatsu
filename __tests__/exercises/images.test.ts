@@ -13,27 +13,29 @@ function make(overrides: Partial<Exercise> = {}): Exercise {
 
 describe('getExerciseImages', () => {
   describe('source が preset 以外', () => {
-    it('custom → sourceなし、thumbnailはプレースホルダー', () => {
+    // カスタム種目に他種目の写真を出さないため、素材が無いことをundefinedで表す。
+    // 表示側（ExerciseThumbnail・種目詳細のメディア枠）がプレースホルダーに分岐する
+    it('custom → source・thumbnailともになし', () => {
       const result = getExerciseImages(make({ source: 'custom' }));
       expect(result.source).toBeUndefined();
-      expect(result.thumbnail).toBeDefined();
+      expect(result.thumbnail).toBeUndefined();
     });
   });
 
   describe('source が preset', () => {
-    it('存在しないslug → sourceなし、thumbnailはプレースホルダー', () => {
+    it('存在しないslug → source・thumbnailともになし', () => {
       const result = getExerciseImages(make({ slug: 'nonexistent_exercise' }));
       expect(result.source).toBeUndefined();
-      expect(result.thumbnail).toBeDefined();
+      expect(result.thumbnail).toBeUndefined();
     });
 
-    it('slugがnull → sourceなし、thumbnailはプレースホルダー', () => {
+    it('slugがnull → source・thumbnailともになし', () => {
       const result = getExerciseImages(make({ slug: null }));
       expect(result.source).toBeUndefined();
-      expect(result.thumbnail).toBeDefined();
+      expect(result.thumbnail).toBeUndefined();
     });
 
-    it('ダンベルカール → source あり、thumbnail はプレースホルダーで補完', () => {
+    it('ダンベルカール → source と thumbnail 両方あり', () => {
       const result = getExerciseImages(make({ slug: 'dumbbell_curl', name: 'ダンベルカール' }));
       expect(result.source).toBeDefined();
       expect(result.thumbnail).toBeDefined();
