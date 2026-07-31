@@ -54,6 +54,7 @@ function render(points: ProgressPoint[]) {
     series,
     // 既定は最大重量（ベスト）指標なので、選択中の系列とベスト系列は同じもの
     bestSeries: series,
+    recordDays: points,
     chartMeasurementType: 'weight_reps',
     metric: 'best',
     loaded: true,
@@ -190,6 +191,7 @@ describe('指標の切り替え', () => {
     mockUseExerciseProgress.mockImplementation((_id, _type, metric) => ({
       series: metric === 'total' ? totalSeries : bestSeries,
       bestSeries,
+      recordDays: points,
       chartMeasurementType,
       metric,
       loaded: true,

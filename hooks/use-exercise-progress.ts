@@ -4,8 +4,10 @@ import type { MeasurementType } from '@/lib/exercises/constants';
 import {
   availableProgressMetrics,
   buildProgressSeries,
+  buildRecordDays,
   resolveChartMeasurementType,
   type ProgressMetric,
+  type ProgressPoint,
   type ProgressSeries,
 } from '@/lib/exercises/progress';
 import { eq } from 'drizzle-orm';
@@ -42,6 +44,11 @@ export function useExerciseProgress(
    * 指標の系列で「記録が0件か」を判定すると、記録があるのに空状態が出てしまう
    */
   bestSeries: ProgressSeries;
+  /**
+   * 過去の記録一覧・「すべての記録」画面に並べる日。**系列と違い、値が置けない日も落とさない。**
+   * 加重種目を加重なしでやった日はグラフに点を置けないが、やった事実は一覧に残す
+   */
+  recordDays: ProgressPoint[];
   /**
    * グラフ上でこの種目を何の計測タイプとして扱っているか。指標チップの文言もこれで決まる。
    * 重量を1度も記録していない加重種目は 'reps' が返る（resolveChartMeasurementType 参照）
@@ -99,6 +106,11 @@ export function useExerciseProgress(
     [chartMeasurementType, metric],
   );
 
+  const recordDays = useMemo(
+    () => buildRecordDays(chartMeasurementType, rows),
+    [chartMeasurementType, rows],
+  );
+
   const bestSeries = useMemo(
     () => buildProgressSeries(chartMeasurementType, rows, 'best'),
     [chartMeasurementType, rows],
@@ -114,6 +126,7 @@ export function useExerciseProgress(
   return {
     series,
     bestSeries,
+    recordDays,
     chartMeasurementType,
     metric: effectiveMetric,
     // useLiveQueryのdataは解決前から[]で、undefinedにはならない。`data !== undefined`だと

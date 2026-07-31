@@ -3,6 +3,7 @@ import { estimateOneRepMax } from '@/lib/exercises/one-rep-max';
 import {
   formatHistoryDuration,
   isEnteredWeight,
+  pickRepresentativeSet,
   primaryMetric,
   secondaryMetric,
   type SetLike,
@@ -260,27 +261,7 @@ export function buildProgressSeries(
   rows: ProgressSetRow[],
   metric: ProgressMetric = 'best',
 ): ProgressSeries {
-  const byDay = new Map<number, { startedAt: number; sets: ProgressSet[] }>();
-  for (const row of rows) {
-    const dayKey = toDayKey(row.startedAt);
-    const day = byDay.get(dayKey);
-    const set: ProgressSet = {
-      sessionId: row.sessionId,
-      workoutSessionExerciseId: row.workoutSessionExerciseId,
-      setNumber: row.setNumber,
-      weight: row.weight,
-      reps: row.reps,
-      durationSeconds: row.durationSeconds,
-      distanceMeters: row.distanceMeters,
-      completedAt: row.completedAt,
-    };
-    if (day) {
-      day.sets.push(set);
-      // rowsは昇順なので、既にある値の方が必ず早い。startedAtは更新しない
-    } else {
-      byDay.set(dayKey, { startedAt: row.startedAt, sets: [set] });
-    }
-  }
+  const byDay = groupByDay(rows);
 
   // 値の置けない日は落とす。落ちる条件は指標ごとに違う——主指標が全セットnullの日（値の無い
   // セットだけを✓した）はどの指標でも落ちるが、推定1RMは13回以上のセットしか無い日も落ちる。
@@ -310,6 +291,70 @@ export function buildProgressSeries(
       sets: d.sets,
     })),
   };
+}
+
+type DayGroup = { startedAt: number; sets: ProgressSet[] };
+
+/** 行を日ごとにまとめる。同じ日に複数セッション・複数カードがあれば1つに連結される */
+function groupByDay(rows: ProgressSetRow[]): Map<number, DayGroup> {
+  const byDay = new Map<number, DayGroup>();
+  for (const row of rows) {
+    const dayKey = toDayKey(row.startedAt);
+    const day = byDay.get(dayKey);
+    const set: ProgressSet = {
+      sessionId: row.sessionId,
+      workoutSessionExerciseId: row.workoutSessionExerciseId,
+      setNumber: row.setNumber,
+      weight: row.weight,
+      reps: row.reps,
+      durationSeconds: row.durationSeconds,
+      distanceMeters: row.distanceMeters,
+      completedAt: row.completedAt,
+    };
+    if (day) {
+      day.sets.push(set);
+      // rowsは昇順なので、既にある値の方が必ず早い。startedAtは更新しない
+    } else {
+      byDay.set(dayKey, { startedAt: row.startedAt, sets: [set] });
+    }
+  }
+  return byDay;
+}
+
+/**
+ * 過去の記録一覧・「すべての記録」画面に並べる日。**グラフの系列と違い、値が置けない日も落とさない。**
+ *
+ * 加重種目を加重なしでやった日は、主指標（重量）が無いのでグラフには点を置けない。それは
+ * 妥当だが、同じ理由で記録一覧からも消えると「記録できていなかったのでは」と不安になる
+ * （記録編集画面にだけ残っている状態になる）。一覧はやった事実を並べる場所なので、
+ * 加重の有無に関わらず出す。
+ *
+ * 一覧のカードは日付・セット・遷移先のsessionIdしか読まないので、値が0でも表示は成立する。
+ */
+export function buildRecordDays(
+  measurementType: MeasurementType,
+  rows: ProgressSetRow[],
+): ProgressPoint[] {
+  const days: ProgressPoint[] = [];
+  for (const [dateKey, day] of groupByDay(rows)) {
+    const completed = day.sets.filter(isCompleted);
+    if (completed.length === 0) continue;
+    // 代表セットは遷移先のsessionIdを持つためだけに要る。重量のある日は最強のセット、
+    // 自重だけの日は主指標を問わず選び、それも決まらなければ最初の✓確定セットに落とす
+    const best =
+      pickBestSet(measurementType, day.sets) ??
+      pickRepresentativeSet(measurementType, completed) ??
+      completed[0];
+    days.push({
+      dateKey,
+      startedAt: day.startedAt,
+      // 一覧は値を読まない。自己ベストの判定はグラフ側の系列で行うので0で構わない
+      value: primaryValue(measurementType, best) ?? 0,
+      best,
+      sets: day.sets,
+    });
+  }
+  return days.sort((a, b) => a.dateKey - b.dateKey);
 }
 
 /**
