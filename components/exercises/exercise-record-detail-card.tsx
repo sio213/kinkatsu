@@ -221,7 +221,9 @@ export function ExerciseRecordDetailCard({
   const numberCell = useColumnWidth(positions);
   const valueCell = useColumnWidth(positions);
 
-  const headerLabel = [dateLabel, relativeLabel, isPersonalBest && '自己ベスト']
+  // 読み上げの語も画面のバッジと揃える。目には「ベスト」と出ているのに「自己ベスト」と
+  // 読まれると、同じものを指しているのか確かめられない
+  const headerLabel = [dateLabel, relativeLabel, isPersonalBest && 'ベスト']
     .filter(Boolean)
     .join('、');
 
@@ -255,7 +257,7 @@ export function ExerciseRecordDetailCard({
             （日付が長い月で1行に収まらなくなるため。デザイン案） */}
         {isPersonalBest && (
           <View style={styles.personalBestRow}>
-            <BestBadge label="自己ベスト" />
+            <BestBadge />
           </View>
         )}
 

@@ -21,6 +21,7 @@ jest.mock('@/lib/workout/session', () => ({
 }));
 
 import { ExerciseProgressChart } from '@/components/exercises/exercise-progress-chart';
+import { ExerciseRecordDetailCard } from '@/components/exercises/exercise-record-detail-card';
 import { ExerciseRecordTab } from '@/components/exercises/exercise-record-tab';
 import type { ProgressPoint, ProgressSet } from '@/lib/exercises/progress';
 import { toDayKey } from '@/lib/exercises/progress';
@@ -78,6 +79,15 @@ function render(points: ProgressPoint[]) {
 const allTexts = (root: ReactTestInstance) =>
   root.findAllByType(Text).map((t) => [t.props.children].flat().join(''));
 
+/**
+ * 内訳カードの中だけを見る。ベストバッジの語が過去の記録一覧のバッジと同じ「ベスト」なので、
+ * 画面全体のテキストから探すと一覧側のバッジを拾ってしまう（2026-07-31 の語の統一以降）
+ */
+const detailCardTexts = (root: ReactTestInstance) => {
+  const cards = root.findAllByType(ExerciseRecordDetailCard);
+  return cards.length === 0 ? [] : allTexts(cards[0]);
+};
+
 const pressChip = (root: ReactTestInstance, label: string) => {
   const chip = root.findAllByType(TouchableOpacity).find((t) => t.props.accessibilityLabel === label)!;
   act(() => {
@@ -106,13 +116,13 @@ describe('ExerciseRecordTab', () => {
     const root = render(points);
 
     // 既定の3ヶ月では80kgの日は期間外。初期選択は最新の点（65kg）なのでバッジは出ない
-    expect(allTexts(root)).not.toContain('自己ベスト');
+    expect(detailCardTexts(root)).not.toContain('ベスト');
 
     // 期間内の最大（70kg）を選んでもベストではない。ここでフィルタ後のpointsで
     // findBestIndexしてしまうと70kgがベスト扱いになり、このテストが落ちる
     selectPoint(root, 0);
     expect(allTexts(root)).toContain('70');
-    expect(allTexts(root)).not.toContain('自己ベスト');
+    expect(detailCardTexts(root)).not.toContain('ベスト');
   });
 
   test('グラフに渡す自己ベストも期間チップに連動しない', () => {
@@ -136,7 +146,7 @@ describe('ExerciseRecordTab', () => {
 
     selectPoint(root, 0);
     expect(allTexts(root)).toContain('80');
-    expect(allTexts(root)).toContain('自己ベスト');
+    expect(detailCardTexts(root)).toContain('ベスト');
   });
 
   describe('グラフの読み上げ', () => {

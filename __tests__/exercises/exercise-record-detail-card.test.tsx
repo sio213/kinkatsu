@@ -116,13 +116,15 @@ describe('ExerciseRecordDetailCard', () => {
     expect(styleOf(root, '75').fontSize).toBeGreaterThan(styleOf(root, '60').fontSize);
   });
 
+  // 語は他のバッジ（カレンダー・記録サマリー）とグラフのチップ「★ ベスト 75kg」に揃えて
+  // 「ベスト」。同じ画面で「自己ベスト」と「ベスト」が混在していたのを統一した
   test('自己ベストの日だけアンバーのバッジが独立した行に出る', () => {
     const best = render([60, 75], true).root;
-    expect(texts(best)).toContain('自己ベスト');
+    expect(texts(best)).toContain('ベスト');
     // 読み上げでもバッジの存在が分かるようにカードのラベルにも含める
-    expect(best.findAllByType(TouchableOpacity)[0].props.accessibilityLabel).toContain('自己ベスト');
+    expect(best.findAllByType(TouchableOpacity)[0].props.accessibilityLabel).toContain('ベスト');
 
-    expect(texts(render([60, 75], false).root)).not.toContain('自己ベスト');
+    expect(texts(render([60, 75], false).root)).not.toContain('ベスト');
   });
 
   test('✓未確定のセットは値を出さず「未実施」を値の列に置く', () => {
