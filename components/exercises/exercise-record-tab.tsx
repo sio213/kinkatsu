@@ -110,14 +110,20 @@ export function ExerciseRecordTab({ exerciseId, exerciseName, measurementType, i
       });
     }
     // 加重種目を加重なしでやった日は点を置けない。一覧の件数とグラフの点数がズレる理由になるので、
-    // 「データが抜けている」と誤解されないよう、消えたのではなく一覧に残っていることを伝える
+    // 「データが抜けている」と誤解されないよう、消えたのではなく一覧に残っていることを伝える。
+    //
+    // 判定は**表示中の期間で**行う。全期間で比べると、自重の日が期間の外にしか無いとき——
+    // 画面上はどこにも抜けが無いのに——注記だけが出てしまう
     const isWeightBased =
       chartMeasurementType === 'weight_reps' || chartMeasurementType === 'weight_time';
-    if (isWeightBased && recordDays.length > bestSeries.points.length) {
+    const droppedInPeriod =
+      filterProgressPoints(recordDays, period).length >
+      filterProgressPoints(bestSeries.points, period).length;
+    if (isWeightBased && droppedInPeriod) {
       list.push({ lead: '自重の日', body: 'グラフには点を出しません。記録は下の一覧に残ります' });
     }
     return list;
-  }, [metric, chartMeasurementType, recordDays.length, bestSeries.points.length]);
+  }, [metric, chartMeasurementType, recordDays, bestSeries.points, period]);
 
   const highlight = useMemo(() => findPersonalBest(series.points), [series.points]);
   // 内訳カードのバッジは選択中の指標に関係なく、実測の自己ベスト（ベスト系列の最高点）を指す
