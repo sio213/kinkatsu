@@ -48,6 +48,31 @@ const SELECTED_LINE_DASH = '3 3';
 const SELECTED_LINE_OPACITY = 0.55;
 
 /**
+ * 集計系の指標（総重量・推定1RM・合計回数など）を選択中の最高点に重ねる印（FIX-16）。
+ *
+ * 最高値を計算しているのに、アンバーと★を実測の自己ベスト専用と決めた結果（FIX-10）、
+ * 集計系では最高点が通常のマーカーと1pxも変わらない状態だった。アンバーを流用せず——
+ * 総重量の最高は「軽い重量×高回数で本数を積んだ日」が、推定1RMの最高は計算式のクセで
+ * 高回数の日が取ることがあり、「達成」の色を付けると次回の重量設定を誤らせる——
+ * 同じブルーの輪で印を付ける。
+ *
+ * 白い円は輪の下敷き。全期間（60点でマーカーが間引かれる状態）でも輪が折れ線から
+ * 切り離されて読めるようにするためのもので、選択中は描かない（下に選択のハローがあり、
+ * 白で塗るとハローを消してしまう）。
+ */
+const METRIC_MAX_BACKING_RADIUS = 8.5;
+const METRIC_MAX_RING_RADIUS = 7;
+const METRIC_MAX_RING_WIDTH = 1.4;
+
+/** チップの左端に置く輪のグリフ。点の印と対にするため、★と同じ位置・同じ大きさ感で描く（FIX-16） */
+const CHIP_GLYPH_OFFSET_X = 13;
+const CHIP_GLYPH_RING_RADIUS = 4.6;
+const CHIP_GLYPH_INNER_RADIUS = 1.7;
+const CHIP_GLYPH_STROKE_WIDTH = 1.3;
+/** グリフ（★・輪）を避けたテキストの開始位置。どちらの印でも同じ位置から書き始める */
+const CHIP_TEXT_OFFSET_X = 22;
+
+/**
  * ハイライト点の見た目。属性ごとに「選択が優先」「種類が優先」と条件が違って読めなくなるため、
  * 4通りを表にして持つ。アンバーの塗りは実測の自己ベスト専用（FIX-10）
  */
@@ -322,14 +347,36 @@ export function ExerciseProgressChart({
 
             {/* ハイライトの点はマーカーの間引きに関係なく必ず描く。「最高の日がどこか」は
                 点が密になっても消してはいけないため、これは指標に関係なく守る。
-                見た目は HIGHLIGHT_DOT の表のとおり——アンバーの塗りは自己ベスト専用で、
-                他の指標では通常のマーカーと同じ見た目で置く（FIX-10） */}
+                見た目は HIGHLIGHT_DOT の表のとおり——アンバーの塗りは自己ベスト専用（FIX-10）。
+                集計系の指標では代わりにブルーの輪を重ねる（FIX-16）。下から白い円・輪・
+                通常のマーカーの順で、未選択なら2重円、選択中はハローが加わって3重円になる
+                （通常の選択点は2重円なので形で区別が付く） */}
             {layout.highlightIndex != null && (
-              <Circle
-                cx={layout.points[layout.highlightIndex].x}
-                cy={layout.points[layout.highlightIndex].y}
-                {...HIGHLIGHT_DOT[highlightKind][highlightSelected ? 'selected' : 'base']}
-              />
+              <>
+                {!isPersonalBest && !highlightSelected && (
+                  <Circle
+                    cx={layout.points[layout.highlightIndex].x}
+                    cy={layout.points[layout.highlightIndex].y}
+                    r={METRIC_MAX_BACKING_RADIUS}
+                    fill={Colors.surface}
+                  />
+                )}
+                {!isPersonalBest && (
+                  <Circle
+                    cx={layout.points[layout.highlightIndex].x}
+                    cy={layout.points[layout.highlightIndex].y}
+                    r={METRIC_MAX_RING_RADIUS}
+                    fill="none"
+                    stroke={Colors.accent}
+                    strokeWidth={METRIC_MAX_RING_WIDTH}
+                  />
+                )}
+                <Circle
+                  cx={layout.points[layout.highlightIndex].x}
+                  cy={layout.points[layout.highlightIndex].y}
+                  {...HIGHLIGHT_DOT[highlightKind][highlightSelected ? 'selected' : 'base']}
+                />
+              </>
             )}
 
             {bestChip && (
@@ -345,15 +392,41 @@ export function ExerciseProgressChart({
                   stroke={isPersonalBest ? Colors.warningBorder : Colors.border}
                   strokeWidth={1}
                 />
-                {/* ★も自己ベスト専用。他の指標では記号を持たず、文字だけの控えめなチップにする */}
-                {isPersonalBest && (
+                {/* ★は自己ベスト専用。集計系の指標では代わりに点と同じ輪のグリフを、
+                    ★と同じ位置に置く（FIX-16）。点だけ・チップだけの片方に印が付くと、
+                    「実測ベスト＝塗り＋★／指標の最高＝輪＋輪」の対応が崩れる */}
+                {isPersonalBest ? (
                   <Polygon
-                    points={starPoints(bestChip.x + 13, bestChip.y + bestChip.height / 2, 5.2, 2.3)}
+                    points={starPoints(
+                      bestChip.x + CHIP_GLYPH_OFFSET_X,
+                      bestChip.y + bestChip.height / 2,
+                      5.2,
+                      2.3,
+                    )}
                     fill={Colors.chartBest}
                   />
+                ) : (
+                  <>
+                    <Circle
+                      cx={bestChip.x + CHIP_GLYPH_OFFSET_X}
+                      cy={bestChip.y + bestChip.height / 2}
+                      r={CHIP_GLYPH_RING_RADIUS}
+                      fill="none"
+                      stroke={Colors.accent}
+                      strokeWidth={CHIP_GLYPH_STROKE_WIDTH}
+                    />
+                    <Circle
+                      cx={bestChip.x + CHIP_GLYPH_OFFSET_X}
+                      cy={bestChip.y + bestChip.height / 2}
+                      r={CHIP_GLYPH_INNER_RADIUS}
+                      fill={Colors.surface}
+                      stroke={Colors.accent}
+                      strokeWidth={CHIP_GLYPH_STROKE_WIDTH}
+                    />
+                  </>
                 )}
                 <SvgText
-                  x={bestChip.x + (isPersonalBest ? 22 : 10)}
+                  x={bestChip.x + CHIP_TEXT_OFFSET_X}
                   y={bestChip.y + bestChip.height / 2 + 3.6}
                   fontSize={BEST_CHIP_FONT_SIZE}
                   fontWeight="700"
