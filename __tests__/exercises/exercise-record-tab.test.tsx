@@ -241,7 +241,7 @@ describe('指標の切り替え', () => {
 
   test('推定1RMを選んだときだけ注記が出る', () => {
     const root = renderWithMetrics();
-    const hasCaption = () => allTexts(root).some((t) => t.includes('実測ではありません'));
+    const hasCaption = () => allTexts(root).some((t) => t.includes('1回だけ挙げられる重量'));
     expect(hasCaption()).toBe(false);
 
     pressChip(root, '推定1RM');

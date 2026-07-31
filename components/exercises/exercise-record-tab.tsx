@@ -106,7 +106,7 @@ export function ExerciseRecordTab({ exerciseId, exerciseName, measurementType, i
     if (metric === 'e1rm') {
       list.push({
         lead: '推定1RM',
-        body: `挙げた重量と回数からの計算値です（${ONE_REP_MAX_REP_LIMIT}回以下のセットから算出／実測ではありません）`,
+        body: `1回だけ挙げられる重量の目安です。重量×回数から計算しています（${ONE_REP_MAX_REP_LIMIT}回以下のセットのみ）`,
       });
     }
     // 加重種目を加重なしでやった日は点を置けない。一覧の件数とグラフの点数がズレる理由になるので、
