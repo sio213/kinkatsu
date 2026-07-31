@@ -20,12 +20,15 @@ type PresetExercise = {
    *     「ダンベルでもバーベルでも自重でもやる」ものは器具が確定しないので付けない
    *     （付けるとバーベルでやっている人の総重量まで倍になる）
    *
-   * (b) 1レップで左右2つ分の重量が動く＝両手同時に挙げる。1個を両手で持つ種目
-   *     （ダンベルプルオーバー・ゴブレットスクワット）と、1個しか持たないワンハンド系は外れる。
-   *     **片腕ずつ交互に挙げる種目も外す**——クロスボディハンマーカールのような交互種目は、
-   *     入力された「10回」が片腕10回か左右合計10回かが人によって違い、2倍が正しいとは
-   *     限らないため。ハンマーカールは両手同時が標準なので対象に含む（交互にやるものは
-   *     「オルタネイトハンマーカール」と別名で呼ばれる）
+   * (b) 左右に1個ずつ、別々の重量を扱う。1個を両手で持つ種目（ダンベルプルオーバー・
+   *     ゴブレットスクワット・スパイダーカール）と、1個しか持たないワンハンド系は外れる。
+   *
+   * **交互か同時かは問わない。** 一度は「片腕ずつ交互に挙げる種目は回数の意味が曖昧
+   * （10回が片腕10回か左右合計10回か分からない）」として外そうとしたが、収録済みの動画を
+   * 見ると同じダンベルカールでも通常版は同時・インクライン版は交互、ハンマーカールは交互、
+   * プリーチャーハンマーカールは同時と、素材ごとにばらばらだった。この軸だと動画の見た目と
+   * 2倍の可否が食い違い、ユーザーには説明がつかない。交互種目でも「10回」は片腕10回の
+   * つもりで入力するのが実情なので、結局2倍が実態に合う（2026-07-31 決定）。
    *
    * ダンベルランジは片脚ずつ動くが、両手に1個ずつ持つので(b)を満たす——見るのは脚ではなく
    * 「入力した重量の器具がいくつ動いたか」
@@ -91,6 +94,9 @@ export const PRESET_EXERCISES: PresetExercise[] = [
   { slug: 'single_arm_dumbbell_shoulder_press', name: 'シングルアームダンベルショルダープレス', category: 'shoulder', measurementType: 'weight_reps' },
   { slug: 'plate_front_raise', name: 'プレートフロントレイズ', category: 'shoulder', measurementType: 'weight_reps' },
   { slug: 'lu_raise', name: 'ルーレイズ', category: 'shoulder', measurementType: 'weight_reps', pairedWeights: true },
+  // 収録済みの動画はケーブル版（左右2本を別々に引く）。ダンベルではないが「左右に1個ずつ
+  // 別々の重量を扱う」点は同じなので付けたままにしてある。ケーブル種目全体を対象にするか
+  // 決めるときに、この1件だけ先行している状態を見直すこと
   { slug: 'y_raise', name: 'Yレイズ', category: 'shoulder', measurementType: 'weight_reps', pairedWeights: true },
   { slug: 'cuban_press', name: 'キューバンプレス', category: 'shoulder', measurementType: 'weight_reps', pairedWeights: true },
   { slug: 'scott_press', name: 'スコットプレス', category: 'shoulder', measurementType: 'weight_reps', pairedWeights: true },
@@ -137,12 +143,12 @@ export const PRESET_EXERCISES: PresetExercise[] = [
   { slug: 'wrist_curl', name: 'リストカール', category: 'arm', measurementType: 'weight_reps' },
   { slug: 'reverse_wrist_curl', name: 'リバースリストカール', category: 'arm', measurementType: 'weight_reps' },
   { slug: 'farmers_walk', name: 'ファーマーズウォーク', category: 'arm', measurementType: 'weight_time' },
-  { slug: 'preacher_hammer_curl', name: 'プリーチャーハンマーカール', category: 'arm', measurementType: 'weight_reps' },
+  { slug: 'preacher_hammer_curl', name: 'プリーチャーハンマーカール', category: 'arm', measurementType: 'weight_reps', pairedWeights: true },
   { slug: 'machine_preacher_curl', name: 'マシンプリーチャーカール', category: 'arm', measurementType: 'weight_reps' },
   { slug: 'cable_rope_hammer_curl', name: 'ケーブルロープハンマーカール', category: 'arm', measurementType: 'weight_reps' },
   { slug: 'curl_21s', name: '21カール', category: 'arm', measurementType: 'weight_reps' },
   { slug: 'waiter_curl', name: 'ウェイターカール', category: 'arm', measurementType: 'weight_reps' },
-  { slug: 'cross_body_hammer_curl', name: 'クロスボディハンマーカール', category: 'arm', measurementType: 'weight_reps' },
+  { slug: 'cross_body_hammer_curl', name: 'クロスボディハンマーカール', category: 'arm', measurementType: 'weight_reps', pairedWeights: true },
   { slug: 'single_arm_dumbbell_curl', name: 'シングルアームダンベルカール', category: 'arm', measurementType: 'weight_reps' },
   { slug: 'band_curl', name: 'バンドカール', category: 'arm', measurementType: 'reps' },
   { slug: 'single_arm_triceps_pushdown', name: 'シングルアームトライセプスプレスダウン', category: 'arm', measurementType: 'weight_reps' },
