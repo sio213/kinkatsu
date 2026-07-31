@@ -218,7 +218,7 @@ describe('刻みの選び方（総重量・合計回数の値域）', () => {
   const totalKg = { label: 'kg', step: 100, minRange: 200, integerOnly: false, auxKind: 'none' } as const;
   const totalReps = { label: '回', step: 20, minRange: 20, integerOnly: true, auxKind: 'none' } as const;
 
-  const scaleOf = (values: number[], unit: typeof totalKg | typeof totalReps) =>
+  const scaleOf = (values: number[], unit: Parameters<typeof computeChartScale>[1]) =>
     computeChartScale(values, unit);
 
   test('総重量の常用レンジ（1,500〜1,900kg）でグリッドが増えすぎず、下端も0に落ちない', () => {
@@ -234,6 +234,28 @@ describe('刻みの選び方（総重量・合計回数の値域）', () => {
     const s = scaleOf([8000, 9500, 11000, 12500], totalKg);
     expect(s.ticks.length).toBeLessThanOrEqual(6);
     expect(s.step).toBeGreaterThanOrEqual(1000);
+  });
+
+  test('軽い日が混ざって幅が広くても、線が増えすぎず目盛りはきりのいい値のまま', () => {
+    // ベンチプレスの総重量の実データ。450kgの日が1つ混ざるだけで、0を避けようとして
+    // 刻みが250kgで止まりグリッドが13本引かれていた
+    const s = scaleOf([1540, 1382.5, 2000, 1810, 2935, 1752.5, 450, 1990, 1255], totalKg);
+    expect(s.ticks.length).toBeLessThanOrEqual(6);
+    // 半端な目盛り（素の自動スケール）に落とさず、きりのいい値で刻む
+    expect(s.ticks.every((t) => Number.isInteger(t) && t % s.step === 0)).toBe(true);
+  });
+
+  test('0起点を避けられるデータでは従来どおり下端を0より上に保つ', () => {
+    // 30→102.5kg のような「まっとうな重量の伸び」まで0起点にしないこと（デザイン案Y-7）
+    const s = scaleOf([30, 45, 60, 72.5, 85, 95, 102.5], {
+      label: 'kg',
+      step: 5,
+      minRange: 10,
+      integerOnly: false,
+      auxKind: 'reps',
+    });
+    expect(s.ticks[0]).toBeGreaterThan(0);
+    expect(s.ticks.length).toBeLessThanOrEqual(6);
   });
 
   test('合計回数（200〜1,000回）でも整数側のラダーが上がりきる', () => {
