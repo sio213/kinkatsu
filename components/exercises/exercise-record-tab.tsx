@@ -109,6 +109,15 @@ export function ExerciseRecordTab({
   //
   // 最大○○（ベスト）指標のときだけ、これが「自己ベスト」——アンバーの点と★のチップになる。
   // 総重量・推定1RMでは単にその指標の最高値なので、色も★も持たせない（FIX-10）
+  // いま画面に出ている総重量が左右2つ分になっているか。グラフ下の注記と内訳カードの補足で
+  // 同じ判定を使う（片方だけ出ると、説明のある画面と無い画面が同居してしまう）。
+  //
+  // 生のmeasurementTypeではなくchartMeasurementTypeで判定すること。重量を1度も入れていない
+  // 種目は reps 扱いになり、総重量チップの中身が「合計回数」に変わる——回数は左右で2倍に
+  // ならないので、そこで説明を出すと誤りになる
+  const showsPairedTotal =
+    metric === 'total' && pairedWeights && chartMeasurementType === 'weight_reps';
+
   // グラフ下の注記。「太字の語＝説明」の形に揃え、当てはまるものを上から並べる
   const captions = useMemo(() => {
     const list: { lead: string; body: string }[] = [];
@@ -126,15 +135,14 @@ export function ExerciseRecordTab({
       // 内訳カードのセット行には「10kg × 10回」と片手の重量が出ているのに、合計だけ2倍になる。
       // 放置すると計算ミスに見えるので、数え方と具体例の両方を置く。
       //
-      // 生のmeasurementTypeではなくchartMeasurementTypeで判定すること。重量を1度も入れていない
-      // 種目は reps 扱いになり、総重量チップの中身が「合計回数」に変わる——回数は左右で2倍に
-      // ならないので、そこにこの注記を出すと誤りになる。
-      //
       // 点が1つも無い期間では出さない。2倍になった数字がどこにも見えていない場所で数え方だけ
       // 説明されても手がかりにならず、「この期間＝記録がありません」と並んで3行目まで積み上がる
       // （@designer指摘）。内訳カードが値行を出さない条件（FIX-13）と同じ考え方
-      if (!nothingToPlot && metric === 'total' && pairedWeights && chartMeasurementType === 'weight_reps') {
-        list.push({ lead: '総重量', body: '左右2つ分の合計です（10kg×10回なら200kg）' });
+      if (!nothingToPlot && showsPairedTotal) {
+        // 括弧は既存の注記では「（12回以下のセットのみ）」のように条件の限定に使っている。
+        // ここだけ例示に使うので、「10kg×10回のときだけ2倍」と条件に読まれないよう
+        // 「例:」で役割を明示する（@designer指摘）
+        list.push({ lead: '総重量', body: '左右2つ分の合計です（例: 10kg×10回なら200kg）' });
       }
     }
     // 加重種目を加重なしでやった日は点を置けない。一覧の件数とグラフの点数がズレる理由になるので、
@@ -156,7 +164,7 @@ export function ExerciseRecordTab({
   }, [
     metric,
     chartMeasurementType,
-    pairedWeights,
+    showsPairedTotal,
     recordDays,
     bestSeries.points,
     period,
@@ -246,6 +254,9 @@ export function ExerciseRecordTab({
                       label: metricLabel,
                       value: formatTickValue(selectedPoint.value),
                       unit: series.unit.label,
+                      // 2倍になった数字と食い違うセット行が同じカードに並ぶので、理由を数字の
+                      // すぐ隣にも置く。グラフ下の注記はスクロールで視野から外れうる
+                      note: showsPairedTotal ? '(左右合計)' : undefined,
                     }
               }
               onPressOpen={(sessionId) => push(`/workout/${sessionId}`)}

@@ -39,7 +39,17 @@ type Props = {
    * 選択中の指標の値を出す行（「総重量 1,645 kg」）。最大○○を選んでいるときはnull——
    * その値はセット行の太字と自己ベストバッジで既に読めるため出さない（FIX-13）
    */
-  metricRow: { label: string; value: string; unit: string } | null;
+  metricRow: {
+    label: string;
+    value: string;
+    unit: string;
+    /**
+     * ラベルに添える補足（「(左右合計)」）。セット行には片手の重量が出ているのに総重量だけが
+     * 2倍になる種目で、その理由を数字と同じ場所に置くために使う。グラフ下の注記だけだと
+     * スクロールで視野から外れ、カードの中に食い違う数字だけが残る（@designer指摘）
+     */
+    note?: string;
+  } | null;
   /** 見出し右端の > を押したとき。その日の記録編集画面へ遷移する */
   onPressOpen: (sessionId: number) => void;
 };
@@ -225,7 +235,9 @@ export function ExerciseRecordDetailCard({
       accessibilityLabel={
         `${headerLabel}の記録。${describeSets(cells, comparison?.label ?? null)}` +
         // 晴眼者に見えている指標の値が読み上げから落ちないよう、カードのラベルに畳んで足す
-        (metricRow ? `、${metricRow.label} ${metricRow.value}${metricRow.unit}` : '')
+        (metricRow
+          ? `、${metricRow.label}${metricRow.note ? ` ${metricRow.note}` : ''} ${metricRow.value}${metricRow.unit}`
+          : '')
       }
       accessibilityHint="タップするとこの日の記録を編集できます"
     >
@@ -281,7 +293,10 @@ export function ExerciseRecordDetailCard({
             カードの高さは伸縮するが、動くのはこのカードから下だけなので許容する（FIX-13） */}
         {metricRow && (
           <View style={styles.metricRow}>
-            <Text style={styles.metricLabel}>{metricRow.label}</Text>
+            <Text style={styles.metricLabel}>
+              {metricRow.label}
+              {metricRow.note && <Text style={styles.metricNote}> {metricRow.note}</Text>}
+            </Text>
             {/* 単位はセット行と同じく値より一段弱く置く。値だけを太字で強調する */}
             <View style={styles.metricValueGroup}>
               <Text style={styles.metricValue}>{metricRow.value}</Text>
@@ -345,6 +360,8 @@ const styles = StyleSheet.create({
   },
   // ラベルは切り替えチップと同じ語（総重量／推定1RM）を同じ大きさで置く
   metricLabel: { ...Typography.caption, color: Colors.textSecondary },
+  // ラベルへの補足はラベルより一段弱く。単位を値より弱く置くのと同じ作法
+  metricNote: { ...Typography.captionCompact, color: Colors.textMuted },
   metricValueGroup: { flexDirection: 'row', alignItems: 'baseline', gap: 3 },
   metricValue: {
     ...Typography.metric,

@@ -246,24 +246,41 @@ describe('指標の切り替え', () => {
   const hasPairedNote = (root: ReactTestInstance) =>
     allTexts(root).some((t) => t.includes('左右2つ分の合計です'));
 
+  // 内訳カードのラベルに添える補足。注記がスクロールで視野から外れても、
+  // 2倍の数字のすぐ隣に理由が残る
+  const hasCardNote = (root: ReactTestInstance) => allTexts(root).some((t) => t.includes('(左右合計)'));
+
   test('左右2つ分の種目で総重量を選んだときだけ、数え方の注記が出る', () => {
     const root = renderWithMetrics('weight_reps', true);
     expect(hasPairedNote(root)).toBe(false);
+    expect(hasCardNote(root)).toBe(false);
 
     pressChip(root, '総重量');
     expect(hasPairedNote(root)).toBe(true);
+    // グラフ下の注記と内訳カードの補足は同じ条件で出入りする
+    expect(hasCardNote(root)).toBe(true);
 
     // 最大重量・推定1RMは片手の値のまま。ここに出すと逆に誤解させる
     pressChip(root, '推定1RM');
     expect(hasPairedNote(root)).toBe(false);
+    expect(hasCardNote(root)).toBe(false);
     pressChip(root, '最大重量');
     expect(hasPairedNote(root)).toBe(false);
+    expect(hasCardNote(root)).toBe(false);
+  });
+
+  test('注記の例は条件ではなく例示だと分かる形にする', () => {
+    const root = renderWithMetrics('weight_reps', true);
+    pressChip(root, '総重量');
+    // 「10kg×10回のときだけ2倍」と条件に読まれないよう「例:」を伴わせる
+    expect(allTexts(root).some((t) => t.includes('（例: 10kg×10回なら200kg）'))).toBe(true);
   });
 
   test('左右2つ分でない種目では総重量を選んでも注記を出さない', () => {
     const root = renderWithMetrics('weight_reps', false);
     pressChip(root, '総重量');
     expect(hasPairedNote(root)).toBe(false);
+    expect(hasCardNote(root)).toBe(false);
   });
 
   test('pairedWeightsはフックへそのまま渡す。ここが抜けると系列だけ倍にならない', () => {
