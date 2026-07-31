@@ -120,7 +120,9 @@ export function ExerciseRecordTab({ exerciseId, exerciseName, measurementType, i
       filterProgressPoints(recordDays, period).length >
       filterProgressPoints(bestSeries.points, period).length;
     if (isWeightBased && droppedInPeriod) {
-      list.push({ lead: '自重の日', body: 'グラフには点を出しません。記録は下の一覧に残ります' });
+      // 「記録は一覧に残ります」は入れない。記録タブの一覧は直近3件しか出ないので、古い自重の日は
+      // 案内した先に無い。理由（加重量が無い）を書く方が、0kgを入れても変わらないことの説明も兼ねる
+      list.push({ lead: '自重の日', body: '加重量が無いので点を出しません' });
     }
     return list;
   }, [metric, chartMeasurementType, recordDays, bestSeries.points, period]);

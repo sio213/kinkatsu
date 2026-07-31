@@ -279,7 +279,7 @@ describe('指標の切り替え', () => {
       );
     });
     const root = instance.root;
-    const hasNote = () => allTexts(root).some((t) => t.includes('グラフには点を出しません'));
+    const hasNote = () => allTexts(root).some((t) => t.includes('加重量が無いので点を出しません'));
 
     // 既定の3ヶ月には40日前が入るので、画面上に抜けがある
     expect(hasNote()).toBe(true);
