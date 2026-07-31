@@ -59,16 +59,26 @@ const SELECTED_LINE_OPACITY = 0.55;
  * 白い円は輪の下敷き。全期間（60点でマーカーが間引かれる状態）でも輪が折れ線から
  * 切り離されて読めるようにするためのもので、選択中は描かない（下に選択のハローがあり、
  * 白で塗るとハローを消してしまう）。
+ *
+ * **輪に opacity を掛けないこと。** 半透明にすると白背景に対して約3.3:1しか出ないうえ、
+ * グラフ下部の面塗り（青のグラデーション）と重なった位置では輪そのものが消える。
+ * 印を控えめにしたくなったときは、透明度ではなく半径と線幅を下げること
  */
-const METRIC_MAX_BACKING_RADIUS = 8.5;
-const METRIC_MAX_RING_RADIUS = 7;
-const METRIC_MAX_RING_WIDTH = 1.4;
+const METRIC_MAX_BACKING_RADIUS = 7.6;
+const METRIC_MAX_RING_RADIUS = 6;
+const METRIC_MAX_RING_WIDTH = 1.2;
 
-/** チップの左端に置く輪のグリフ。点の印と対にするため、★と同じ位置・同じ大きさ感で描く（FIX-16） */
+/**
+ * チップの左端に置く輪のグリフ。点の印と対にするため、★と同じ位置・同じ大きさ感で描く（FIX-16）。
+ *
+ * 寸法は点の輪に追従させること。点を 7→6・線幅 1.4→1.2 に詰めたとき、チップだけ元の
+ * 4.6/1.7/1.3 のままだとグリフの方が大きく見えて、同じ印だと読めなくなる。ここの値は
+ * その比（6/7・1.2/1.4）で換算したもの
+ */
 const CHIP_GLYPH_OFFSET_X = 13;
-const CHIP_GLYPH_RING_RADIUS = 4.6;
-const CHIP_GLYPH_INNER_RADIUS = 1.7;
-const CHIP_GLYPH_STROKE_WIDTH = 1.3;
+const CHIP_GLYPH_RING_RADIUS = 3.9;
+const CHIP_GLYPH_INNER_RADIUS = 1.5;
+const CHIP_GLYPH_STROKE_WIDTH = 1.1;
 /** グリフ（★・輪）を避けたテキストの開始位置。どちらの印でも同じ位置から書き始める */
 const CHIP_TEXT_OFFSET_X = 22;
 

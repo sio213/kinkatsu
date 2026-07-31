@@ -75,10 +75,10 @@ describe('ExerciseProgressChart: 集計系の指標の最高点マーカー（FI
     const root = render({ highlightKind: 'metric-max' });
 
     // 輪が折れ線から切り離されて読めるようにする下敷き
-    const backing = circleWithRadius(root, 8.5);
+    const backing = circleWithRadius(root, 7.6);
     expect(backing).toMatchObject({ fill: Colors.surface });
-    const ring = circleWithRadius(root, 7);
-    expect(ring).toMatchObject({ fill: 'none', stroke: Colors.accent, strokeWidth: 1.4 });
+    const ring = circleWithRadius(root, 6);
+    expect(ring).toMatchObject({ fill: 'none', stroke: Colors.accent, strokeWidth: 1.2 });
     // 通常のマーカーはそのまま。輪を足しただけで寸法は変えない
     expect(circleWithRadius(root, 3)).toMatchObject({
       fill: Colors.surface,
@@ -86,13 +86,21 @@ describe('ExerciseProgressChart: 集計系の指標の最高点マーカー（FI
     });
   });
 
+  test('輪は不透明のまま。半透明だと白背景で3.3:1しか出ず、面塗りと重なると消える', () => {
+    const root = render({ highlightKind: 'metric-max' });
+    const ring = circleWithRadius(root, 6);
+
+    expect(ring?.opacity).toBeUndefined();
+    expect(ring?.strokeOpacity).toBeUndefined();
+  });
+
   test('最高点を選択中は白い円を描かない。選択のハローを消してしまうため', () => {
     const root = render({ highlightKind: 'metric-max', selectedIndex: HIGHLIGHT_INDEX });
 
-    expect(circleWithRadius(root, 8.5)).toBeUndefined();
+    expect(circleWithRadius(root, 7.6)).toBeUndefined();
     // ハロー・輪・青玉の3重円。通常の選択点は2重円なので形で区別が付く
     expect(circleWithRadius(root, 9.5)).toMatchObject({ fill: Colors.accent });
-    expect(circleWithRadius(root, 7)).toMatchObject({ stroke: Colors.accent });
+    expect(circleWithRadius(root, 6)).toMatchObject({ stroke: Colors.accent });
     expect(circleWithRadius(root, 4.5)).toMatchObject({
       fill: Colors.accent,
       stroke: Colors.surface,
@@ -102,23 +110,23 @@ describe('ExerciseProgressChart: 集計系の指標の最高点マーカー（FI
   test('最高点以外を選択しても最高点の輪は残る', () => {
     const root = render({ highlightKind: 'metric-max', selectedIndex: 0 });
 
-    expect(circleWithRadius(root, 8.5)).toBeDefined();
-    expect(circleWithRadius(root, 7)).toBeDefined();
+    expect(circleWithRadius(root, 7.6)).toBeDefined();
+    expect(circleWithRadius(root, 6)).toBeDefined();
   });
 
   test('チップに点と同じ輪のグリフが付く。★は出さない', () => {
     const root = render({ highlightKind: 'metric-max' });
 
     expect(root.findAllByType(Polygon)).toHaveLength(0);
-    expect(circleWithRadius(root, 4.6)).toMatchObject({
+    expect(circleWithRadius(root, 3.9)).toMatchObject({
       fill: 'none',
       stroke: Colors.accent,
-      strokeWidth: 1.3,
+      strokeWidth: 1.1,
     });
-    expect(circleWithRadius(root, 1.7)).toMatchObject({
+    expect(circleWithRadius(root, 1.5)).toMatchObject({
       fill: Colors.surface,
       stroke: Colors.accent,
-      strokeWidth: 1.3,
+      strokeWidth: 1.1,
     });
   });
 
@@ -127,10 +135,10 @@ describe('ExerciseProgressChart: 集計系の指標の最高点マーカー（FI
     const outside = makePoint(-10, 90);
     const root = render({ highlightKind: 'metric-max', highlight: outside });
 
-    expect(circleWithRadius(root, 8.5)).toBeUndefined();
-    expect(circleWithRadius(root, 7)).toBeUndefined();
+    expect(circleWithRadius(root, 7.6)).toBeUndefined();
+    expect(circleWithRadius(root, 6)).toBeUndefined();
     // チップは値を出し続けるので、グリフも出る
-    expect(circleWithRadius(root, 4.6)).toBeDefined();
+    expect(circleWithRadius(root, 3.9)).toBeDefined();
   });
 });
 
@@ -138,9 +146,9 @@ describe('ExerciseProgressChart: 実測ベストは従来どおり（FIX-10）',
   test('アンバーの点と★のチップのまま。輪は足さない', () => {
     const root = render({ highlightKind: 'personal-best' });
 
-    expect(circleWithRadius(root, 8.5)).toBeUndefined();
-    expect(circleWithRadius(root, 7)).toBeUndefined();
-    expect(circleWithRadius(root, 4.6)).toBeUndefined();
+    expect(circleWithRadius(root, 7.6)).toBeUndefined();
+    expect(circleWithRadius(root, 6)).toBeUndefined();
+    expect(circleWithRadius(root, 3.9)).toBeUndefined();
     expect(root.findAllByType(Polygon)).toHaveLength(1);
     expect(circleWithRadius(root, 4)).toMatchObject({ fill: Colors.chartBest });
   });
@@ -148,7 +156,7 @@ describe('ExerciseProgressChart: 実測ベストは従来どおり（FIX-10）',
   test('選択中もアンバーのまま', () => {
     const root = render({ highlightKind: 'personal-best', selectedIndex: HIGHLIGHT_INDEX });
 
-    expect(circleWithRadius(root, 7)).toBeUndefined();
+    expect(circleWithRadius(root, 6)).toBeUndefined();
     expect(circleWithRadius(root, 4.5)).toMatchObject({ fill: Colors.chartBest });
   });
 });
