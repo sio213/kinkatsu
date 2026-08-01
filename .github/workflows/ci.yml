@@ -23,8 +23,11 @@ jobs:
       - name: Install dependencies
         run: npm ci
 
-      - name: Run Jest tests
-        run: npm test -- --ci
+      # カバレッジ計測込みで走らせ、package.json の coverageThreshold を下回ったら失敗する。
+      # 閾値は 2026-08-01 時点の実測値（statements 88.7% / lines 89.7% / functions 85.2% /
+      # branches 85.6%）から数ポイント下に置いた退行検知用のラインで、目標値ではない
+      - name: Run Jest tests with coverage
+        run: npm test -- --ci --coverage
 
   typecheck:
     name: Typecheck
