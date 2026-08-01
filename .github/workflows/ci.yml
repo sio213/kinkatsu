@@ -24,8 +24,14 @@ jobs:
         run: npm ci
 
       # カバレッジ計測込みで走らせ、package.json の coverageThreshold を下回ったら失敗する。
-      # 閾値は 2026-08-01 時点の実測値（statements 88.7% / lines 89.7% / functions 85.2% /
-      # branches 85.6%）から数ポイント下に置いた退行検知用のラインで、目標値ではない
+      # 閾値は 2026-08-01 時点の実測値（statements 92.7% / lines 93.6% / functions 90.7% /
+      # branches 88.7%）から数ポイント下に置いた退行検知用のラインで、目標値ではない。
+      # 未計測のまま残っているのは Expo テンプレート由来の未使用ファイル群
+      # （components/hello-wave.tsx・parallax-scroll-view.tsx・external-link.tsx・
+      # ui/collapsible.tsx・themed-text.tsx・themed-view.tsx・hooks/use-theme-color.ts・
+      # app/modal.tsx）と、iOS では読み込まれないプラットフォーム別実装
+      # （components/ui/icon-symbol.tsx・hooks/use-color-scheme.web.ts）。
+      # 前者はテストを足すより削除が筋なので、別途判断する
       - name: Run Jest tests with coverage
         run: npm test -- --ci --coverage
 
