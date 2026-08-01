@@ -219,8 +219,8 @@ export const PRESET_EXERCISES: PresetExercise[] = [
   { slug: 'knee_to_elbow_plank', name: 'ニートゥエルボープランク', category: 'abs', measurementType: 'reps' },
   { slug: 'stability_ball_crunch', name: 'バランスボールクランチ', category: 'abs', measurementType: 'reps' },
   { slug: 'landmine_twist', name: 'ランドミンツイスト', category: 'abs', measurementType: 'weight_reps' },
-  { slug: 'machine_crunch', name: 'アブドミナルクランチ（マシン）', category: 'abs', measurementType: 'weight_reps' },
-  { slug: 'torso_rotation_machine', name: 'トーソローテーション（マシン）', category: 'abs', measurementType: 'weight_reps' },
+  { slug: 'machine_crunch', name: 'アブドミナルクランチマシン', category: 'abs', measurementType: 'weight_reps' },
+  { slug: 'torso_rotation_machine', name: 'トーソローテーションマシン', category: 'abs', measurementType: 'weight_reps' },
   // 背中
   { slug: 'deadlift', name: 'デッドリフト', category: 'back', measurementType: 'weight_reps' },
   { slug: 'lat_pulldown', name: 'ラットプルダウン', category: 'back', measurementType: 'weight_reps' },
