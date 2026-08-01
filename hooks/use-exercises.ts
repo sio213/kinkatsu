@@ -16,6 +16,7 @@ export function useExercises() {
       category: values.category,
       note: values.note,
       favorite: values.favorite,
+      measurementType: values.measurementType,
       formPoints: serializeFormPoints(values.formPoints),
       source: 'custom',
       createdAt: Date.now(),

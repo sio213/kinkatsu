@@ -6,6 +6,7 @@
 const mockBack = jest.fn();
 const mockUseExercise = jest.fn();
 const mockUpdateExercise = jest.fn();
+const mockUseExerciseRecordCount = jest.fn();
 
 jest.mock('expo-router', () => ({
   useRouter: () => ({ back: mockBack }),
@@ -16,6 +17,11 @@ jest.mock('expo-router', () => ({
 jest.mock('@/hooks/use-exercises', () => ({
   useExercise: (...args: unknown[]) => mockUseExercise(...args),
   useExercises: () => ({ updateExercise: mockUpdateExercise }),
+}));
+
+// このフックはdb/clientを引き込むため、モックしないとテストスイートごと起動できない
+jest.mock('@/hooks/use-exercise-record-count', () => ({
+  useExerciseRecordCount: (...args: unknown[]) => mockUseExerciseRecordCount(...args),
 }));
 
 import React from 'react';
@@ -61,6 +67,7 @@ function allTexts(root: ReactTestInstance) {
 beforeEach(() => {
   jest.clearAllMocks();
   mockUseExercise.mockReturnValue({ exercise: makeExercise(), loaded: true });
+  mockUseExerciseRecordCount.mockReturnValue({ count: 0, loaded: true });
   mockUpdateExercise.mockResolvedValue(undefined);
 });
 
@@ -97,7 +104,17 @@ describe('ExerciseEditScreen', () => {
       favorite: true,
       formPoints: ['肩甲骨を寄せる'],
       source: 'custom',
+      measurementType: 'weight_reps',
     });
+  });
+
+  it('記録件数をフォームへ渡す（「記録する項目」を変えたときの確認ダイアログの発火判定に使う）', () => {
+    mockUseExerciseRecordCount.mockReturnValue({ count: 12, loaded: true });
+
+    const form = render().findByType(ExerciseFormScreen);
+
+    expect(mockUseExerciseRecordCount).toHaveBeenCalledWith(7);
+    expect(form.props.recordCount).toBe(12);
   });
 
   it('URLのidで更新し、成功したら前の画面へ戻る', async () => {
