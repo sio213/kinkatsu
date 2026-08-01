@@ -10,6 +10,7 @@
     "web": "expo start --web",
     "lint": "expo lint",
     "test": "jest",
+    "test:coverage": "jest --coverage",
     "typecheck": "tsc --noEmit"
   },
   "jest": {
@@ -25,6 +26,24 @@
       "/node_modules/",
       "<rootDir>/.claude/worktrees/"
     ],
+    "collectCoverageFrom": [
+      "{app,components,lib,hooks,db}/**/*.{ts,tsx}",
+      "!**/*.d.ts"
+    ],
+    "coverageReporters": [
+      "text-summary",
+      "json-summary",
+      "lcov"
+    ],
+    "coverageThreshold": {
+      "global": {
+        "statements": 85,
+        "lines": 86,
+        "functions": 82,
+        "branches": 82
+      }
+    },
+    "testTimeout": 15000,
     "transformIgnorePatterns": [
       "node_modules/(?!((jest-)?react-native|@react-native(-community)?|expo(-[^/]*)?|@expo(-[^/]*)?/.*|react-navigation|@react-navigation/.*|@unimodules/.*|unimodules|sentry-expo|native-base|react-native-svg|react-native-gesture-handler|react-native-reorderable-list|react-native-reanimated|react-native-worklets|drizzle-orm)/)"
     ]

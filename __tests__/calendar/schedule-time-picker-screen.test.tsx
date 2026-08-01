@@ -48,13 +48,26 @@ function findByLabel(root: ReactTestInstance, label: string) {
   return root.findAllByType(TouchableOpacity).find((btn) => btn.props.accessibilityLabel === label);
 }
 
+// この画面は usePermissionState 経由で AppState のリスナーを張るため、アンマウントしないまま
+// テストを終えるとリスナーが残り、Jest環境の破棄後にタイマーが発火して worker ごと落ちる
+// （カバレッジ計測で処理が遅くなると顕在化する）。作ったインスタンスを控えて必ず片付ける
+const mountedInstances: ReturnType<typeof create>[] = [];
+
 function render() {
   let instance!: ReturnType<typeof create>;
   act(() => {
     instance = create(React.createElement(ScheduleTimePickerScreen));
   });
+  mountedInstances.push(instance);
   return instance.root;
 }
+
+afterEach(() => {
+  act(() => {
+    for (const instance of mountedInstances) instance.unmount();
+  });
+  mountedInstances.length = 0;
+});
 
 async function renderAndSettle() {
   const root = render();
