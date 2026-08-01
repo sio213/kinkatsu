@@ -1244,9 +1244,113 @@ const IMAGES: Record<string, { source: number; thumbnail: number }> = {
     source: require('@/assets/exercise-media/standing_cable_chest_press.mp4'),
     thumbnail: require('@/assets/exercise-media/standing_cable_chest_press_thumb.png'),
   },
+  chest_dip: {
+    source: require('@/assets/exercise-media/chest_dip.mp4'),
+    thumbnail: require('@/assets/exercise-media/chest_dip_thumb.png'),
+  },
+  smith_shoulder_press: {
+    source: require('@/assets/exercise-media/smith_shoulder_press.mp4'),
+    thumbnail: require('@/assets/exercise-media/smith_shoulder_press_thumb.png'),
+  },
+  seated_side_raise: {
+    source: require('@/assets/exercise-media/seated_side_raise.mp4'),
+    thumbnail: require('@/assets/exercise-media/seated_side_raise_thumb.png'),
+  },
+  cable_shrug: {
+    source: require('@/assets/exercise-media/cable_shrug.mp4'),
+    thumbnail: require('@/assets/exercise-media/cable_shrug_thumb.png'),
+  },
+  machine_crunch: {
+    source: require('@/assets/exercise-media/machine_crunch.mp4'),
+    thumbnail: require('@/assets/exercise-media/machine_crunch_thumb.png'),
+  },
+  torso_rotation_machine: {
+    source: require('@/assets/exercise-media/torso_rotation_machine.mp4'),
+    thumbnail: require('@/assets/exercise-media/torso_rotation_machine_thumb.png'),
+  },
+  dumbbell_deadlift: {
+    source: require('@/assets/exercise-media/dumbbell_deadlift.mp4'),
+    thumbnail: require('@/assets/exercise-media/dumbbell_deadlift_thumb.png'),
+  },
+  smith_row: {
+    source: require('@/assets/exercise-media/smith_row.mp4'),
+    thumbnail: require('@/assets/exercise-media/smith_row_thumb.png'),
+  },
+  machine_pullover: {
+    source: require('@/assets/exercise-media/machine_pullover.mp4'),
+    thumbnail: require('@/assets/exercise-media/machine_pullover_thumb.png'),
+  },
+  machine_back_extension: {
+    source: require('@/assets/exercise-media/machine_back_extension.mp4'),
+    thumbnail: require('@/assets/exercise-media/machine_back_extension_thumb.png'),
+  },
+  treadmill: {
+    source: require('@/assets/exercise-media/treadmill.mp4'),
+    thumbnail: require('@/assets/exercise-media/treadmill_thumb.png'),
+  },
+  stationary_bike: {
+    source: require('@/assets/exercise-media/stationary_bike.mp4'),
+    thumbnail: require('@/assets/exercise-media/stationary_bike_thumb.png'),
+  },
+  dumbbell_squat: {
+    source: require('@/assets/exercise-media/dumbbell_squat.mp4'),
+    thumbnail: require('@/assets/exercise-media/dumbbell_squat_thumb.png'),
+  },
+  standing_leg_curl: {
+    source: require('@/assets/exercise-media/standing_leg_curl.mp4'),
+    thumbnail: require('@/assets/exercise-media/standing_leg_curl_thumb.png'),
+  },
+  smith_calf_raise: {
+    source: require('@/assets/exercise-media/smith_calf_raise.mp4'),
+    thumbnail: require('@/assets/exercise-media/smith_calf_raise_thumb.png'),
+  },
+  single_leg_press: {
+    source: require('@/assets/exercise-media/single_leg_press.mp4'),
+    thumbnail: require('@/assets/exercise-media/single_leg_press_thumb.png'),
+  },
+  jump_lunge: {
+    source: require('@/assets/exercise-media/jump_lunge.mp4'),
+    thumbnail: require('@/assets/exercise-media/jump_lunge_thumb.png'),
+  },
+  smith_hip_thrust: {
+    source: require('@/assets/exercise-media/smith_hip_thrust.mp4'),
+    thumbnail: require('@/assets/exercise-media/smith_hip_thrust_thumb.png'),
+  },
+  dumbbell_hip_thrust: {
+    source: require('@/assets/exercise-media/dumbbell_hip_thrust.mp4'),
+    thumbnail: require('@/assets/exercise-media/dumbbell_hip_thrust_thumb.png'),
+  },
+  lateral_band_walk: {
+    source: require('@/assets/exercise-media/lateral_band_walk.mp4'),
+    thumbnail: require('@/assets/exercise-media/lateral_band_walk_thumb.png'),
+  },
+  power_clean: {
+    source: require('@/assets/exercise-media/power_clean.mp4'),
+    thumbnail: require('@/assets/exercise-media/power_clean_thumb.png'),
+  },
+  hang_clean: {
+    source: require('@/assets/exercise-media/hang_clean.mp4'),
+    thumbnail: require('@/assets/exercise-media/hang_clean_thumb.png'),
+  },
+  clean_and_jerk: {
+    source: require('@/assets/exercise-media/clean_and_jerk.mp4'),
+    thumbnail: require('@/assets/exercise-media/clean_and_jerk_thumb.png'),
+  },
+  snatch: {
+    source: require('@/assets/exercise-media/snatch.mp4'),
+    thumbnail: require('@/assets/exercise-media/snatch_thumb.png'),
+  },
+  power_snatch: {
+    source: require('@/assets/exercise-media/power_snatch.mp4'),
+    thumbnail: require('@/assets/exercise-media/power_snatch_thumb.png'),
+  },
+  thruster: {
+    source: require('@/assets/exercise-media/thruster.mp4'),
+    thumbnail: require('@/assets/exercise-media/thruster_thumb.png'),
+  },
 };
 
-// presetの309種目はすべてIMAGESに登録済みなので、ここで未ヒットになるのは実質カスタム種目だけ。
+// presetの335種目はすべてIMAGESに登録済みなので、ここで未ヒットになるのは実質カスタム種目だけ。
 // ただしseed()はinsert/updateのみでdeleteしないため、過去のseedにあって今は消えたslugのpreset行が
 // 手元のDBに残ることがある。呼び出し側はsource/customではなく「画像の有無」で分岐すること
 export function getExerciseImages(exercise: Pick<Exercise, 'source' | 'slug'>): ExerciseImages {
