@@ -24,7 +24,8 @@
     },
     "testPathIgnorePatterns": [
       "/node_modules/",
-      "<rootDir>/.claude/worktrees/"
+      "<rootDir>/.claude/worktrees/",
+      "<rootDir>/__tests__/helpers/"
     ],
     "collectCoverageFrom": [
       "{app,components,lib,hooks,db}/**/*.{ts,tsx}",
@@ -37,10 +38,10 @@
     ],
     "coverageThreshold": {
       "global": {
-        "statements": 85,
-        "lines": 86,
-        "functions": 82,
-        "branches": 82
+        "statements": 90,
+        "lines": 91,
+        "functions": 88,
+        "branches": 86
       }
     },
     "testTimeout": 15000,
