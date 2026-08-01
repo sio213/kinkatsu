@@ -1,5 +1,5 @@
 import { exerciseSchema } from '@/lib/exercises/validation';
-import { EXERCISE_CATEGORIES } from '@/lib/exercises/constants';
+import { EXERCISE_CATEGORIES, MEASUREMENT_TYPES } from '@/lib/exercises/constants';
 
 describe('exerciseSchema', () => {
   test('正常系: name/category/noteすべて有効な値', () => {
@@ -8,6 +8,7 @@ describe('exerciseSchema', () => {
       category: 'chest',
       note: 'メモ',
       favorite: false,
+      measurementType: 'weight_reps',
       formPoints: [],
     });
     expect(r.success).toBe(true);
@@ -17,6 +18,7 @@ describe('exerciseSchema', () => {
         category: 'chest',
         note: 'メモ',
         favorite: false,
+        measurementType: 'weight_reps',
         formPoints: [],
       });
     }
@@ -29,6 +31,7 @@ describe('exerciseSchema', () => {
         category: 'chest',
         note: '',
         favorite: false,
+        measurementType: 'weight_reps',
       });
       expect(r.success).toBe(false);
       if (!r.success) expect(r.error.issues[0].message).toBe('種目名を入力してください');
@@ -40,6 +43,7 @@ describe('exerciseSchema', () => {
         category: 'chest',
         note: '',
         favorite: false,
+        measurementType: 'weight_reps',
         formPoints: [],
       });
       expect(r.success).toBe(true);
@@ -52,6 +56,7 @@ describe('exerciseSchema', () => {
         category: 'chest',
         note: '',
         favorite: false,
+        measurementType: 'weight_reps',
       });
       expect(r.success).toBe(false);
     });
@@ -64,6 +69,7 @@ describe('exerciseSchema', () => {
         category: undefined,
         note: '',
         favorite: false,
+        measurementType: 'weight_reps',
       });
       expect(r.success).toBe(false);
       if (!r.success) expect(r.error.issues[0].message).toBe('カテゴリを選択してください');
@@ -75,6 +81,7 @@ describe('exerciseSchema', () => {
         category: '廃止済みカテゴリ',
         note: '',
         favorite: false,
+        measurementType: 'weight_reps',
       });
       expect(r.success).toBe(false);
       if (!r.success) expect(r.error.issues[0].message).toBe('カテゴリを選択してください');
@@ -87,6 +94,7 @@ describe('exerciseSchema', () => {
           category: cat,
           note: '',
           favorite: false,
+          measurementType: 'weight_reps',
           formPoints: [],
         });
         expect(r.success).toBe(true);
@@ -101,6 +109,7 @@ describe('exerciseSchema', () => {
         category: 'chest',
         note: '',
         favorite: false,
+        measurementType: 'weight_reps',
         formPoints: [],
       });
       expect(r.success && r.data.note).toBeNull();
@@ -112,6 +121,7 @@ describe('exerciseSchema', () => {
         category: 'chest',
         note: '   ',
         favorite: false,
+        measurementType: 'weight_reps',
         formPoints: [],
       });
       expect(r.success && r.data.note).toBeNull();
@@ -123,6 +133,7 @@ describe('exerciseSchema', () => {
         category: 'chest',
         note: '  フォーム注意  ',
         favorite: false,
+        measurementType: 'weight_reps',
         formPoints: [],
       });
       expect(r.success && r.data.note).toBe('フォーム注意');
@@ -134,9 +145,39 @@ describe('exerciseSchema', () => {
         category: 'chest',
         note: null,
         favorite: false,
+        measurementType: 'weight_reps',
         formPoints: [],
       });
       expect(r.success && r.data.note).toBeNull();
+    });
+  });
+
+  describe('measurementType', () => {
+    test('MEASUREMENT_TYPESすべての値で成功する', () => {
+      for (const type of MEASUREMENT_TYPES) {
+        const r = exerciseSchema.safeParse({
+          name: 'a',
+          category: 'chest',
+          note: '',
+          favorite: false,
+          measurementType: type,
+          formPoints: [],
+        });
+        expect(r.success).toBe(true);
+        if (r.success) expect(r.data.measurementType).toBe(type);
+      }
+    });
+
+    test('MEASUREMENT_TYPESに存在しない値は無効', () => {
+      const r = exerciseSchema.safeParse({
+        name: 'a',
+        category: 'chest',
+        note: '',
+        favorite: false,
+        measurementType: 'weight_distance',
+        formPoints: [],
+      });
+      expect(r.success).toBe(false);
     });
   });
 
@@ -147,6 +188,7 @@ describe('exerciseSchema', () => {
         category: 'chest',
         note: '',
         favorite: false,
+        measurementType: 'weight_reps',
         formPoints: ['  肩甲骨を寄せる  ', '', '   '],
       });
       expect(r.success && r.data.formPoints).toEqual(['肩甲骨を寄せる']);

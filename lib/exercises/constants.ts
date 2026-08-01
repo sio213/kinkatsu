@@ -107,6 +107,25 @@ export function resolveMeasurementType(value: string | null | undefined): Measur
 }
 
 /**
+ * カスタム種目フォームの「記録する項目」の選択肢の文言（デザイン案A確定）。
+ *
+ * 画面に出す1行の説明は「実際に出る入力欄 — 代表的な種目」で、前半は
+ * lib/workout/set-format.ts の MEASUREMENT_COLUMNS から組み立てる（単位表記を二重管理しない）。
+ * ここが持つのは選択肢名と代表種目だけ。
+ *
+ * 選ぶ前に「結果」と「具体例」の両方が読める状態にするための説明なので、省略・折りたたみを
+ * しないこと（「重量×時間と距離×時間の違いで一瞬止まる」というユーザーヒアリングの指摘への
+ * 対応。2026-07-31）。表示順は MEASUREMENT_TYPES の順＝使用頻度順で、並べ替えないこと。
+ */
+export const MEASUREMENT_TYPE_LABELS: Record<MeasurementType, { label: string; examples: string }> = {
+  weight_reps: { label: '重量×回数', examples: 'ベンチプレス、ダンベルカール' },
+  reps: { label: '回数のみ', examples: '懸垂、腕立て伏せ' },
+  time: { label: '時間のみ', examples: 'プランク、デッドハング' },
+  distance_time: { label: '距離×時間', examples: 'ランニング、バイク' },
+  weight_time: { label: '重量×時間', examples: '加重プランク、ファーマーズウォーク' },
+};
+
+/**
  * exercises.pairedWeights の種目で総重量を何倍にするか。左右で2つ。
  *
  * 定数にしているのは、同じ倍率を2箇所で掛けるため——種目詳細のグラフ（lib/exercises/progress.ts）と

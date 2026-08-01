@@ -8,7 +8,7 @@ jest.mock('@/components/ui/form-scroll-context', () => ({
 
 import React from 'react';
 import { act, create, type ReactTestInstance } from 'react-test-renderer';
-import { Text, TextInput, TouchableOpacity } from 'react-native';
+import { Alert, Text, TextInput, TouchableOpacity } from 'react-native';
 import { Switch } from '@/components/ui/switch';
 import { ExerciseForm, type ExerciseFormHandle } from '@/components/exercises/exercise-form';
 
@@ -29,6 +29,13 @@ function allTexts(root: ReactTestInstance) {
     .findAllByType(Text)
     .map((t: ReactTestInstance) => t.props.children)
     .flat();
+}
+
+// 「記録する項目」の選択行。accessibilityLabelは「選択肢名。入力欄 — 代表種目」の形
+function findMeasurementRow(root: ReactTestInstance, label: string) {
+  return root
+    .findAllByType(TouchableOpacity)
+    .find((row: ReactTestInstance) => String(row.props.accessibilityLabel ?? '').startsWith(`${label}。`));
 }
 
 async function renderForm(props: Partial<React.ComponentProps<typeof ExerciseForm>> = {}) {
@@ -110,6 +117,7 @@ test('name・categoryを入力して送信すると trim・null化された値�
     category: 'chest',
     note: null,
     favorite: false,
+    measurementType: 'weight_reps',
     formPoints: [],
   });
 });
@@ -163,6 +171,7 @@ test('送信失敗後に値を修正すると再送信で onSubmit が呼ばれ�
     category: 'back',
     note: null,
     favorite: false,
+    measurementType: 'weight_reps',
     formPoints: [],
   });
 });
@@ -192,6 +201,7 @@ test('favoriteスイッチをONにして送信すると favorite: true で onSub
     category: 'chest',
     note: null,
     favorite: true,
+    measurementType: 'weight_reps',
     formPoints: [],
   });
 });
@@ -230,6 +240,7 @@ test('ref経由の submit() でもバリデーション・送信が実行され�
     category: 'leg',
     note: null,
     favorite: false,
+    measurementType: 'weight_reps',
     formPoints: [],
   });
 });
@@ -268,6 +279,7 @@ test('フォームのポイントを入力して送信すると、空欄を除�
     category: 'chest',
     note: null,
     favorite: false,
+    measurementType: 'weight_reps',
     formPoints: ['肩甲骨を寄せる'],
   });
 });
@@ -311,6 +323,7 @@ test('フォームのポイントの削除ボタンで該当行が取り除か�
     category: 'chest',
     note: null,
     favorite: false,
+    measurementType: 'weight_reps',
     formPoints: ['2つ目'],
   });
 });
@@ -353,7 +366,254 @@ test('initial.source=presetのとき、フォームのポイント欄は表示�
     category: 'chest',
     note: null,
     favorite: false,
+    measurementType: 'weight_reps',
     formPoints: ['既存のポイント'],
+  });
+});
+
+describe('記録する項目（計測タイプ）', () => {
+  test('新規作成時は「重量×回数」が選択済みで、未選択の状態が無い', async () => {
+    const { root } = await renderForm();
+
+    expect(findMeasurementRow(root, '重量×回数')!.props.accessibilityState.checked).toBe(true);
+    for (const label of ['回数のみ', '時間のみ', '距離×時間', '重量×時間']) {
+      expect(findMeasurementRow(root, label)!.props.accessibilityState.checked).toBe(false);
+    }
+  });
+
+  test('5つの選択肢すべてが最初から表示される（折りたたまない）', async () => {
+    const { root } = await renderForm();
+
+    for (const label of ['重量×回数', '回数のみ', '時間のみ', '距離×時間', '重量×時間']) {
+      expect(findMeasurementRow(root, label)).toBeDefined();
+    }
+  });
+
+  test('選んだ計測タイプが onSubmit の値に反映される', async () => {
+    const { root, onSubmit, ref } = await renderForm();
+
+    const [nameInput] = getInputs(root);
+    await act(async () => {
+      nameInput.props.onChangeText('プランク');
+    });
+    await act(async () => {
+      findButtonByLabel(root, '体幹')!.props.onPress();
+    });
+    await act(async () => {
+      findMeasurementRow(root, '時間のみ')!.props.onPress();
+    });
+
+    await act(async () => {
+      ref.current!.submit();
+    });
+
+    expect(onSubmit.mock.calls[0][0]).toEqual(
+      expect.objectContaining({ name: 'プランク', measurementType: 'time' }),
+    );
+  });
+
+  test('編集モード: initial.measurementType が選択状態に反映される', async () => {
+    const { root } = await renderForm({
+      initial: { name: 'ランニング', category: 'cardio', measurementType: 'distance_time' },
+    });
+
+    expect(findMeasurementRow(root, '距離×時間')!.props.accessibilityState.checked).toBe(true);
+    expect(findMeasurementRow(root, '重量×回数')!.props.accessibilityState.checked).toBe(false);
+  });
+
+  test('initial.measurementType が未知の値でも weight_reps に丸められ、保存できなくならない', async () => {
+    const { root, onSubmit, ref } = await renderForm({
+      initial: { name: '旧種目', category: 'chest', measurementType: 'weight_distance' },
+    });
+
+    expect(findMeasurementRow(root, '重量×回数')!.props.accessibilityState.checked).toBe(true);
+
+    await act(async () => {
+      ref.current!.submit();
+    });
+
+    expect(onSubmit.mock.calls[0][0]).toEqual(
+      expect.objectContaining({ measurementType: 'weight_reps' }),
+    );
+  });
+
+  test('accessibilityLabelに入力欄・代表種目の説明まで含まれる（VoiceOver用の文言崩れを検知）', async () => {
+    const { root } = await renderForm();
+    const labels = root
+      .findAllByType(TouchableOpacity)
+      .map((row: ReactTestInstance) => row.props.accessibilityLabel)
+      .filter((label: unknown): label is string => typeof label === 'string');
+
+    expect(labels).toContain('重量×回数。重量(kg)・回数 — ベンチプレス、ダンベルカール');
+    expect(labels).toContain('回数のみ。回数 — 懸垂、腕立て伏せ');
+    expect(labels).toContain('時間のみ。時間(分:秒) — プランク、デッドハング');
+    expect(labels).toContain('距離×時間。距離(km)・時間 — ランニング、バイク');
+    expect(labels).toContain('重量×時間。重量(kg)・時間 — 加重プランク、ファーマーズウォーク');
+  });
+
+  test('initial.source=presetのとき、記録する項目は表示されない（seedが正のため変更させない）', async () => {
+    const { root } = await renderForm({
+      initial: { name: 'ベンチプレス', category: 'chest', source: 'preset' },
+    });
+
+    expect(findMeasurementRow(root, '重量×回数')).toBeUndefined();
+  });
+});
+
+describe('記録する項目の変更確認（記録がある種目）', () => {
+  // beforeEachでのrestoreだとdescribe内の最後のテストが張ったAlertスパイが解除されず、
+  // 後続のテストに漏れる（@reviewer指摘）
+  afterEach(() => {
+    jest.restoreAllMocks();
+  });
+
+  async function renderWithRecords(recordCount: number) {
+    return renderForm({
+      recordCount,
+      initial: { name: '懸垂', category: 'back', measurementType: 'weight_reps' },
+    });
+  }
+
+  test('記録があり計測タイプを変えて保存すると、確認アラートが1回だけ出る', async () => {
+    const alertSpy = jest.spyOn(Alert, 'alert').mockImplementation(() => {});
+    const { root, ref } = await renderWithRecords(12);
+
+    await act(async () => {
+      findMeasurementRow(root, '回数のみ')!.props.onPress();
+    });
+    await act(async () => {
+      ref.current!.submit();
+    });
+
+    expect(alertSpy).toHaveBeenCalledTimes(1);
+    expect(alertSpy.mock.calls[0][0]).toBe('記録する項目を変更しますか？');
+    expect(alertSpy.mock.calls[0][1]).toBe(
+      'この種目にはすでに記録があります。変更すると、これまでの記録がグラフや記録一覧に表示されなくなる場合があります。記録は削除されず、元に戻せば再表示されます。',
+    );
+  });
+
+  test('「変更する」を押すと新しい計測タイプで onSubmit が呼ばれる', async () => {
+    jest.spyOn(Alert, 'alert').mockImplementation((_t, _m, buttons) => {
+      buttons?.find((b) => b.text === '変更する')?.onPress?.();
+    });
+    const { root, onSubmit, ref } = await renderWithRecords(12);
+
+    await act(async () => {
+      findMeasurementRow(root, '回数のみ')!.props.onPress();
+    });
+    await act(async () => {
+      ref.current!.submit();
+    });
+
+    expect(onSubmit.mock.calls[0][0]).toEqual(expect.objectContaining({ measurementType: 'reps' }));
+  });
+
+  test('「キャンセル」を押すと保存されず、選択も元の値に戻る', async () => {
+    jest.spyOn(Alert, 'alert').mockImplementation((_t, _m, buttons) => {
+      buttons?.find((b) => b.text === 'キャンセル')?.onPress?.();
+    });
+    const { root, onSubmit, ref } = await renderWithRecords(12);
+
+    await act(async () => {
+      findMeasurementRow(root, '回数のみ')!.props.onPress();
+    });
+    await act(async () => {
+      ref.current!.submit();
+    });
+
+    expect(onSubmit).not.toHaveBeenCalled();
+    expect(findMeasurementRow(root, '重量×回数')!.props.accessibilityState.checked).toBe(true);
+    expect(findMeasurementRow(root, '回数のみ')!.props.accessibilityState.checked).toBe(false);
+  });
+
+  test('記録が0件なら、計測タイプを変えてもアラートは出ずそのまま保存される', async () => {
+    const alertSpy = jest.spyOn(Alert, 'alert').mockImplementation(() => {});
+    const { root, onSubmit, ref } = await renderWithRecords(0);
+
+    await act(async () => {
+      findMeasurementRow(root, '回数のみ')!.props.onPress();
+    });
+    await act(async () => {
+      ref.current!.submit();
+    });
+
+    expect(alertSpy).not.toHaveBeenCalled();
+    expect(onSubmit.mock.calls[0][0]).toEqual(expect.objectContaining({ measurementType: 'reps' }));
+  });
+
+  test('記録が1件（境界値）でもアラートは出る', async () => {
+    const alertSpy = jest.spyOn(Alert, 'alert').mockImplementation(() => {});
+    const { root, ref } = await renderWithRecords(1);
+
+    await act(async () => {
+      findMeasurementRow(root, '回数のみ')!.props.onPress();
+    });
+    await act(async () => {
+      ref.current!.submit();
+    });
+
+    expect(alertSpy).toHaveBeenCalledTimes(1);
+    // 件数は本文に出さない（カード単位と日単位で数え方が食い違うため。2026-08-01）
+    expect(alertSpy.mock.calls[0][1]).not.toMatch(/\d+件/);
+  });
+
+  test('一度別の値にしてから元に戻した場合はアラートが出ず、そのまま保存される', async () => {
+    const alertSpy = jest.spyOn(Alert, 'alert').mockImplementation(() => {});
+    const { root, onSubmit, ref } = await renderWithRecords(12);
+
+    await act(async () => {
+      findMeasurementRow(root, '回数のみ')!.props.onPress();
+    });
+    await act(async () => {
+      findMeasurementRow(root, '重量×回数')!.props.onPress();
+    });
+    await act(async () => {
+      ref.current!.submit();
+    });
+
+    expect(alertSpy).not.toHaveBeenCalled();
+    expect(onSubmit.mock.calls[0][0]).toEqual(
+      expect.objectContaining({ measurementType: 'weight_reps' }),
+    );
+  });
+
+  test('キャンセルで戻るのは計測タイプだけで、同時に編集した他の項目は保持される', async () => {
+    jest.spyOn(Alert, 'alert').mockImplementation((_t, _m, buttons) => {
+      buttons?.find((b) => b.text === 'キャンセル')?.onPress?.();
+    });
+    const { root, ref } = await renderWithRecords(12);
+
+    const [nameInput] = getInputs(root);
+    await act(async () => {
+      nameInput.props.onChangeText('チンニング');
+    });
+    await act(async () => {
+      findMeasurementRow(root, '回数のみ')!.props.onPress();
+    });
+    await act(async () => {
+      ref.current!.submit();
+    });
+
+    expect(getInputs(root)[0].props.value).toBe('チンニング');
+    expect(findMeasurementRow(root, '重量×回数')!.props.accessibilityState.checked).toBe(true);
+  });
+
+  test('記録があっても計測タイプを変えていなければアラートは出ない', async () => {
+    const alertSpy = jest.spyOn(Alert, 'alert').mockImplementation(() => {});
+    const { root, onSubmit, ref } = await renderWithRecords(12);
+
+    const [nameInput] = getInputs(root);
+    await act(async () => {
+      nameInput.props.onChangeText('チンニング');
+    });
+    await act(async () => {
+      ref.current!.submit();
+    });
+
+    expect(alertSpy).not.toHaveBeenCalled();
+    expect(onSubmit.mock.calls[0][0]).toEqual(
+      expect.objectContaining({ name: 'チンニング', measurementType: 'weight_reps' }),
+    );
   });
 });
 

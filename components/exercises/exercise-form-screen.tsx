@@ -12,6 +12,8 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 
 type Props = {
   initial?: React.ComponentProps<typeof ExerciseForm>['initial'];
+  /** 「記録する項目」変更時の確認ダイアログの判定用。編集画面のみ渡す（ExerciseFormのコメント参照） */
+  recordCount?: number;
   onSubmit: (values: ExerciseFormValues) => void;
 };
 
@@ -22,7 +24,7 @@ export type ExerciseFormScreenHandle = { focusName: () => void };
 // 種目の新規作成(app/exercise/new.tsx)・編集(app/exercise/edit/[id].tsx)で共通の
 // 「フォーム＋下部固定の保存ボタン」の画面シェル。データ取得・not-found判定は呼び出し側の責務。
 export const ExerciseFormScreen = forwardRef<ExerciseFormScreenHandle, Props>(function ExerciseFormScreen(
-  { initial, onSubmit },
+  { initial, recordCount, onSubmit },
   ref,
 ) {
   const formRef = useRef<ExerciseFormHandle>(null);
@@ -46,6 +48,7 @@ export const ExerciseFormScreen = forwardRef<ExerciseFormScreenHandle, Props>(fu
               <ExerciseForm
                 ref={formRef}
                 initial={initial}
+                recordCount={recordCount}
                 onSubmit={onSubmit}
                 onSubmitDisabledChange={setSubmitDisabled}
               />

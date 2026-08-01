@@ -1,4 +1,5 @@
 import { chipStyles } from '@/components/exercises/chip-styles';
+import { MeasurementTypeField } from '@/components/exercises/measurement-type-field';
 import { BoxedTextInput } from '@/components/ui/boxed-text-input';
 import { FormField } from '@/components/ui/form-field';
 import { FormFieldStack } from '@/components/ui/form-field-stack';
@@ -9,6 +10,7 @@ import { Colors, Typography } from '@/constants/theme';
 import {
   EXERCISE_CATEGORIES,
   getCategoryLabel,
+  resolveMeasurementType,
   type ExerciseCategory,
 } from '@/lib/exercises/constants';
 import {
@@ -16,9 +18,10 @@ import {
   type ExerciseFormValues,
 } from '@/lib/exercises/validation';
 import { zodResolver } from '@hookform/resolvers/zod';
-import { forwardRef, useEffect, useImperativeHandle, useRef } from 'react';
+import { forwardRef, useCallback, useEffect, useImperativeHandle, useRef } from 'react';
 import { Controller, useForm } from 'react-hook-form';
 import {
+  Alert,
   StyleSheet,
   Text,
   TextInput,
@@ -30,6 +33,36 @@ function toExerciseCategory(value: string | undefined): ExerciseCategory | undef
   return (EXERCISE_CATEGORIES as readonly string[]).includes(value ?? '')
     ? (value as ExerciseCategory)
     : undefined;
+}
+
+/**
+ * 記録がある種目で「記録する項目」を変えたときの確認。
+ *
+ * **保存を押した時に1回だけ出す。** 選択した瞬間に出すと、他の項目を編集している最中にも
+ * 割り込み、キャンセルのたびに選択が巻き戻る往復が生まれる（削除確認と同じ「保存直前に一度だけ」に揃える）。
+ *
+ * 本文の3文は「記録がある → 影響 → 復元可能」の順で固定。setsは計測タイプごとの列を持つ1枚の
+ * ワイドテーブルで、記録行自体は計測タイプを持たない。つまり変更してもDBの値は消えず、
+ * 元の項目に戻せば表示も完全に戻る——だから赤（destructive）にはしない。
+ *
+ * 件数は出さない。useExerciseRecordCountはカード（workoutSessionExercises）単位で数えるため、
+ * 同じ日に同じ種目を2枚のカードに分けた日があると、種目詳細の記録一覧が出す「全N件」（日単位）と
+ * 食い違う。同じ種目なのに画面によって数字が違って見えるくらいなら出さない方がよい（2026-08-01）
+ */
+function confirmMeasurementTypeChange(): Promise<boolean> {
+  return new Promise((resolve) => {
+    Alert.alert(
+      '記録する項目を変更しますか？',
+      'この種目にはすでに記録があります。変更すると、これまでの記録がグラフや記録一覧に表示されなくなる場合があります。記録は削除されず、元に戻せば再表示されます。',
+      [
+        { text: 'キャンセル', style: 'cancel', onPress: () => resolve(false) },
+        { text: '変更する', onPress: () => resolve(true) },
+      ],
+      // optionsに{ cancelable: true }を渡さないこと。Androidで戻る操作でも閉じられるようになるが、
+      // その経路はonDismissでしかresolveできず、渡し忘れるとPromiseが解決せずisSubmittingが
+      // trueのまま＝保存ボタンが永久にdisabledになる。既定のcancelable:falseなら戻るでは閉じない
+    );
+  });
 }
 
 export type ExerciseFormHandle = {
@@ -47,20 +80,28 @@ type Props = {
     favorite?: boolean;
     formPoints?: string[] | null;
     source?: string;
+    measurementType?: string | null;
   };
+  /**
+   * その種目の記録件数（編集画面がuseExerciseRecordCountから渡す）。0より大きいときだけ、
+   * 「記録する項目」を変えて保存しようとした時に確認ダイアログを出す。新規作成では記録が
+   * 存在しえないため渡さない
+   */
+  recordCount?: number;
   onSubmit: (values: ExerciseFormValues) => void;
   onSubmitDisabledChange?: (disabled: boolean) => void;
 };
 
 export const ExerciseForm = forwardRef<ExerciseFormHandle, Props>(function ExerciseForm(
-  { initial, onSubmit, onSubmitDisabledChange },
+  { initial, recordCount = 0, onSubmit, onSubmitDisabledChange },
   ref,
 ) {
   const nameInputRef = useRef<TextInput>(null);
   const {
     control,
     handleSubmit,
-    formState: { errors, isSubmitted, isSubmitting },
+    resetField,
+    formState: { errors, isSubmitted, isSubmitting, dirtyFields },
   } = useForm<ExerciseFormValues>({
     resolver: zodResolver(exerciseSchema),
     defaultValues: {
@@ -69,6 +110,9 @@ export const ExerciseForm = forwardRef<ExerciseFormHandle, Props>(function Exerc
       note: initial?.note ?? '',
       favorite: initial?.favorite ?? false,
       formPoints: initial?.formPoints?.length ? initial.formPoints : [''],
+      // 想定外のDB値でも保存できなくならないよう、既知の5値に丸めてから初期値にする
+      // （新規作成は初期値なし＝resolveMeasurementTypeが weight_reps を返す）
+      measurementType: resolveMeasurementType(initial?.measurementType),
     },
   });
   const hasErrors = Object.keys(errors).length > 0;
@@ -78,13 +122,34 @@ export const ExerciseForm = forwardRef<ExerciseFormHandle, Props>(function Exerc
   const isPreset = initial?.source === 'preset';
   const scrollToFirstError = useScrollToFirstError();
 
+  // 記録がある種目で「記録する項目」が変わっていたら、保存の直前に一度だけ確認する。
+  // キャンセルされたら選択を開いた時点の値に戻し、フォームには留まる。
+  //
+  // 「変わっているか」はRHFのdirtyFieldsで見る（defaultValuesと突き合わせた結果を別途refに
+  // 持つと、将来resetを足したときにrefだけ取り残されて誤検知する）。一度別の値にしてから元に
+  // 戻した場合もRHFがdirtyを解除するため、確認は出ない
+  const measurementTypeChanged = dirtyFields.measurementType === true;
+  const submitWithConfirm = useCallback(
+    () =>
+      handleSubmit(async (values) => {
+        if (recordCount > 0 && measurementTypeChanged) {
+          if (!(await confirmMeasurementTypeChange())) {
+            resetField('measurementType');
+            return;
+          }
+        }
+        onSubmit(values);
+      }, scrollToFirstError)(),
+    [handleSubmit, measurementTypeChanged, onSubmit, recordCount, resetField, scrollToFirstError],
+  );
+
   useImperativeHandle(
     ref,
     () => ({
-      submit: () => handleSubmit(onSubmit, scrollToFirstError)(),
+      submit: submitWithConfirm,
       focusName: () => nameInputRef.current?.focus(),
     }),
-    [handleSubmit, onSubmit, scrollToFirstError],
+    [submitWithConfirm],
   );
 
   useEffect(() => {
@@ -140,7 +205,22 @@ export const ExerciseForm = forwardRef<ExerciseFormHandle, Props>(function Exerc
         />
       </FormField>
 
+      {/* プリセット種目では「記録する項目」も「フォームのポイント」も出さない。計測タイプは
+          db/seed.tsが正で、変更しても次回起動時の差分検知で黙って戻されるため（「変えたのに
+          戻っている」という原因不明のバグに見える）。フォームのポイントは詳細画面がgetGuide()の
+          解説を出すため、保存しても表示されない「書き込み専用」状態になるのを避ける */}
       {!isPreset && (
+        <>
+        <FormField name="measurementType" label="記録する項目">
+          <Controller
+            control={control}
+            name="measurementType"
+            render={({ field: { value, onChange } }) => (
+              <MeasurementTypeField value={value} onChange={onChange} />
+            )}
+          />
+        </FormField>
+
         <FormField name="formPoints" label="フォームのポイント" optional>
           <Controller
             control={control}
@@ -184,6 +264,7 @@ export const ExerciseForm = forwardRef<ExerciseFormHandle, Props>(function Exerc
             )}
           />
         </FormField>
+        </>
       )}
 
       <FormField name="note" label="メモ" optional>

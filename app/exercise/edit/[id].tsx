@@ -1,5 +1,6 @@
 import { ExerciseFormScreen } from '@/components/exercises/exercise-form-screen';
 import { NotFoundScreen } from '@/components/ui/not-found-screen';
+import { useExerciseRecordCount } from '@/hooks/use-exercise-record-count';
 import { useExercise, useExercises } from '@/hooks/use-exercises';
 import { parseFormPoints } from '@/lib/exercises/form-points';
 import type { ExerciseFormValues } from '@/lib/exercises/validation';
@@ -12,6 +13,9 @@ export default function ExerciseEditScreen() {
   const router = useRouter();
   const { exercise, loaded } = useExercise(Number(id));
   const { updateExercise } = useExercises();
+  // 「記録する項目」を変えて保存しようとした時の確認ダイアログの発火判定に使う。
+  // 種目詳細の初期タブ判定と同じフックをそのまま流用する
+  const { count: recordCount } = useExerciseRecordCount(Number(id));
 
   const handleSubmit = useCallback(
     async (values: ExerciseFormValues) => {
@@ -43,7 +47,9 @@ export default function ExerciseEditScreen() {
         favorite: exercise.favorite,
         formPoints: parseFormPoints(exercise.formPoints),
         source: exercise.source,
+        measurementType: exercise.measurementType,
       }}
+      recordCount={recordCount}
       onSubmit={handleSubmit}
     />
   );

@@ -91,7 +91,7 @@ describe('useExercises', () => {
     it('note: null を渡すとそのまま渡る', async () => {
       const { addExercise } = mount();
       await act(async () => {
-        await addExercise({ name: 'ベンチプレス', category: 'chest', note: null, favorite: false, formPoints: [] });
+        await addExercise({ name: 'ベンチプレス', category: 'chest', note: null, favorite: false, formPoints: [], measurementType: 'weight_reps' });
       });
       expect(mockValues).toHaveBeenCalledWith(expect.objectContaining({ note: null }));
     });
@@ -99,7 +99,7 @@ describe('useExercises', () => {
     it('note 指定時その値が渡る', async () => {
       const { addExercise } = mount();
       await act(async () => {
-        await addExercise({ name: 'ベンチプレス', category: 'chest', note: 'メモ', favorite: false, formPoints: [] });
+        await addExercise({ name: 'ベンチプレス', category: 'chest', note: 'メモ', favorite: false, formPoints: [], measurementType: 'weight_reps' });
       });
       expect(mockValues).toHaveBeenCalledWith(expect.objectContaining({ note: 'メモ' }));
     });
@@ -107,7 +107,7 @@ describe('useExercises', () => {
     it('source は常に "custom"', async () => {
       const { addExercise } = mount();
       await act(async () => {
-        await addExercise({ name: 'ベンチプレス', category: 'chest', note: null, favorite: false, formPoints: [] });
+        await addExercise({ name: 'ベンチプレス', category: 'chest', note: null, favorite: false, formPoints: [], measurementType: 'weight_reps' });
       });
       expect(mockValues).toHaveBeenCalledWith(expect.objectContaining({ source: 'custom' }));
     });
@@ -116,7 +116,7 @@ describe('useExercises', () => {
       const before = Date.now();
       const { addExercise } = mount();
       await act(async () => {
-        await addExercise({ name: 'ベンチプレス', category: 'chest', note: null, favorite: false, formPoints: [] });
+        await addExercise({ name: 'ベンチプレス', category: 'chest', note: null, favorite: false, formPoints: [], measurementType: 'weight_reps' });
       });
       const after = Date.now();
       const payload = (mockValues as jest.Mock).mock.calls[0][0];
@@ -127,7 +127,7 @@ describe('useExercises', () => {
     it('favorite: false を渡すとそのまま渡る', async () => {
       const { addExercise } = mount();
       await act(async () => {
-        await addExercise({ name: 'ベンチプレス', category: 'chest', note: null, favorite: false, formPoints: [] });
+        await addExercise({ name: 'ベンチプレス', category: 'chest', note: null, favorite: false, formPoints: [], measurementType: 'weight_reps' });
       });
       expect(mockValues).toHaveBeenCalledWith(expect.objectContaining({ favorite: false }));
     });
@@ -135,9 +135,24 @@ describe('useExercises', () => {
     it('favorite: true を渡すとそのまま渡る', async () => {
       const { addExercise } = mount();
       await act(async () => {
-        await addExercise({ name: 'ベンチプレス', category: 'chest', note: null, favorite: true, formPoints: [] });
+        await addExercise({ name: 'ベンチプレス', category: 'chest', note: null, favorite: true, formPoints: [], measurementType: 'weight_reps' });
       });
       expect(mockValues).toHaveBeenCalledWith(expect.objectContaining({ favorite: true }));
+    });
+
+    it('measurementType: フォームで選んだ値がそのまま渡る（DBのdefaultに落ちない）', async () => {
+      const { addExercise } = mount();
+      await act(async () => {
+        await addExercise({
+          name: 'プランク',
+          category: 'core',
+          note: null,
+          favorite: false,
+          formPoints: [],
+          measurementType: 'time',
+        });
+      });
+      expect(mockValues).toHaveBeenCalledWith(expect.objectContaining({ measurementType: 'time' }));
     });
 
     it('formPoints: 非空配列はJSON文字列化されて渡る', async () => {
@@ -149,6 +164,7 @@ describe('useExercises', () => {
           note: null,
           favorite: false,
           formPoints: ['肩甲骨を寄せる', 'バーを胸に下ろす'],
+          measurementType: 'weight_reps',
         });
       });
       expect(mockValues).toHaveBeenCalledWith(
@@ -167,6 +183,7 @@ describe('useExercises', () => {
           note: null,
           favorite: false,
           formPoints: [],
+          measurementType: 'weight_reps',
         });
       });
       expect(mockValues).toHaveBeenCalledWith(expect.objectContaining({ formPoints: null }));
@@ -197,6 +214,12 @@ describe('useExercises', () => {
       const payload = (mockSet as jest.Mock).mock.calls[0][0];
       expect(payload.favorite).toBe(true);
       expect(payload.name).toBeUndefined();
+    });
+
+    it('measurementType を渡すとそのままSETされる（spreadで通るので専用の記述は不要）', async () => {
+      const { updateExercise } = mount();
+      await act(async () => { await updateExercise(1, { measurementType: 'distance_time' }); });
+      expect((mockSet as jest.Mock).mock.calls[0][0].measurementType).toBe('distance_time');
     });
 
     it('formPoints省略時はSETにformPointsキーを含まない（既存値を保持）', async () => {
@@ -277,7 +300,7 @@ describe('useExercises', () => {
       const { addExercise } = mount();
       mockValues.mockRejectedValueOnce(new Error('insert failed'));
       await expect(
-        addExercise({ name: 'ベンチプレス', category: 'chest', note: null, favorite: false, formPoints: [] }),
+        addExercise({ name: 'ベンチプレス', category: 'chest', note: null, favorite: false, formPoints: [], measurementType: 'weight_reps' }),
       ).rejects.toThrow('insert failed');
     });
 
