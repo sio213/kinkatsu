@@ -51,7 +51,7 @@ export const PRESET_EXERCISES: PresetExercise[] = [
   { slug: 'dumbbell_fly', name: 'ダンベルフライ', category: 'chest', measurementType: 'weight_reps', pairedWeights: true },
   { slug: 'incline_dumbbell_fly', name: 'インクラインダンベルフライ', category: 'chest', measurementType: 'weight_reps', pairedWeights: true },
   { slug: 'cable_crossover', name: 'ケーブルクロスオーバー', category: 'chest', measurementType: 'weight_reps', pairedWeights: true },
-  { slug: 'chest_press_machine', name: 'チェストプレス（マシン）', category: 'chest', measurementType: 'weight_reps' },
+  { slug: 'chest_press_machine', name: 'チェストプレスマシン', category: 'chest', measurementType: 'weight_reps' },
   { slug: 'push_up', name: 'プッシュアップ', category: 'chest', measurementType: 'reps' },
   { slug: 'smith_bench_press', name: 'スミスマシンベンチプレス', category: 'chest', measurementType: 'weight_reps' },
   { slug: 'close_grip_bench_press', name: 'クローズグリップベンチプレス', category: 'chest', measurementType: 'weight_reps' },

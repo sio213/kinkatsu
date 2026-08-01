@@ -25,6 +25,7 @@ import m0020 from './0020_workout_sessions_scheduled_workout_id.sql';
 import m0021 from './0021_scheduled_workouts_notify_enabled.sql';
 import m0022 from './0022_exercises_paired_weights.sql';
 import m0023 from './0023_rename_ab_machine_presets.sql';
+import m0024 from './0024_rename_chest_press_machine.sql';
 
   export default {
     journal,
@@ -52,6 +53,7 @@ m0019,
 m0020,
 m0021,
 m0022,
-m0023
+m0023,
+m0024
     }
   }

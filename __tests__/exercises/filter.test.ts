@@ -30,6 +30,9 @@ const UNKNOWN = make({ id: 5, name: 'テスト種目',    category: '未知カ�
 const ALL = [CHEST, CHEST2, SHOULDER, FAV, UNKNOWN];
 
 const CUSTOM_ALNUM = make({ id: 6, name: 'EZバーカール', category: 'arm' });
+// 全角括弧の扱い（NFKC正規化）を見るためのフィクスチャ。マスタからは同名のプリセットが
+// 消えた（0024で「チェストプレスマシン」へ改名）が、ユーザーが自作の種目にこう名付けることは
+// あるので、カスタム種目の例としてそのまま使う
 const CUSTOM_PAREN = make({ id: 7, name: 'チェストプレス（マシン）', category: 'chest' });
 const CUSTOM_CHOON = make({ id: 8, name: 'カーフレイズ', category: 'leg' });
 const CUSTOM_KANJI = make({ id: 9, name: '縄跳び', category: 'cardio' });
