@@ -524,7 +524,7 @@ const GUIDES: Record<string, ExerciseGuide> = {
     breath: 'しゃがむときに吸い、立ち上がるときに吐く',
   },
   front_squat: {
-    muscle: '大腿四頭筋（特に）・体幹・臀筋',
+    muscle: '大腿四頭筋・体幹・臀筋',
     points: [
       'バーを鎖骨の上・三角筋前部に置き、肘を高く上げてキープ',
       '上体を垂直に近い角度で保ってしゃがむ',
