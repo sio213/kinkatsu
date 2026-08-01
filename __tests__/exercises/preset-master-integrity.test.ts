@@ -10,7 +10,8 @@ import { PRESET_EXERCISES } from '@/db/seed';
 import { getGuide } from '@/lib/exercises/guides';
 import { getExerciseImages } from '@/lib/exercises/images';
 
-// 2026-08-01 に全309種目を監査した結果を固定するテスト。プリセット種目の追加は
+// 2026-08-01 に全種目（監査時309、競合調査での追加後335）を監査した結果を固定するテスト。
+// プリセット種目の追加は
 // 「seed.ts に1行足す」だけでは完結せず、guides・images・素材ファイルが揃って初めて
 // 成立する（CLAUDE.md「プリセット種目を新規追加するとき」参照）。片方だけ足した状態を
 // CIで検知するのがこのファイルの役割。

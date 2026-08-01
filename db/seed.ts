@@ -51,7 +51,7 @@ export const PRESET_EXERCISES: PresetExercise[] = [
   { slug: 'dumbbell_fly', name: 'ダンベルフライ', category: 'chest', measurementType: 'weight_reps', pairedWeights: true },
   { slug: 'incline_dumbbell_fly', name: 'インクラインダンベルフライ', category: 'chest', measurementType: 'weight_reps', pairedWeights: true },
   { slug: 'cable_crossover', name: 'ケーブルクロスオーバー', category: 'chest', measurementType: 'weight_reps', pairedWeights: true },
-  { slug: 'chest_press_machine', name: 'チェストプレス（マシン）', category: 'chest', measurementType: 'weight_reps' },
+  { slug: 'chest_press_machine', name: 'チェストプレスマシン', category: 'chest', measurementType: 'weight_reps' },
   { slug: 'push_up', name: 'プッシュアップ', category: 'chest', measurementType: 'reps' },
   { slug: 'smith_bench_press', name: 'スミスマシンベンチプレス', category: 'chest', measurementType: 'weight_reps' },
   { slug: 'close_grip_bench_press', name: 'クローズグリップベンチプレス', category: 'chest', measurementType: 'weight_reps' },
@@ -89,6 +89,9 @@ export const PRESET_EXERCISES: PresetExercise[] = [
   { slug: 'archer_push_up', name: 'アーチャープッシュアップ', category: 'chest', measurementType: 'reps' },
   { slug: 'machine_incline_press', name: 'マシンインクラインプレス', category: 'chest', measurementType: 'weight_reps' },
   { slug: 'standing_cable_chest_press', name: 'スタンディングケーブルチェストプレス', category: 'chest', measurementType: 'weight_reps', pairedWeights: true },
+  // 「ディップス」(arm) は体を立てて三頭を狙う版。こちらは前傾して大胸筋下部を狙う別種目で、
+  // 競合アプリでも Chest Dip / Triceps Dip として別々に持っている
+  { slug: 'chest_dip', name: 'チェストディップス', category: 'chest', measurementType: 'reps' },
   // 肩
   { slug: 'barbell_shoulder_press', name: 'バーベルショルダープレス', category: 'shoulder', measurementType: 'weight_reps' },
   { slug: 'dumbbell_shoulder_press', name: 'ダンベルショルダープレス', category: 'shoulder', measurementType: 'weight_reps', pairedWeights: true },
@@ -124,6 +127,10 @@ export const PRESET_EXERCISES: PresetExercise[] = [
   { slug: 'cable_lateral_raise', name: 'ケーブルサイドレイズ', category: 'shoulder', measurementType: 'weight_reps' },
   { slug: 'cable_front_raise', name: 'ケーブルフロントレイズ', category: 'shoulder', measurementType: 'weight_reps' },
   { slug: 'trap_bar_shrug', name: 'トラップバーシュラッグ', category: 'shoulder', measurementType: 'weight_reps' },
+  { slug: 'smith_shoulder_press', name: 'スミスマシンショルダープレス', category: 'shoulder', measurementType: 'weight_reps' },
+  { slug: 'seated_side_raise', name: 'シーテッドサイドレイズ', category: 'shoulder', measurementType: 'weight_reps', pairedWeights: true },
+  // 収録済みの動画は1本のケーブルを両手で持つ版のためスタックは1つ。pairedWeightsは付けない
+  { slug: 'cable_shrug', name: 'ケーブルシュラッグ', category: 'shoulder', measurementType: 'weight_reps' },
   // 腕
   { slug: 'barbell_curl', name: 'バーベルカール', category: 'arm', measurementType: 'weight_reps' },
   { slug: 'dumbbell_curl', name: 'ダンベルカール', category: 'arm', measurementType: 'weight_reps', pairedWeights: true },
@@ -212,6 +219,8 @@ export const PRESET_EXERCISES: PresetExercise[] = [
   { slug: 'knee_to_elbow_plank', name: 'ニートゥエルボープランク', category: 'abs', measurementType: 'reps' },
   { slug: 'stability_ball_crunch', name: 'バランスボールクランチ', category: 'abs', measurementType: 'reps' },
   { slug: 'landmine_twist', name: 'ランドミンツイスト', category: 'abs', measurementType: 'weight_reps' },
+  { slug: 'machine_crunch', name: 'アブドミナルクランチマシン', category: 'abs', measurementType: 'weight_reps' },
+  { slug: 'torso_rotation_machine', name: 'トーソローテーションマシン', category: 'abs', measurementType: 'weight_reps' },
   // 背中
   { slug: 'deadlift', name: 'デッドリフト', category: 'back', measurementType: 'weight_reps' },
   { slug: 'lat_pulldown', name: 'ラットプルダウン', category: 'back', measurementType: 'weight_reps' },
@@ -256,6 +265,10 @@ export const PRESET_EXERCISES: PresetExercise[] = [
   { slug: 'banded_deadlift', name: 'バンドデッドリフト', category: 'back', measurementType: 'reps' },
   { slug: 'muscle_up', name: 'マッスルアップ', category: 'back', measurementType: 'reps' },
   { slug: 'band_lat_pulldown', name: 'バンドラットプルダウン', category: 'back', measurementType: 'reps' },
+  { slug: 'dumbbell_deadlift', name: 'ダンベルデッドリフト', category: 'back', measurementType: 'weight_reps', pairedWeights: true },
+  { slug: 'smith_row', name: 'スミスマシンロウ', category: 'back', measurementType: 'weight_reps' },
+  { slug: 'machine_pullover', name: 'プルオーバーマシン', category: 'back', measurementType: 'weight_reps' },
+  { slug: 'machine_back_extension', name: 'バックエクステンションマシン', category: 'back', measurementType: 'weight_reps' },
   // 有酸素
   { slug: 'running', name: 'ランニング', category: 'cardio', measurementType: 'distance_time' },
   { slug: 'walking', name: 'ウォーキング', category: 'cardio', measurementType: 'distance_time' },
@@ -282,6 +295,10 @@ export const PRESET_EXERCISES: PresetExercise[] = [
   { slug: 'tuck_jump', name: 'タックジャンプ', category: 'cardio', measurementType: 'reps' },
   { slug: 'rope_climb', name: 'ロープクライム', category: 'cardio', measurementType: 'reps' },
   { slug: 'double_unders', name: 'ダブルアンダー', category: 'cardio', measurementType: 'reps' },
+  // ランニング／サイクリングは屋外を含む「動作」の記録。こちらはジムのマシンを指す別エントリで、
+  // 傾斜・負荷レベルが変わるため同じ距離でも別物として並べたい（競合アプリも別種目として持つ）
+  { slug: 'treadmill', name: 'トレッドミル', category: 'cardio', measurementType: 'distance_time' },
+  { slug: 'stationary_bike', name: 'エアロバイク', category: 'cardio', measurementType: 'distance_time' },
   // 脚
   { slug: 'squat', name: 'スクワット', category: 'leg', measurementType: 'weight_reps' },
   { slug: 'front_squat', name: 'フロントスクワット', category: 'leg', measurementType: 'weight_reps' },
@@ -329,6 +346,11 @@ export const PRESET_EXERCISES: PresetExercise[] = [
   { slug: 'banded_squat', name: 'バンドスクワット', category: 'leg', measurementType: 'reps' },
   { slug: 'tibialis_raise', name: 'ティビアリスレイズ（すね上げ）', category: 'leg', measurementType: 'reps' },
   { slug: 'walking_calf_raise', name: 'ウォーキングカーフレイズ', category: 'leg', measurementType: 'reps' },
+  { slug: 'dumbbell_squat', name: 'ダンベルスクワット', category: 'leg', measurementType: 'weight_reps', pairedWeights: true },
+  { slug: 'standing_leg_curl', name: 'スタンディングレッグカール', category: 'leg', measurementType: 'weight_reps' },
+  { slug: 'smith_calf_raise', name: 'スミスマシンカーフレイズ', category: 'leg', measurementType: 'weight_reps' },
+  { slug: 'single_leg_press', name: 'シングルレッグプレス', category: 'leg', measurementType: 'weight_reps' },
+  { slug: 'jump_lunge', name: 'ジャンプランジ', category: 'leg', measurementType: 'reps' },
   // お尻
   { slug: 'hip_thrust', name: 'ヒップスラスト', category: 'glute', measurementType: 'weight_reps' },
   { slug: 'glute_bridge', name: 'グルートブリッジ', category: 'glute', measurementType: 'weight_reps' },
@@ -344,6 +366,10 @@ export const PRESET_EXERCISES: PresetExercise[] = [
   { slug: 'clamshell', name: 'クラムシェル', category: 'glute', measurementType: 'weight_reps' },
   { slug: 'single_leg_glute_bridge', name: 'シングルレッググルートブリッジ', category: 'glute', measurementType: 'weight_reps' },
   { slug: 'hip_thrust_machine', name: 'ヒップスラストマシン', category: 'glute', measurementType: 'weight_reps' },
+  { slug: 'smith_hip_thrust', name: 'スミスマシンヒップスラスト', category: 'glute', measurementType: 'weight_reps' },
+  // ダンベル版は1個を骨盤の上に置くだけなので、器具は1つ。pairedWeightsは付けない
+  { slug: 'dumbbell_hip_thrust', name: 'ダンベルヒップスラスト', category: 'glute', measurementType: 'weight_reps' },
+  { slug: 'lateral_band_walk', name: 'ラテラルバンドウォーク', category: 'glute', measurementType: 'reps' },
   // その他
   { slug: 'foam_rolling', name: 'フォームローリング', category: 'other', measurementType: 'time' },
   { slug: 'hip_flexor_stretch', name: '股関節屈筋ストレッチ', category: 'other', measurementType: 'time' },
@@ -365,6 +391,14 @@ export const PRESET_EXERCISES: PresetExercise[] = [
   { slug: 'downward_dog', name: 'ダウンドッグ', category: 'other', measurementType: 'time' },
   { slug: 'yoga_sun_salutation', name: '太陽礼拝', category: 'other', measurementType: 'reps' },
   { slug: 'kettlebell_halo', name: 'ケトルベルハロー', category: 'other', measurementType: 'reps' },
+  // ウエイトリフティング系。1つの部位に寄せられない全身種目なので、ターキッシュゲットアップ・
+  // タイヤフリップと同じ「その他」に置く（競合アプリでは Olympic / Full Body 相当の枠）
+  { slug: 'power_clean', name: 'パワークリーン', category: 'other', measurementType: 'weight_reps' },
+  { slug: 'hang_clean', name: 'ハングクリーン', category: 'other', measurementType: 'weight_reps' },
+  { slug: 'clean_and_jerk', name: 'クリーン&ジャーク', category: 'other', measurementType: 'weight_reps' },
+  { slug: 'snatch', name: 'スナッチ', category: 'other', measurementType: 'weight_reps' },
+  { slug: 'power_snatch', name: 'パワースナッチ', category: 'other', measurementType: 'weight_reps' },
+  { slug: 'thruster', name: 'スラスター', category: 'other', measurementType: 'weight_reps' },
 ];
 
 export const seed = async () => {

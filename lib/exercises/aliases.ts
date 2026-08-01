@@ -66,6 +66,21 @@ const ALIASES: Record<string, AliasEntry[]> = {
   barbell_curl: [{ text: 'Barbell Curl' }],
   hammer_curl: [{ text: 'Hammer Curl' }],
   dips: [{ text: 'Dips' }],
+  // 2026-08-01 の競合調査で「正式名と別の呼び方のほうが通っている」と分かったもの
+  lying_triceps_extension: [{ text: 'スカルクラッシャー' }],
+  triceps_pushdown: [{ text: 'トライセプスプッシュダウン' }, { text: 'プレスダウン' }],
+  rear_delt_fly: [{ text: 'リアレイズ' }],
+  chest_dip: [{ text: '胸ディップス', reading: 'むねでぃっぷす' }, { text: 'Chest Dip' }],
+  machine_crunch: [{ text: 'アブドミナルマシン' }, { text: 'アブクランチ' }],
+  torso_rotation_machine: [{ text: 'ツイストマシン' }, { text: 'オブリークマシン' }],
+  machine_pullover: [{ text: 'マシンプルオーバー' }],
+  treadmill: [{ text: 'ランニングマシン' }, { text: 'ルームランナー' }, { text: 'Treadmill' }],
+  stationary_bike: [{ text: 'フィットネスバイク' }, { text: 'バイク' }],
+  single_leg_press: [{ text: '片脚レッグプレス', reading: 'かたあしれっぐぷれす' }],
+  lateral_band_walk: [{ text: 'モンスターウォーク' }, { text: 'サイドバンドウォーク' }],
+  power_clean: [{ text: 'クリーン' }, { text: 'Power Clean' }],
+  clean_and_jerk: [{ text: 'クリーンアンドジャーク' }, { text: 'Clean and Jerk' }],
+  snatch: [{ text: 'Snatch' }],
 };
 
 export function getAliases(exercise: Exercise): AliasEntry[] {
