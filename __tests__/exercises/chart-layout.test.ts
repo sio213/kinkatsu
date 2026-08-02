@@ -10,7 +10,12 @@ import {
   starPoints,
   type ChartLayout,
 } from '@/lib/exercises/chart-layout';
-import { findPersonalBest, type ProgressPoint, type ProgressUnit } from '@/lib/exercises/progress';
+import {
+  findPersonalBest,
+  type ProgressLeadIn,
+  type ProgressPoint,
+  type ProgressUnit,
+} from '@/lib/exercises/progress';
 
 const KG: ProgressUnit = { label: 'kg', step: 5, minRange: 10, integerOnly: false, auxKind: 'reps' };
 const KM: ProgressUnit = { label: 'km', step: 2.5, minRange: 4, integerOnly: false, auxKind: 'none' };
@@ -460,6 +465,75 @@ describe('ツールチップ', () => {
 
   test('点が無ければnull', () => {
     expect(placeTooltip(layout, 99, texts, null)).toBeNull();
+  });
+});
+
+describe('期間の外から伸ばす線（リードイン）', () => {
+  const WINDOW_START = BASE - 30 * DAY;
+  /** 期間内は1点だけ、その2ヶ月前に記録がある——1ヶ月表示でいちばん起きやすい形 */
+  const only = (value: number) => [{ ...makePoints([value])[0], dateKey: BASE, startedAt: BASE }];
+  const leadInAt = (dayOffset: number, value: number): ProgressLeadIn => ({
+    point: { ...makePoints([value])[0], dateKey: BASE + dayOffset * DAY, startedAt: BASE + dayOffset * DAY },
+    windowStart: WINDOW_START,
+  });
+
+  const layoutWithLeadIn = (points: ProgressPoint[], leadIn: ProgressLeadIn | null) =>
+    computeChartLayout(points, KG, WIDTH, findPersonalBest(points), leadIn);
+
+  test('点が1つでも線の入り口が返る', () => {
+    const layout = layoutWithLeadIn(only(70), leadInAt(-60, 65));
+    expect(layout.leadIn).not.toBeNull();
+  });
+
+  test('唯一の点は水平中央ではなく右端に来る（X軸の左端が期間の始まりになるため）', () => {
+    const withLeadIn = layoutWithLeadIn(only(70), leadInAt(-60, 65));
+    const without = layoutWithLeadIn(only(70), null);
+
+    expect(withLeadIn.points[0].x).toBeGreaterThan(without.points[0].x);
+    expect(withLeadIn.points[0].x).toBeCloseTo(withLeadIn.right - 6, 5);
+    // 中央に置いていた従来のケースは変わらない
+    expect(without.points[0].x).toBeCloseTo((without.left + 6 + without.right - 6) / 2, 5);
+  });
+
+  test('X軸ラベルは右揃えにする。中央揃えのままだとプロットの右へはみ出す', () => {
+    expect(layoutWithLeadIn(only(70), leadInAt(-60, 65)).xTicks[0].anchor).toBe('end');
+    expect(layoutWithLeadIn(only(70), null).xTicks[0].anchor).toBe('middle');
+  });
+
+  test('入り口は必ずプロットの内側。縦軸のスケール外の値でも上下でクリップする', () => {
+    for (const value of [65, 5, 500]) {
+      const layout = layoutWithLeadIn(only(70), leadInAt(-60, value));
+      const entry = layout.leadIn!;
+      expect(entry.x).toBeGreaterThanOrEqual(layout.left);
+      expect(entry.y).toBeGreaterThanOrEqual(layout.top);
+      // 下端は面塗りのベースライン（最下段のグリッド線）で止める
+      expect(entry.y).toBeLessThanOrEqual(layout.tickYs[0]);
+    }
+  });
+
+  test('期間外の点が高すぎれば上端から、低すぎればベースラインから線が入る', () => {
+    const high = layoutWithLeadIn(only(70), leadInAt(-60, 500))!.leadIn!;
+    const low = layoutWithLeadIn(only(70), leadInAt(-60, 5))!.leadIn!;
+    const layout = layoutWithLeadIn(only(70), leadInAt(-60, 65));
+
+    expect(high.y).toBeCloseTo(layout.top, 5);
+    expect(low.y).toBeCloseTo(layout.tickYs[0], 5);
+    // 縦軸のスケールは表示中の点だけで決める（期間外の1点で潰されない）
+    expect(layout.scale).toEqual(layoutWithLeadIn(only(70), null).scale);
+  });
+
+  test('点が2つ以上ある期間では座標を動かさない。左端に届く頃には傾きが読めなくなるため', () => {
+    const points = makePoints([60, 65]);
+    const withLeadIn = layoutWithLeadIn(points, leadInAt(-60, 55));
+
+    expect(withLeadIn.leadIn).toBeNull();
+    expect(withLeadIn.points.map((p) => p.x)).toEqual(
+      layoutWithLeadIn(points, null).points.map((p) => p.x),
+    );
+  });
+
+  test('点が0件なら繋ぐ先が無いので線を引かない', () => {
+    expect(layoutWithLeadIn([], leadInAt(-60, 65)).leadIn).toBeNull();
   });
 });
 

@@ -18,6 +18,7 @@ import {
   availableProgressMetrics,
   DEFAULT_PROGRESS_PERIOD,
   filterProgressPoints,
+  findLeadIn,
   findPersonalBest,
   progressMetricLabel,
   type ProgressMetric,
@@ -80,6 +81,10 @@ export function ExerciseRecordTab({
     () => filterProgressPoints(series.points, period),
     [series.points, period],
   );
+
+  // 期間の外から線を伸ばすための、期間の直前の記録。**pointsには混ぜないこと**——混ぜると
+  // 選択の添字・前回比・内訳カードが期間外の記録を指してしまう。グラフは線の始点にしか使わない
+  const leadIn = useMemo(() => findLeadIn(series.points, period), [series.points, period]);
 
   // 選択中の点は添字ではなく日付で覚える。期間を切り替えても同じ日を選び続けられるようにし、
   // 選んでいた日が期間外に出たときだけ最新の点へ戻す（初期表示も最新の点＝未選択のときの既定）
@@ -214,6 +219,7 @@ export function ExerciseRecordTab({
               highlight={highlight}
               // アンバーと★は実測の自己ベスト専用。他の指標では色も記号も持たせない（FIX-10）
               highlightKind={metric === 'best' ? 'personal-best' : 'metric-max'}
+              leadIn={leadIn}
               selectedIndex={selectedIndex}
               onSelect={handleSelect}
             />

@@ -4,7 +4,7 @@ import {
   formatTickValue,
   type ChartScale,
 } from '@/lib/exercises/chart-scale';
-import type { ProgressPoint, ProgressUnit } from '@/lib/exercises/progress';
+import type { ProgressLeadIn, ProgressPoint, ProgressUnit } from '@/lib/exercises/progress';
 
 /**
  * 重量グラフの座標計算。SVGの描画そのもの（exercise-progress-chart.tsx）から切り離して
@@ -70,6 +70,14 @@ export type ChartPoint = {
 
 export type XTick = { x: number; label: string; anchor: 'start' | 'middle' | 'end' };
 
+/** 期間の外から伸ばす線の、プロットの縁での入り口。ここから最初の点まで線と面塗りを繋ぐ */
+export type ChartLeadIn = {
+  x: number;
+  y: number;
+  /** 線の元になった期間外の記録。読み上げにだけ使う（点もツールチップも描かない） */
+  point: ProgressPoint;
+};
+
 export type ChartLayout = {
   width: number;
   height: number;
@@ -98,6 +106,11 @@ export type ChartLayout = {
    * （印は描けない。値は highlight から読む）
    */
   highlightIndex: number | null;
+  /**
+   * 期間の外から最初の点へ線を伸ばす場合の入り口。描かない場合はnull（＝従来どおり
+   * 表示中の点だけで線を引く）
+   */
+  leadIn: ChartLeadIn | null;
   /** X軸ラベル（位置と文字列） */
   xTicks: XTick[];
 };
@@ -142,6 +155,12 @@ export function computeChartLayout(
    * その月の最大が「最高」になり、内訳カード・過去の記録一覧のバッジと食い違うため
    */
   highlight: ProgressPoint | null,
+  /**
+   * 表示期間の直前の記録（findLeadIn の結果）。渡すと、期間内の点が1つだけのときに
+   * 線が期間の外から伸びてきてその点に繋がる。**pointsには混ぜないこと**——混ぜると
+   * 選択の添字・マーカーの間引き・X軸ラベル・ベストチップの衝突判定が全てズレる
+   */
+  leadIn: ProgressLeadIn | null = null,
 ): ChartLayout {
   const scale = computeChartScale(points.map((p) => p.value), unit);
   const top = PAD_TOP;
@@ -155,12 +174,25 @@ export function computeChartLayout(
   const innerWidth = Math.max(right - left - INSET * 2, 1);
   const first = points[0]?.dateKey ?? 0;
   const last = points[points.length - 1]?.dateKey ?? 0;
-  const span = last - first;
+  /**
+   * リードイン（期間の外から伸ばす線）を描くときだけ、X軸の左端を最初の点ではなく
+   * 「表示期間の始まり」に置き換える。点が1つだけだと通常はその点を水平中央に置くので、
+   * 線を伸ばす余地がそもそも無いため。左端が期間の始まりに変わることで、その1点は他の
+   * ケースと同じく右端（＝最新の記録の位置）に来る。
+   *
+   * **点が2つ以上ある期間では左端を動かさない。** X軸が「最初の点〜最後の点」に張られている
+   * 以上、2ヶ月前の記録のX座標はプロット幅の何倍も左に出てしまい、左端に届く頃には傾きが
+   * ほぼ0の数pxの切れ端になる。何も伝わらない線を足しても読みづらくなるだけなので描かない
+   * （1m/3m/6mでは常にX軸を期間の窓にする案は、既存グラフ全ての見た目が変わるため別途検討）。
+   */
+  const useWindow = leadIn != null && points.length === 1 && leadIn.windowStart < last;
+  const domainStart = useWindow ? leadIn.windowStart : first;
+  const span = last - domainStart;
   // 点が1つだけ、または全点が同じ日なら水平中央に置く（X軸ラベルも中央揃えになる）
   const toX = (dateKey: number) =>
-    points.length < 2 || span === 0
+    span <= 0
       ? left + INSET + innerWidth / 2
-      : left + INSET + (innerWidth * (dateKey - first)) / span;
+      : left + INSET + (innerWidth * (dateKey - domainStart)) / span;
 
   const chartPoints: ChartPoint[] = points.map((point, index) => ({
     x: toX(point.dateKey),
@@ -170,11 +202,23 @@ export function computeChartLayout(
   }));
 
   const spacing = innerWidth / Math.max(points.length - 1, 1);
+  // 期間の窓に張り替えたときのspanは最長でも6ヶ月なので、ここは従来どおりで判定が変わらない
   const withYear = span >= YEAR_LABEL_SPAN_MS;
 
   // 自己ベストの日が表示期間に含まれていなければ描く点が無い。チップだけが値を出し続ける
   const highlightAt = highlight == null ? -1 : points.findIndex((p) => p.dateKey === highlight.dateKey);
   const highlightIndex = highlightAt < 0 ? null : highlightAt;
+
+  const tickYs = scale.ticks.map(toY);
+  const leadInEntry =
+    useWindow && chartPoints.length > 0
+      ? clipLeadIn(
+          { x: toX(leadIn.point.dateKey), y: toY(leadIn.point.value) },
+          chartPoints[0],
+          { left, top, bottom: tickYs[0] },
+          leadIn.point,
+        )
+      : null;
 
   return {
     width,
@@ -185,13 +229,43 @@ export function computeChartLayout(
     left,
     right,
     scale,
-    tickYs: scale.ticks.map(toY),
+    tickYs,
     points: chartPoints,
     markerIndices: pickMarkerIndices(points.length, spacing),
     highlight,
     highlightIndex,
-    xTicks: pickXTicks(chartPoints, withYear),
+    leadIn: leadInEntry,
+    // 期間の窓に張り替えたときだけ、唯一の点は中央ではなく右端に来る。中央揃えのままだと
+    // ラベルがプロットの右へはみ出すので、最後の点と同じ右揃えにする
+    xTicks: pickXTicks(chartPoints, withYear, useWindow ? 'end' : 'middle'),
   };
+}
+
+/**
+ * 期間の外の記録から最初の点へ引く線が、プロットの縁を横切る位置。線を描き始める場所になる。
+ *
+ * 期間外の点はX座標が左端より左に出るうえ、縦軸のスケール（表示中の点だけで決めている）の
+ * 外に出ることもあるので、線分をプロットの内側でクリップして「どこから入ってくるか」だけを返す。
+ * 期間外の1点のために縦軸を広げると、肝心の表示中の点が潰れてしまうためスケールには含めない。
+ * 上下は目盛りの下端（＝面塗りのベースライン）とプロットの上端で止める。
+ */
+function clipLeadIn(
+  from: { x: number; y: number },
+  to: { x: number; y: number },
+  bounds: { left: number; top: number; bottom: number },
+  point: ProgressPoint,
+): ChartLeadIn | null {
+  const dx = from.x - to.x;
+  const dy = from.y - to.y;
+  // 期間外の点が最初の点より右に来ることは無いが、0除算を避けるため念のため弾く
+  if (dx >= 0) return null;
+
+  let t = Math.min(1, (bounds.left - to.x) / dx);
+  if (dy < 0) t = Math.min(t, (bounds.top - to.y) / dy);
+  if (dy > 0) t = Math.min(t, (bounds.bottom - to.y) / dy);
+  if (!(t > 0)) return null;
+
+  return { x: to.x + dx * t, y: to.y + dy * t, point };
 }
 
 /** ラベルが実際に占める横方向の区間。アンカーによって基準点の左右どちらに伸びるかが変わる */
@@ -217,14 +291,19 @@ function placeXTick(points: ChartPoint[], index: number, withYear: boolean): Pla
  * それでも近すぎる場合は、文字幅の見積もりから重なる中間ラベルを落とす。期間の始まりと
  * 終わりが分かるように両端のラベルは必ず残す（両端は常にプロットの左右端にあり重ならない）。
  */
-function pickXTicks(points: ChartPoint[], withYear: boolean): XTick[] {
+function pickXTicks(
+  points: ChartPoint[],
+  withYear: boolean,
+  /** 点が1つだけのときのラベルの揃え方。その点が右端に来る場合だけ 'end' */
+  singleAnchor: XTick['anchor'] = 'middle',
+): XTick[] {
   if (points.length === 0) return [];
 
   const leftX = points[0].x;
   const rightX = points[points.length - 1].x;
-  // 点が1つだけ、または全点が同じ日なら横に並ばないので中央に1つだけ出す
+  // 点が1つだけ、または全点が同じ日なら横に並ばないので1つだけ出す
   if (leftX === rightX) {
-    return [{ ...placeXTick(points, 0, withYear).tick, anchor: 'middle' }];
+    return [{ ...placeXTick(points, 0, withYear).tick, anchor: singleAnchor }];
   }
 
   const candidates: number[] = [];
@@ -271,18 +350,18 @@ export type BestChipBox = {
 };
 
 /**
- * 自己ベストが表示期間の外にあるとき、チップに添える日付。
+ * 表示期間の外にある記録の日付。自己ベストのチップと、期間の外から伸びる線の読み上げで使う。
  *
  * 点が無い状態で値だけ浮いていると「今どこかにこの値の点があるはず」と誤読されるため、
  * 「過去のある1日の記録」だと分かるように日付を出す（デザイン相談での採用案）。
  * 表示中の最新の記録と年が違えば年も出す——「4/12」だけでは去年のベストと区別できないため。
  */
-function outOfRangeDate(layout: ChartLayout, best: ProgressPoint): string {
+export function formatOutOfRangeDate(layout: ChartLayout, point: ProgressPoint): string {
   const latest = layout.points[layout.points.length - 1];
   const withYear =
     layout.withYear ||
-    (latest != null && new Date(best.dateKey).getFullYear() !== new Date(latest.point.dateKey).getFullYear());
-  return formatTooltipDate(best.dateKey, withYear);
+    (latest != null && new Date(point.dateKey).getFullYear() !== new Date(latest.point.dateKey).getFullYear());
+  return formatTooltipDate(point.dateKey, withYear);
 }
 
 /**
@@ -311,7 +390,7 @@ export function placeBestChip(
   const value = `${formatTickValue(best.value)}${unit.label}`;
   const label = `${prefix} ${value}`;
   // 期間外の日付は本体の値より一段弱く描くので、幅の見積もりだけ合算して別々に返す
-  const date = layout.highlightIndex == null ? `・${outOfRangeDate(layout, best)}` : '';
+  const date = layout.highlightIndex == null ? `・${formatOutOfRangeDate(layout, best)}` : '';
   const width = Math.round(estimateTextWidth(label + date, BEST_CHIP_FONT_SIZE) + BEST_CHIP_PAD);
   const height = BEST_CHIP_HEIGHT;
 

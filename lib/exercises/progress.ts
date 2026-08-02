@@ -537,6 +537,42 @@ export function progressPeriodStart(period: ProgressPeriod, now: number): number
   return toDayKey(d.getTime());
 }
 
+export type ProgressLeadIn = {
+  /** 表示期間の直前にある最新の点。線の始点にだけ使い、マーカーもツールチップも持たない */
+  point: ProgressPoint;
+  /** 表示期間の始まり（＝X軸の左端に置く日） */
+  windowStart: number;
+};
+
+/**
+ * 表示期間の1つ前の記録。「1ヶ月」表示で期間内の記録が1件しか無くても、線が期間の外から
+ * 伸びてきてその点に繋がるようにするためのもの（期間外なので点そのものは描かない）。
+ *
+ * 無料プランは直近1ヶ月しか見られないため、「期間内1点＝線が1本も引かれない」は無料ユーザーの
+ * 標準的な画面になる（グラフは種目ごとなので、通っていても月1〜2回しかやらない種目では普通に
+ * 起きる）。そこで推移が何も読めないと、期間を広げる価値も伝わらない。自己ベストが表示期間の
+ * 外にあってもチップで値を出し続けているのと同じ考え方（マネタイズ設計 2026-07-30）。
+ *
+ * 全期間表示では常にnull（期間の外が存在しない）。全期間で1件しか無い場合も同じくnullで、
+ * このときは点1つだけが描かれる。
+ *
+ * pointsは古い順（buildProgressSeriesの出力）であること。
+ */
+export function findLeadIn(
+  points: ProgressPoint[],
+  period: ProgressPeriod,
+  now: number = Date.now(),
+): ProgressLeadIn | null {
+  const windowStart = progressPeriodStart(period, now);
+  if (windowStart == null) return null;
+  let point: ProgressPoint | null = null;
+  for (const p of points) {
+    if (p.dateKey >= windowStart) break;
+    point = p;
+  }
+  return point == null ? null : { point, windowStart };
+}
+
 /** 期間チップの選択に応じて系列を絞り込む。単位は全期間のデータで決めた値をそのまま使う */
 export function filterProgressPoints(
   points: ProgressPoint[],
