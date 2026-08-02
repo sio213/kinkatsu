@@ -500,24 +500,28 @@ describe('期間の外から伸ばす線（リードイン）', () => {
     expect(layoutWithLeadIn(only(70), null).xTicks[0].anchor).toBe('middle');
   });
 
-  test('入り口は必ずプロットの内側。縦軸のスケール外の値でも上下でクリップする', () => {
-    for (const value of [65, 5, 500]) {
-      const layout = layoutWithLeadIn(only(70), leadInAt(-60, value));
-      const entry = layout.leadIn!;
-      expect(entry.x).toBeGreaterThanOrEqual(layout.left);
+  test('線は必ず左端から引く。縦軸のスケール外の値でも上下に丸めるだけで切り詰めない', () => {
+    // 前回2kg→今回70kgのような極端な差でも、右端の切れ端にしない（実機で確認した不具合）
+    for (const value of [65, 2, 500]) {
+      const entry = layoutWithLeadIn(only(70), leadInAt(-60, value)).leadIn!;
+      const layout = layoutWithLeadIn(only(70), null);
+      expect(entry.x).toBeCloseTo(layout.left, 5);
       expect(entry.y).toBeGreaterThanOrEqual(layout.top);
       // 下端は面塗りのベースライン（最下段のグリッド線）で止める
       expect(entry.y).toBeLessThanOrEqual(layout.tickYs[0]);
     }
   });
 
-  test('期間外の点が高すぎれば上端から、低すぎればベースラインから線が入る', () => {
-    const high = layoutWithLeadIn(only(70), leadInAt(-60, 500))!.leadIn!;
-    const low = layoutWithLeadIn(only(70), leadInAt(-60, 5))!.leadIn!;
+  test('期間外の点が高すぎれば左上、低すぎれば左下から線が入る', () => {
+    const high = layoutWithLeadIn(only(70), leadInAt(-60, 500)).leadIn!;
+    const low = layoutWithLeadIn(only(70), leadInAt(-60, 2)).leadIn!;
     const layout = layoutWithLeadIn(only(70), leadInAt(-60, 65));
 
     expect(high.y).toBeCloseTo(layout.top, 5);
     expect(low.y).toBeCloseTo(layout.tickYs[0], 5);
+    // 差が小さければ丸めは効かず、点との間の実際の値のまま入ってくる
+    expect(layout.leadIn!.y).toBeGreaterThan(layout.points[0].y);
+    expect(layout.leadIn!.y).toBeLessThan(layout.tickYs[0]);
     // 縦軸のスケールは表示中の点だけで決める（期間外の1点で潰されない）
     expect(layout.scale).toEqual(layoutWithLeadIn(only(70), null).scale);
   });
