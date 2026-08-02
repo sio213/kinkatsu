@@ -2,6 +2,7 @@ import {
   buildProgressSeries,
   DEFAULT_PROGRESS_PERIOD,
   filterProgressPoints,
+  findLeadIn,
   findPersonalBest,
   formatProgressAux,
   progressPeriodStart,
@@ -209,6 +210,38 @@ describe('期間の絞り込み', () => {
       row({ startedAt: at(2026, 4, 28, 23), setNumber: 1, weight: 60, reps: 8 }),
     ]);
     expect(filterProgressPoints(boundary.points, '3m', now)).toHaveLength(1);
+  });
+
+  describe('findLeadIn: 期間の外から線を伸ばすための直前の記録', () => {
+    test('期間の直前にある最新の1点を返す', () => {
+      const lead = findLeadIn(series.points, '1m', now)!;
+      // 1ヶ月表示に残るのは65・70の2点。その直前は5/1の60
+      expect(lead.point.value).toBe(60);
+      expect(lead.windowStart).toBe(progressPeriodStart('1m', now));
+    });
+
+    test('期間をさかのぼるほど直前の点も古くなる', () => {
+      expect(findLeadIn(series.points, '3m', now)?.point.value).toBe(55);
+      expect(findLeadIn(series.points, '6m', now)?.point.value).toBe(50);
+    });
+
+    test('全期間表示では常にnull。期間の外が存在しない', () => {
+      expect(findLeadIn(series.points, 'all', now)).toBeNull();
+    });
+
+    test('期間より前に記録が無ければnull。全期間で1点だけなら線は引けない', () => {
+      const single = buildProgressSeries('weight_reps', [
+        row({ startedAt: at(2026, 7, 23), setNumber: 1, weight: 70, reps: 8 }),
+      ]);
+      expect(findLeadIn(single.points, '1m', now)).toBeNull();
+    });
+
+    test('起点ちょうどの日は期間内なのでリードインにしない', () => {
+      const boundary = buildProgressSeries('weight_reps', [
+        row({ startedAt: at(2026, 6, 28, 23), setNumber: 1, weight: 60, reps: 8 }),
+      ]);
+      expect(findLeadIn(boundary.points, '1m', now)).toBeNull();
+    });
   });
 });
 

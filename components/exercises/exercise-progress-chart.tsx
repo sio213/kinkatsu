@@ -4,6 +4,7 @@ import {
   CHART_HEIGHT,
   computeChartLayout,
   findNearestPointIndex,
+  formatOutOfRangeDate,
   formatTooltipDate,
   placeBestChip,
   placeTooltip,
@@ -12,7 +13,12 @@ import {
   type HighlightKind,
 } from '@/lib/exercises/chart-layout';
 import { formatTickLabel, formatTickValue } from '@/lib/exercises/chart-scale';
-import { formatProgressAux, type ProgressPoint, type ProgressUnit } from '@/lib/exercises/progress';
+import {
+  formatProgressAux,
+  type ProgressLeadIn,
+  type ProgressPoint,
+  type ProgressUnit,
+} from '@/lib/exercises/progress';
 import { useMemo, useState } from 'react';
 import { StyleSheet, View, type LayoutChangeEvent } from 'react-native';
 import { Gesture, GestureDetector } from 'react-native-gesture-handler';
@@ -118,18 +124,32 @@ type Props = {
    * ★のチップにする。総重量・推定1RMでは単なる最高値なので色も★も持たない（FIX-10）
    */
   highlightKind: HighlightKind;
+  /**
+   * 表示期間の直前の記録（findLeadIn の結果）。期間内の点が1つだけのときに、線を期間の外から
+   * 伸ばしてその点に繋げる。点・マーカー・ツールチップは持たない
+   */
+  leadIn: ProgressLeadIn | null;
   /** 選択中の点。点が無いときはnull */
   selectedIndex: number | null;
   onSelect: (index: number) => void;
 };
 
+/**
+ * 線・面塗りが通る座標。期間の外から線を伸ばす場合は、プロットの縁での入り口を先頭に足す
+ * （その点にはマーカーを描かない。期間外の記録なので「その日にここで記録した」とは読ませない）
+ */
+function pathPoints(layout: ChartLayout): { x: number; y: number }[] {
+  return layout.leadIn ? [layout.leadIn, ...layout.points] : layout.points;
+}
+
 function linePath(layout: ChartLayout): string {
-  return `M ${layout.points.map((p) => `${p.x} ${p.y}`).join(' L ')}`;
+  return `M ${pathPoints(layout).map((p) => `${p.x} ${p.y}`).join(' L ')}`;
 }
 
 function areaPath(layout: ChartLayout): string {
-  const first = layout.points[0];
-  const last = layout.points[layout.points.length - 1];
+  const coords = pathPoints(layout);
+  const first = coords[0];
+  const last = coords[coords.length - 1];
   // 塗りの下端はプロットの下端(layout.bottom)ではなく最下段のグリッド線に合わせる。
   // 描画範囲は目盛りの外側へ少し広げてあるため、bottomまで塗ると軸線の下へはみ出して見える
   const baseline = layout.tickYs[0];
@@ -149,14 +169,15 @@ export function ExerciseProgressChart({
   unit,
   highlight,
   highlightKind,
+  leadIn,
   selectedIndex,
   onSelect,
 }: Props) {
   const [width, setWidth] = useState(0);
 
   const layout = useMemo(
-    () => (width > 0 ? computeChartLayout(points, unit, width, highlight) : null),
-    [points, unit, width, highlight],
+    () => (width > 0 ? computeChartLayout(points, unit, width, highlight, leadIn) : null),
+    [points, unit, width, highlight, leadIn],
   );
   const bestChip = useMemo(
     () => (layout ? placeBestChip(layout, unit, highlightKind) : null),
@@ -241,9 +262,17 @@ export function ExerciseProgressChart({
       ? `${isPersonalBest ? '自己ベスト' : '最高値'}は表示期間の外（${bestChip.value}${bestChip.date}）。`
       : '';
 
+  // 期間の外から伸びてくる線は、晴眼者には「前の記録から繋がっている」と見えているのに
+  // 読み上げでは存在ごと消えてしまう。値と日付を1文で添える
+  const leadInLabel =
+    layout?.leadIn == null
+      ? ''
+      : `期間の前の記録（${formatOutOfRangeDate(layout, layout.leadIn.point)}・` +
+        `${formatTickValue(layout.leadIn.point.value)}${unit.label}）から線が続いています。`;
+
   const chartLabel = selectionLabel
-    ? `記録の推移グラフ。${outOfRangeBestLabel}選択中: ${selectionLabel}`
-    : `記録の推移グラフ。${outOfRangeBestLabel}`.trimEnd();
+    ? `記録の推移グラフ。${leadInLabel}${outOfRangeBestLabel}選択中: ${selectionLabel}`
+    : `記録の推移グラフ。${leadInLabel}${outOfRangeBestLabel}`.trimEnd();
 
   return (
     <GestureDetector gesture={gesture}>
@@ -293,7 +322,7 @@ export function ExerciseProgressChart({
               );
             })}
 
-            {layout.points.length > 1 && (
+            {pathPoints(layout).length > 1 && (
               <>
                 <Path d={areaPath(layout)} fill={`url(#${AREA_GRADIENT_ID})`} />
                 <Path

@@ -1,9 +1,14 @@
 import { ExerciseProgressChart } from '@/components/exercises/exercise-progress-chart';
 import { Colors } from '@/constants/theme';
-import type { ProgressPoint, ProgressSet, ProgressUnit } from '@/lib/exercises/progress';
+import type {
+  ProgressLeadIn,
+  ProgressPoint,
+  ProgressSet,
+  ProgressUnit,
+} from '@/lib/exercises/progress';
 import React from 'react';
 import { act, create, type ReactTestInstance } from 'react-test-renderer';
-import { Circle, Polygon } from 'react-native-svg';
+import { Circle, Path, Polygon } from 'react-native-svg';
 
 const KG: ProgressUnit = { label: 'kg', step: 5, minRange: 10, integerOnly: false, auxKind: 'reps' };
 
@@ -40,6 +45,7 @@ function render(options: {
   selectedIndex?: number | null;
   highlight?: ProgressPoint | null;
   points?: ProgressPoint[];
+  leadIn?: ProgressLeadIn | null;
 }) {
   const points = options.points ?? POINTS;
   let instance!: ReturnType<typeof create>;
@@ -50,6 +56,7 @@ function render(options: {
         unit={KG}
         highlight={options.highlight === undefined ? points[HIGHLIGHT_INDEX] : options.highlight}
         highlightKind={options.highlightKind}
+        leadIn={options.leadIn ?? null}
         selectedIndex={options.selectedIndex ?? null}
         onSelect={jest.fn()}
       />,
@@ -158,5 +165,47 @@ describe('ExerciseProgressChart: 実測ベストは従来どおり（FIX-10）',
 
     expect(circleWithRadius(root, 6)).toBeUndefined();
     expect(circleWithRadius(root, 4.5)).toMatchObject({ fill: Colors.chartBest });
+  });
+});
+
+describe('ExerciseProgressChart: 期間の外から伸ばす線', () => {
+  const ONLY = [makePoint(0, 70)];
+  const LEAD_IN: ProgressLeadIn = {
+    point: makePoint(-9, 65),
+    windowStart: BASE - 30 * DAY,
+  };
+
+  /** 折れ線本体。面塗りのPathはstrokeを持たないので、これで1本に絞れる */
+  const linePath = (root: ReactTestInstance) =>
+    root.findAllByType(Path).find((p) => p.props.stroke === Colors.accent)?.props.d as
+      | string
+      | undefined;
+
+  test('期間内の点が1つでも、期間の外の記録があれば線が引かれる', () => {
+    const root = render({ highlightKind: 'personal-best', points: ONLY, leadIn: LEAD_IN });
+
+    // M（入り口）→ L（唯一の点）の2点で1本の線になる
+    expect(linePath(root)).toMatch(/^M [\d.]+ [\d.]+ L [\d.]+ [\d.]+$/);
+  });
+
+  test('期間の外に記録が無ければ従来どおり線を引かない', () => {
+    const root = render({ highlightKind: 'personal-best', points: ONLY, leadIn: null });
+
+    expect(linePath(root)).toBeUndefined();
+  });
+
+  test('期間外の記録にマーカーは足さない。点は1つのまま', () => {
+    const withLine = render({ highlightKind: 'personal-best', points: ONLY, leadIn: LEAD_IN });
+    const withoutLine = render({ highlightKind: 'personal-best', points: ONLY, leadIn: null });
+
+    expect(circles(withLine).length).toBe(circles(withoutLine).length);
+  });
+
+  test('読み上げにも「期間の前の記録から線が続いている」ことを添える', () => {
+    const root = render({ highlightKind: 'personal-best', points: ONLY, leadIn: LEAD_IN });
+
+    expect(root.findByProps({ accessibilityRole: 'image' }).props.accessibilityLabel).toContain(
+      '期間の前の記録（2/8・65kg）から線が続いています',
+    );
   });
 });

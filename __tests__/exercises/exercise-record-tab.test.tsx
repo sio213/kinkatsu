@@ -140,6 +140,37 @@ describe('ExerciseRecordTab', () => {
     expect(personalBest().value).toBe(80);
   });
 
+  describe('期間の外から伸ばす線', () => {
+    // 100日前と40日前に記録があり、直近1ヶ月には3日前の1点しか無い——無料プランの
+    // 1ヶ月表示でいちばん起きやすい形
+    const sparse = [makePoint(100, 80), makePoint(40, 70), makePoint(3, 65)];
+
+    test('期間の直前の記録をグラフに渡す。pointsには混ぜない', () => {
+      const root = render(sparse);
+      pressChip(root, '1ヶ月');
+      const chart = () => root.findByType(ExerciseProgressChart).props;
+
+      expect(chart().points).toHaveLength(1);
+      // 直前の1点（40日前の70kg）だけを線の始点にする。100日前の80kgではない
+      expect(chart().leadIn.point.value).toBe(70);
+      expect(chart().leadIn.windowStart).toBeLessThan(chart().points[0].dateKey);
+    });
+
+    test('全期間表示では渡さない。期間の外が存在しない', () => {
+      const root = render(points);
+      pressChip(root, '全期間');
+
+      expect(root.findByType(ExerciseProgressChart).props.leadIn).toBeNull();
+    });
+
+    test('期間より前に記録が無ければ渡さない', () => {
+      const root = render([makePoint(3, 65)]);
+      pressChip(root, '1ヶ月');
+
+      expect(root.findByType(ExerciseProgressChart).props.leadIn).toBeNull();
+    });
+  });
+
   test('全期間に切り替えて80kgの日を選ぶと自己ベストのバッジが出る', () => {
     const root = render(points);
     pressChip(root, '全期間');
