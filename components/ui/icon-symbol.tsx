@@ -36,6 +36,7 @@ const MAPPING = {
   'clock.arrow.circlepath': 'history',
   'exclamationmark.triangle.fill': 'warning',
   'arrow.up.right.square': 'open-in-new',
+  'square.and.arrow.up': 'ios-share',
 } as IconMapping;
 
 /**

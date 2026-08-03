@@ -3,8 +3,10 @@ import { ExerciseProgressChartSample } from '@/components/exercises/exercise-pro
 import { ExerciseRecordDetailCard } from '@/components/exercises/exercise-record-detail-card';
 import { MetricFilterChips } from '@/components/exercises/metric-filter-chips';
 import { ExerciseRecordHistoryList } from '@/components/exercises/exercise-record-history-list';
+import { ExerciseProgressShareModal } from '@/components/exercises/exercise-progress-share-modal';
 import { PeriodFilterChips } from '@/components/exercises/period-filter-chips';
 import { DesignIcon } from '@/components/ui/design-icon';
+import { IconSymbol } from '@/components/ui/icon-symbol';
 import { PrimaryButton } from '@/components/ui/primary-button';
 import { Colors, Typography } from '@/constants/theme';
 import { useDebouncedPush } from '@/hooks/use-debounced-push';
@@ -21,12 +23,14 @@ import {
   findLeadIn,
   findPersonalBest,
   progressMetricLabel,
+  PROGRESS_PERIOD_LABELS,
   type ProgressMetric,
   type ProgressPeriod,
 } from '@/lib/exercises/progress';
+import type { ProgressShareSummary } from '@/lib/share/progress-share';
 import { startWorkoutWithExercise } from '@/lib/workout/session';
 import { useMemo, useState } from 'react';
-import { StyleSheet, Text, View } from 'react-native';
+import { Pressable, StyleSheet, Text, View } from 'react-native';
 
 type Props = {
   exerciseId: number;
@@ -180,6 +184,19 @@ export function ExerciseRecordTab({
   // 内訳カードのバッジは選択中の指標に関係なく、実測の自己ベスト（ベスト系列の最高点）を指す
   const personalBest = useMemo(() => findPersonalBest(bestSeries.points), [bestSeries.points]);
 
+  const [shareVisible, setShareVisible] = useState(false);
+  // 共有カードに載せる代表値はハイライト（最大○○なら自己ベスト、集計系ならその指標の最高値）。
+  // 選択中の点にしないこと——共有画像には選択の印を描かないので、どの点の値なのか読めなくなる
+  const shareSummary = useMemo<ProgressShareSummary>(
+    () => ({
+      exerciseName,
+      metricLabel: metric === 'best' ? null : metricLabel,
+      value: highlight ? formatTickValue(highlight.value) : null,
+      unit: series.unit.label,
+    }),
+    [exerciseName, metric, metricLabel, highlight, series.unit.label],
+  );
+
   return (
     <View style={styles.container}>
       <PeriodFilterChips value={period} onChange={setPeriod} />
@@ -242,6 +259,19 @@ export function ExerciseRecordTab({
             </Text>
           ))}
 
+          {/* 点が1つも無い期間では出さない。描くものが無いグラフを共有しても何も伝わらない */}
+          {points.length > 0 && (
+            <Pressable
+              style={styles.shareLink}
+              onPress={() => setShareVisible(true)}
+              accessibilityRole="button"
+              accessibilityLabel="この記録を共有する"
+            >
+              <IconSymbol name="square.and.arrow.up" size={16} color={Colors.accent} />
+              <Text style={styles.shareLabel}>この記録を共有</Text>
+            </Pressable>
+          )}
+
           {selectedPoint && (
             <ExerciseRecordDetailCard
               // 別の日を選んだら「他N件を見る」の展開状態を持ち越さず畳んだ状態から始める
@@ -281,6 +311,19 @@ export function ExerciseRecordTab({
               }
             />
           )}
+
+          <ExerciseProgressShareModal
+            visible={shareVisible}
+            onClose={() => setShareVisible(false)}
+            summary={shareSummary}
+            periodLabel={PROGRESS_PERIOD_LABELS[period]}
+            isPersonalBest={metric === 'best'}
+            points={points}
+            chartUnit={series.unit}
+            highlight={highlight}
+            highlightKind={metric === 'best' ? 'personal-best' : 'metric-max'}
+            leadIn={leadIn}
+          />
         </>
       )}
     </View>
@@ -296,6 +339,9 @@ const styles = StyleSheet.create({
   // 幅290pxでは2行になる想定で、チップ列との間隔と合わせて内訳カードが45px下がる
   caption: { ...Typography.captionCompact, color: Colors.textSecondary },
   captionLead: { color: Colors.textPrimary, fontWeight: '700' },
+  // 注記の下に置く控えめなテキストリンク。グラフ周りの主役は記録そのものなので面や枠は持たせない
+  shareLink: { flexDirection: 'row', alignItems: 'center', gap: 5, alignSelf: 'flex-start' },
+  shareLabel: { ...Typography.footnote, fontWeight: '600', color: Colors.accent },
   emptyText: { alignItems: 'center', gap: 5 },
   emptyHeading: { ...Typography.cardTitle, color: Colors.textPrimary },
   emptyBody: { ...Typography.footnote, color: Colors.textMuted },
