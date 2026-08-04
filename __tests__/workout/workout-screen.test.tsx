@@ -488,37 +488,14 @@ test('進行中セッション（endedAt無し）ではフッターに「戻る�
   expect(findButtonByLabel(root, '戻る')).toBeUndefined();
 });
 
-// 完了サマリーからの寄り道。行き先は同じrouter.back()だが、「戻る」だと一段前の画面（一覧）へ
-// 抜ける操作に読めてしまい、実際にはサマリーへ帰る＝右スワイプで戻る関係と食い違う（@ユーザー指摘）
-test('完了サマリーから開かれた場合はフッターが「完了」になる', () => {
-  const finishedSession = { id: 1, startedAt: FIXED_NOW - 5000, endedAt: FIXED_NOW };
-  mockUseLocalSearchParams.mockReturnValue({ id: '1', from: 'summary' });
-  mockUseWorkoutSession.mockReturnValue({ session: finishedSession, loaded: true });
-  const root = render();
-
-  expect(findButtonByLabel(root, '戻る')).toBeUndefined();
-  const doneBtn = findButtonByLabel(root, '完了')!;
-  expect(doneBtn).toBeDefined();
-  act(() => {
-    doneBtn.props.onPress();
-  });
-  expect(mockBack).toHaveBeenCalled();
-});
-
-// フッターの「完了」と行き先が同じで二重になるため。スワイプバックは有効なままにする
-test('完了サマリーから開かれた場合はヘッダーのシェブロンを出さない', () => {
-  const finishedSession = { id: 1, startedAt: FIXED_NOW - 5000, endedAt: FIXED_NOW };
-  mockUseLocalSearchParams.mockReturnValue({ id: '1', from: 'summary' });
-  mockUseWorkoutSession.mockReturnValue({ session: finishedSession, loaded: true });
-
-  expect(capturedScreenOptions().headerLeft?.({})).toBeNull();
-});
-
-test('通常の記録編集（記録タブ経由）ではヘッダーのシェブロンを既定のまま残す', () => {
+// 完了サマリーから開いても記録タブから開いても同じ画面。戻り先はスタックの下に居る画面が
+// 決めるので、経路による出し分けを持たない（ヘッダーのシェブロンも既定のまま）
+test('記録編集はどの経路から開かれてもフッターが「戻る」でヘッダーのシェブロンも既定のまま', () => {
   const finishedSession = { id: 1, startedAt: FIXED_NOW - 5000, endedAt: FIXED_NOW };
   mockUseWorkoutSession.mockReturnValue({ session: finishedSession, loaded: true });
 
   expect(capturedScreenOptions().headerLeft).toBeUndefined();
+  expect(findButtonByLabel(render(), '戻る')).toBeDefined();
 });
 
 test('値はあるが✓0件で終了を押すと確認ダイアログが出て、確定するとendWorkoutSessionが呼ばれる', async () => {

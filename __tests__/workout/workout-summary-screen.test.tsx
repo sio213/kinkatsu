@@ -160,10 +160,7 @@ test('⋮の「記録を編集」は記録編集画面をpushする（popでは�
     edit.onPress();
   });
 
-  expect(mockPush).toHaveBeenCalledWith({
-    pathname: '/workout/[id]',
-    params: { id: '1', from: 'summary' },
-  });
+  expect(mockPush).toHaveBeenCalledWith('/workout/1');
 });
 
 test('「閉じる」を押すとrouter.dismissAllで元いたタブまで畳む', () => {

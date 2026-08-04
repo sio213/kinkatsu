@@ -55,12 +55,11 @@ export default function WorkoutSummaryScreen() {
   // fromChild/fromGrandchildの2種類に割れているのと同じ事情）
   const handleClose = () => router.dismissAll();
 
-  // 記録編集はこの画面の上にpushする。fromを渡すのは、記録編集画面が「サマリーへ帰る寄り道」
-  // として振る舞う（フッターを「完了」にし、シェブロンを出さない）ために経路を知る必要があるため。
-  // 記録タブのセッションカードから開いた場合は従来通りの編集画面のままにする
+  // 記録編集はこの画面の上にpushする。編集画面側は経路を知る必要がない——戻る先が
+  // サマリーか記録タブかは、そのときスタックの下に居る画面がそのまま答えになる
   const handleEdit = () => {
     if (sessionId == null) return;
-    router.push({ pathname: '/workout/[id]', params: { id: String(sessionId), from: 'summary' } });
+    router.push(`/workout/${sessionId}`);
   };
 
   // この記録に対する副次操作は⋮に集約する。ヘッダー左に戻るシェブロンを置いて編集へ入る形は

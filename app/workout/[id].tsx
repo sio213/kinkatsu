@@ -38,11 +38,8 @@ import { Alert, FlatList, StyleSheet, Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 export default function WorkoutScreen() {
-  const { id, from } = useLocalSearchParams<{ id: string; from?: string }>();
+  const { id } = useLocalSearchParams<{ id: string }>();
   const router = useRouter();
-  // 完了サマリーから開かれた記録編集。サマリーへ帰る寄り道なので、フッターの文言と
-  // ヘッダーのシェブロンの扱いが通常の編集（記録タブのセッションカード経由）と変わる
-  const fromSummary = from === 'summary';
   const pushDebounced = useDebouncedPush();
   const parsedId = Number(id);
   const sessionId = Number.isFinite(parsedId) ? parsedId : null;
@@ -325,9 +322,6 @@ export default function WorkoutScreen() {
             />
           ),
           headerRight: () => <HeaderMenu groups={[menuItems]} accessibilityLabel="トレーニングのメニューを開く" />,
-          // サマリーから来た場合は、フッターの「完了」とシェブロンが同じ行き先（サマリー）に
-          // なって二重になるため出さない。スワイプバックは有効なままなので、右スワイプでも帰れる
-          ...(fromSummary ? { headerLeft: () => null } : {}),
         }}
       />
 
@@ -408,11 +402,10 @@ export default function WorkoutScreen() {
           // 過去の記録の編集モード。app/calendar/schedule-workout-edit.tsxの「戻るのみ」の
           // フッターと同じ体験に揃える（@ユーザー指摘）。
           //
-          // サマリーから来た場合だけ「完了」にする。行き先が同じrouter.back()でも、
-          // 「戻る」は一段前の画面（＝トレーニングを始める前の一覧）へ抜ける操作に読めてしまい、
-          // 実際にはサマリーへ帰る＝右スワイプで戻る関係なので言葉と体感が食い違う（@ユーザー指摘）
+          // 完了サマリーから開かれた場合も同じ「戻る」でよい。サマリー側の入口が⋮の「記録を編集」
+          // （＝前に進む遷移）になったことで、ここは素直に1つ戻る操作になったため
           <ScreenFooter>
-            <PrimaryButton label={fromSummary ? '完了' : '戻る'} onPress={() => router.back()} />
+            <PrimaryButton label="戻る" onPress={() => router.back()} />
           </ScreenFooter>
         )}
       </KeyboardAvoidingScreen>
