@@ -230,6 +230,19 @@ export const Typography = {
   /** NEW/BESTなどの小バッジ */
   badge: { fontSize: 11, fontWeight: '700' },
   /**
+   * 数値ブロックの見出しラベル（完了サマリーの「時間／総重量／今週」）。captionより更に
+   * 小さいのは、3項目を等幅で1行に収めたうえで主役の数値との差を付けるため（デザイン案指定）。
+   * 字間を広げているのは、この大きさだと詰まって読みにくくなるのを補うため
+   * （letterSpacingはデザイン案の 0.06em × 9.5px ＝ 0.57。サイズを変えるなら字間も再計算すること）。
+   * 単独のラベルには小さすぎるので、真下に数値が続く形以外に転用しないこと
+   */
+  statLabel: { fontSize: 9.5, lineHeight: 13, fontWeight: '600', letterSpacing: 0.57 },
+  /**
+   * 数値ブロックで数値の右に添える単位（「kg」「回目」）。badgeと同じ11pxだが、あちらは
+   * NEW/BESTの強調バッジ（700）で役割が違うため分けている。主役の数値から一段落とすのが目的
+   */
+  statUnit: { fontSize: 11, fontWeight: '600' },
+  /**
    * Android用の時刻選択ボタン（reminder-form.tsx・app/calendar/schedule-time-picker.tsxで
    * 共通使用）。iOSのspinner表示の数字サイズ感に合わせた大きめの太字数値。letterSpacingは
    * 「18 : 00」のように時刻がゆったり読めるようにするため

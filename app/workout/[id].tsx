@@ -156,10 +156,11 @@ export default function WorkoutScreen() {
     isFinishingRef.current = true;
     try {
       await endWorkoutSession(sessionId);
-      // backではなくpushで完了サマリーを上に積む。この画面はendedAtが入ったことで
-      // 「記録の編集」モードになっており、サマリーの戻る・スワイプバックがそのまま
-      // 「記録を編集する」導線になる。サマリーの「閉じる」がdismissAllで2枚まとめて畳む
-      router.push(`/workout/summary/${sessionId}`);
+      // pushではなくreplaceでこの画面を完了サマリーに差し替える。pushにすると、サマリーの
+      // 戻る（pop）で記録編集へ降りた時点でサマリーがスタックから消え、記録編集の「戻る」が
+      // サマリーではなくタブまで抜けてしまう（@ユーザー指摘、実機で確認）。
+      // 記録編集はサマリーからpushする寄り道、という関係にする
+      router.replace(`/workout/summary/${sessionId}`);
     } catch (e) {
       console.error('[workout session finish]', e);
       Alert.alert('エラー', 'トレーニングを終了できませんでした。');
@@ -399,7 +400,10 @@ export default function WorkoutScreen() {
           </ScreenFooter>
         ) : (
           // 過去の記録の編集モード。app/calendar/schedule-workout-edit.tsxの「戻るのみ」の
-          // フッターと同じ体験に揃える（@ユーザー指摘）
+          // フッターと同じ体験に揃える（@ユーザー指摘）。
+          //
+          // 完了サマリーから開かれた場合も同じ「戻る」でよい。サマリー側の入口が⋮の「記録を編集」
+          // （＝前に進む遷移）になったことで、ここは素直に1つ戻る操作になったため
           <ScreenFooter>
             <PrimaryButton label="戻る" onPress={() => router.back()} />
           </ScreenFooter>

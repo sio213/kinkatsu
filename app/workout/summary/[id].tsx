@@ -1,23 +1,32 @@
+import { HeaderMenu, type DropdownMenuItem } from '@/components/ui/dropdown-menu';
 import { HeaderTitle } from '@/components/ui/header-title';
 import { PrimaryButton } from '@/components/ui/primary-button';
 import { ScreenFooter } from '@/components/ui/screen-footer';
+import { SessionSummaryStats } from '@/components/workout/session-summary-stats';
 import { ScreenStyles } from '@/constants/theme';
+import { useSessionTotal, useSessionWeekOrdinal } from '@/hooks/use-session-summary';
 import { useWorkoutSession } from '@/hooks/use-workout-session';
-import { formatSessionDateGroup } from '@/lib/workout/summary';
+import { formatSessionDateGroup, formatSessionDurationLong } from '@/lib/workout/summary';
 import { Stack, useLocalSearchParams, useRouter } from 'expo-router';
 import { useEffect } from 'react';
 import { ScrollView, StyleSheet } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 /**
- * トレーニング完了サマリー。トレーニング中画面で「終了」を押したあと、その画面の上に
- * pushされる（replaceではない）。真下に残る app/workout/[id].tsx は endedAt が入った
- * ことで「記録の編集」モードになっているため、ヘッダーの戻る・スワイプバックがそのまま
- * 「記録を編集する」導線になり、専用の遷移処理を持たなくて済む。
+ * トレーニング完了サマリー。トレーニング中画面で「終了」を押すと、その画面を **replaceして**
+ * この画面に着地する。記録編集はここから push する寄り道、という関係。
  *
- * 「戻る」というラベルを使わないこと。トレーニングの再開（endedAtをnullに戻す）と読まれるが、
- * endWorkoutSessionは予定(scheduledWorkouts)の削除まで済ませており巻き戻せない。
- * 詳細は lib/workout/session.ts の discardSession のコメントを参照。
+ * 逆（トレーニング中画面の上にサマリーをpush）にしてはいけない。サマリーの戻るがpopになり、
+ * 記録編集へ降りた時点でサマリーがスタックから消えるため、記録編集の「戻る」がサマリーではなく
+ * タブまで抜けてしまう（@ユーザー指摘、実機で確認）。
+ *
+ * 下に積まれているのはタブなので、ヘッダー左にシェブロンは置かない。記録編集への導線は
+ * ヘッダー右の⋮メニューに集約する（副次操作を⋮にまとめるのは種目詳細・記録編集と同じ扱い）。
+ * スワイプバックは下のタブへ抜ける＝「閉じる」と同義なので、そのまま有効にしている。
+ *
+ * 記録編集への導線に「戻る」というラベルを使わないこと。トレーニングの再開（endedAtをnullに
+ * 戻す）と読まれるが、endWorkoutSessionは予定(scheduledWorkouts)の削除まで済ませており
+ * 巻き戻せない。詳細は lib/workout/session.ts の discardSession のコメントを参照。
  */
 export default function WorkoutSummaryScreen() {
   const { id } = useLocalSearchParams<{ id: string }>();
@@ -25,6 +34,8 @@ export default function WorkoutSummaryScreen() {
   const parsedId = Number(id);
   const sessionId = Number.isFinite(parsedId) ? parsedId : null;
   const { session, loaded } = useWorkoutSession(sessionId ?? -1);
+  const { total } = useSessionTotal(sessionId ?? -1);
+  const weekOrdinal = useSessionWeekOrdinal(session?.startedAt ?? null);
 
   // 記録編集画面の⋮「削除」は deleteSession → router.back() なので、サマリーから開いていると
   // 削除済みセッションのサマリーへ戻ってくる。NotFoundStateを見せる場面ではない（ユーザーは
@@ -44,6 +55,23 @@ export default function WorkoutSummaryScreen() {
   // fromChild/fromGrandchildの2種類に割れているのと同じ事情）
   const handleClose = () => router.dismissAll();
 
+  // 記録編集はこの画面の上にpushする。編集画面側は経路を知る必要がない——戻る先が
+  // サマリーか記録タブかは、そのときスタックの下に居る画面がそのまま答えになる
+  const handleEdit = () => {
+    if (sessionId == null) return;
+    router.push(`/workout/${sessionId}`);
+  };
+
+  // この記録に対する副次操作は⋮に集約する。ヘッダー左に戻るシェブロンを置いて編集へ入る形は
+  // 採らない——下に積まれているのはタブなので、シェブロンは「戻る」ではなく前に進む遷移になり、
+  // 記号と動きが食い違う（@ユーザー指摘、実機で確認）。
+  // 当面は「記録を編集」1項目だけだが、SNS共有・ルーティンとして登録が同じメニューに並ぶ予定。
+  // フッターにサブ導線を置く案（主ボタンの下のリンク）だと、⋮が増えた時点で副次操作の入口が
+  // 2箇所に割れるため、最初から最終形の器にしている
+  const menuItems: DropdownMenuItem[] = [
+    { key: 'edit', label: '記録を編集', icon: 'edit', onPress: handleEdit },
+  ];
+
   if (!session) return null;
 
   return (
@@ -53,11 +81,24 @@ export default function WorkoutSummaryScreen() {
           headerTitle: () => (
             <HeaderTitle title="トレーニング完了" subtitle={formatSessionDateGroup(session.startedAt)} />
           ),
+          // ルートStackが全画面に配るHeaderBackButtonを止める。canGoBack()は真（下にタブ）なので、
+          // 明示的に空にしないとタブへ抜けるだけのシェブロンが出てしまう
+          headerLeft: () => null,
+          headerRight: () => (
+            <HeaderMenu groups={[menuItems]} accessibilityLabel="この記録のメニューを開く" />
+          ),
         }}
       />
 
       <ScrollView style={styles.body} contentContainerStyle={styles.bodyContent}>
-        {/* 数値3項目・みんなの声・グラフ・実施した種目はこの下に順次追加する */}
+        <SessionSummaryStats
+          // 所要時間はendedAt基準の確定値。サマリーを開いている間に伸びることは無いので
+          // now基準のフォールバック（進行中セッション用）には落ちない
+          duration={formatSessionDurationLong(session.startedAt, session.endedAt)}
+          total={total}
+          weekOrdinal={weekOrdinal}
+        />
+        {/* みんなの声・グラフ・実施した種目はこの下に順次追加する */}
       </ScrollView>
 
       <ScreenFooter>

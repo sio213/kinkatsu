@@ -1,5 +1,6 @@
 const mockBack = jest.fn();
 const mockPush = jest.fn();
+const mockReplace = jest.fn();
 const mockUseLocalSearchParams = jest.fn();
 const mockUseWorkoutSession = jest.fn();
 const mockUseSessionFinishCounts = jest.fn();
@@ -13,9 +14,12 @@ const mockUseRoutines = jest.fn();
 // 新規追加カードへのフォーカスはnavigation.addListener('transitionEnd', ...)を使うため
 // （app/exercise/new.tsxと同じ方針）、useNavigationも最低限モックしておく必要がある
 const mockAddListener = jest.fn().mockReturnValue(() => {});
+// Stack.Screenに渡されたoptionsそのもの。headerLeftの有無のように、レンダー結果には
+// 現れないナビゲーション設定を検証するために取っておく
+let capturedOptions: Record<string, any> = {};
 
 jest.mock('expo-router', () => ({
-  useRouter: () => ({ back: mockBack, push: mockPush }),
+  useRouter: () => ({ back: mockBack, push: mockPush, replace: mockReplace }),
   useLocalSearchParams: () => mockUseLocalSearchParams(),
   useNavigation: () => ({ addListener: mockAddListener }),
   // Stack.Screen はナビゲーターのoptionsを設定するコンポーネントで本来は見た目を持たないが、
@@ -23,6 +27,7 @@ jest.mock('expo-router', () => ({
   Stack: {
     Screen: ({ options }: { options?: { headerTitle?: () => unknown; headerRight?: () => unknown } }) => {
       const { createElement, Fragment } = require('react');
+      capturedOptions = (options ?? {}) as Record<string, any>;
       return createElement(Fragment, null, options?.headerTitle?.(), options?.headerRight?.());
     },
   },
@@ -69,6 +74,12 @@ function findButtonByLabel(root: ReactTestInstance, label: string) {
     .find((btn: ReactTestInstance) =>
       btn.findAllByType(Text).some((t: ReactTestInstance) => [t.props.children].flat().join('') === label),
     );
+}
+
+/** 直近のレンダーでStack.Screenに渡されたoptions。呼ぶ前にrender()すること */
+function capturedScreenOptions() {
+  render();
+  return capturedOptions;
 }
 
 function render() {
@@ -477,6 +488,16 @@ test('進行中セッション（endedAt無し）ではフッターに「戻る�
   expect(findButtonByLabel(root, '戻る')).toBeUndefined();
 });
 
+// 完了サマリーから開いても記録タブから開いても同じ画面。戻り先はスタックの下に居る画面が
+// 決めるので、経路による出し分けを持たない（ヘッダーのシェブロンも既定のまま）
+test('記録編集はどの経路から開かれてもフッターが「戻る」でヘッダーのシェブロンも既定のまま', () => {
+  const finishedSession = { id: 1, startedAt: FIXED_NOW - 5000, endedAt: FIXED_NOW };
+  mockUseWorkoutSession.mockReturnValue({ session: finishedSession, loaded: true });
+
+  expect(capturedScreenOptions().headerLeft).toBeUndefined();
+  expect(findButtonByLabel(render(), '戻る')).toBeDefined();
+});
+
 test('値はあるが✓0件で終了を押すと確認ダイアログが出て、確定するとendWorkoutSessionが呼ばれる', async () => {
   mockUseSessionFinishCounts.mockReturnValue({ completedSetCount: 0, valuedSetCount: 2, loaded: true });
   mockUseWorkoutSession.mockReturnValue({ session: activeSession, loaded: true });
@@ -497,7 +518,7 @@ test('値はあるが✓0件で終了を押すと確認ダイアログが出て�
     expect.anything(),
   );
   expect(mockEndWorkoutSession).toHaveBeenCalledWith(1);
-  expect(mockPush).toHaveBeenCalledWith('/workout/summary/1');
+  expect(mockReplace).toHaveBeenCalledWith('/workout/summary/1');
 });
 
 test('値はあるが✓0件で終了確認をキャンセルするとendWorkoutSessionは呼ばれない', async () => {
@@ -658,10 +679,10 @@ test('セットが1件以上ある場合は確認ダイアログを出さず即�
 
   expect(Alert.alert).not.toHaveBeenCalled();
   expect(mockEndWorkoutSession).toHaveBeenCalledWith(1);
-  expect(mockPush).toHaveBeenCalledWith('/workout/summary/1');
+  expect(mockReplace).toHaveBeenCalledWith('/workout/summary/1');
 });
 
-test('連打してもendWorkoutSession/完了サマリーへのpushは1回しか呼ばれない（二重終了の防止）', async () => {
+test('連打してもendWorkoutSession/完了サマリーへの遷移は1回しか呼ばれない（二重終了の防止）', async () => {
   let resolveEnd!: () => void;
   mockUseSessionFinishCounts.mockReturnValue({ completedSetCount: 3, valuedSetCount: 3, loaded: true });
   mockEndWorkoutSession.mockReturnValue(
@@ -683,7 +704,7 @@ test('連打してもendWorkoutSession/完了サマリーへのpushは1回しか
   await act(async () => {
     resolveEnd();
   });
-  expect(mockPush).toHaveBeenCalledTimes(1);
+  expect(mockReplace).toHaveBeenCalledTimes(1);
 });
 
 test('endWorkoutSessionが失敗した場合はエラーAlertが表示され、完了サマリーへ遷移しない', async () => {
@@ -698,7 +719,7 @@ test('endWorkoutSessionが失敗した場合はエラーAlertが表示され、�
   });
 
   expect(Alert.alert).toHaveBeenCalledWith('エラー', 'トレーニングを終了できませんでした。');
-  expect(mockPush).not.toHaveBeenCalled();
+  expect(mockReplace).not.toHaveBeenCalled();
 });
 
 test('種目を追加ボタンを押すと種目追加ピッカーへ遷移する', () => {
