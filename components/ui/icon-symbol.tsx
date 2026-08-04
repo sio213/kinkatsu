@@ -35,6 +35,9 @@ const MAPPING = {
   xmark: 'close',
   'clock.arrow.circlepath': 'history',
   'exclamationmark.triangle.fill': 'warning',
+  // みんなの声（完了サマリー）の反応アイコン。デザイン案のMaterial Symbols favorite/refreshに対応する
+  'heart.fill': 'favorite',
+  'arrow.clockwise': 'refresh',
   'arrow.up.right.square': 'open-in-new',
 } as IconMapping;
 
