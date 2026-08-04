@@ -151,12 +151,15 @@ export default function WorkoutScreen() {
 
   const finish = async () => {
     if (sessionId == null) return;
-    // 連打でendWorkoutSession/router.backが二重に呼ばれるのを防ぐ
+    // 連打でendWorkoutSession/router.pushが二重に呼ばれるのを防ぐ
     if (isFinishingRef.current) return;
     isFinishingRef.current = true;
     try {
       await endWorkoutSession(sessionId);
-      router.back();
+      // backではなくpushで完了サマリーを上に積む。この画面はendedAtが入ったことで
+      // 「記録の編集」モードになっており、サマリーの戻る・スワイプバックがそのまま
+      // 「記録を編集する」導線になる。サマリーの「閉じる」がdismissAllで2枚まとめて畳む
+      router.push(`/workout/summary/${sessionId}`);
     } catch (e) {
       console.error('[workout session finish]', e);
       Alert.alert('エラー', 'トレーニングを終了できませんでした。');

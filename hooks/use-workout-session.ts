@@ -33,10 +33,19 @@ export function useWorkoutSessions() {
 // useWorkoutSessions()と違い全sessionsのlive queryを張らないため、
 // 他セッションの更新で不要な再レンダーが起きない
 export function useWorkoutSession(id: number) {
-  const { data } = useLiveQuery(
+  const { data, updatedAt, error } = useLiveQuery(
     db.select().from(workoutSessions).where(eq(workoutSessions.id, id)).limit(1),
   );
-  return { session: data?.[0], loaded: data !== undefined };
+  if (error) console.error('[workout session]', error);
+  return {
+    session: data?.[0],
+    // dataの初期値は[]（undefinedではない）ため `data !== undefined` は解決前から常にtrueで、
+    // 「読み込み中」を一度も表現できていなかった。トレーニング中画面では「トレーニングが
+    // 見つかりません」が一瞬見えるだけで済んでいたが、完了サマリー画面は同じ判定で
+    // 画面を閉じる（削除済みセッションの検知）ため、マウント直後に必ず閉じてしまう。
+    // 最初の解決時にだけ入るupdatedAtで判定する（use-exercise-record-count.tsと同じ理由）
+    loaded: updatedAt !== undefined || error !== undefined,
+  };
 }
 
 // 記録タブの履歴一覧用。setsは記録の度に増え続ける実データなので、
