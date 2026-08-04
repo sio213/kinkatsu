@@ -2,12 +2,13 @@ const mockBack = jest.fn();
 const mockPush = jest.fn();
 const mockUseLocalSearchParams = jest.fn();
 const mockUseWorkoutSession = jest.fn();
-const mockUseSessionSetCount = jest.fn();
+const mockUseSessionFinishCounts = jest.fn();
 const mockUseSessionExercises = jest.fn();
 const mockUseSessionSets = jest.fn();
 const mockUseExercisesWithHistory = jest.fn();
 const mockEndWorkoutSession = jest.fn();
 const mockDeleteSession = jest.fn();
+const mockDiscardSession = jest.fn();
 const mockUseRoutines = jest.fn();
 // 新規追加カードへのフォーカスはnavigation.addListener('transitionEnd', ...)を使うため
 // （app/exercise/new.tsxと同じ方針）、useNavigationも最低限モックしておく必要がある
@@ -29,7 +30,7 @@ jest.mock('expo-router', () => ({
 
 jest.mock('@/hooks/use-workout-session', () => ({
   useWorkoutSession: (...args: unknown[]) => mockUseWorkoutSession(...args),
-  useSessionSetCount: (...args: unknown[]) => mockUseSessionSetCount(...args),
+  useSessionFinishCounts: (...args: unknown[]) => mockUseSessionFinishCounts(...args),
   useSessionExercises: (...args: unknown[]) => mockUseSessionExercises(...args),
   useSessionSets: (...args: unknown[]) => mockUseSessionSets(...args),
   useExercisesWithHistory: (...args: unknown[]) => mockUseExercisesWithHistory(...args),
@@ -40,6 +41,7 @@ jest.mock('@/hooks/use-workout-session', () => ({
 jest.mock('@/lib/workout/session', () => ({
   endWorkoutSession: (...args: unknown[]) => mockEndWorkoutSession(...args),
   deleteSession: (...args: unknown[]) => mockDeleteSession(...args),
+  discardSession: (...args: unknown[]) => mockDiscardSession(...args),
 }));
 
 jest.mock('@/hooks/use-routines', () => ({
@@ -87,12 +89,13 @@ beforeEach(() => {
   jest.setSystemTime(FIXED_NOW);
   jest.clearAllMocks();
   mockUseLocalSearchParams.mockReturnValue({ id: '1' });
-  mockUseSessionSetCount.mockReturnValue(0);
+  mockUseSessionFinishCounts.mockReturnValue({ completedSetCount: 0, valuedSetCount: 0, loaded: true });
   mockUseSessionExercises.mockReturnValue([]);
   mockUseSessionSets.mockReturnValue(new Map());
   mockUseExercisesWithHistory.mockReturnValue(new Set());
   mockEndWorkoutSession.mockResolvedValue(undefined);
   mockDeleteSession.mockResolvedValue(undefined);
+  mockDiscardSession.mockResolvedValue(undefined);
   mockUseRoutines.mockReturnValue({ routines: [{ id: 1, name: 'ルーティンA' }] });
   jest.spyOn(Alert, 'alert').mockImplementation(() => {});
 });
@@ -474,8 +477,8 @@ test('進行中セッション（endedAt無し）ではフッターに「戻る�
   expect(findButtonByLabel(root, '戻る')).toBeUndefined();
 });
 
-test('セット0件で終了を押すと確認ダイアログが出て、確定するとendWorkoutSessionが呼ばれる', async () => {
-  mockUseSessionSetCount.mockReturnValue(0);
+test('値はあるが✓0件で終了を押すと確認ダイアログが出て、確定するとendWorkoutSessionが呼ばれる', async () => {
+  mockUseSessionFinishCounts.mockReturnValue({ completedSetCount: 0, valuedSetCount: 2, loaded: true });
   mockUseWorkoutSession.mockReturnValue({ session: activeSession, loaded: true });
   (Alert.alert as jest.Mock).mockImplementation((_title, _msg, buttons) => {
     const confirmBtn = buttons?.find((b: { text: string }) => b.text === '終了する');
@@ -490,15 +493,15 @@ test('セット0件で終了を押すと確認ダイアログが出て、確定�
 
   expect(Alert.alert).toHaveBeenCalledWith(
     'トレーニングを終了',
-    'まだ種目を記録していません。終了しますか？',
+    '✓が付いたセットがありません。このまま終了しますか？',
     expect.anything(),
   );
   expect(mockEndWorkoutSession).toHaveBeenCalledWith(1);
   expect(mockBack).toHaveBeenCalled();
 });
 
-test('セット0件で終了確認をキャンセルするとendWorkoutSessionは呼ばれない', async () => {
-  mockUseSessionSetCount.mockReturnValue(0);
+test('値はあるが✓0件で終了確認をキャンセルするとendWorkoutSessionは呼ばれない', async () => {
+  mockUseSessionFinishCounts.mockReturnValue({ completedSetCount: 0, valuedSetCount: 2, loaded: true });
   mockUseWorkoutSession.mockReturnValue({ session: activeSession, loaded: true });
   (Alert.alert as jest.Mock).mockImplementation(() => {
     // キャンセル: どのボタンも押さない
@@ -514,8 +517,137 @@ test('セット0件で終了確認をキャンセルするとendWorkoutSession�
   expect(mockBack).not.toHaveBeenCalled();
 });
 
+// 値が1件も入っていないセッション（種目未追加／空行のまま／全セット削除）は終了ではなく破棄する。
+// endWorkoutSessionで空の記録を履歴に残さないことがこのテストの主眼
+test('値0件で終了を押すと破棄ダイアログが出て、確定するとdeleteSessionが呼ばれる', async () => {
+  mockUseSessionFinishCounts.mockReturnValue({ completedSetCount: 0, valuedSetCount: 0, loaded: true });
+  mockUseWorkoutSession.mockReturnValue({ session: activeSession, loaded: true });
+  (Alert.alert as jest.Mock).mockImplementation((_title, _msg, buttons) => {
+    const confirmBtn = buttons?.find((b: { text: string }) => b.text === '破棄する');
+    confirmBtn?.onPress?.();
+  });
+
+  const root = render();
+  const finishBtn = findButtonByLabel(root, 'トレーニングを終了')!;
+  await act(async () => {
+    finishBtn.props.onPress();
+  });
+
+  expect(Alert.alert).toHaveBeenCalledWith(
+    'トレーニングを破棄',
+    '記録がないため履歴に残りません。このトレーニングを破棄しますか？',
+    expect.anything(),
+  );
+  expect(mockDiscardSession).toHaveBeenCalledWith(1);
+  expect(mockDeleteSession).not.toHaveBeenCalled();
+  expect(mockEndWorkoutSession).not.toHaveBeenCalled();
+  expect(mockBack).toHaveBeenCalled();
+});
+
+test('値0件で破棄確認をキャンセルするとdiscardSessionは呼ばれない', async () => {
+  mockUseSessionFinishCounts.mockReturnValue({ completedSetCount: 0, valuedSetCount: 0, loaded: true });
+  mockUseWorkoutSession.mockReturnValue({ session: activeSession, loaded: true });
+  (Alert.alert as jest.Mock).mockImplementation(() => {
+    // キャンセル: どのボタンも押さない
+  });
+
+  const root = render();
+  const finishBtn = findButtonByLabel(root, 'トレーニングを終了')!;
+  await act(async () => {
+    finishBtn.props.onPress();
+  });
+
+  expect(mockDiscardSession).not.toHaveBeenCalled();
+  expect(mockBack).not.toHaveBeenCalled();
+});
+
+// 全欄が空のままでも✓は押せる（set-row.tsxのhandleTogglePress）。ユーザーが明示的に付けた
+// ✓ごとセッションを消してしまわないよう、この組み合わせでは破棄せず終了させる
+test('値0件でも✓が1件でもあれば破棄せず終了する', async () => {
+  mockUseSessionFinishCounts.mockReturnValue({ completedSetCount: 1, valuedSetCount: 0, loaded: true });
+  mockUseWorkoutSession.mockReturnValue({ session: activeSession, loaded: true });
+
+  const root = render();
+  const finishBtn = findButtonByLabel(root, 'トレーニングを終了')!;
+  await act(async () => {
+    finishBtn.props.onPress();
+  });
+
+  expect(Alert.alert).not.toHaveBeenCalled();
+  expect(mockDiscardSession).not.toHaveBeenCalled();
+  expect(mockEndWorkoutSession).toHaveBeenCalledWith(1);
+});
+
+// 集計クエリが未解決の間は両カウントとも0になる。そのまま判定すると記録があるセッションを
+// 破棄してしまうため、解決するまでは変更前と同じ「終了」確認に倒す
+test('集計が未解決（loaded=false）のうちは0件でも破棄せず終了確認を出す', async () => {
+  mockUseSessionFinishCounts.mockReturnValue({ completedSetCount: 0, valuedSetCount: 0, loaded: false });
+  mockUseWorkoutSession.mockReturnValue({ session: activeSession, loaded: true });
+
+  const root = render();
+  const finishBtn = findButtonByLabel(root, 'トレーニングを終了')!;
+  await act(async () => {
+    finishBtn.props.onPress();
+  });
+
+  expect(Alert.alert).toHaveBeenCalledWith(
+    'トレーニングを終了',
+    '✓が付いたセットがありません。このまま終了しますか？',
+    expect.anything(),
+  );
+  expect(mockDiscardSession).not.toHaveBeenCalled();
+});
+
+test('破棄確認ボタンを連打してもdiscardSession/router.backは1回しか呼ばれない', async () => {
+  let resolveDiscard!: () => void;
+  mockUseSessionFinishCounts.mockReturnValue({ completedSetCount: 0, valuedSetCount: 0, loaded: true });
+  mockDiscardSession.mockReturnValue(
+    new Promise<void>((resolve) => {
+      resolveDiscard = resolve;
+    }),
+  );
+  mockUseWorkoutSession.mockReturnValue({ session: activeSession, loaded: true });
+  (Alert.alert as jest.Mock).mockImplementation((_title, _msg, buttons) => {
+    const confirmBtn = buttons?.find((b: { text: string }) => b.text === '破棄する');
+    confirmBtn?.onPress?.();
+    confirmBtn?.onPress?.();
+  });
+
+  const root = render();
+  const finishBtn = findButtonByLabel(root, 'トレーニングを終了')!;
+  act(() => {
+    finishBtn.props.onPress();
+  });
+
+  expect(mockDiscardSession).toHaveBeenCalledTimes(1);
+
+  await act(async () => {
+    resolveDiscard();
+  });
+  expect(mockBack).toHaveBeenCalledTimes(1);
+});
+
+test('破棄が失敗した場合はエラーAlertが表示され、router.backは呼ばれない', async () => {
+  mockUseSessionFinishCounts.mockReturnValue({ completedSetCount: 0, valuedSetCount: 0, loaded: true });
+  mockDiscardSession.mockRejectedValueOnce(new Error('fail'));
+  mockUseWorkoutSession.mockReturnValue({ session: activeSession, loaded: true });
+  (Alert.alert as jest.Mock).mockImplementation((_title, _msg, buttons) => {
+    const confirmBtn = buttons?.find((b: { text: string }) => b.text === '破棄する');
+    confirmBtn?.onPress?.();
+  });
+
+  const root = render();
+  const finishBtn = findButtonByLabel(root, 'トレーニングを終了')!;
+  await act(async () => {
+    finishBtn.props.onPress();
+  });
+
+  expect(Alert.alert).toHaveBeenCalledWith('エラー', 'トレーニングを破棄できませんでした。');
+  expect(mockBack).not.toHaveBeenCalled();
+});
+
 test('セットが1件以上ある場合は確認ダイアログを出さず即座に終了する', async () => {
-  mockUseSessionSetCount.mockReturnValue(3);
+  mockUseSessionFinishCounts.mockReturnValue({ completedSetCount: 3, valuedSetCount: 3, loaded: true });
   mockUseWorkoutSession.mockReturnValue({ session: activeSession, loaded: true });
 
   const root = render();
@@ -531,7 +663,7 @@ test('セットが1件以上ある場合は確認ダイアログを出さず即�
 
 test('連打してもendWorkoutSession/router.backは1回しか呼ばれない（二重終了の防止）', async () => {
   let resolveEnd!: () => void;
-  mockUseSessionSetCount.mockReturnValue(3);
+  mockUseSessionFinishCounts.mockReturnValue({ completedSetCount: 3, valuedSetCount: 3, loaded: true });
   mockEndWorkoutSession.mockReturnValue(
     new Promise<void>((resolve) => {
       resolveEnd = resolve;
@@ -555,7 +687,7 @@ test('連打してもendWorkoutSession/router.backは1回しか呼ばれない�
 });
 
 test('endWorkoutSessionが失敗した場合はエラーAlertが表示され、router.backは呼ばれない', async () => {
-  mockUseSessionSetCount.mockReturnValue(3);
+  mockUseSessionFinishCounts.mockReturnValue({ completedSetCount: 3, valuedSetCount: 3, loaded: true });
   mockEndWorkoutSession.mockRejectedValueOnce(new Error('fail'));
   mockUseWorkoutSession.mockReturnValue({ session: activeSession, loaded: true });
 

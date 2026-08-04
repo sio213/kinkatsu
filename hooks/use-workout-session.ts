@@ -72,17 +72,42 @@ export function useSessionStats(): Map<number, SessionSummary> {
   );
 }
 
-// トレーニング中画面の終了確認（何かセットを記録済みかどうか）用。行の中身は使わないため件数のみ取得する。
-// 種目追加直後の自動生成セット（completedAtがnull）は「まだ記録していない」に含めるため、
-// ✓で確定したセットのみを数える
-export function useSessionSetCount(sessionId: number): number {
-  const { data } = useLiveQuery(
+export type SessionFinishCounts = {
+  // ✓で確定したセット数。種目追加直後の自動生成セット（completedAtがnull）は
+  // 「まだ記録していない」に含めるため数えない
+  completedSetCount: number;
+  // 4つの値カラムのいずれかに入力があるセット数（✓の有無は問わない）
+  valuedSetCount: number;
+  // クエリが一度でも解決したか。未解決の間は両カウントとも0になり、そのまま判定すると
+  // 「記録が無い」と誤認して破棄に倒れてしまうため、呼び出し側は破棄の条件にこれを含めること
+  loaded: boolean;
+};
+
+// トレーニング中画面の終了確認の分岐用。行の中身は使わないため件数のみ取得する。
+// 「終了」を押したときの分岐は3通りあり、この2つの件数で判定する:
+//   valuedSetCount === 0     → 入力が1つも無い（種目未追加／種目だけ追加して空行のまま／
+//                              全セットを削除した）。残す意味が無いので破棄を確認する
+//   completedSetCount === 0  → 入力はあるが✓が1つも無い。破棄すると入力を失うため終了を確認する
+//   それ以外                  → 確認なしで終了
+// valuedSetCountの条件はlib/workout/set-values.tsのhasAnyValueと同じ判定。全行をJSへ
+// 引き上げてから数えずに済むようSQL側で表現している（同じ理由でuseSessionStatsもSQLで集計）
+export function useSessionFinishCounts(sessionId: number): SessionFinishCounts {
+  const { data, updatedAt, error } = useLiveQuery(
     db
-      .select({ count: sql<number>`sum(case when ${sets.completedAt} is not null then 1 else 0 end)` })
+      .select({
+        completedSetCount: sql<number>`sum(case when ${sets.completedAt} is not null then 1 else 0 end)`,
+        valuedSetCount: sql<number>`sum(case when ${sets.weight} is not null or ${sets.reps} is not null or ${sets.durationSeconds} is not null or ${sets.distanceMeters} is not null then 1 else 0 end)`,
+      })
       .from(sets)
       .where(eq(sets.sessionId, sessionId)),
   );
-  return data?.[0]?.count ?? 0;
+  return {
+    completedSetCount: data?.[0]?.completedSetCount ?? 0,
+    valuedSetCount: data?.[0]?.valuedSetCount ?? 0,
+    // dataの初期値は[]（undefinedではない）ため data !== undefined では判定できない。
+    // 最初の解決時にだけ入るupdatedAtで見る（hooks/use-exercise-record-count.tsと同じ理由）
+    loaded: updatedAt !== undefined || error !== undefined,
+  };
 }
 
 export type ResumeWorkoutSummary = {

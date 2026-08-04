@@ -426,6 +426,21 @@ export async function deleteSession(sessionId: number) {
   await cleanupScheduledWorkoutAfter(session?.scheduledWorkoutId ?? null, 'after session delete');
 }
 
+// トレーニング中画面で「終了」を押したが記録が1件も無かった場合の破棄。deleteSessionと違い
+// 予定（scheduledWorkouts）には一切触らない。deleteSessionが予定も消すのは「⋮削除＝この予定は
+// もう実施しない」という意思表示だからで、破棄は「開始したが何もしないまま終えた」＝予定は
+// 未消化のままなので、カレンダーに予定を残し通知も鳴らし続けるのが正しい。
+// 消してしまうと復元できない: scheduledWorkoutExercises/Setsがcascadeで道連れになるうえ、
+// リマインダー由来の実体化予定はreminderScheduleSkips側のskip行だけが残り
+// （lib/notifications/scheduled-workout-scheduler.tsのmaterializeReminderOccurrence）、
+// hooks/use-calendar-day-schedule.ts・use-calendar-month-schedule.tsのフィルタによって
+// その日のリマインダー予定が二度と表示されなくなる。
+// workoutSessions行を消すだけで予定カードは復活する（進行中セッションがある間だけ予定を隠す
+// lib/calendar/schedule.tsのexcludeActiveScheduledCardによる出し分けのため）
+export async function discardSession(sessionId: number) {
+  await db.delete(workoutSessions).where(eq(workoutSessions.id, sessionId));
+}
+
 // 種目カードの「⋮」メニューの「上へ移動」「下へ移動」。orderIndexにユニーク制約は無いため、
 // 隣接する2行のorderIndexを単純に入れ替えるだけで並び順を反映できる
 export async function swapExerciseOrder(sessionExerciseId: number, targetSessionExerciseId: number) {

@@ -1,7 +1,8 @@
 // jest.mock はホイストされるため、変数は var で定義してスコープを合わせる
 /* eslint-disable no-var */
 // useLiveQuery はhook呼び出し順に消費するキュー
-var mockLiveQueryQueue: { data: unknown }[];
+// updatedAt/errorは、解決済みかどうかを見るフック（useSessionFinishCounts）のテストでのみ渡す
+var mockLiveQueryQueue: { data: unknown; updatedAt?: Date; error?: Error }[];
 // 各useLiveQuery呼び出しに渡されたdeps引数を呼び出し順に記録する。drizzle-orm/expo-sqliteの
 // useLiveQueryはdepsが変化したときだけクエリを張り直す仕様（デフォルト[]＝マウント時の1回きり）のため、
 // sessionId/routineIdの変化を追従させるにはdepsへ明示的に渡す必要がある（実機で再現・特定した不具合）。
@@ -72,7 +73,7 @@ import {
   useExercisesWithHistory,
   useResumeWorkoutSummary,
   useSessionExercises,
-  useSessionSetCount,
+  useSessionFinishCounts,
   useSessionSets,
   useSessionStats,
   useWorkoutSession,
@@ -183,17 +184,34 @@ describe('useSessionStats', () => {
   });
 });
 
-describe('useSessionSetCount', () => {
-  const mount = makeHarness(() => useSessionSetCount(1));
+describe('useSessionFinishCounts', () => {
+  const mount = makeHarness(() => useSessionFinishCounts(1));
 
-  it('dataがundefinedのとき0を返す', () => {
-    mockLiveQueryQueue = [{ data: undefined }];
-    expect(mount()).toBe(0);
+  // 未解決の間はdataが空配列（undefinedではない）で来るため、両カウントが0になる。
+  // このとき破棄側に倒れないよう、呼び出し側はloadedを見る必要がある
+  it('未解決（updatedAt/errorとも無し）のときloadedがfalseになる', () => {
+    mockLiveQueryQueue = [{ data: [] }];
+    expect(mount()).toEqual({ completedSetCount: 0, valuedSetCount: 0, loaded: false });
   });
 
-  it('集計行のcountをそのまま返す', () => {
-    mockLiveQueryQueue = [{ data: [{ count: 4 }] }];
-    expect(mount()).toBe(4);
+  it('集計行の件数をそのまま返す', () => {
+    mockLiveQueryQueue = [{ data: [{ completedSetCount: 4, valuedSetCount: 6 }], updatedAt: new Date() }];
+    expect(mount()).toEqual({ completedSetCount: 4, valuedSetCount: 6, loaded: true });
+  });
+
+  // セットが1件も無いセッションではSUMがnullを返すため、0へのフォールバックが必要になる
+  it('集計行の値がnullのとき0を返す', () => {
+    mockLiveQueryQueue = [
+      { data: [{ completedSetCount: null, valuedSetCount: null }], updatedAt: new Date() },
+    ];
+    expect(mount()).toEqual({ completedSetCount: 0, valuedSetCount: 0, loaded: true });
+  });
+
+  // クエリが失敗したまま「未解決」扱いにすると終了操作が永久に破棄側へ倒れないため、
+  // errorも解決済みとして扱う（use-exercise-record-count.tsと同じ方針）
+  it('errorが入っている場合もloadedはtrueになる', () => {
+    mockLiveQueryQueue = [{ data: [], error: new Error('fail') }];
+    expect(mount()).toEqual({ completedSetCount: 0, valuedSetCount: 0, loaded: true });
   });
 });
 
