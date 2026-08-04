@@ -1,3 +1,4 @@
+import { HeaderBackButton } from '@/components/ui/header-back-button';
 import { HeaderTitle } from '@/components/ui/header-title';
 import { PrimaryButton } from '@/components/ui/primary-button';
 import { ScreenFooter } from '@/components/ui/screen-footer';
@@ -12,14 +13,19 @@ import { ScrollView, StyleSheet } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 /**
- * トレーニング完了サマリー。トレーニング中画面で「終了」を押したあと、その画面の上に
- * pushされる（replaceではない）。真下に残る app/workout/[id].tsx は endedAt が入った
- * ことで「記録の編集」モードになっているため、ヘッダーの戻る・スワイプバックがそのまま
- * 「記録を編集する」導線になり、専用の遷移処理を持たなくて済む。
+ * トレーニング完了サマリー。トレーニング中画面で「終了」を押すと、その画面を **replaceして**
+ * この画面に着地する。記録編集はここから push する寄り道、という関係。
  *
- * 「戻る」というラベルを使わないこと。トレーニングの再開（endedAtをnullに戻す）と読まれるが、
- * endWorkoutSessionは予定(scheduledWorkouts)の削除まで済ませており巻き戻せない。
- * 詳細は lib/workout/session.ts の discardSession のコメントを参照。
+ * 逆（トレーニング中画面の上にサマリーをpush）にしてはいけない。サマリーの戻るがpopになり、
+ * 記録編集へ降りた時点でサマリーがスタックから消えるため、記録編集の「戻る」がサマリーではなく
+ * タブまで抜けてしまう（@ユーザー指摘、実機で確認）。
+ *
+ * 下に積まれているのはタブなので、ヘッダーのシェブロンは「1つ戻る」ではなく記録編集へのpush。
+ * スワイプバックだけがタブへ抜けて挙動が食い違うため、この画面ではジェスチャを無効にしている。
+ *
+ * 記録編集への導線に「戻る」というラベルを使わないこと。トレーニングの再開（endedAtをnullに
+ * 戻す）と読まれるが、endWorkoutSessionは予定(scheduledWorkouts)の削除まで済ませており
+ * 巻き戻せない。詳細は lib/workout/session.ts の discardSession のコメントを参照。
  */
 export default function WorkoutSummaryScreen() {
   const { id } = useLocalSearchParams<{ id: string }>();
@@ -48,6 +54,14 @@ export default function WorkoutSummaryScreen() {
   // fromChild/fromGrandchildの2種類に割れているのと同じ事情）
   const handleClose = () => router.dismissAll();
 
+  // 記録編集はこの画面の上にpushする。fromを渡すのは、記録編集画面が「サマリーへ帰る寄り道」
+  // として振る舞う（フッターを「完了」にし、シェブロンを出さない）ために経路を知る必要があるため。
+  // 記録タブのセッションカードから開いた場合は従来通りの編集画面のままにする
+  const handleEdit = () => {
+    if (sessionId == null) return;
+    router.push({ pathname: '/workout/[id]', params: { id: String(sessionId), from: 'summary' } });
+  };
+
   if (!session) return null;
 
   return (
@@ -57,6 +71,12 @@ export default function WorkoutSummaryScreen() {
           headerTitle: () => (
             <HeaderTitle title="トレーニング完了" subtitle={formatSessionDateGroup(session.startedAt)} />
           ),
+          headerLeft: ({ tintColor }) => (
+            <HeaderBackButton tintColor={tintColor} onPress={handleEdit} accessibilityLabel="記録を編集する" />
+          ),
+          // シェブロンが記録編集へ「進む」のに対し、スワイプバックは下のタブへ抜けてしまい
+          // 挙動が食い違う。達成感を締めくくる画面でもあるので、離脱は「閉じる」に一本化する
+          gestureEnabled: false,
         }}
       />
 

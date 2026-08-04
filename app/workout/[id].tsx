@@ -38,8 +38,11 @@ import { Alert, FlatList, StyleSheet, Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 export default function WorkoutScreen() {
-  const { id } = useLocalSearchParams<{ id: string }>();
+  const { id, from } = useLocalSearchParams<{ id: string; from?: string }>();
   const router = useRouter();
+  // 完了サマリーから開かれた記録編集。サマリーへ帰る寄り道なので、フッターの文言と
+  // ヘッダーのシェブロンの扱いが通常の編集（記録タブのセッションカード経由）と変わる
+  const fromSummary = from === 'summary';
   const pushDebounced = useDebouncedPush();
   const parsedId = Number(id);
   const sessionId = Number.isFinite(parsedId) ? parsedId : null;
@@ -156,10 +159,11 @@ export default function WorkoutScreen() {
     isFinishingRef.current = true;
     try {
       await endWorkoutSession(sessionId);
-      // backではなくpushで完了サマリーを上に積む。この画面はendedAtが入ったことで
-      // 「記録の編集」モードになっており、サマリーの戻る・スワイプバックがそのまま
-      // 「記録を編集する」導線になる。サマリーの「閉じる」がdismissAllで2枚まとめて畳む
-      router.push(`/workout/summary/${sessionId}`);
+      // pushではなくreplaceでこの画面を完了サマリーに差し替える。pushにすると、サマリーの
+      // 戻る（pop）で記録編集へ降りた時点でサマリーがスタックから消え、記録編集の「戻る」が
+      // サマリーではなくタブまで抜けてしまう（@ユーザー指摘、実機で確認）。
+      // 記録編集はサマリーからpushする寄り道、という関係にする
+      router.replace(`/workout/summary/${sessionId}`);
     } catch (e) {
       console.error('[workout session finish]', e);
       Alert.alert('エラー', 'トレーニングを終了できませんでした。');
@@ -321,6 +325,9 @@ export default function WorkoutScreen() {
             />
           ),
           headerRight: () => <HeaderMenu groups={[menuItems]} accessibilityLabel="トレーニングのメニューを開く" />,
+          // サマリーから来た場合は、フッターの「完了」とシェブロンが同じ行き先（サマリー）に
+          // なって二重になるため出さない。スワイプバックは有効なままなので、右スワイプでも帰れる
+          ...(fromSummary ? { headerLeft: () => null } : {}),
         }}
       />
 
@@ -399,9 +406,13 @@ export default function WorkoutScreen() {
           </ScreenFooter>
         ) : (
           // 過去の記録の編集モード。app/calendar/schedule-workout-edit.tsxの「戻るのみ」の
-          // フッターと同じ体験に揃える（@ユーザー指摘）
+          // フッターと同じ体験に揃える（@ユーザー指摘）。
+          //
+          // サマリーから来た場合だけ「完了」にする。行き先が同じrouter.back()でも、
+          // 「戻る」は一段前の画面（＝トレーニングを始める前の一覧）へ抜ける操作に読めてしまい、
+          // 実際にはサマリーへ帰る＝右スワイプで戻る関係なので言葉と体感が食い違う（@ユーザー指摘）
           <ScreenFooter>
-            <PrimaryButton label="戻る" onPress={() => router.back()} />
+            <PrimaryButton label={fromSummary ? '完了' : '戻る'} onPress={() => router.back()} />
           </ScreenFooter>
         )}
       </KeyboardAvoidingScreen>

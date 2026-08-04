@@ -1,17 +1,21 @@
 const mockDismissAll = jest.fn();
+const mockPush = jest.fn();
+// Stack.Screenに渡されたoptions（headerLeft・gestureEnabled）を検証するために取っておく
+let capturedOptions: Record<string, any> = {};
 const mockUseLocalSearchParams = jest.fn();
 const mockUseWorkoutSession = jest.fn();
 const mockUseSessionTotal = jest.fn();
 const mockUseSessionWeekOrdinal = jest.fn();
 
 jest.mock('expo-router', () => ({
-  useRouter: () => ({ dismissAll: mockDismissAll }),
+  useRouter: () => ({ dismissAll: mockDismissAll, push: mockPush }),
   useLocalSearchParams: () => mockUseLocalSearchParams(),
   // Stack.Screen はナビゲーターのoptionsを設定するコンポーネントで本来は見た目を持たないが、
   // headerTitle（タイトル＋日付サブタイトル）をテストで検証できるようレンダー関数だけ実行する
   Stack: {
     Screen: ({ options }: { options?: { headerTitle?: () => unknown } }) => {
       const { createElement, Fragment } = require('react');
+      capturedOptions = (options ?? {}) as Record<string, any>;
       return createElement(Fragment, null, options?.headerTitle?.());
     },
   },
@@ -124,6 +128,29 @@ test('数値3項目はセル単位で1つの読み上げにまとまる', () => 
   expect(labels).toEqual(
     expect.arrayContaining(['時間 1時間12分', '総重量 12,450kg', '今週 2回目']),
   );
+});
+
+// サマリーの下に積まれているのはタブなので、シェブロンは「1つ戻る」ではなく記録編集へのpush。
+// popにすると記録編集へ降りた時点でサマリーがスタックから消え、記録編集の「完了」がタブまで抜ける
+test('ヘッダーのシェブロンは記録編集画面をpushする（popではない）', () => {
+  render();
+
+  const headerLeft = capturedOptions.headerLeft?.({});
+  act(() => {
+    headerLeft.props.onPress();
+  });
+
+  expect(mockPush).toHaveBeenCalledWith({
+    pathname: '/workout/[id]',
+    params: { id: '1', from: 'summary' },
+  });
+});
+
+// シェブロンが記録編集へ進むのに対し、スワイプバックは下のタブへ抜けてしまい食い違う
+test('スワイプバックを無効にする', () => {
+  render();
+
+  expect(capturedOptions.gestureEnabled).toBe(false);
 });
 
 test('「閉じる」を押すとrouter.dismissAllで元いたタブまで畳む', () => {
