@@ -23,18 +23,23 @@ export function useSessionTotal(sessionId: number): { total: SessionTotal | null
         reps: sets.reps,
         durationSeconds: sets.durationSeconds,
         distanceMeters: sets.distanceMeters,
+        completedAt: sets.completedAt,
       })
       .from(sets)
       .innerJoin(exercises, eq(sets.exerciseId, exercises.id))
-      // ✓未確定のセットは記録として成立していないため主役数値にも入れない
-      // （記録タブのセッションカード・カレンダーの集計と同じ基準）
-      .where(and(eq(sets.sessionId, sessionId), isNotNull(sets.completedAt))),
+      // ✓未確定のセットも引く。合計そのものには入れない（記録タブのセッションカード・
+      // カレンダーの集計と同じ基準）が、「何の合計を出す画面か」＝ラベルの決定には使う。
+      // 絞り込みはcomputeSessionTotal側で行う
+      .where(eq(sets.sessionId, sessionId)),
     [sessionId],
   );
 
   if (error) console.error('[session total]', error);
 
-  const rows = useMemo(() => data ?? [], [data]);
+  const rows = useMemo(
+    () => (data ?? []).map(({ completedAt, ...row }) => ({ ...row, completed: completedAt != null })),
+    [data],
+  );
   const total = useMemo(() => computeSessionTotal(rows), [rows]);
 
   // dataの初期値は[]なので、解決前は「確定セット0件」と見分けが付かない。未解決のまま

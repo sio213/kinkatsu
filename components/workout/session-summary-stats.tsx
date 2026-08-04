@@ -53,11 +53,12 @@ export function SessionSummaryStats({ duration, total, weekOrdinal }: Props) {
       <Stat label="時間" value={duration} />
       <View style={styles.divider} />
       <Stat
-        // 未解決の間もラベルの幅を確定させたいので、総重量を仮に出しておく。解決後に
-        // セッションの中身次第で「合計回数」等へ差し替わる
+        // 未解決の間もラベルの幅を確定させたいので総重量を仮に出しておく。解決後は
+        // セッションの中身次第で「合計回数」等へ差し替わる（✓が1つも無い場合でも、
+        // 種目の計測タイプからラベルだけは決まる）
         label={total?.label ?? '総重量'}
         value={total === undefined ? null : (total?.value ?? NO_VALUE)}
-        unit={total?.unit}
+        unit={total?.unit ?? undefined}
       />
       <View style={styles.divider} />
       <Stat label="今週" value={weekOrdinal == null ? null : String(weekOrdinal)} unit="回目" />

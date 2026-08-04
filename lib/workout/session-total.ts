@@ -2,8 +2,12 @@ import { PAIRED_WEIGHT_SIDES, resolveMeasurementType, type MeasurementType } fro
 import { progressMetricLabel } from '@/lib/exercises/progress';
 
 /**
- * 完了サマリーの主役数値（デザイン案の2項目目）に必要な、確定セット1件分の値。
- * DBに依存しないよう、フック側（hooks/use-session-summary.ts）が引いた行をそのまま渡す形にする
+ * 完了サマリーの主役数値（デザイン案の2項目目）に必要な、セット1件分の値。
+ * DBに依存しないよう、フック側（hooks/use-session-summary.ts）が引いた行をそのまま渡す形にする。
+ *
+ * ✓未確定の行も渡すこと。合計そのものは確定セットだけで出すが、**何の合計を出す画面なのか**
+ * （総重量なのか合計回数なのか）は✓の有無に関係なく決まるべきで、✓が1つも無いセッションでも
+ * 「総重量」に固定されないようにするため
  */
 export type SessionTotalRow = {
   measurementType: string;
@@ -12,15 +16,20 @@ export type SessionTotalRow = {
   reps: number | null;
   durationSeconds: number | null;
   distanceMeters: number | null;
+  /** ✓で確定済みか。合計に足すのはこれがtrueの行だけ */
+  completed: boolean;
 };
 
 export type SessionTotal = {
   /** 「総重量」「合計回数」など。lib/exercises/progress.ts のグラフ指標チップと同じ語を使う */
   label: string;
-  /** 表示用に整形済みの値（3桁区切り・小数の丸めまで済ませたもの） */
-  value: string;
-  /** 値の右に小さく添える単位（「kg」「回」など） */
-  unit: string;
+  /**
+   * 表示用に整形済みの値（3桁区切り・小数の丸めまで済ませたもの）。確定セットから合計が
+   * 立たなかった場合はnullで、呼び出し側が「—」等に描き分ける
+   */
+  value: string | null;
+  /** 値の右に小さく添える単位（「kg」「回」など）。valueがnullなら添える先が無いのでnull */
+  unit: string | null;
 };
 
 /**
@@ -109,32 +118,59 @@ function format(kind: TotalKind, total: number): { value: string; unit: string }
   }
 }
 
+/** 足せる量があった最初の計測タイプ。1つも無ければnull */
+function pickKind(rows: SessionTotalRow[]): { kind: TotalKind; total: number } | null {
+  return (
+    TOTAL_ORDER.map((kind) => ({ kind, total: sumFor(kind, rows) })).find((c) => c.total > 0) ?? null
+  );
+}
+
 /**
- * 完了サマリーの主役数値を組み立てる。渡すのは**確定（✓）済みのセットだけ**。
+ * 値を一切見ず、種目の計測タイプだけで決める最後の砦。ラベル専用。
+ *
+ * 合計が1つも立たない状態（欄が空のまま✓を押した／重量だけ入れて回数が空欄）でも、
+ * 何を記録する画面だったかは種目から分かる。ここが無いと呼び出し側の既定値に落ちて、
+ * 懸垂だけのセッションが「総重量」と名乗ってしまう
+ */
+function pickKindByType(rows: SessionTotalRow[]): TotalKind | null {
+  return TOTAL_ORDER.find((kind) => rows.some((row) => classify(row.measurementType) === kind)) ?? null;
+}
+
+/**
+ * 完了サマリーの主役数値を組み立てる。**✓未確定の行も含めて**渡すこと。
  *
  * 重量種目が1つでもあれば「総重量」。無ければ「合計回数」「合計時間」「合計距離」の順に降りる。
  * 「足せる量が0だったら次へ」という判定にしているのは、重量欄を1度も埋めていない加重種目
  * （カスタム種目を重量×回数で作って回数だけ入れている等）で「総重量 0kg」を主役に据えないため。
  * グラフ側の resolveChartMeasurementType が同じ状況を reps 種目として描くのと揃えている。
  *
- * どの計測タイプでも足せる量が0だった場合はnull。「重量だけ入れて回数が空欄のまま✓を押した」
- * ように、確定セットはあるのに合計が立たない状態が実際に起こりうる（set-row.tsxは全欄が空でも
- * ✓を押せる）。そこで「総重量 0kg」を主役に据えると、やった内容が0扱いされたように見えるため、
- * 値なしとして呼び出し側に描き分けさせる
+ * ラベルと値で見る行が違う。値は確定セットだけの合計だが、ラベル（何の合計を出す画面か）は
+ * ✓の有無に関係なく決まるべきで、**値を入れたが✓を1つも押さずに終了した**場合——記録として
+ * 成立しないので合計は出せないが、画面自体には遷移する——でも、懸垂だけのセッションが
+ * 「総重量」と名乗ってしまわないようにする（@ユーザー指摘、実機で確認）。
+ *
+ * valueがnullになるのは、確定セットから合計が立たない場合。「重量だけ入れて回数が空欄のまま
+ * ✓を押した」ように、確定セットがあっても合計が0のことがある（set-row.tsxは全欄が空でも
+ * ✓を押せる）。「総重量 0kg」はやった内容が0扱いされたように見えるため値なしに倒す。
+ *
+ * 戻り値自体がnullになるのは、セットが1行も無い等でラベルすら決められない場合だけ
  */
 export function computeSessionTotal(rows: SessionTotalRow[]): SessionTotal | null {
-  const picked = TOTAL_ORDER.map((kind) => ({ kind, total: sumFor(kind, rows) })).find(
-    (candidate) => candidate.total > 0,
-  );
-  if (!picked) return null;
+  const completed = rows.filter((row) => row.completed);
+  // ラベルの決め方は3段階。確定セットの合計で決まるならそれが正。決まらなければ✓未確定を
+  // 含む全行の合計、それでも決まらなければ値を見ず種目の計測タイプだけで決める（値は出さない）
+  const fromCompleted = pickKind(completed);
+  const kind = fromCompleted?.kind ?? pickKind(rows)?.kind ?? pickKindByType(rows);
+  if (kind == null) return null;
 
-  const { value, unit } = format(picked.kind, picked.total);
-  return {
+  const label =
     // グラフの指標チップと同じ語（総重量／合計回数／合計時間／合計距離）を使い、
     // 画面ごとに呼び名が割れないようにする。TOTAL_ORDERの4つはいずれもMETRIC_LABELSに
     // totalを持つのでnullは返らないが、型の上では省略可能なので明示的に落とす
-    label: progressMetricLabel(picked.kind, 'total') ?? '合計',
-    value,
-    unit,
-  };
+    progressMetricLabel(kind, 'total') ?? '合計';
+
+  if (!fromCompleted) return { label, value: null, unit: null };
+
+  const { value, unit } = format(fromCompleted.kind, fromCompleted.total);
+  return { label, value, unit };
 }

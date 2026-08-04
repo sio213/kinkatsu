@@ -8,6 +8,8 @@ function row(over: Partial<SessionTotalRow>): SessionTotalRow {
     reps: null,
     durationSeconds: null,
     distanceMeters: null,
+    // 既定は確定済み。✓なしの挙動を見るテストだけ明示的に落とす
+    completed: true,
     ...over,
   };
 }
@@ -93,12 +95,26 @@ describe('computeSessionTotal', () => {
 
   // set-row.tsxは全欄が空でも✓を押せるため、確定セットはあるのに合計が立たない状態が実際に起こる。
   // 「総重量 0kg」を主役に据えるとやった内容が0扱いされたように見えるので、値なしとして返す
-  it('どの計測タイプも足せる量が0ならnull', () => {
-    expect(computeSessionTotal([row({ weight: null, reps: null })])).toBeNull();
+  // 合計が1つも立たなくても、何を記録する画面だったかは種目の計測タイプから決まる
+  it('全欄が空のまま✓を押した場合も、計測タイプからラベルだけは決める', () => {
+    expect(computeSessionTotal([row({ weight: null, reps: null })])).toEqual({
+      label: '総重量',
+      value: null,
+      unit: null,
+    });
+    expect(computeSessionTotal([row({ measurementType: 'reps', reps: null })])).toEqual({
+      label: '合計回数',
+      value: null,
+      unit: null,
+    });
   });
 
-  it('重量だけ入れて回数が空欄のままでもnull（総重量0kgを主役にしない）', () => {
-    expect(computeSessionTotal([row({ weight: 100, reps: null })])).toBeNull();
+  it('重量だけ入れて回数が空欄のままなら「総重量」で値なし（0kgを主役にしない）', () => {
+    expect(computeSessionTotal([row({ weight: 100, reps: null })])).toEqual({
+      label: '総重量',
+      value: null,
+      unit: null,
+    });
   });
 
   // 距離種目は距離と時間の両方を記録する（MEASUREMENT_COLUMNS.distance_time）。時間の合計を
@@ -116,6 +132,39 @@ describe('computeSessionTotal', () => {
       row({ measurementType: 'distance_time', distanceMeters: 5000, durationSeconds: 1800 }),
     ]);
     expect(total).toEqual({ label: '合計時間', value: '1', unit: '分' });
+  });
+
+  // 値は入れたが✓を1つも押さずに終了した場合。記録として成立しないので合計は出せないが、
+  // 「何の合計を出す画面か」は種目の計測タイプから決まる（@ユーザー指摘、実機で確認）
+  describe('✓が1つも無いセッション', () => {
+    it('回数のみの種目なら「合計回数」で値なし（総重量に固定しない）', () => {
+      const total = computeSessionTotal([
+        row({ measurementType: 'reps', reps: 12, completed: false }),
+        row({ measurementType: 'reps', reps: 10, completed: false }),
+      ]);
+      expect(total).toEqual({ label: '合計回数', value: null, unit: null });
+    });
+
+    it('重量種目なら「総重量」で値なし', () => {
+      const total = computeSessionTotal([row({ weight: 100, reps: 5, completed: false })]);
+      expect(total).toEqual({ label: '総重量', value: null, unit: null });
+    });
+
+    it('距離種目なら「合計距離」で値なし', () => {
+      const total = computeSessionTotal([
+        row({ measurementType: 'distance_time', distanceMeters: 5000, durationSeconds: 1800, completed: false }),
+      ]);
+      expect(total).toEqual({ label: '合計距離', value: null, unit: null });
+    });
+  });
+
+  // ラベルは確定セットから決める。✓未確定の重量セットに引きずられて「総重量 —」にしない
+  it('確定セットと未確定セットが混在する場合、確定セット側で決める', () => {
+    const total = computeSessionTotal([
+      row({ measurementType: 'reps', reps: 12, completed: true }),
+      row({ weight: 100, reps: 5, completed: false }),
+    ]);
+    expect(total).toEqual({ label: '合計回数', value: '12', unit: '回' });
   });
 
   // 想定外のDB値でも画面ごと落とさない（resolveMeasurementTypeがweight_repsへフォールバックする）
