@@ -16,6 +16,44 @@ export function formatSessionDuration(
   return `${minutes}分`;
 }
 
+/**
+ * 完了サマリーの所要時間表示。formatSessionDurationの「N分」に準拠しつつ、60分を超えたら
+ * 「1時間12分」に切り替える（デザイン案）。ちょうど1時間なら「1時間」で、「1時間0分」は出さない。
+ *
+ * 記録タブのセッションカード・トレーニング中画面のタイマーチップは今も「N分」のままなので、
+ * 90分のセッションはサマリーで「1時間30分」・記録タブで「90分」と表記が割れる。サマリーは
+ * 数値を主役に据える画面で「92分」では長さが直感的に掴めないため、まずここだけ切り替えている
+ */
+export function formatSessionDurationLong(
+  startedAt: number,
+  endedAt: number | null,
+  now: number = Date.now(),
+): string {
+  const end = endedAt ?? now;
+  const minutes = Math.max(0, Math.round((end - startedAt) / 60_000));
+  if (minutes < MINUTES_PER_HOUR) return `${minutes}分`;
+  const hours = Math.floor(minutes / MINUTES_PER_HOUR);
+  const rest = minutes % MINUTES_PER_HOUR;
+  return rest === 0 ? `${hours}時間` : `${hours}時間${rest}分`;
+}
+
+const MINUTES_PER_HOUR = 60;
+
+/**
+ * その週の始まり（月曜0時）。完了サマリーの「今週N回目」の集計範囲に使う。
+ *
+ * 週の始まりを月曜に置くのはデザイン案の指定。トレーニングの習慣は「土日で帳尻を合わせる」
+ * 形になりやすく、日曜始まりだと週末の2日が別々の週に割れてしまう
+ */
+export function startOfWeek(timestamp: number): number {
+  const d = new Date(timestamp);
+  d.setHours(0, 0, 0, 0);
+  // getDay()は日曜が0。月曜を0にずらしてから、その日数だけ巻き戻す
+  const daysSinceMonday = (d.getDay() + 6) % 7;
+  d.setDate(d.getDate() - daysSinceMonday);
+  return d.getTime();
+}
+
 // 経過時間を「M:SS」形式にする（分は60を超えても位取りせずそのまま伸びる）。
 // トレーニング中画面のタイマーチップ・再開バナーの60分未満表記で共通利用（@reviewer指摘: 重複実装の解消）
 export function formatMinutesSeconds(ms: number): string {

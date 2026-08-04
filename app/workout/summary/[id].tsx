@@ -1,9 +1,11 @@
 import { HeaderTitle } from '@/components/ui/header-title';
 import { PrimaryButton } from '@/components/ui/primary-button';
 import { ScreenFooter } from '@/components/ui/screen-footer';
+import { SessionSummaryStats } from '@/components/workout/session-summary-stats';
 import { ScreenStyles } from '@/constants/theme';
+import { useSessionTotal, useSessionWeekOrdinal } from '@/hooks/use-session-summary';
 import { useWorkoutSession } from '@/hooks/use-workout-session';
-import { formatSessionDateGroup } from '@/lib/workout/summary';
+import { formatSessionDateGroup, formatSessionDurationLong } from '@/lib/workout/summary';
 import { Stack, useLocalSearchParams, useRouter } from 'expo-router';
 import { useEffect } from 'react';
 import { ScrollView, StyleSheet } from 'react-native';
@@ -25,6 +27,8 @@ export default function WorkoutSummaryScreen() {
   const parsedId = Number(id);
   const sessionId = Number.isFinite(parsedId) ? parsedId : null;
   const { session, loaded } = useWorkoutSession(sessionId ?? -1);
+  const { total } = useSessionTotal(sessionId ?? -1);
+  const weekOrdinal = useSessionWeekOrdinal(session?.startedAt ?? null);
 
   // 記録編集画面の⋮「削除」は deleteSession → router.back() なので、サマリーから開いていると
   // 削除済みセッションのサマリーへ戻ってくる。NotFoundStateを見せる場面ではない（ユーザーは
@@ -57,7 +61,14 @@ export default function WorkoutSummaryScreen() {
       />
 
       <ScrollView style={styles.body} contentContainerStyle={styles.bodyContent}>
-        {/* 数値3項目・みんなの声・グラフ・実施した種目はこの下に順次追加する */}
+        <SessionSummaryStats
+          // 所要時間はendedAt基準の確定値。サマリーを開いている間に伸びることは無いので
+          // now基準のフォールバック（進行中セッション用）には落ちない
+          duration={formatSessionDurationLong(session.startedAt, session.endedAt)}
+          total={total}
+          weekOrdinal={weekOrdinal}
+        />
+        {/* みんなの声・グラフ・実施した種目はこの下に順次追加する */}
       </ScrollView>
 
       <ScreenFooter>

@@ -5,6 +5,8 @@ import {
   formatRelativeDaysAgo,
   formatSessionDateGroup,
   formatSessionDuration,
+  formatSessionDurationLong,
+  startOfWeek,
   groupByMonth,
   groupSessionsByDate,
 } from '@/lib/workout/summary';
@@ -61,6 +63,54 @@ describe('formatSessionDuration', () => {
 
   it('Math.roundの仕様通り、29.5分ちょうどは30分に切り上がる', () => {
     expect(formatSessionDuration(0, 29.5 * 60_000)).toBe('30分');
+  });
+});
+
+describe('formatSessionDurationLong', () => {
+  it('60分未満はformatSessionDurationと同じ「N分」', () => {
+    expect(formatSessionDurationLong(0, 45 * 60_000)).toBe('45分');
+  });
+
+  it('60分を超えたら「N時間M分」', () => {
+    expect(formatSessionDurationLong(0, 72 * 60_000)).toBe('1時間12分');
+  });
+
+  // 「1時間0分」は冗長なので分を落とす
+  it('ちょうど1時間は「1時間」', () => {
+    expect(formatSessionDurationLong(0, 60 * 60_000)).toBe('1時間');
+  });
+
+  it('endedAtが無い場合（進行中）はnow基準で計算する', () => {
+    expect(formatSessionDurationLong(0, null, 90 * 60_000)).toBe('1時間30分');
+  });
+
+  it('負の経過時間にはならない', () => {
+    expect(formatSessionDurationLong(10_000, 0)).toBe('0分');
+  });
+});
+
+describe('startOfWeek', () => {
+  // 2026-08-04 は火曜日。週の始まりは前日の月曜0時
+  it('週の始まりを月曜0時に丸める', () => {
+    const tuesday = new Date(2026, 7, 4, 19, 30).getTime();
+    expect(startOfWeek(tuesday)).toBe(new Date(2026, 7, 3, 0, 0, 0, 0).getTime());
+  });
+
+  // 日曜始まりだと週末の土日が別の週に割れてしまうため、日曜はその週の最後になる
+  it('日曜はその週の月曜まで巻き戻す（翌週の始まりにしない）', () => {
+    const sunday = new Date(2026, 7, 9, 23, 59).getTime();
+    expect(startOfWeek(sunday)).toBe(new Date(2026, 7, 3, 0, 0, 0, 0).getTime());
+  });
+
+  it('月曜0時ちょうどはそのまま', () => {
+    const monday = new Date(2026, 7, 3, 0, 0, 0, 0).getTime();
+    expect(startOfWeek(monday)).toBe(monday);
+  });
+
+  it('月をまたいでも前月へ正しく巻き戻す', () => {
+    // 2026-08-01 は土曜日。その週の月曜は7月27日
+    const saturday = new Date(2026, 7, 1, 12, 0).getTime();
+    expect(startOfWeek(saturday)).toBe(new Date(2026, 6, 27, 0, 0, 0, 0).getTime());
   });
 });
 
