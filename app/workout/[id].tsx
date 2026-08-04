@@ -22,13 +22,13 @@ import {
   EMPTY_SETS,
   useExercisesWithHistory,
   useSessionExercises,
-  useSessionSetCount,
+  useSessionFinishCounts,
   useSessionSets,
   useWorkoutSession,
   type SessionExercise,
 } from '@/hooks/use-workout-session';
 import { subscribePrefilled } from '@/lib/workout/prefill-feedback';
-import { deleteSession, endWorkoutSession, type PrefilledCard } from '@/lib/workout/session';
+import { deleteSession, discardSession, endWorkoutSession, type PrefilledCard } from '@/lib/workout/session';
 import { formatMinutesSeconds, formatSessionDateGroup, formatSessionDuration } from '@/lib/workout/summary';
 import type { ParamListBase } from '@react-navigation/native';
 import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
@@ -44,7 +44,11 @@ export default function WorkoutScreen() {
   const parsedId = Number(id);
   const sessionId = Number.isFinite(parsedId) ? parsedId : null;
   const { session, loaded } = useWorkoutSession(sessionId ?? -1);
-  const setCount = useSessionSetCount(sessionId ?? -1);
+  const {
+    completedSetCount,
+    valuedSetCount,
+    loaded: finishCountsLoaded,
+  } = useSessionFinishCounts(sessionId ?? -1);
   const sessionExercises = useSessionExercises(sessionId ?? -1);
   const sessionSets = useSessionSets(sessionId ?? -1);
   const exercisesWithHistory = useExercisesWithHistory(sessionId ?? -1);
@@ -161,9 +165,42 @@ export default function WorkoutScreen() {
     }
   };
 
+  // 入力が1つも無いまま終了するケース。終了させても中身の無い記録が履歴に残るだけなので、
+  // セッションごと破棄する（finishと同じくisFinishingRefで連打を抑える）
+  const discard = async () => {
+    if (sessionId == null) return;
+    if (isFinishingRef.current) return;
+    isFinishingRef.current = true;
+    try {
+      await discardSession(sessionId);
+      router.back();
+    } catch (e) {
+      console.error('[workout session discard]', e);
+      Alert.alert('エラー', 'トレーニングを破棄できませんでした。');
+    } finally {
+      isFinishingRef.current = false;
+    }
+  };
+
   const handleFinish = () => {
-    if (setCount === 0) {
-      Alert.alert('トレーニングを終了', 'まだ種目を記録していません。終了しますか？', [
+    // 値が1つも入っていない（種目を追加していない／種目だけ追加して空行のまま／全セットを削除した）
+    // 場合は、終了しても記録として何も残らないため破棄する。
+    // completedSetCountも0であることを条件に含めるのは、全欄が空のままでも✓は押せる
+    // （components/workout/set-row.tsxのhandleTogglePress、空欄はnull保存でよいという仕様）ため。
+    // ユーザーが明示的に付けた✓ごとセッションを消してしまわないよう、その場合は終了側に倒す。
+    // finishCountsLoadedを見るのは、クエリ未解決の間は両カウントとも0になり
+    // 「記録が無い」と誤認して破棄してしまうため（未解決の間は変更前と同じ挙動＝終了確認になる）
+    if (finishCountsLoaded && valuedSetCount === 0 && completedSetCount === 0) {
+      Alert.alert('トレーニングを破棄', '記録がないため履歴に残りません。このトレーニングを破棄しますか？', [
+        { text: 'キャンセル', style: 'cancel' },
+        { text: '破棄する', style: 'destructive', onPress: discard },
+      ]);
+      return;
+    }
+    // 値はあるが✓が1つも無い場合。破棄すると入力内容を失うため、確認のうえ終了させる
+    // （記録編集モードで開き直せば✓を付け直せる）
+    if (completedSetCount === 0) {
+      Alert.alert('トレーニングを終了', '✓が付いたセットがありません。このまま終了しますか？', [
         { text: 'キャンセル', style: 'cancel' },
         { text: '終了する', style: 'destructive', onPress: finish },
       ]);
