@@ -2,10 +2,12 @@ import { HeaderMenu, type DropdownMenuItem } from '@/components/ui/dropdown-menu
 import { HeaderTitle } from '@/components/ui/header-title';
 import { PrimaryButton } from '@/components/ui/primary-button';
 import { ScreenFooter } from '@/components/ui/screen-footer';
+import { CommunityMessageCard } from '@/components/workout/community-message-card';
 import { SessionSummaryStats } from '@/components/workout/session-summary-stats';
 import { ScreenStyles } from '@/constants/theme';
 import { useSessionTotal, useSessionWeekOrdinal } from '@/hooks/use-session-summary';
 import { useWorkoutSession } from '@/hooks/use-workout-session';
+import { PLACEHOLDER_COMMUNITY_MESSAGE } from '@/lib/workout/community-message';
 import { formatSessionDateGroup, formatSessionDurationLong } from '@/lib/workout/summary';
 import { Stack, useLocalSearchParams, useRouter } from 'expo-router';
 import { useEffect } from 'react';
@@ -98,7 +100,8 @@ export default function WorkoutSummaryScreen() {
           total={total}
           weekOrdinal={weekOrdinal}
         />
-        {/* みんなの声・グラフ・実施した種目はこの下に順次追加する */}
+        <CommunityMessageCard message={PLACEHOLDER_COMMUNITY_MESSAGE} />
+        {/* グラフ・実施した種目はこの下に順次追加する */}
       </ScrollView>
 
       <ScreenFooter>

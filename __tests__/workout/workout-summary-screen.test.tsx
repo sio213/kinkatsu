@@ -46,6 +46,7 @@ import React from 'react';
 import { act, create, type ReactTestInstance } from 'react-test-renderer';
 import { Text, TouchableOpacity } from 'react-native';
 import WorkoutSummaryScreen from '@/app/workout/summary/[id]';
+import { PLACEHOLDER_COMMUNITY_MESSAGE } from '@/lib/workout/community-message';
 
 function findButtonByLabel(root: ReactTestInstance, label: string) {
   return root
@@ -161,6 +162,14 @@ test('⋮の「記録を編集」は記録編集画面をpushする（popでは�
   });
 
   expect(mockPush).toHaveBeenCalledWith('/workout/1');
+});
+
+// 投稿・抽選の仕組みが入るまでは固定の1件を出す。文言そのものはプレースホルダー側の
+// 責務なので、画面テストは中身に依存させずマウントされていることだけを見る
+test('みんなの声を表示する', () => {
+  const root = render();
+
+  expect(texts(root)).toContain(PLACEHOLDER_COMMUNITY_MESSAGE.author);
 });
 
 test('「閉じる」を押すとrouter.dismissAllで元いたタブまで畳む', () => {

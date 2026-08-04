@@ -243,6 +243,19 @@ export const Typography = {
    */
   statUnit: { fontSize: 11, fontWeight: '600' },
   /**
+   * みんなの声（他ユーザーからの応援メッセージ）の本文。captionCompactと同じ「小さいが読ませる
+   * 文章」だが、注記ではなくカード内の主役テキストなので一回り大きく、行間もさらに広い
+   * （デザイン案指定の 11.5px / line-height 1.65）。
+   *
+   * 以下3つは名前を community で始めること。lib/notifications/messages.ts（通知の文言）と
+   * 語が衝突するため、message だけでは何のメッセージか判別できない
+   */
+  communityMessageBody: { fontSize: 11.5, lineHeight: 19, fontWeight: '400' },
+  /** みんなの声の投稿者名。本文の添え物なので、このアプリで最も控えめな属性表示にする */
+  communityMessageAuthor: { fontSize: 10, fontWeight: '500' },
+  /** みんなの声の反応（♡の件数など）。投稿者名より半段大きく、数字が読み取れる下限 */
+  communityMessageAction: { fontSize: 10.5, fontWeight: '500' },
+  /**
    * Android用の時刻選択ボタン（reminder-form.tsx・app/calendar/schedule-time-picker.tsxで
    * 共通使用）。iOSのspinner表示の数字サイズ感に合わせた大きめの太字数値。letterSpacingは
    * 「18 : 00」のように時刻がゆったり読めるようにするため
