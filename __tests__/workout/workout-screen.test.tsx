@@ -497,7 +497,7 @@ test('値はあるが✓0件で終了を押すと確認ダイアログが出て�
     expect.anything(),
   );
   expect(mockEndWorkoutSession).toHaveBeenCalledWith(1);
-  expect(mockBack).toHaveBeenCalled();
+  expect(mockPush).toHaveBeenCalledWith('/workout/summary/1');
 });
 
 test('値はあるが✓0件で終了確認をキャンセルするとendWorkoutSessionは呼ばれない', async () => {
@@ -658,10 +658,10 @@ test('セットが1件以上ある場合は確認ダイアログを出さず即�
 
   expect(Alert.alert).not.toHaveBeenCalled();
   expect(mockEndWorkoutSession).toHaveBeenCalledWith(1);
-  expect(mockBack).toHaveBeenCalled();
+  expect(mockPush).toHaveBeenCalledWith('/workout/summary/1');
 });
 
-test('連打してもendWorkoutSession/router.backは1回しか呼ばれない（二重終了の防止）', async () => {
+test('連打してもendWorkoutSession/完了サマリーへのpushは1回しか呼ばれない（二重終了の防止）', async () => {
   let resolveEnd!: () => void;
   mockUseSessionFinishCounts.mockReturnValue({ completedSetCount: 3, valuedSetCount: 3, loaded: true });
   mockEndWorkoutSession.mockReturnValue(
@@ -683,10 +683,10 @@ test('連打してもendWorkoutSession/router.backは1回しか呼ばれない�
   await act(async () => {
     resolveEnd();
   });
-  expect(mockBack).toHaveBeenCalledTimes(1);
+  expect(mockPush).toHaveBeenCalledTimes(1);
 });
 
-test('endWorkoutSessionが失敗した場合はエラーAlertが表示され、router.backは呼ばれない', async () => {
+test('endWorkoutSessionが失敗した場合はエラーAlertが表示され、完了サマリーへ遷移しない', async () => {
   mockUseSessionFinishCounts.mockReturnValue({ completedSetCount: 3, valuedSetCount: 3, loaded: true });
   mockEndWorkoutSession.mockRejectedValueOnce(new Error('fail'));
   mockUseWorkoutSession.mockReturnValue({ session: activeSession, loaded: true });
@@ -698,7 +698,7 @@ test('endWorkoutSessionが失敗した場合はエラーAlertが表示され、r
   });
 
   expect(Alert.alert).toHaveBeenCalledWith('エラー', 'トレーニングを終了できませんでした。');
-  expect(mockBack).not.toHaveBeenCalled();
+  expect(mockPush).not.toHaveBeenCalled();
 });
 
 test('種目を追加ボタンを押すと種目追加ピッカーへ遷移する', () => {

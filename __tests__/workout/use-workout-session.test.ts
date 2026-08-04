@@ -136,15 +136,18 @@ describe('useWorkoutSessions', () => {
 describe('useWorkoutSession', () => {
   const mountSingle = makeHarness(() => useWorkoutSession(1));
 
-  it('data=undefined のとき loaded=false', () => {
-    mockLiveQueryQueue = [{ data: undefined }];
+  // dataは解決前から[]で来るため、loadedの判定にdataは使えない（updatedAt/errorで見る）。
+  // 完了サマリー画面はloadedを「セッションが削除された」の判定に使い、trueなら画面を畳むので、
+  // 未解決をloaded=trueと誤判定すると開いた瞬間に閉じてしまう
+  it('未解決（updatedAt/errorとも無し）のとき loaded=false', () => {
+    mockLiveQueryQueue = [{ data: [] }];
     const { session, loaded } = mountSingle();
     expect(session).toBeUndefined();
     expect(loaded).toBe(false);
   });
 
-  it('data=[] のとき loaded=true・sessionはundefined（見つからない）', () => {
-    mockLiveQueryQueue = [{ data: [] }];
+  it('解決済みで0件のとき loaded=true・sessionはundefined（見つからない）', () => {
+    mockLiveQueryQueue = [{ data: [], updatedAt: new Date() }];
     const { session, loaded } = mountSingle();
     expect(session).toBeUndefined();
     expect(loaded).toBe(true);
@@ -152,9 +155,16 @@ describe('useWorkoutSession', () => {
 
   it('data=[session] のときそのセッションを返す', () => {
     const fake = { id: 1, startedAt: 0, endedAt: null };
-    mockLiveQueryQueue = [{ data: [fake] }];
+    mockLiveQueryQueue = [{ data: [fake], updatedAt: new Date() }];
     const { session, loaded } = mountSingle();
     expect(session).toBe(fake);
+    expect(loaded).toBe(true);
+  });
+
+  // 取得に失敗したまま「未解決」扱いにすると、削除済みセッションを永久に検知できなくなる
+  it('errorが入っている場合も loaded=true', () => {
+    mockLiveQueryQueue = [{ data: [], error: new Error('fail') }];
+    const { loaded } = mountSingle();
     expect(loaded).toBe(true);
   });
 });
