@@ -1,4 +1,4 @@
-import { HeaderBackButton } from '@/components/ui/header-back-button';
+import { HeaderMenu, type DropdownMenuItem } from '@/components/ui/dropdown-menu';
 import { HeaderTitle } from '@/components/ui/header-title';
 import { PrimaryButton } from '@/components/ui/primary-button';
 import { ScreenFooter } from '@/components/ui/screen-footer';
@@ -20,8 +20,9 @@ import { SafeAreaView } from 'react-native-safe-area-context';
  * 記録編集へ降りた時点でサマリーがスタックから消えるため、記録編集の「戻る」がサマリーではなく
  * タブまで抜けてしまう（@ユーザー指摘、実機で確認）。
  *
- * 下に積まれているのはタブなので、ヘッダーのシェブロンは「1つ戻る」ではなく記録編集へのpush。
- * スワイプバックだけがタブへ抜けて挙動が食い違うため、この画面ではジェスチャを無効にしている。
+ * 下に積まれているのはタブなので、ヘッダー左にシェブロンは置かない。記録編集への導線は
+ * ヘッダー右の⋮メニューに集約する（副次操作を⋮にまとめるのは種目詳細・記録編集と同じ扱い）。
+ * スワイプバックは下のタブへ抜ける＝「閉じる」と同義なので、そのまま有効にしている。
  *
  * 記録編集への導線に「戻る」というラベルを使わないこと。トレーニングの再開（endedAtをnullに
  * 戻す）と読まれるが、endWorkoutSessionは予定(scheduledWorkouts)の削除まで済ませており
@@ -62,6 +63,16 @@ export default function WorkoutSummaryScreen() {
     router.push({ pathname: '/workout/[id]', params: { id: String(sessionId), from: 'summary' } });
   };
 
+  // この記録に対する副次操作は⋮に集約する。ヘッダー左に戻るシェブロンを置いて編集へ入る形は
+  // 採らない——下に積まれているのはタブなので、シェブロンは「戻る」ではなく前に進む遷移になり、
+  // 記号と動きが食い違う（@ユーザー指摘、実機で確認）。
+  // 当面は「記録を編集」1項目だけだが、SNS共有・ルーティンとして登録が同じメニューに並ぶ予定。
+  // フッターにサブ導線を置く案（主ボタンの下のリンク）だと、⋮が増えた時点で副次操作の入口が
+  // 2箇所に割れるため、最初から最終形の器にしている
+  const menuItems: DropdownMenuItem[] = [
+    { key: 'edit', label: '記録を編集', icon: 'edit', onPress: handleEdit },
+  ];
+
   if (!session) return null;
 
   return (
@@ -71,12 +82,12 @@ export default function WorkoutSummaryScreen() {
           headerTitle: () => (
             <HeaderTitle title="トレーニング完了" subtitle={formatSessionDateGroup(session.startedAt)} />
           ),
-          headerLeft: ({ tintColor }) => (
-            <HeaderBackButton tintColor={tintColor} onPress={handleEdit} accessibilityLabel="記録を編集する" />
+          // ルートStackが全画面に配るHeaderBackButtonを止める。canGoBack()は真（下にタブ）なので、
+          // 明示的に空にしないとタブへ抜けるだけのシェブロンが出てしまう
+          headerLeft: () => null,
+          headerRight: () => (
+            <HeaderMenu groups={[menuItems]} accessibilityLabel="この記録のメニューを開く" />
           ),
-          // シェブロンが記録編集へ「進む」のに対し、スワイプバックは下のタブへ抜けてしまい
-          // 挙動が食い違う。達成感を締めくくる画面でもあるので、離脱は「閉じる」に一本化する
-          gestureEnabled: false,
         }}
       />
 

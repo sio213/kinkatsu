@@ -2,6 +2,8 @@ const mockDismissAll = jest.fn();
 const mockPush = jest.fn();
 // Stack.Screenに渡されたoptions（headerLeft・gestureEnabled）を検証するために取っておく
 let capturedOptions: Record<string, any> = {};
+// HeaderMenuに渡されたgroups（⋮の項目）
+let capturedMenuGroups: any[][] = [];
 const mockUseLocalSearchParams = jest.fn();
 const mockUseWorkoutSession = jest.fn();
 const mockUseSessionTotal = jest.fn();
@@ -13,11 +15,20 @@ jest.mock('expo-router', () => ({
   // Stack.Screen はナビゲーターのoptionsを設定するコンポーネントで本来は見た目を持たないが、
   // headerTitle（タイトル＋日付サブタイトル）をテストで検証できるようレンダー関数だけ実行する
   Stack: {
-    Screen: ({ options }: { options?: { headerTitle?: () => unknown } }) => {
+    Screen: ({ options }: { options?: { headerTitle?: () => unknown; headerRight?: () => unknown } }) => {
       const { createElement, Fragment } = require('react');
       capturedOptions = (options ?? {}) as Record<string, any>;
-      return createElement(Fragment, null, options?.headerTitle?.());
+      return createElement(Fragment, null, options?.headerTitle?.(), options?.headerRight?.());
     },
+  },
+}));
+
+// HeaderMenuは中身（項目のkey/label/onPress）だけ検証すればよく、ドロップダウンの開閉は
+// dropdown-menu側のテストの担当なので、groupsを取り出すだけのモックに差し替える
+jest.mock('@/components/ui/dropdown-menu', () => ({
+  HeaderMenu: ({ groups }: { groups: unknown[][] }) => {
+    capturedMenuGroups = groups as any[][];
+    return null;
   },
 }));
 
@@ -130,27 +141,29 @@ test('数値3項目はセル単位で1つの読み上げにまとまる', () => 
   );
 });
 
-// サマリーの下に積まれているのはタブなので、シェブロンは「1つ戻る」ではなく記録編集へのpush。
-// popにすると記録編集へ降りた時点でサマリーがスタックから消え、記録編集の「完了」がタブまで抜ける
-test('ヘッダーのシェブロンは記録編集画面をpushする（popではない）', () => {
+// 副次操作は⋮に集約する。ヘッダー左にシェブロンを置くと、下がタブなので「戻る」ではなく
+// 前に進む遷移になり、記号と動きが食い違う（@ユーザー指摘、実機で確認）
+test('ヘッダー左にシェブロンを出さない', () => {
   render();
 
-  const headerLeft = capturedOptions.headerLeft?.({});
+  expect(capturedOptions.headerLeft?.({})).toBeNull();
+});
+
+// popにすると記録編集へ降りた時点でサマリーがスタックから消え、記録編集の「完了」がタブまで抜ける
+test('⋮の「記録を編集」は記録編集画面をpushする（popではない）', () => {
+  render();
+
+  const items = capturedMenuGroups.flat();
+  const edit = items.find((i: any) => i.key === 'edit');
+  expect(edit.label).toBe('記録を編集');
   act(() => {
-    headerLeft.props.onPress();
+    edit.onPress();
   });
 
   expect(mockPush).toHaveBeenCalledWith({
     pathname: '/workout/[id]',
     params: { id: '1', from: 'summary' },
   });
-});
-
-// シェブロンが記録編集へ進むのに対し、スワイプバックは下のタブへ抜けてしまい食い違う
-test('スワイプバックを無効にする', () => {
-  render();
-
-  expect(capturedOptions.gestureEnabled).toBe(false);
 });
 
 test('「閉じる」を押すとrouter.dismissAllで元いたタブまで畳む', () => {
