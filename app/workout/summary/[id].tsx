@@ -97,9 +97,13 @@ export default function WorkoutSummaryScreen() {
           headerTitle: () => (
             <HeaderTitle title="トレーニング完了" subtitle={formatSessionDateGroup(session.startedAt)} />
           ),
-          // ルートStackが全画面に配るHeaderBackButtonを止める。canGoBack()は真（下にタブ）なので、
-          // 明示的に空にしないとタブへ抜けるだけのシェブロンが出てしまう
+          // ルートStackが全画面に配るHeaderBackButton（自前のシェブロン）を止める
           headerLeft: () => null,
+          // headerLeftを空にしただけではネイティブの戻るボタンが残る。native-stackでは
+          // 自前のheaderLeftとネイティブの戻るボタンが別管理で、後者はこちらで消す
+          // （headerLeftがnullを返すと「headerLeftを指定していない」のと同じ扱いになり、
+          // ネイティブ側が表に出てくる。実機で確認）
+          headerBackVisible: false,
           // 戻る導線を持たない画面なので、同じことをするスワイプバックも止める。
           // 残しておくと「戻れる画面」に見えるが、戻った先はタブ＝「閉じる」と同じで、
           // 記号（戻る）と結果（閉じる）が食い違う

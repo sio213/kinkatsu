@@ -201,6 +201,8 @@ test('戻る導線を持たない（ヘッダーのシェブロンもスワイ�
   render();
 
   expect(capturedOptions.headerLeft?.({})).toBeNull();
+  // headerLeftを空にするだけではネイティブの戻るボタンが残る（実機で確認）
+  expect(capturedOptions.headerBackVisible).toBe(false);
   expect(capturedOptions.gestureEnabled).toBe(false);
 });
 
