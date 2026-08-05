@@ -355,7 +355,7 @@ describe('useResumeWorkoutSummary', () => {
   // では再フェッチされず画面に戻っても反映されない不具合があった（実機で再現・特定）。
   // setsテーブル単体のクエリに分けてJS側で突き合わせているため、ここではその2クエリの結果を
   // 個別に渡してテストする
-  it('totalSets>0かつcompletedSets===totalSetsの種目のみ完了扱いにする（useAutoCollapseCompletedExercisesと同じ基準）', () => {
+  it('totalSets>0かつcompletedSets===totalSetsの種目のみ完了扱いにする（useSessionExerciseCollapseと同じ基準）', () => {
     mockLiveQueryQueue = [
       {
         data: [{ sessionExerciseId: 1 }, { sessionExerciseId: 2 }, { sessionExerciseId: 3 }],

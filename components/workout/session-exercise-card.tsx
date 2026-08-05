@@ -29,10 +29,6 @@ type Props = {
   previousSessionExerciseId: number | null;
   nextSessionExerciseId: number | null;
   onToggleCollapsed: (sessionExerciseId: number) => void;
-  // カード内で何らかの操作（セット確定/取り消し/追加/削除、値の入力開始、開閉）が起きるたびに
-  // 呼ばれる。親（workout/[id].tsx）はこれを「別の種目カードに触れた」タイミングとして使い、
-  // 完了済みで畳む予約がされている他のカードを実際に畳む
-  onInteract: (sessionExerciseId: number) => void;
   // 種目追加/入れ替え時に前回の記録から実際に値をコピーして挿入したセットのid一覧
   // （lib/workout/session.tsのPrefilledCard.prefilledSetIds）。この行idに含まれるSetRowだけ
   // ゴースト表示にする
@@ -43,6 +39,16 @@ type Props = {
 };
 
 export type SessionExerciseCardHandle = { focusFirstSet: () => void };
+
+// カードの状態に一切依存しないため、カードごとにuseCallbackで作らずモジュールスコープに置く
+async function handleReopenSet(setId: number) {
+  try {
+    await reopenSet(setId);
+  } catch (e) {
+    console.error('[reopen set]', e);
+    Alert.alert('エラー', 'セットを編集状態に戻せませんでした。');
+  }
+}
 
 export const SessionExerciseCard = memo(
   forwardRef<SessionExerciseCardHandle, Props>(function SessionExerciseCard(
@@ -56,7 +62,6 @@ export const SessionExerciseCard = memo(
       previousSessionExerciseId,
       nextSessionExerciseId,
       onToggleCollapsed,
-      onInteract,
       prefilledSetIds,
       hasHistory,
     }: Props,
@@ -107,18 +112,10 @@ export const SessionExerciseCard = memo(
   }
   const cardReviewed = cardReviewedRef.current || anyEditedInCard;
 
-  const notifyInteraction = useCallback(() => {
-    onInteract(exercise.sessionExerciseId);
-  }, [onInteract, exercise.sessionExerciseId]);
-
-  const handleDraftChange = useCallback(
-    (setId: number, values: Record<string, string>) => {
-      draftValuesRef.current.set(setId, values);
-      setAnyEditedInCard(true);
-      notifyInteraction();
-    },
-    [notifyInteraction],
-  );
+  const handleDraftChange = useCallback((setId: number, values: Record<string, string>) => {
+    draftValuesRef.current.set(setId, values);
+    setAnyEditedInCard(true);
+  }, []);
 
   // 1文字入力するたびに呼ばれるバックグラウンド保存。ここでAlertを出すと入力中に
   // 何度もポップアップが出てしまうため、失敗時はログのみに留める（最終的な保存は
@@ -132,12 +129,10 @@ export const SessionExerciseCard = memo(
   }, []);
 
   const handlePressInfo = useCallback(() => {
-    notifyInteraction();
     pushDebounced(`/exercise/${exercise.id}`);
-  }, [pushDebounced, exercise.id, notifyInteraction]);
+  }, [pushDebounced, exercise.id]);
 
   const handleSwapExercise = useCallback(() => {
-    notifyInteraction();
     // 確認ダイアログの要否をexercise-swap画面側で判断できるよう、既に何か記録済みか
     // （✓確定済みかどうか）を渡しておく。前回セットのプリフィル（✓未タップ・値だけ入っている状態）は
     // ユーザーがまだ確認していないため「記録済み」に含めない（セット削除の確認要否と同じ考え方）
@@ -152,10 +147,9 @@ export const SessionExerciseCard = memo(
         hasRecordedData: hasRecordedData ? 'true' : 'false',
       },
     });
-  }, [pushDebounced, sessionId, exercise.sessionExerciseId, exercise.id, exercise.name, sets, notifyInteraction]);
+  }, [pushDebounced, sessionId, exercise.sessionExerciseId, exercise.id, exercise.name, sets]);
 
   const handleLoadFromHistory = useCallback(() => {
-    notifyInteraction();
     // 確認ダイアログの要否を記録から読み込む画面側で判断できるよう、既に何か記録済みか
     // （✓確定済みかどうか）を渡しておく（handleSwapExerciseと同じ考え方）
     const hasRecordedData = sets.some((s) => s.completedAt != null);
@@ -169,18 +163,16 @@ export const SessionExerciseCard = memo(
         hasRecordedData: hasRecordedData ? 'true' : 'false',
       },
     });
-  }, [pushDebounced, sessionId, exercise.sessionExerciseId, exercise.id, exercise.name, sets, notifyInteraction]);
+  }, [pushDebounced, sessionId, exercise.sessionExerciseId, exercise.id, exercise.name, sets]);
 
   const handleToggleExpanded = useCallback(() => {
     LayoutAnimation.configureNext(LayoutAnimation.Presets.easeInEaseOut);
     onToggleCollapsed(exercise.sessionExerciseId);
-    notifyInteraction();
-  }, [onToggleCollapsed, exercise.sessionExerciseId, notifyInteraction]);
+  }, [onToggleCollapsed, exercise.sessionExerciseId]);
 
   const handleAddSet = useCallback(async () => {
     if (isMutatingRef.current) return;
     isMutatingRef.current = true;
-    notifyInteraction();
     try {
       // 直前のセットが✓未タップ（completedAt: null）の場合、DBにはまだ値が保存されていないため、
       // 画面上の入力途中の値（draft）があればそれをコピー元にする。✓タップ済みならDB上の
@@ -202,10 +194,9 @@ export const SessionExerciseCard = memo(
     } finally {
       isMutatingRef.current = false;
     }
-  }, [sessionId, exercise.id, exercise.sessionExerciseId, sets, columns, notifyInteraction]);
+  }, [sessionId, exercise.id, exercise.sessionExerciseId, sets, columns]);
 
   const handleDeleteSet = useCallback(async () => {
-    notifyInteraction();
     if (isMutatingRef.current) return;
     isMutatingRef.current = true;
     try {
@@ -219,11 +210,10 @@ export const SessionExerciseCard = memo(
     } finally {
       isMutatingRef.current = false;
     }
-  }, [exercise.sessionExerciseId, sets, notifyInteraction]);
+  }, [exercise.sessionExerciseId, sets]);
 
   const handleSaveSet = useCallback(
     async (setId: number, values: SetValues) => {
-      notifyInteraction();
       try {
         await saveSet(setId, values);
         // 確定後はhandleAddSetがこのセットのdraftを参照しなくなるため、Mapに積み上がらないよう掃除する
@@ -233,46 +223,30 @@ export const SessionExerciseCard = memo(
         Alert.alert('エラー', 'セットを保存できませんでした。');
       }
     },
-    [notifyInteraction],
-  );
-
-  const handleReopenSet = useCallback(
-    async (setId: number) => {
-      notifyInteraction();
-      try {
-        await reopenSet(setId);
-      } catch (e) {
-        console.error('[reopen set]', e);
-        Alert.alert('エラー', 'セットを編集状態に戻せませんでした。');
-      }
-    },
-    [notifyInteraction],
+    [],
   );
 
   const handleMoveUp = useCallback(async () => {
     if (previousSessionExerciseId == null) return;
-    notifyInteraction();
     try {
       await swapExerciseOrder(exercise.sessionExerciseId, previousSessionExerciseId);
     } catch (e) {
       console.error('[move exercise up]', e);
       Alert.alert('エラー', '種目を並び替えられませんでした。');
     }
-  }, [exercise.sessionExerciseId, previousSessionExerciseId, notifyInteraction]);
+  }, [exercise.sessionExerciseId, previousSessionExerciseId]);
 
   const handleMoveDown = useCallback(async () => {
     if (nextSessionExerciseId == null) return;
-    notifyInteraction();
     try {
       await swapExerciseOrder(exercise.sessionExerciseId, nextSessionExerciseId);
     } catch (e) {
       console.error('[move exercise down]', e);
       Alert.alert('エラー', '種目を並び替えられませんでした。');
     }
-  }, [exercise.sessionExerciseId, nextSessionExerciseId, notifyInteraction]);
+  }, [exercise.sessionExerciseId, nextSessionExerciseId]);
 
   const handleDeleteExercise = useCallback(() => {
-    notifyInteraction();
     Alert.alert('この種目を削除しますか？', '記録した内容も削除されます。', [
       { text: 'キャンセル', style: 'cancel' },
       {
@@ -288,7 +262,7 @@ export const SessionExerciseCard = memo(
         },
       },
     ]);
-  }, [exercise.sessionExerciseId, notifyInteraction]);
+  }, [exercise.sessionExerciseId]);
 
   const collapsedSummary = summarizeExerciseSets(measurementType, sets);
 

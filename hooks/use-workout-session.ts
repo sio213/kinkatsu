@@ -130,7 +130,7 @@ export type ResumeWorkoutSummary = {
 
 // 記録タブ・カレンダー今日パネルの再開バナー(ResumeWorkoutBanner)用。進行中セッション1件分の
 // 「種目数（完了/合計）」「完了セット数」「ルーティン名」をまとめて取得する。種目の完了判定は
-// useAutoCollapseCompletedExercisesと同じ基準（セットが1件以上あり、全セットが✓確定済み）に揃える。
+// useSessionExerciseCollapseと同じ基準（セットが1件以上あり、全セットが✓確定済み）に揃える。
 //
 // sessionId/routineIdは呼び出し側のactiveSession（useWorkoutSessions自身のuseLiveQueryが非同期に
 // 解決する）に由来するため、この関数が最初にマウントされた時点ではまだ-1のプレースホルダーで、
