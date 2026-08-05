@@ -61,6 +61,7 @@ jest.mock('react-native-reanimated', () => {
 import React from 'react';
 import { act, create, type ReactTestInstance } from 'react-test-renderer';
 import { Text, TouchableOpacity } from 'react-native';
+import { ExerciseProgressChartSample } from '@/components/exercises/exercise-progress-chart-sample';
 import { SummaryExerciseChart } from '@/components/workout/summary-exercise-chart';
 
 const EXERCISES = [
@@ -189,8 +190,9 @@ test('種目が0件なら何も描かない', () => {
   expect(texts(root)).toHaveLength(0);
 });
 
-// ✓を付けずに終えた種目はここに来る。種目詳細のような見本グラフ＋CTAは出さない
-test('記録が0件の種目ではグラフの代わりに理由を出す', () => {
+// ✓を付けずに終えた種目はここに来る。空白にせず薄い見本グラフを描いて、記録が貯まると
+// どうなるかを見せる（@ユーザー指摘）。自分の記録と取り違えないよう注記も重ねる
+test('記録が0件の種目では見本グラフと注記を出す', () => {
   mockUseExerciseProgress.mockReturnValue({
     series: { points: [], unit: { label: 'kg' } },
     bestSeries: { points: [] },
@@ -204,7 +206,9 @@ test('記録が0件の種目ではグラフの代わりに理由を出す', () =
   const root = render();
 
   expect(texts(root)).toContain('まだ記録がありません');
+  // 本物のグラフ（モックが'グラフ'を描く）ではなく見本に差し替わっている
   expect(texts(root)).not.toContain('グラフ');
+  expect(root.findAllByType(ExerciseProgressChartSample)).toHaveLength(3);
 });
 
 test('取得に失敗したら理由を出す', () => {

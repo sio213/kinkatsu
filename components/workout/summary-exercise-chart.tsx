@@ -1,4 +1,5 @@
 import { ExerciseProgressChart } from '@/components/exercises/exercise-progress-chart';
+import { ExerciseProgressChartSample } from '@/components/exercises/exercise-progress-chart-sample';
 import { PeriodFilterChips } from '@/components/exercises/period-filter-chips';
 import { SummaryChartDots } from '@/components/workout/summary-chart-dots';
 import { SummaryExerciseNav } from '@/components/workout/summary-exercise-nav';
@@ -81,9 +82,21 @@ function ExerciseChart({
 
   if (failed) return <Text style={styles.placeholder}>記録を読み込めませんでした</Text>;
   if (!loaded) return <Text style={styles.placeholder}>読み込み中</Text>;
-  // ✓を付けずに終えた種目はここに来る。種目詳細のような見本グラフ＋CTAは出さない
-  // （サマリーは今日の結果を見る画面で、そこから記録を促す場面ではない）
-  if (recordDays.length === 0) return <Text style={styles.placeholder}>まだ記録がありません</Text>;
+  // ✓を付けずに終えた種目はここに来る。空白にせず、種目詳細と同じ薄い見本グラフを描いて
+  // 「記録が貯まるとこうなる」を見せる（@ユーザー指摘）。種目詳細が添えている
+  // 「1回目を記録する」ボタンは出さない——今まさに終えた直後の画面で、記録を促す場面ではない。
+  // 見本を自分の記録と取り違えないよう、注記を重ねる（枠の高さは見本＝グラフと同じなので、
+  // 下に置き足すのではなく重ねる）
+  if (recordDays.length === 0) {
+    return (
+      <View>
+        <ExerciseProgressChartSample />
+        <View style={styles.sampleNoteWrap} pointerEvents="none">
+          <Text style={styles.sampleNote}>まだ記録がありません</Text>
+        </View>
+      </View>
+    );
+  }
 
   return (
     <ExerciseProgressChart
@@ -308,6 +321,17 @@ const styles = StyleSheet.create({
   track: { flexDirection: 'row', alignItems: 'flex-start' },
   // 枠と枠の間。ページ背景と同化させて「余白」に見せる（隣接する折れ線が繋がって見えるのを断ち切る）
   slotSpacing: { marginRight: SLOT_GAP, backgroundColor: Colors.background },
+  // 見本グラフの上に重ねる注記。見本は薄いので、その上でも読める程度に面を敷く
+  sampleNoteWrap: { ...StyleSheet.absoluteFillObject, alignItems: 'center', justifyContent: 'center' },
+  sampleNote: {
+    ...Typography.footnote,
+    color: Colors.textMuted,
+    backgroundColor: Colors.background,
+    paddingHorizontal: 10,
+    paddingVertical: 4,
+    borderRadius: 999,
+    overflow: 'hidden',
+  },
   // グラフと同じ高さの枠の中で中央に置き、送るたびに高さが変わらないようにする
   placeholder: {
     ...Typography.footnote,
