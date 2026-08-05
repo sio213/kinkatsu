@@ -39,6 +39,7 @@ const MAPPING = {
   'heart.fill': 'favorite',
   'arrow.clockwise': 'refresh',
   'arrow.up.right.square': 'open-in-new',
+  'square.and.arrow.up': 'ios-share',
 } as IconMapping;
 
 /**
