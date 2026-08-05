@@ -3,14 +3,16 @@ import { HeaderTitle } from '@/components/ui/header-title';
 import { PrimaryButton } from '@/components/ui/primary-button';
 import { ScreenFooter } from '@/components/ui/screen-footer';
 import { CommunityMessageCard } from '@/components/workout/community-message-card';
+import { SummaryExerciseList } from '@/components/workout/summary-exercise-list';
 import { SessionSummaryStats } from '@/components/workout/session-summary-stats';
 import { ScreenStyles } from '@/constants/theme';
+import { useSessionExerciseCards } from '@/hooks/use-session-exercise-cards';
 import { useSessionTotal, useSessionWeekOrdinal } from '@/hooks/use-session-summary';
 import { useWorkoutSession } from '@/hooks/use-workout-session';
 import { PLACEHOLDER_COMMUNITY_MESSAGE } from '@/lib/workout/community-message';
 import { formatSessionDateGroup, formatSessionDurationLong } from '@/lib/workout/summary';
 import { Stack, useLocalSearchParams, useRouter } from 'expo-router';
-import { useEffect } from 'react';
+import { useEffect, useMemo } from 'react';
 import { ScrollView, StyleSheet } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
@@ -38,6 +40,13 @@ export default function WorkoutSummaryScreen() {
   const { session, loaded } = useWorkoutSession(sessionId ?? -1);
   const { total } = useSessionTotal(sessionId ?? -1);
   const weekOrdinal = useSessionWeekOrdinal(session?.startedAt ?? null);
+  // 一覧・自己ベスト・前回比較はカレンダーの選択日パネルと同じ取得を使う（対象が1件なだけ）。
+  // 記録編集から戻ったときに再取得されるのもフック側の担当
+  const sessionsForCards = useMemo(
+    () => (session ? [{ id: session.id, startedAt: session.startedAt }] : []),
+    [session],
+  );
+  const { cards, retry: retryCards } = useSessionExerciseCards(sessionsForCards);
 
   // 記録編集画面の⋮「削除」は deleteSession → router.back() なので、サマリーから開いていると
   // 削除済みセッションのサマリーへ戻ってくる。NotFoundStateを見せる場面ではない（ユーザーは
@@ -101,7 +110,14 @@ export default function WorkoutSummaryScreen() {
           weekOrdinal={weekOrdinal}
         />
         <CommunityMessageCard message={PLACEHOLDER_COMMUNITY_MESSAGE} />
-        {/* グラフ・実施した種目はこの下に順次追加する */}
+        {/* グラフ（種目切替・期間チップ）はこの上に入る */}
+        {/* どのカードを押しても行き先は同じ記録編集画面。押した種目までスクロールさせる案は
+            バックログ送りにしてあるため、onPressExerciseが渡すカードはここでは使わない */}
+        <SummaryExerciseList
+          cards={cards}
+          onPressExercise={handleEdit}
+          onRetry={retryCards}
+        />
       </ScrollView>
 
       <ScreenFooter>

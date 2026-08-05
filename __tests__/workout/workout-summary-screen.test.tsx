@@ -8,6 +8,7 @@ const mockUseLocalSearchParams = jest.fn();
 const mockUseWorkoutSession = jest.fn();
 const mockUseSessionTotal = jest.fn();
 const mockUseSessionWeekOrdinal = jest.fn();
+const mockUseSessionExerciseCards = jest.fn();
 
 jest.mock('expo-router', () => ({
   useRouter: () => ({ dismissAll: mockDismissAll, push: mockPush }),
@@ -42,6 +43,10 @@ jest.mock('@/hooks/use-session-summary', () => ({
   useSessionWeekOrdinal: (...args: unknown[]) => mockUseSessionWeekOrdinal(...args),
 }));
 
+jest.mock('@/hooks/use-session-exercise-cards', () => ({
+  useSessionExerciseCards: (...args: unknown[]) => mockUseSessionExerciseCards(...args),
+}));
+
 import React from 'react';
 import { act, create, type ReactTestInstance } from 'react-test-renderer';
 import { Text, TouchableOpacity } from 'react-native';
@@ -60,7 +65,9 @@ function findButtonByLabel(root: ReactTestInstance, label: string) {
 function texts(root: ReactTestInstance): string[] {
   return root
     .findAllByType(Text)
-    .map((t) => [t.props.children].flat().filter((c) => typeof c === 'string').join(''))
+    .map((t) =>
+      [t.props.children].flat().filter((c) => typeof c === 'string' || typeof c === 'number').join(''),
+    )
     .filter((s) => s.length > 0);
 }
 
@@ -72,6 +79,40 @@ function render() {
   return instance.root;
 }
 
+function exerciseCard({
+  workoutSessionExerciseId,
+  name,
+  completed,
+}: {
+  workoutSessionExerciseId: number;
+  name: string;
+  completed: boolean;
+}) {
+  return {
+    workoutSessionExerciseId,
+    exerciseId: workoutSessionExerciseId,
+    name,
+    category: 'chest',
+    measurementType: 'weight_reps',
+    source: 'preset',
+    slug: null,
+    sets: [
+      {
+        setNumber: 1,
+        weight: 100,
+        reps: 5,
+        durationSeconds: null,
+        distanceMeters: null,
+        completedAt: completed ? 1 : null,
+      },
+    ],
+    sessionId: 1,
+    sessionStartedAt: 0,
+    isBest: false,
+    comparison: null,
+  };
+}
+
 const FIXED_START = new Date(2026, 7, 1, 19, 30, 0).getTime();
 const session = { id: 1, startedAt: FIXED_START, endedAt: FIXED_START + 72 * 60_000 };
 
@@ -81,6 +122,7 @@ beforeEach(() => {
   mockUseWorkoutSession.mockReturnValue({ session, loaded: true });
   mockUseSessionTotal.mockReturnValue({ total: { label: '総重量', value: '12,450', unit: 'kg' } });
   mockUseSessionWeekOrdinal.mockReturnValue(2);
+  mockUseSessionExerciseCards.mockReturnValue({ cards: [], retry: jest.fn() });
 });
 
 test('ヘッダーにタイトルとセッションの日付を表示する', () => {
@@ -170,6 +212,18 @@ test('みんなの声を表示する', () => {
   const root = render();
 
   expect(texts(root)).toContain(PLACEHOLDER_COMMUNITY_MESSAGE.author);
+});
+
+// ✓が付いていない種目も並べる（@ユーザー指摘）。実施していないことはカード自身が
+// 「0セット」と示すため、一覧から消して見えなくする必要がない
+test('✓が1つも付いていない種目も一覧に並べる', () => {
+  const performed = exerciseCard({ workoutSessionExerciseId: 1, name: 'ベンチプレス', completed: true });
+  const untouched = exerciseCard({ workoutSessionExerciseId: 2, name: 'ディップス', completed: false });
+  mockUseSessionExerciseCards.mockReturnValue({ cards: [performed, untouched], retry: jest.fn() });
+
+  const root = render();
+
+  expect(texts(root)).toEqual(expect.arrayContaining(['ベンチプレス', 'ディップス', '全2件']));
 });
 
 test('「閉じる」を押すとrouter.dismissAllで元いたタブまで畳む', () => {
