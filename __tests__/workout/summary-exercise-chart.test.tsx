@@ -121,17 +121,31 @@ function press(root: ReactTestInstance, label: string) {
   flushSnap();
 }
 
+/** フックを呼んだコンポーネントがマウントされた順の種目id。再マウントの検出に使う */
+const mounted: number[] = [];
+
+const PROGRESS_RESULT = {
+  series: { points: [{ dateKey: 1, value: 100 }], unit: { label: 'kg' } },
+  bestSeries: { points: [] },
+  recordDays: [{ dateKey: 1 }],
+  chartMeasurementType: 'weight_reps',
+  metric: 'best',
+  loaded: true,
+  failed: false,
+};
+
 beforeEach(() => {
   jest.clearAllMocks();
   mockTimingCalls.length = 0;
-  mockUseExerciseProgress.mockReturnValue({
-    series: { points: [{ dateKey: 1, value: 100 }], unit: { label: 'kg' } },
-    bestSeries: { points: [] },
-    recordDays: [{ dateKey: 1 }],
-    chartMeasurementType: 'weight_reps',
-    metric: 'best',
-    loaded: true,
-    failed: false,
+  mounted.length = 0;
+  mockUseExerciseProgress.mockImplementation((exerciseId: number) => {
+    // フックはグラフ1枚につき1つ。マウント時だけ記録することで、送ったときに
+    // 既存のグラフが作り直されていないかを見る
+    React.useEffect(() => {
+      mounted.push(exerciseId);
+      // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, []);
+    return PROGRESS_RESULT;
   });
 });
 
@@ -217,6 +231,18 @@ test('グラフは種目ごとに別々の系列を引く（前の種目のも�
   const ids = mockUseExerciseProgress.mock.calls.map((c) => c[0]);
   // 表示中と前後の3枠ぶん。それぞれ自分のidで引いている
   expect(new Set(ids)).toEqual(new Set([1, 2]));
+});
+
+// 位置で並べると、送るたびに真ん中の中身が別の種目に差し替わって作り直され、
+// useLiveQueryが空から始まって一瞬「読み込み中」を挟む＝白くちらつく（@ユーザー報告）
+test('送っても、隣にマウント済みだったグラフは作り直さない', () => {
+  const root = render();
+  expect(mounted).toEqual([1, 2]);
+
+  press(root, '次の種目');
+
+  // 新しく画面外に入ってきた3だけが増える。中央に来た2は作り直されない
+  expect(mounted).toEqual([1, 2, 3]);
 });
 
 // カレンダーの月送りと同じ3スロットのトラック。指を離した位置と速度で送るか戻すかを決める

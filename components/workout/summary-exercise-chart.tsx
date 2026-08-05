@@ -99,18 +99,25 @@ function ExerciseChart({
   );
 }
 
-/** トラックの1枠。種目が無い端（先頭の左・末尾の右）は幅だけ保った空枠にする */
+/**
+ * トラックの1枠。種目が無い端（先頭の左・末尾の右）は幅だけ保った空枠にする。
+ *
+ * 枠と枠の間はgapではなくmarginRightで空ける。3枠をキー付きの配列として並べるため、
+ * 間に別要素を挟むとキーによる並べ替えの対象がずれるため（下のtrackを参照）
+ */
 function Slot({
   exercise,
   period,
   width,
+  last,
 }: {
   exercise: SummaryChartExercise | undefined;
   period: ProgressPeriod;
   width: number;
+  last: boolean;
 }) {
   return (
-    <View style={{ width }}>
+    <View style={[{ width }, !last && styles.slotSpacing]}>
       {exercise && <ExerciseChart key={exercise.exerciseId} exercise={exercise} period={period} />}
     </View>
   );
@@ -263,11 +270,23 @@ export function SummaryExerciseChart({
               <Animated.View
                 style={[styles.track, { width: containerWidth * 3 + SLOT_GAP * 2 }, animatedTrackStyle]}
               >
-                <Slot exercise={exercises[displayIndex - 1]} period={period} width={containerWidth} />
-                <View style={styles.slotGap} />
-                <Slot exercise={exercises[displayIndex]} period={period} width={containerWidth} />
-                <View style={styles.slotGap} />
-                <Slot exercise={exercises[displayIndex + 1]} period={period} width={containerWidth} />
+                {/* **キーは位置ではなく種目id。** 位置で並べると、送るたびに真ん中の中身が別の種目に
+                    差し替わり、隣にマウント済みだったグラフが再利用されず作り直される。すると
+                    useLiveQueryが空から始まって一瞬「読み込み中」を挟み、白くちらつく（@ユーザー報告）。
+                    キーを種目に紐付ければ、Reactが同じ親の中で既存のサブツリーを移動して再利用でき、
+                    新しくマウントされるのは画面外に入ってきた端の1枚だけになる */}
+                {[displayIndex - 1, displayIndex, displayIndex + 1].map((slotIndex, position) => {
+                  const exercise = exercises[slotIndex];
+                  return (
+                    <Slot
+                      key={exercise ? `exercise-${exercise.exerciseId}` : `edge-${position}`}
+                      exercise={exercise}
+                      period={period}
+                      width={containerWidth}
+                      last={position === 2}
+                    />
+                  );
+                })}
               </Animated.View>
             )}
           </View>
@@ -287,8 +306,8 @@ const styles = StyleSheet.create({
   chartBlock: { gap: 8 },
   viewport: { height: CHART_HEIGHT, overflow: 'hidden' },
   track: { flexDirection: 'row', alignItems: 'flex-start' },
-  // ページ背景と同化させて「余白」に見せる（隣接する折れ線が繋がって見えるのを断ち切る）
-  slotGap: { width: SLOT_GAP, height: CHART_HEIGHT, backgroundColor: Colors.background },
+  // 枠と枠の間。ページ背景と同化させて「余白」に見せる（隣接する折れ線が繋がって見えるのを断ち切る）
+  slotSpacing: { marginRight: SLOT_GAP, backgroundColor: Colors.background },
   // グラフと同じ高さの枠の中で中央に置き、送るたびに高さが変わらないようにする
   placeholder: {
     ...Typography.footnote,
