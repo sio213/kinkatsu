@@ -28,7 +28,11 @@ export default function LibraryStackLayout() {
         headerLeft: ({ tintColor }) => <HeaderBackButton tintColor={tintColor} />,
       }}
     >
-      <Stack.Screen name="exercises/index" options={{ title: '種目ライブラリ' }} />
+      {/* タブのルートには戻るシェブロンを出さない（理由は(record)/_layout.tsxのコメント参照） */}
+      <Stack.Screen
+        name="exercises/index"
+        options={{ title: '種目ライブラリ', headerLeft: () => null }}
+      />
       {/* タイトルは種目名を動的に出すため画面側でStack.Screen optionsを上書きする */}
       <Stack.Screen name="exercises/[id]" options={{ title: '' }} />
       {/* タイトルはHeaderTitleで種目名つきに差し替えるため画面側で上書きする */}

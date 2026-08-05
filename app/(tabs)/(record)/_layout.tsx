@@ -28,12 +28,17 @@ export default function RecordStackLayout() {
       screenOptions={{
         ...headerOptions,
         // ルートStack(app/_layout.tsx)と同じく一括指定にしておく。ここに画面を足したときの
-        // 指定漏れで、素のネイティブ戻るボタン(左端に寄りすぎる)が黙って出るのを防ぐ。
-        // Stack先頭のindexではHeaderBackButton自身がcanGoBack()=falseで非表示に倒れる
+        // 指定漏れで、素のネイティブ戻るボタン(左端に寄りすぎる)が黙って出るのを防ぐ
         headerLeft: ({ tintColor }) => <HeaderBackButton tintColor={tintColor} />,
       }}
     >
-      <Stack.Screen name="index" options={{ title: '記録' }} />
+      {/* タブのルートには戻るシェブロンを出さない。HeaderBackButtonのcanGoBack()は
+          タブナビゲータまで遡って判定するため、別のタブから切り替えてくるとtrueになり、
+          Stack先頭のこの画面にもシェブロンが出てしまう（押すと直前のタブへ戻る＝
+          タブをスタックのように扱う挙動になり、iOSの作法から外れる。@ユーザー指摘）。
+          native-stackの標準の戻るボタンはStack先頭では出ないため、headerLeftを空にするだけでよい
+          （完了サマリーのようにpushされた画面ではheaderBackVisibleも要る） */}
+      <Stack.Screen name="index" options={{ title: '記録', headerLeft: () => null }} />
       <Stack.Screen name="routine" options={{ title: 'ルーティン' }} />
     </Stack>
   );
