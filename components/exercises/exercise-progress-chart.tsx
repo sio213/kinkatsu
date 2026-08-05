@@ -132,6 +132,16 @@ type Props = {
   /** 選択中の点。点が無いときはnull */
   selectedIndex: number | null;
   onSelect: (index: number) => void;
+  /**
+   * 指を横に滑らせて選択を動かせるか。既定は有効。
+   *
+   * 完了サマリーだけ無効にしている。あちらはグラフの外側に「種目を送るスワイプ」があり、
+   * 同じ横ドラッグに2つの意味は持たせられない。グラフ本体がブロックの過半を占めるため、
+   * ここが横ドラッグを握っていると種目送りの当たり判定が全体の1〜2割しか残らず、
+   * 「スワイプが効かない」と読まれていた（@designer・@user-advisor とも無効化を支持）。
+   * 無効にしてもタップでの選択は残る（点を狙わなくても最寄りにスナップする）
+   */
+  scrubbable?: boolean;
 };
 
 /**
@@ -172,6 +182,7 @@ export function ExerciseProgressChart({
   leadIn,
   selectedIndex,
   onSelect,
+  scrubbable = true,
 }: Props) {
   const [width, setWidth] = useState(0);
 
@@ -218,26 +229,27 @@ export function ExerciseProgressChart({
   // タップに加えて、指を横に滑らせると選択が追従する。ScrollViewの中にあるので、
   // 横に8px動くまでPanを有効化せず、縦に12px動いたら失敗させてスクロールへ譲る
   // （こうしないとグラフの上から始めた縦方向のドラッグでスクロールできなくなる）。
-  // コールバックはUIスレッドではなくJSスレッドで動かす（runOnJS)
-  const gesture = useMemo(
-    () =>
-      Gesture.Race(
-        Gesture.Tap()
-          .runOnJS(true)
-          .onEnd((event) => selectAt(event.x)),
-        Gesture.Pan()
-          .runOnJS(true)
-          .activeOffsetX([-8, 8])
-          .failOffsetY([-12, 12])
-          // onBeginは指を置いた瞬間（＝まだ縦か横か決まっていない時点）に呼ばれるため使わない。
-          // 使うと縦スクロールしただけで選択が変わってしまう。有効化された後のonStartから拾う
-          .onStart((event) => selectAt(event.x))
-          .onUpdate((event) => selectAt(event.x)),
-      ),
+  // コールバックはUIスレッドではなくJSスレッドで動かす（runOnJS)。
+  // scrubbable=falseならPanを外し、横ドラッグを外側（種目送りのスワイプ）へ明け渡す
+  const gesture = useMemo(() => {
+    const tap = Gesture.Tap()
+      .runOnJS(true)
+      .onEnd((event) => selectAt(event.x));
+    if (!scrubbable) return tap;
+    return Gesture.Race(
+      tap,
+      Gesture.Pan()
+        .runOnJS(true)
+        .activeOffsetX([-8, 8])
+        .failOffsetY([-12, 12])
+        // onBeginは指を置いた瞬間（＝まだ縦か横か決まっていない時点）に呼ばれるため使わない。
+        // 使うと縦スクロールしただけで選択が変わってしまう。有効化された後のonStartから拾う
+        .onStart((event) => selectAt(event.x))
+        .onUpdate((event) => selectAt(event.x)),
+    );
     // selectAtはlayoutにだけ依存する（onSelectは親で毎回作られるため依存に含めない）
     // eslint-disable-next-line react-hooks/exhaustive-deps
-    [layout],
-  );
+  }, [layout, scrubbable]);
 
   // 視覚ではアンバーの点で分かる「自己ベスト」を読み上げにも足す（デザインレビュー指摘）
   const selectionLabel =
@@ -281,7 +293,11 @@ export function ExerciseProgressChart({
         onLayout={handleLayout}
         accessibilityRole="image"
         accessibilityLabel={chartLabel}
-        accessibilityHint="グラフを押すか横になぞると、その位置に一番近い記録を選びます"
+        accessibilityHint={
+          scrubbable
+            ? 'グラフを押すか横になぞると、その位置に一番近い記録を選びます'
+            : 'グラフを押すと、その位置に一番近い記録を選びます'
+        }
       >
         {layout && (
           <Svg width={layout.width} height={layout.height}>

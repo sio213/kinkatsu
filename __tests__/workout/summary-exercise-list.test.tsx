@@ -16,6 +16,7 @@ function card(over: Partial<RecordedExerciseCard> = {}): RecordedExerciseCard {
     measurementType: 'weight_reps',
     source: 'preset',
     slug: 'bench-press',
+    pairedWeights: false,
     sets: [{ setNumber: 1, weight: 100, reps: 5, durationSeconds: null, distanceMeters: null, completedAt: 1 }],
     sessionId: 1,
     sessionStartedAt: 0,

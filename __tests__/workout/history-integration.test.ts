@@ -768,7 +768,8 @@ function getSessionExerciseCardsSql(
   const cards = db
     .prepare(
       `SELECT wse.id AS workoutSessionExerciseId, e.id AS exerciseId, e.name AS name, e.category AS category,
-              e.measurement_type AS measurementType, e.source AS source, e.slug AS slug
+              e.measurement_type AS measurementType, e.source AS source, e.slug AS slug,
+    e.paired_weights AS pairedWeights
        FROM workout_session_exercises wse
        JOIN exercises e ON wse.exercise_id = e.id
        WHERE wse.session_id = ?

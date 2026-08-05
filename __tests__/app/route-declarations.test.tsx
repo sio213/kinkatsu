@@ -115,6 +115,20 @@ describe('app/(tabs)/_layout.tsx の宣言と実ファイルの整合', () => {
   });
 });
 
+// HeaderBackButtonのcanGoBack()はタブナビゲータまで遡って判定するため、別のタブから
+// 切り替えてくるとStack先頭の画面にもシェブロンが出る。タブのルートは戻る先ではない
+describe('タブ配下Stackの先頭画面に戻るシェブロンを出さない', () => {
+  test.each([
+    ['@/app/(tabs)/(record)/_layout', 'index'],
+    ['@/app/(tabs)/(library)/_layout', 'exercises/index'],
+  ])('%s の %s', (modulePath, rootName) => {
+    const stack = renderLayout(modulePath, 'Stack');
+    const root = stack.getScreens().find((s) => s.name === rootName);
+    const headerLeft = root?.options?.headerLeft as undefined | (() => unknown);
+    expect(headerLeft?.()).toBeNull();
+  });
+});
+
 describe('app/(tabs)/(record)/_layout.tsx の宣言と実ファイルの整合', () => {
   const recordStack = renderLayout('@/app/(tabs)/(record)/_layout', 'Stack');
   const recordDir = path.join(appDir, '(tabs)', '(record)');

@@ -56,6 +56,7 @@ const benchCard: SessionHistoryCard = {
   measurementType: 'weight_reps',
   source: 'preset',
   slug: 'bench_press',
+  pairedWeights: false,
   sets: [{ setNumber: 1, weight: 60, reps: 10, durationSeconds: null, distanceMeters: null, completedAt: 1 }],
 };
 const flyCard: SessionHistoryCard = {
@@ -66,6 +67,7 @@ const flyCard: SessionHistoryCard = {
   measurementType: 'weight_reps',
   source: 'preset',
   slug: 'dumbbell_fly',
+  pairedWeights: false,
   sets: [{ setNumber: 1, weight: 14, reps: 12, durationSeconds: null, distanceMeters: null, completedAt: 1 }],
 };
 // 「中央の1件だけ解除しても並び順が保たれる」ことを見るために3件目を用意する
@@ -77,6 +79,7 @@ const curlCard: SessionHistoryCard = {
   measurementType: 'weight_reps',
   source: 'preset',
   slug: 'arm_curl',
+  pairedWeights: false,
   sets: [{ setNumber: 1, weight: 10, reps: 12, durationSeconds: null, distanceMeters: null, completedAt: 1 }],
 };
 

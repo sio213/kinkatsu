@@ -12,6 +12,7 @@ const baseCard: SessionHistoryCard = {
   measurementType: 'weight_reps',
   source: 'preset',
   slug: 'bench_press',
+  pairedWeights: false,
   sets: [
     { setNumber: 1, weight: 60, reps: 10, durationSeconds: null, distanceMeters: null, completedAt: 1 },
     { setNumber: 2, weight: 60, reps: 8, durationSeconds: null, distanceMeters: null, completedAt: 1 },

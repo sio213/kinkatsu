@@ -43,6 +43,15 @@ jest.mock('@/hooks/use-session-summary', () => ({
   useSessionWeekOrdinal: (...args: unknown[]) => mockUseSessionWeekOrdinal(...args),
 }));
 
+// グラフは専用のテストで検証済み。ここでは渡している種目だけを見たいのでラベルに置き換える
+jest.mock('@/components/workout/summary-exercise-chart', () => ({
+  SummaryExerciseChart: ({ exercises }: { exercises: { name: string }[] }) => {
+    const { Text } = require('react-native');
+    const { createElement } = require('react');
+    return createElement(Text, null, `グラフ:${exercises.map((e) => e.name).join(',')}`);
+  },
+}));
+
 jest.mock('@/hooks/use-session-exercise-cards', () => ({
   useSessionExerciseCards: (...args: unknown[]) => mockUseSessionExerciseCards(...args),
 }));
@@ -83,19 +92,22 @@ function exerciseCard({
   workoutSessionExerciseId,
   name,
   completed,
+  exerciseId,
 }: {
   workoutSessionExerciseId: number;
   name: string;
   completed: boolean;
+  exerciseId?: number;
 }) {
   return {
     workoutSessionExerciseId,
-    exerciseId: workoutSessionExerciseId,
+    exerciseId: exerciseId ?? workoutSessionExerciseId,
     name,
     category: 'chest',
     measurementType: 'weight_reps',
     source: 'preset',
     slug: null,
+    pairedWeights: false,
     sets: [
       {
         setNumber: 1,
@@ -184,12 +196,14 @@ test('数値3項目はセル単位で1つの読み上げにまとまる', () => 
   );
 });
 
-// 副次操作は⋮に集約する。ヘッダー左にシェブロンを置くと、下がタブなので「戻る」ではなく
-// 前に進む遷移になり、記号と動きが食い違う（@ユーザー指摘、実機で確認）
-test('ヘッダー左にシェブロンを出さない', () => {
+// 戻る先が無い画面なので、シェブロンもスワイプバックも持たせない。離脱は「閉じる」に一本化する
+test('戻る導線を持たない（ヘッダーのシェブロンもスワイプバックも無し）', () => {
   render();
 
   expect(capturedOptions.headerLeft?.({})).toBeNull();
+  // headerLeftを空にするだけではネイティブの戻るボタンが残る（実機で確認）
+  expect(capturedOptions.headerBackVisible).toBe(false);
+  expect(capturedOptions.gestureEnabled).toBe(false);
 });
 
 // popにすると記録編集へ降りた時点でサマリーがスタックから消え、記録編集の「完了」がタブまで抜ける
@@ -224,6 +238,22 @@ test('✓が1つも付いていない種目も一覧に並べる', () => {
   const root = render();
 
   expect(texts(root)).toEqual(expect.arrayContaining(['ベンチプレス', 'ディップス', '全2件']));
+});
+
+// 同じ種目を2枚追加している場合（ウォームアップ＋本番）、カードは2件でも描くグラフは同じ
+test('グラフに渡す種目は種目idで重複を畳む', () => {
+  mockUseSessionExerciseCards.mockReturnValue({
+    cards: [
+      exerciseCard({ workoutSessionExerciseId: 1, name: 'ベンチプレス', completed: true }),
+      exerciseCard({ workoutSessionExerciseId: 2, name: 'ベンチプレス', completed: true, exerciseId: 1 }),
+      exerciseCard({ workoutSessionExerciseId: 3, name: 'ディップス', completed: true }),
+    ],
+    retry: jest.fn(),
+  });
+
+  const root = render();
+
+  expect(texts(root)).toContain('グラフ:ベンチプレス,ディップス');
 });
 
 test('「閉じる」を押すとrouter.dismissAllで元いたタブまで畳む', () => {

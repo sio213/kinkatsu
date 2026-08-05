@@ -3,12 +3,14 @@ import { HeaderTitle } from '@/components/ui/header-title';
 import { PrimaryButton } from '@/components/ui/primary-button';
 import { ScreenFooter } from '@/components/ui/screen-footer';
 import { CommunityMessageCard } from '@/components/workout/community-message-card';
+import { SummaryExerciseChart } from '@/components/workout/summary-exercise-chart';
 import { SummaryExerciseList } from '@/components/workout/summary-exercise-list';
 import { SessionSummaryStats } from '@/components/workout/session-summary-stats';
 import { ScreenStyles } from '@/constants/theme';
 import { useSessionExerciseCards } from '@/hooks/use-session-exercise-cards';
 import { useSessionTotal, useSessionWeekOrdinal } from '@/hooks/use-session-summary';
 import { useWorkoutSession } from '@/hooks/use-workout-session';
+import { toChartExercises } from '@/lib/workout/chart-exercises';
 import { PLACEHOLDER_COMMUNITY_MESSAGE } from '@/lib/workout/community-message';
 import { formatSessionDateGroup, formatSessionDurationLong } from '@/lib/workout/summary';
 import { Stack, useLocalSearchParams, useRouter } from 'expo-router';
@@ -24,9 +26,10 @@ import { SafeAreaView } from 'react-native-safe-area-context';
  * 記録編集へ降りた時点でサマリーがスタックから消えるため、記録編集の「戻る」がサマリーではなく
  * タブまで抜けてしまう（@ユーザー指摘、実機で確認）。
  *
- * 下に積まれているのはタブなので、ヘッダー左にシェブロンは置かない。記録編集への導線は
- * ヘッダー右の⋮メニューに集約する（副次操作を⋮にまとめるのは種目詳細・記録編集と同じ扱い）。
- * スワイプバックは下のタブへ抜ける＝「閉じる」と同義なので、そのまま有効にしている。
+ * **この画面からは戻れない。** 下に積まれているのはタブで、トレーニング中画面はreplaceで
+ * 既に消えている＝戻る先が無いため、ヘッダー左のシェブロンもスワイプバックも持たせない。
+ * 離脱はフッターの「閉じる」に一本化する。記録編集への導線はヘッダー右の⋮メニューへ
+ * （副次操作を⋮にまとめるのは種目詳細・記録編集と同じ扱い）。
  *
  * 記録編集への導線に「戻る」というラベルを使わないこと。トレーニングの再開（endedAtをnullに
  * 戻す）と読まれるが、endWorkoutSessionは予定(scheduledWorkouts)の削除まで済ませており
@@ -47,6 +50,8 @@ export default function WorkoutSummaryScreen() {
     [session],
   );
   const { cards, retry: retryCards } = useSessionExerciseCards(sessionsForCards);
+  // グラフは種目単位で切り替える（同じ種目の2枚目は同じ絵になるので畳む）
+  const chartExercises = useMemo(() => (Array.isArray(cards) ? toChartExercises(cards) : []), [cards]);
 
   // 記録編集画面の⋮「削除」は deleteSession → router.back() なので、サマリーから開いていると
   // 削除済みセッションのサマリーへ戻ってくる。NotFoundStateを見せる場面ではない（ユーザーは
@@ -92,9 +97,17 @@ export default function WorkoutSummaryScreen() {
           headerTitle: () => (
             <HeaderTitle title="トレーニング完了" subtitle={formatSessionDateGroup(session.startedAt)} />
           ),
-          // ルートStackが全画面に配るHeaderBackButtonを止める。canGoBack()は真（下にタブ）なので、
-          // 明示的に空にしないとタブへ抜けるだけのシェブロンが出てしまう
+          // ルートStackが全画面に配るHeaderBackButton（自前のシェブロン）を止める
           headerLeft: () => null,
+          // headerLeftを空にしただけではネイティブの戻るボタンが残る。native-stackでは
+          // 自前のheaderLeftとネイティブの戻るボタンが別管理で、後者はこちらで消す
+          // （headerLeftがnullを返すと「headerLeftを指定していない」のと同じ扱いになり、
+          // ネイティブ側が表に出てくる。実機で確認）
+          headerBackVisible: false,
+          // 戻る導線を持たない画面なので、同じことをするスワイプバックも止める。
+          // 残しておくと「戻れる画面」に見えるが、戻った先はタブ＝「閉じる」と同じで、
+          // 記号（戻る）と結果（閉じる）が食い違う
+          gestureEnabled: false,
           headerRight: () => (
             <HeaderMenu groups={[menuItems]} accessibilityLabel="この記録のメニューを開く" />
           ),
@@ -110,7 +123,7 @@ export default function WorkoutSummaryScreen() {
           weekOrdinal={weekOrdinal}
         />
         <CommunityMessageCard message={PLACEHOLDER_COMMUNITY_MESSAGE} />
-        {/* グラフ（種目切替・期間チップ）はこの上に入る */}
+        <SummaryExerciseChart exercises={chartExercises} horizontalInset={BODY_HORIZONTAL_PADDING} />
         {/* どのカードを押しても行き先は同じ記録編集画面。押した種目までスクロールさせる案は
             バックログ送りにしてあるため、onPressExerciseが渡すカードはここでは使わない */}
         <SummaryExerciseList
@@ -127,8 +140,16 @@ export default function WorkoutSummaryScreen() {
   );
 }
 
+// グラフブロックが「画面端までスワイプを拾う」ために同じ値を必要とするため定数にする
+const BODY_HORIZONTAL_PADDING = 16;
+
 const styles = StyleSheet.create({
   body: { flex: 1 },
   // ブロック間の縦の間隔はデザイン案指定の12px
-  bodyContent: { paddingHorizontal: 16, paddingTop: 12, paddingBottom: 12, gap: 12 },
+  bodyContent: {
+    paddingHorizontal: BODY_HORIZONTAL_PADDING,
+    paddingTop: 12,
+    paddingBottom: 12,
+    gap: 12,
+  },
 });
