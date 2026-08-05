@@ -208,7 +208,7 @@ test('記録が0件でも実物のグラフを描き、点が無い理由を注�
   expect(texts(root)).toContain('グラフ');
   // 点が無い理由はグラフ下の注記で伝える（種目詳細の「自重の日＝…」と同じ形）
   expect(texts(root)).toContain('記録なし＝');
-  expect(texts(root)).toContain('✓を付けたセットが無いので点を出しません');
+  expect(texts(root)).toContain('まだ✓を付けたセットがありません');
 });
 
 test('記録がある種目では注記を出さない', () => {

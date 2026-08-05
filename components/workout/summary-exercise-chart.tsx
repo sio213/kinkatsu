@@ -114,7 +114,7 @@ function ExerciseChart({
         {isEmpty && (
           <Text style={styles.caption}>
             <Text style={styles.captionLead}>記録なし＝</Text>
-            ✓を付けたセットが無いので点を出しません
+            まだ✓を付けたセットがありません
           </Text>
         )}
       </View>
