@@ -1,5 +1,4 @@
 import { ExerciseProgressChart } from '@/components/exercises/exercise-progress-chart';
-import { ExerciseProgressChartSample } from '@/components/exercises/exercise-progress-chart-sample';
 import { PeriodFilterChips } from '@/components/exercises/period-filter-chips';
 import { SummaryChartDots } from '@/components/workout/summary-chart-dots';
 import { SummaryExerciseNav } from '@/components/workout/summary-exercise-nav';
@@ -39,6 +38,11 @@ const SNAP_DURATION_MS = 240;
  * 同じ現象への対処）
  */
 const SLOT_GAP = 12;
+/**
+ * グラフの下に置く注記の行。**記録の有無に関わらず常に確保する。**
+ * 注記が出る種目と出ない種目でブロックの高さが変わると、送るたびに下の一覧が上下する
+ */
+const CAPTION_ROW_HEIGHT = 21;
 
 /**
  * 1種目分のグラフ。**必ず `key={exerciseId}` を付けて呼ぶこと。**
@@ -80,35 +84,41 @@ function ExerciseChart({
     return found >= 0 ? found : points.length - 1;
   }, [points, selectedDateKey]);
 
-  if (failed) return <Text style={styles.placeholder}>記録を読み込めませんでした</Text>;
-  if (!loaded) return <Text style={styles.placeholder}>読み込み中</Text>;
-  // ✓を付けずに終えた種目はここに来る。空白にせず、種目詳細と同じ薄い見本グラフを描いて
-  // 「記録が貯まるとこうなる」を見せる（@ユーザー指摘）。種目詳細が添えている
-  // 「1回目を記録する」ボタンは出さない——今まさに終えた直後の画面で、記録を促す場面ではない。
-  // 見本を自分の記録と取り違えないよう、注記を重ねる（枠の高さは見本＝グラフと同じなので、
-  // 下に置き足すのではなく重ねる）
-  if (recordDays.length === 0) {
-    return (
-      <View>
-        <ExerciseProgressChartSample />
-        <View style={styles.sampleNoteWrap} pointerEvents="none">
-          <Text style={styles.sampleNote}>まだ記録がありません</Text>
-        </View>
-      </View>
-    );
-  }
+  // ✓を付けずに終えた種目はここに来る（buildRecordDaysは✓確定セットのある日だけを数える）。
+  // 種目詳細のような薄い見本グラフには差し替えない。**実物のグラフを点が無い状態で描く**ことで、
+  // 「これから何がここに出るのか」を実際の目盛り・軸のまま見せる（@ユーザー指摘）。
+  // 見本に差し替えると、自分の記録と取り違える余地が残るうえ、軸の単位も本物ではなくなる
+  const isEmpty = loaded && !failed && recordDays.length === 0;
 
   return (
-    <ExerciseProgressChart
-      points={points}
-      unit={series.unit}
-      // 指標は常にbestなので、ハイライトは実測の自己ベスト（アンバーの点と★）
-      highlight={highlight}
-      highlightKind="personal-best"
-      leadIn={leadIn}
-      selectedIndex={selectedIndex}
-      onSelect={(i) => setSelectedDateKey(points[i]?.dateKey ?? null)}
-    />
+    <View>
+      {failed ? (
+        <Text style={styles.placeholder}>記録を読み込めませんでした</Text>
+      ) : !loaded ? (
+        <Text style={styles.placeholder}>読み込み中</Text>
+      ) : (
+        <ExerciseProgressChart
+          points={points}
+          unit={series.unit}
+          // 指標は常にbestなので、ハイライトは実測の自己ベスト（アンバーの点と★）
+          highlight={highlight}
+          highlightKind="personal-best"
+          leadIn={leadIn}
+          selectedIndex={selectedIndex}
+          onSelect={(i) => setSelectedDateKey(points[i]?.dateKey ?? null)}
+        />
+      )}
+      {/* 点が無い理由を説明する注記。種目詳細のグラフ下の注記（「自重の日＝加重量が無いので
+          点を出しません」）と同じ「太字の語＝説明」の形に揃える */}
+      <View style={styles.captionRow}>
+        {isEmpty && (
+          <Text style={styles.caption}>
+            <Text style={styles.captionLead}>記録なし＝</Text>
+            ✓を付けたセットが無いので点を出しません
+          </Text>
+        )}
+      </View>
+    </View>
   );
 }
 
@@ -317,21 +327,13 @@ export function SummaryExerciseChart({
 const styles = StyleSheet.create({
   container: { gap: 12 },
   chartBlock: { gap: 8 },
-  viewport: { height: CHART_HEIGHT, overflow: 'hidden' },
+  viewport: { height: CHART_HEIGHT + CAPTION_ROW_HEIGHT, overflow: 'hidden' },
   track: { flexDirection: 'row', alignItems: 'flex-start' },
   // 枠と枠の間。ページ背景と同化させて「余白」に見せる（隣接する折れ線が繋がって見えるのを断ち切る）
   slotSpacing: { marginRight: SLOT_GAP, backgroundColor: Colors.background },
-  // 見本グラフの上に重ねる注記。見本は薄いので、その上でも読める程度に面を敷く
-  sampleNoteWrap: { ...StyleSheet.absoluteFillObject, alignItems: 'center', justifyContent: 'center' },
-  sampleNote: {
-    ...Typography.footnote,
-    color: Colors.textMuted,
-    backgroundColor: Colors.background,
-    paddingHorizontal: 10,
-    paddingVertical: 4,
-    borderRadius: 999,
-    overflow: 'hidden',
-  },
+  captionRow: { height: CAPTION_ROW_HEIGHT, justifyContent: 'flex-end' },
+  caption: { ...Typography.captionCompact, color: Colors.textSecondary },
+  captionLead: { color: Colors.textPrimary, fontWeight: '700' },
   // グラフと同じ高さの枠の中で中央に置き、送るたびに高さが変わらないようにする
   placeholder: {
     ...Typography.footnote,

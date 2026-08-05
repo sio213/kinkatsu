@@ -61,7 +61,6 @@ jest.mock('react-native-reanimated', () => {
 import React from 'react';
 import { act, create, type ReactTestInstance } from 'react-test-renderer';
 import { Text, TouchableOpacity } from 'react-native';
-import { ExerciseProgressChartSample } from '@/components/exercises/exercise-progress-chart-sample';
 import { SummaryExerciseChart } from '@/components/workout/summary-exercise-chart';
 
 const EXERCISES = [
@@ -190,9 +189,9 @@ test('種目が0件なら何も描かない', () => {
   expect(texts(root)).toHaveLength(0);
 });
 
-// ✓を付けずに終えた種目はここに来る。空白にせず薄い見本グラフを描いて、記録が貯まると
-// どうなるかを見せる（@ユーザー指摘）。自分の記録と取り違えないよう注記も重ねる
-test('記録が0件の種目では見本グラフと注記を出す', () => {
+// ✓を付けずに終えた種目はここに来る。見本には差し替えず、実物のグラフを点が無い状態で描き、
+// なぜ点が無いのかを注記で説明する（@ユーザー指摘）
+test('記録が0件でも実物のグラフを描き、点が無い理由を注記で出す', () => {
   mockUseExerciseProgress.mockReturnValue({
     series: { points: [], unit: { label: 'kg' } },
     bestSeries: { points: [] },
@@ -205,10 +204,17 @@ test('記録が0件の種目では見本グラフと注記を出す', () => {
 
   const root = render();
 
-  expect(texts(root)).toContain('まだ記録がありません');
-  // 本物のグラフ（モックが'グラフ'を描く）ではなく見本に差し替わっている
-  expect(texts(root)).not.toContain('グラフ');
-  expect(root.findAllByType(ExerciseProgressChartSample)).toHaveLength(3);
+  // 見本に差し替えず、実物のグラフ（モックが'グラフ'を描く）をそのまま描く
+  expect(texts(root)).toContain('グラフ');
+  // 点が無い理由はグラフ下の注記で伝える（種目詳細の「自重の日＝…」と同じ形）
+  expect(texts(root)).toContain('記録なし＝');
+  expect(texts(root)).toContain('✓を付けたセットが無いので点を出しません');
+});
+
+test('記録がある種目では注記を出さない', () => {
+  const root = render();
+
+  expect(texts(root)).not.toContain('記録なし＝');
 });
 
 test('取得に失敗したら理由を出す', () => {
