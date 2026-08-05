@@ -158,6 +158,7 @@ function makeHistoryCard(overrides: Partial<SessionHistoryCard> = {}): SessionHi
     measurementType: 'weight_reps',
     source: 'preset',
     slug: 'bench_press',
+    pairedWeights: false,
     sets: [{ setNumber: 1, weight: 60, reps: 8, durationSeconds: null, distanceMeters: null, completedAt: 1 }],
     ...overrides,
   };

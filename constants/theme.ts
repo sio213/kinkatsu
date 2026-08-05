@@ -29,6 +29,7 @@ const Palette = {
   slate900: '#0F172A',
 
   blue50: '#EFF6FF',
+  blue200: '#BFDBFE',
   blue600: '#2563EB',
   sky500: '#0EA5E9',
 
@@ -73,6 +74,8 @@ export const Colors = {
 
   accent: Palette.blue600,
   accentSurface: Palette.blue50,
+  // accentSurfaceの面に添える枠。borderだと面との差が出ず、accentだと枠が主張しすぎる中間
+  accentBorder: Palette.blue200,
   onAccent: Palette.white,
   // 再開バナー（ResumeWorkoutBanner）の「進行中」ドット。デザイン案指定の#86EFAC
   accentLiveDot: Palette.green300,
@@ -227,6 +230,11 @@ export const Typography = {
    * 行間を広く取って読ませる。1行に収まるラベル用途にはcaptionを使うこと
    */
   captionCompact: { fontSize: 11, lineHeight: 17, fontWeight: '400' },
+  /**
+   * 完了サマリーのグラフで、送りボタンに挟まれた表示中の種目名。cardTitle(15px)より一回り
+   * 大きいのは、このブロックの主題がグラフではなく「どの種目を見ているか」であるため（デザイン案）
+   */
+  exerciseNavTitle: { fontSize: 16, fontWeight: '700', letterSpacing: -0.3 },
   /** NEW/BESTなどの小バッジ */
   badge: { fontSize: 11, fontWeight: '700' },
   /**

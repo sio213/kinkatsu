@@ -3,12 +3,14 @@ import { HeaderTitle } from '@/components/ui/header-title';
 import { PrimaryButton } from '@/components/ui/primary-button';
 import { ScreenFooter } from '@/components/ui/screen-footer';
 import { CommunityMessageCard } from '@/components/workout/community-message-card';
+import { SummaryExerciseChart } from '@/components/workout/summary-exercise-chart';
 import { SummaryExerciseList } from '@/components/workout/summary-exercise-list';
 import { SessionSummaryStats } from '@/components/workout/session-summary-stats';
 import { ScreenStyles } from '@/constants/theme';
 import { useSessionExerciseCards } from '@/hooks/use-session-exercise-cards';
 import { useSessionTotal, useSessionWeekOrdinal } from '@/hooks/use-session-summary';
 import { useWorkoutSession } from '@/hooks/use-workout-session';
+import { toChartExercises } from '@/lib/workout/chart-exercises';
 import { PLACEHOLDER_COMMUNITY_MESSAGE } from '@/lib/workout/community-message';
 import { formatSessionDateGroup, formatSessionDurationLong } from '@/lib/workout/summary';
 import { Stack, useLocalSearchParams, useRouter } from 'expo-router';
@@ -47,6 +49,8 @@ export default function WorkoutSummaryScreen() {
     [session],
   );
   const { cards, retry: retryCards } = useSessionExerciseCards(sessionsForCards);
+  // グラフは種目単位で切り替える（同じ種目の2枚目は同じ絵になるので畳む）
+  const chartExercises = useMemo(() => (Array.isArray(cards) ? toChartExercises(cards) : []), [cards]);
 
   // 記録編集画面の⋮「削除」は deleteSession → router.back() なので、サマリーから開いていると
   // 削除済みセッションのサマリーへ戻ってくる。NotFoundStateを見せる場面ではない（ユーザーは
@@ -110,7 +114,7 @@ export default function WorkoutSummaryScreen() {
           weekOrdinal={weekOrdinal}
         />
         <CommunityMessageCard message={PLACEHOLDER_COMMUNITY_MESSAGE} />
-        {/* グラフ（種目切替・期間チップ）はこの上に入る */}
+        <SummaryExerciseChart exercises={chartExercises} />
         {/* どのカードを押しても行き先は同じ記録編集画面。押した種目までスクロールさせる案は
             バックログ送りにしてあるため、onPressExerciseが渡すカードはここでは使わない */}
         <SummaryExerciseList

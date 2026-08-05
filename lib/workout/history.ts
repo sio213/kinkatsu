@@ -287,6 +287,9 @@ export type SessionHistoryCard = {
   // サムネイル表示（getExerciseImages）に必要。Exercise型のPick<'source'|'slug'>と同じ形にしておく
   source: string;
   slug: string | null;
+  // 器具を同時に2つ扱う種目か。総重量を左右2つ分で数えるグラフ（useExerciseProgress）へ
+  // そのまま渡せるよう、カード側に含めておく
+  pairedWeights: boolean;
   sets: HistorySetValues[];
 };
 
@@ -310,6 +313,7 @@ export async function getSessionExerciseCards(
       measurementType: exercises.measurementType,
       source: exercises.source,
       slug: exercises.slug,
+      pairedWeights: exercises.pairedWeights,
     })
     .from(workoutSessionExercises)
     .innerJoin(exercises, eq(workoutSessionExercises.exerciseId, exercises.id))
