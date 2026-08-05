@@ -37,6 +37,28 @@ describe('buildCarouselDots', () => {
     expect(buildCarouselDots(8, 7)[4]).toEqual({ small: false, active: true });
     expect(buildCarouselDots(8, 7)[0]).toEqual({ small: true, active: false });
   });
+
+  // 端の隣に居ることもドットで分かるようにする（両端2つずつを実際の位置に対応させる）
+  it('圧縮時、2番目では2番目・最後から2番目では4番目を光らせる', () => {
+    const second = buildCarouselDots(8, 1);
+    expect(second.map((d) => d.active)).toEqual([false, true, false, false, false]);
+    // 左端は「まだ先がある」印のままにする（実際に前の種目が1つある）
+    expect(second[0]).toEqual({ small: true, active: false });
+
+    const secondFromLast = buildCarouselDots(8, 6);
+    expect(secondFromLast.map((d) => d.active)).toEqual([false, false, false, true, false]);
+    expect(secondFromLast[4]).toEqual({ small: true, active: false });
+  });
+
+  // 6件では 0→0 1→1 2,3→2 4→3 5→4。中ほどが2件だけになっても破綻しない
+  it('上限+1件（6件）でも両端の対応が優先される', () => {
+    expect(buildCarouselDots(6, 0).findIndex((d) => d.active)).toBe(0);
+    expect(buildCarouselDots(6, 1).findIndex((d) => d.active)).toBe(1);
+    expect(buildCarouselDots(6, 2).findIndex((d) => d.active)).toBe(2);
+    expect(buildCarouselDots(6, 3).findIndex((d) => d.active)).toBe(2);
+    expect(buildCarouselDots(6, 4).findIndex((d) => d.active)).toBe(3);
+    expect(buildCarouselDots(6, 5).findIndex((d) => d.active)).toBe(4);
+  });
 });
 
 describe('carouselPositionLabel', () => {
