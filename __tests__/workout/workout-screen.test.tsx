@@ -789,13 +789,13 @@ function findCheckbox(root: ReactTestInstance, label: string) {
     .find((t) => t.props.accessibilityRole === 'checkbox' && t.props.accessibilityLabel === label)!;
 }
 
-describe('完了済み種目の自動折りたたみ', () => {
+describe('種目カードの折りたたみ', () => {
   const twoExercises = [
     { id: 10, name: 'ベンチプレス', category: 'chest', measurementType: 'weight_reps', orderIndex: 0, sessionExerciseId: 100 },
     { id: 11, name: 'スクワット', category: 'legs', measurementType: 'weight_reps', orderIndex: 1, sessionExerciseId: 101 },
   ];
 
-  test('全セット完了しても即座には畳まれず、別の種目カードに触れたタイミングで畳まれる', async () => {
+  test('回帰: 全セット完了した種目は、別の種目カードに触れても自動では畳まれない（畳むとカードの高さが減った分だけ操作中の種目が画面上でずれ、入力中に見失うため撤去した）', async () => {
     mockUseWorkoutSession.mockReturnValue({ session: activeSession, loaded: true });
     mockUseSessionExercises.mockReturnValue(twoExercises);
     let sets: Map<number, any[]> = new Map([
@@ -828,54 +828,36 @@ describe('完了済み種目の自動折りたたみ', () => {
       findCheckbox(root, 'スクワット セット1').props.onPress();
     });
 
-    expect(findBenchCard().props.collapsed).toBe(true);
+    expect(findBenchCard().props.collapsed).toBe(false);
   });
 
-  test('手動で開閉した種目は、完了しても自動では畳まれない', async () => {
+  test('カードヘッダーのタップで、ユーザー自身のタイミングで畳める／開ける', () => {
     mockUseWorkoutSession.mockReturnValue({ session: activeSession, loaded: true });
     mockUseSessionExercises.mockReturnValue(twoExercises);
-    let sets: Map<number, any[]> = new Map([
-      [100, [{ id: 1, setNumber: 1, weight: 60, reps: 10, completedAt: null }]],
-      [101, [{ id: 2, setNumber: 1, weight: 80, reps: 5, completedAt: null }]],
-    ]);
-    mockUseSessionSets.mockImplementation(() => sets);
+    mockUseSessionSets.mockReturnValue(
+      new Map([
+        [100, [{ id: 1, setNumber: 1, weight: 60, reps: 10, completedAt: null }]],
+        [101, [{ id: 2, setNumber: 1, weight: 80, reps: 5, completedAt: null }]],
+      ]),
+    );
 
-    let instance!: ReturnType<typeof create>;
-    act(() => {
-      instance = create(React.createElement(WorkoutScreen));
-    });
-    const root = instance.root;
-
+    const root = render();
     const findBenchCard = () =>
       root.findAllByType(SessionExerciseCard).find((c) => c.props.exercise.sessionExerciseId === 100)!;
-
-    // ユーザーがベンチプレスのカードを手動で開閉する
-    act(() => {
-      findBenchCard().props.onToggleCollapsed(100);
-    });
-    act(() => {
-      findBenchCard().props.onToggleCollapsed(100);
-    });
     expect(findBenchCard().props.collapsed).toBe(false);
 
-    // その後ベンチプレスの唯一のセットが完了する
-    sets = new Map([
-      [100, [{ id: 1, setNumber: 1, weight: 60, reps: 10, completedAt: Date.now() }]],
-      [101, [{ id: 2, setNumber: 1, weight: 80, reps: 5, completedAt: null }]],
-    ]);
     act(() => {
-      instance.update(React.createElement(WorkoutScreen));
+      findBenchCard().props.onToggleCollapsed(100);
     });
+    expect(findBenchCard().props.collapsed).toBe(true);
 
-    // スクワット側に触れても、手動操作済みのベンチプレスは自動で畳まれない
-    await act(async () => {
-      findCheckbox(root, 'スクワット セット1').props.onPress();
+    act(() => {
+      findBenchCard().props.onToggleCollapsed(100);
     });
-
     expect(findBenchCard().props.collapsed).toBe(false);
   });
 
-  test('過去の記録編集モード（endedAt有り）では、全セット完了済みでも自動で畳まれない', async () => {
+  test('過去の記録編集モード（endedAt有り）では、全セット完了済みでも畳まれない', () => {
     const finishedSession = { id: 1, startedAt: FIXED_NOW - 5000, endedAt: FIXED_NOW };
     mockUseWorkoutSession.mockReturnValue({ session: finishedSession, loaded: true });
     mockUseSessionExercises.mockReturnValue(twoExercises);
@@ -894,7 +876,7 @@ describe('完了済み種目の自動折りたたみ', () => {
     expect(benchCard.props.collapsed).toBe(false);
   });
 
-  test('セッションを開いた時点で既に全セット完了済みの種目は、別カードに触れるのを待たず最初から畳まれた状態で表示される（再開直後に不自然に見えないように）', () => {
+  test('セッションを開いた時点で既に全セット完了済みの種目は、最初から畳まれた状態で表示される（中断したセッションの再開時に、終わった種目まで全部展開されていると見づらいため）', () => {
     mockUseWorkoutSession.mockReturnValue({ session: activeSession, loaded: true });
     mockUseSessionExercises.mockReturnValue(twoExercises);
     mockUseSessionSets.mockReturnValue(
@@ -906,18 +888,18 @@ describe('完了済み種目の自動折りたたみ', () => {
 
     const root = render();
 
-    const benchCard = root
-      .findAllByType(SessionExerciseCard)
-      .find((c) => c.props.exercise.sessionExerciseId === 100)!;
-    expect(benchCard.props.collapsed).toBe(true);
+    const collapsed = (id: number) =>
+      root.findAllByType(SessionExerciseCard).find((c) => c.props.exercise.sessionExerciseId === id)!.props
+        .collapsed;
+    expect(collapsed(100)).toBe(true);
+    expect(collapsed(101)).toBe(false);
   });
 
-  test('種目が1件しかない場合、全セット完了しても触れる別カードが無いため畳まれないままになる', () => {
+  test('種目より1テンポ遅れてセットが届いた場合でも、初回の折りたたみ判定は行われる（種目だけ揃った時点で判定するとセット0件を未完了と誤判定してしまう）', () => {
     mockUseWorkoutSession.mockReturnValue({ session: activeSession, loaded: true });
-    mockUseSessionExercises.mockReturnValue([twoExercises[0]]);
-    let sets: Map<number, any[]> = new Map([
-      [100, [{ id: 1, setNumber: 1, weight: 60, reps: 10, completedAt: null }]],
-    ]);
+    mockUseSessionExercises.mockReturnValue(twoExercises);
+    // 1回目のレンダー時点ではセットのクエリがまだ解決していない
+    let sets: Map<number, any[]> = new Map();
     mockUseSessionSets.mockImplementation(() => sets);
 
     let instance!: ReturnType<typeof create>;
@@ -925,21 +907,27 @@ describe('完了済み種目の自動折りたたみ', () => {
       instance = create(React.createElement(WorkoutScreen));
     });
     const root = instance.root;
+    const findBenchCard = () =>
+      root.findAllByType(SessionExerciseCard).find((c) => c.props.exercise.sessionExerciseId === 100)!;
+    expect(findBenchCard().props.collapsed).toBe(false);
 
-    sets = new Map([[100, [{ id: 1, setNumber: 1, weight: 60, reps: 10, completedAt: Date.now() }]]]);
+    // 遅れてセットが届く（ベンチプレスは完了済み）
+    sets = new Map([
+      [100, [{ id: 1, setNumber: 1, weight: 60, reps: 10, completedAt: FIXED_NOW }]],
+      [101, [{ id: 2, setNumber: 1, weight: 80, reps: 5, completedAt: null }]],
+    ]);
     act(() => {
       instance.update(React.createElement(WorkoutScreen));
     });
 
-    const card = root.findAllByType(SessionExerciseCard)[0];
-    expect(card.props.collapsed).toBe(false);
+    expect(findBenchCard().props.collapsed).toBe(true);
   });
 
-  test('完了したカード自身への後続操作（onInteractを自分自身のidで呼ぶ）では、そのカード自身は畳まれない', async () => {
+  test('初回の折りたたみ判定は一度きりで、その後に別の種目が完了しても開閉状態は変わらない', () => {
     mockUseWorkoutSession.mockReturnValue({ session: activeSession, loaded: true });
     mockUseSessionExercises.mockReturnValue(twoExercises);
     let sets: Map<number, any[]> = new Map([
-      [100, [{ id: 1, setNumber: 1, weight: 60, reps: 10, completedAt: null }]],
+      [100, [{ id: 1, setNumber: 1, weight: 60, reps: 10, completedAt: FIXED_NOW }]], // 最初から完了済み
       [101, [{ id: 2, setNumber: 1, weight: 80, reps: 5, completedAt: null }]],
     ]);
     mockUseSessionSets.mockImplementation(() => sets);
@@ -950,65 +938,23 @@ describe('完了済み種目の自動折りたたみ', () => {
     });
     const root = instance.root;
 
+    // スクワットもこの場で完了させる
     sets = new Map([
-      [100, [{ id: 1, setNumber: 1, weight: 60, reps: 10, completedAt: Date.now() }]],
-      [101, [{ id: 2, setNumber: 1, weight: 80, reps: 5, completedAt: null }]],
-    ]);
-    act(() => {
-      instance.update(React.createElement(WorkoutScreen));
-    });
-
-    const findBenchCard = () =>
-      root.findAllByType(SessionExerciseCard).find((c) => c.props.exercise.sessionExerciseId === 100)!;
-    act(() => {
-      findBenchCard().props.onInteract(100);
-    });
-    expect(findBenchCard().props.collapsed).toBe(false);
-  });
-
-  test('複数カードが同時に畳む予約状態でも、別カードに触れた時点で一括して畳まれる', async () => {
-    const threeExercises = [
-      ...twoExercises,
-      { id: 12, name: 'デッドリフト', category: 'back', measurementType: 'weight_reps', orderIndex: 2, sessionExerciseId: 102 },
-    ];
-    mockUseWorkoutSession.mockReturnValue({ session: activeSession, loaded: true });
-    mockUseSessionExercises.mockReturnValue(threeExercises);
-    let sets: Map<number, any[]> = new Map([
-      [100, [{ id: 1, setNumber: 1, weight: 60, reps: 10, completedAt: null }]],
-      [101, [{ id: 2, setNumber: 1, weight: 80, reps: 5, completedAt: null }]],
-      [102, [{ id: 3, setNumber: 1, weight: 100, reps: 3, completedAt: null }]],
-    ]);
-    mockUseSessionSets.mockImplementation(() => sets);
-
-    let instance!: ReturnType<typeof create>;
-    act(() => {
-      instance = create(React.createElement(WorkoutScreen));
-    });
-    const root = instance.root;
-
-    // ベンチプレス・スクワットが両方完了（同時に予約対象になる）
-    sets = new Map([
-      [100, [{ id: 1, setNumber: 1, weight: 60, reps: 10, completedAt: Date.now() }]],
+      [100, [{ id: 1, setNumber: 1, weight: 60, reps: 10, completedAt: FIXED_NOW }]],
       [101, [{ id: 2, setNumber: 1, weight: 80, reps: 5, completedAt: Date.now() }]],
-      [102, [{ id: 3, setNumber: 1, weight: 100, reps: 3, completedAt: null }]],
     ]);
     act(() => {
       instance.update(React.createElement(WorkoutScreen));
-    });
-
-    await act(async () => {
-      findCheckbox(root, 'デッドリフト セット1').props.onPress();
     });
 
     const collapsed = (id: number) =>
       root.findAllByType(SessionExerciseCard).find((c) => c.props.exercise.sessionExerciseId === id)!.props
         .collapsed;
-    expect(collapsed(100)).toBe(true);
-    expect(collapsed(101)).toBe(true);
-    expect(collapsed(102)).toBe(false);
+    expect(collapsed(100)).toBe(true); // 再開時に畳まれたまま
+    expect(collapsed(101)).toBe(false); // 今完了させた種目は畳まれない
   });
 
-  test('セットが未ロード（0件）の種目は、空配列の誤判定で完了扱いにならない', async () => {
+  test('セットが未ロード（0件）の種目は、空配列の誤判定で完了扱いにならない', () => {
     mockUseWorkoutSession.mockReturnValue({ session: activeSession, loaded: true });
     mockUseSessionExercises.mockReturnValue(twoExercises);
     // sessionExerciseId:100 はまだsessionSetsにエントリが無い
@@ -1018,71 +964,114 @@ describe('完了済み種目の自動折りたたみ', () => {
 
     const root = render();
 
-    await act(async () => {
-      findCheckbox(root, 'スクワット セット1').props.onPress();
-    });
-
     const benchCard = root
       .findAllByType(SessionExerciseCard)
       .find((c) => c.props.exercise.sessionExerciseId === 100)!;
     expect(benchCard.props.collapsed).toBe(false);
   });
 
-  test('畳まれた完了済みカードのセットが未完了に戻ると、他カードを触るのを待たず即座に再展開する', async () => {
+  test('セットが種目より先に届いた場合でも、初回判定は種目が揃うまで待って正しく行われる', () => {
     mockUseWorkoutSession.mockReturnValue({ session: activeSession, loaded: true });
-    mockUseSessionExercises.mockReturnValue(twoExercises);
-    let sets: Map<number, any[]> = new Map([
-      [100, [{ id: 1, setNumber: 1, weight: 60, reps: 10, completedAt: null }]],
-      [101, [{ id: 2, setNumber: 1, weight: 80, reps: 5, completedAt: null }]],
-    ]);
-    mockUseSessionSets.mockImplementation(() => sets);
+    let exercises: typeof twoExercises = [];
+    mockUseSessionExercises.mockImplementation(() => exercises);
+    mockUseSessionSets.mockReturnValue(
+      new Map([
+        [100, [{ id: 1, setNumber: 1, weight: 60, reps: 10, completedAt: FIXED_NOW }]],
+        [101, [{ id: 2, setNumber: 1, weight: 80, reps: 5, completedAt: null }]],
+      ]),
+    );
 
     let instance!: ReturnType<typeof create>;
     act(() => {
       instance = create(React.createElement(WorkoutScreen));
     });
     const root = instance.root;
+    expect(root.findAllByType(SessionExerciseCard)).toHaveLength(0);
 
-    sets = new Map([
-      [100, [{ id: 1, setNumber: 1, weight: 60, reps: 10, completedAt: Date.now() }]],
-      [101, [{ id: 2, setNumber: 1, weight: 80, reps: 5, completedAt: null }]],
-    ]);
+    exercises = twoExercises;
     act(() => {
       instance.update(React.createElement(WorkoutScreen));
     });
 
-    // スクワットを触ってベンチプレスを畳ませる（前提条件）
-    await act(async () => {
-      findCheckbox(root, 'スクワット セット1').props.onPress();
-    });
-    const findBenchCard = () =>
-      root.findAllByType(SessionExerciseCard).find((c) => c.props.exercise.sessionExerciseId === 100)!;
-    expect(findBenchCard().props.collapsed).toBe(true);
-
-    // ベンチプレスにセットを追加（completedAt: null）→ 未完了に戻る
-    sets = new Map([
-      [
-        100,
-        [
-          { id: 1, setNumber: 1, weight: 60, reps: 10, completedAt: Date.now() },
-          { id: 3, setNumber: 2, weight: 60, reps: 10, completedAt: null },
-        ],
-      ],
-      [101, [{ id: 2, setNumber: 1, weight: 80, reps: 5, completedAt: Date.now() }]],
-    ]);
-    act(() => {
-      instance.update(React.createElement(WorkoutScreen));
-    });
-
-    // 他カードを触らずとも即座に再展開されている
-    expect(findBenchCard().props.collapsed).toBe(false);
+    const benchCard = root
+      .findAllByType(SessionExerciseCard)
+      .find((c) => c.props.exercise.sessionExerciseId === 100)!;
+    expect(benchCard.props.collapsed).toBe(true);
   });
 
-  test('回帰: 畳む予約中に手動でトグルされた種目は、後で別カードに触れても古い予約に従って畳まれない', async () => {
+  test('セッションのクエリが遅れて解決してisActiveがfalse→trueになった場合でも、初回判定が走る', () => {
+    mockUseWorkoutSession.mockReturnValue({ session: undefined, loaded: false });
+    mockUseSessionExercises.mockReturnValue(twoExercises);
+    mockUseSessionSets.mockReturnValue(
+      new Map([
+        [100, [{ id: 1, setNumber: 1, weight: 60, reps: 10, completedAt: FIXED_NOW }]],
+        [101, [{ id: 2, setNumber: 1, weight: 80, reps: 5, completedAt: null }]],
+      ]),
+    );
+
+    let instance!: ReturnType<typeof create>;
+    act(() => {
+      instance = create(React.createElement(WorkoutScreen));
+    });
+    const root = instance.root;
+    // セッションが未解決の間は画面自体がまだ何も描かない（isActive=falseで初回判定も走らない）
+    expect(root.findAllByType(SessionExerciseCard)).toHaveLength(0);
+
+    mockUseWorkoutSession.mockReturnValue({ session: activeSession, loaded: true });
+    act(() => {
+      instance.update(React.createElement(WorkoutScreen));
+    });
+
+    const benchCard = root
+      .findAllByType(SessionExerciseCard)
+      .find((c) => c.props.exercise.sessionExerciseId === 100)!;
+    expect(benchCard.props.collapsed).toBe(true);
+  });
+
+  test('初回判定を待っている間にユーザーが手動で畳んだ種目は、判定が走った時点でも畳まれたまま保たれる', () => {
     mockUseWorkoutSession.mockReturnValue({ session: activeSession, loaded: true });
     mockUseSessionExercises.mockReturnValue(twoExercises);
+    // セットのクエリがまだ解決していない＝初回判定が保留されている状態
+    let sets: Map<number, any[]> = new Map();
+    mockUseSessionSets.mockImplementation(() => sets);
+
+    let instance!: ReturnType<typeof create>;
+    act(() => {
+      instance = create(React.createElement(WorkoutScreen));
+    });
+    const root = instance.root;
+    const collapsed = (id: number) =>
+      root.findAllByType(SessionExerciseCard).find((c) => c.props.exercise.sessionExerciseId === id)!.props
+        .collapsed;
+
+    // 判定を待っている間もカードは描画されており、ヘッダーはタップできる
+    act(() => {
+      root
+        .findAllByType(SessionExerciseCard)
+        .find((c) => c.props.exercise.sessionExerciseId === 101)!
+        .props.onToggleCollapsed(101);
+    });
+    expect(collapsed(101)).toBe(true);
+
+    // 遅れてセットが届き、初回判定が走る
+    sets = new Map([
+      [100, [{ id: 1, setNumber: 1, weight: 60, reps: 10, completedAt: FIXED_NOW }]],
+      [101, [{ id: 2, setNumber: 1, weight: 80, reps: 5, completedAt: null }]],
+    ]);
+    act(() => {
+      instance.update(React.createElement(WorkoutScreen));
+    });
+
+    expect(collapsed(100)).toBe(true); // 完了済みなので畳まれる
+    expect(collapsed(101)).toBe(true); // 手動で畳んだ状態が上書きされていない
+  });
+
+  test('初回判定後に種目を追加しても、既存カードの状態は変わらず新しい種目も畳まれない', () => {
+    mockUseWorkoutSession.mockReturnValue({ session: activeSession, loaded: true });
+    let exercises = twoExercises;
+    mockUseSessionExercises.mockImplementation(() => exercises);
     let sets: Map<number, any[]> = new Map([
-      [100, [{ id: 1, setNumber: 1, weight: 60, reps: 10, completedAt: null }]],
+      [100, [{ id: 1, setNumber: 1, weight: 60, reps: 10, completedAt: FIXED_NOW }]], // 最初から完了済み
       [101, [{ id: 2, setNumber: 1, weight: 80, reps: 5, completedAt: null }]],
     ]);
     mockUseSessionSets.mockImplementation(() => sets);
@@ -1092,32 +1081,26 @@ describe('完了済み種目の自動折りたたみ', () => {
       instance = create(React.createElement(WorkoutScreen));
     });
     const root = instance.root;
+    const collapsed = (id: number) =>
+      root.findAllByType(SessionExerciseCard).find((c) => c.props.exercise.sessionExerciseId === id)!.props
+        .collapsed;
+    expect(collapsed(100)).toBe(true);
 
-    // 1. ベンチプレス完了 → 畳む予約が立つ（この時点ではまだ手動操作していない）
+    // 完了済みの種目を追加で読み込む（過去の記録から読み込み等）
+    exercises = [
+      ...twoExercises,
+      { id: 12, name: 'デッドリフト', category: 'back', measurementType: 'weight_reps', orderIndex: 2, sessionExerciseId: 102 },
+    ];
     sets = new Map([
-      [100, [{ id: 1, setNumber: 1, weight: 60, reps: 10, completedAt: Date.now() }]],
-      [101, [{ id: 2, setNumber: 1, weight: 80, reps: 5, completedAt: null }]],
+      ...sets,
+      [102, [{ id: 3, setNumber: 1, weight: 100, reps: 3, completedAt: FIXED_NOW }]],
     ]);
     act(() => {
       instance.update(React.createElement(WorkoutScreen));
     });
 
-    // 2. その後にユーザーが手動でベンチプレスを開閉する（予約取消しのはず）
-    const findBenchCard = () =>
-      root.findAllByType(SessionExerciseCard).find((c) => c.props.exercise.sessionExerciseId === 100)!;
-    act(() => {
-      findBenchCard().props.onToggleCollapsed(100);
-    });
-    act(() => {
-      findBenchCard().props.onToggleCollapsed(100);
-    });
-    expect(findBenchCard().props.collapsed).toBe(false);
-
-    // 3. スクワットに触れる → 古い予約に従って畳まれてしまわないこと
-    await act(async () => {
-      findCheckbox(root, 'スクワット セット1').props.onPress();
-    });
-    expect(findBenchCard().props.collapsed).toBe(false);
+    expect(collapsed(100)).toBe(true); // 既存の状態は変わらない
+    expect(collapsed(102)).toBe(false); // 後から増えた種目は完了済みでも畳まれない
   });
 });
 

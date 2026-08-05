@@ -7,7 +7,6 @@ const mockRemoveExerciseFromSession = jest.fn();
 const mockSwapExerciseOrder = jest.fn();
 const mockPush = jest.fn();
 const mockOnToggleCollapsed = jest.fn();
-const mockOnInteract = jest.fn();
 
 jest.mock('@/lib/workout/sets', () => ({
   addSet: (...args: unknown[]) => mockAddSet(...args),
@@ -42,7 +41,6 @@ function render(
     previousSessionExerciseId: null,
     nextSessionExerciseId: null,
     onToggleCollapsed: mockOnToggleCollapsed,
-    onInteract: mockOnInteract,
     prefilledSetIds: [],
     hasHistory: true,
     ...props,
@@ -218,7 +216,6 @@ test('直前セットを✓再タップで編集に戻した直後（未編集�
         previousSessionExerciseId={null}
         nextSessionExerciseId={null}
         onToggleCollapsed={mockOnToggleCollapsed}
-        onInteract={mockOnInteract}
         prefilledSetIds={[]}
         hasHistory={true}
       />,
@@ -248,7 +245,6 @@ test('直前セットを✓再タップで編集に戻した直後（未編集�
         previousSessionExerciseId={null}
         nextSessionExerciseId={null}
         onToggleCollapsed={mockOnToggleCollapsed}
-        onInteract={mockOnInteract}
         prefilledSetIds={[]}
         hasHistory={true}
       />,
@@ -395,7 +391,6 @@ test('セット削除後に別idの新しいセットが同じ位置に来ても
         previousSessionExerciseId={null}
         nextSessionExerciseId={null}
         onToggleCollapsed={mockOnToggleCollapsed}
-        onInteract={mockOnInteract}
         prefilledSetIds={[]}
         hasHistory={true}
       />,
@@ -428,7 +423,6 @@ test('セット削除後に別idの新しいセットが同じ位置に来ても
         previousSessionExerciseId={null}
         nextSessionExerciseId={null}
         onToggleCollapsed={mockOnToggleCollapsed}
-        onInteract={mockOnInteract}
         prefilledSetIds={[]}
         hasHistory={true}
       />,
@@ -924,7 +918,6 @@ describe('prefilledSetIdsの行への伝播とfocusFirstSet()（ゴースト値�
           previousSessionExerciseId={null}
           nextSessionExerciseId={null}
           onToggleCollapsed={mockOnToggleCollapsed}
-          onInteract={mockOnInteract}
           prefilledSetIds={[]}
           hasHistory={true}
         />,
@@ -958,7 +951,6 @@ describe('prefilledSetIdsの行への伝播とfocusFirstSet()（ゴースト値�
           previousSessionExerciseId={null}
           nextSessionExerciseId={null}
           onToggleCollapsed={mockOnToggleCollapsed}
-          onInteract={mockOnInteract}
           prefilledSetIds={[1, 2]}
           hasHistory={true}
         />,
@@ -983,7 +975,6 @@ describe('prefilledSetIdsの行への伝播とfocusFirstSet()（ゴースト値�
           previousSessionExerciseId={null}
           nextSessionExerciseId={null}
           onToggleCollapsed={mockOnToggleCollapsed}
-          onInteract={mockOnInteract}
           prefilledSetIds={[1, 2]}
           hasHistory={true}
         />,
@@ -1014,7 +1005,6 @@ describe('prefilledSetIdsの行への伝播とfocusFirstSet()（ゴースト値�
           previousSessionExerciseId={null}
           nextSessionExerciseId={null}
           onToggleCollapsed={mockOnToggleCollapsed}
-          onInteract={mockOnInteract}
           prefilledSetIds={[1, 2]}
           hasHistory={true}
         />,
@@ -1035,7 +1025,6 @@ describe('prefilledSetIdsの行への伝播とfocusFirstSet()（ゴースト値�
           previousSessionExerciseId={null}
           nextSessionExerciseId={null}
           onToggleCollapsed={mockOnToggleCollapsed}
-          onInteract={mockOnInteract}
           prefilledSetIds={[1, 2]}
           hasHistory={true}
         />,
@@ -1087,7 +1076,6 @@ describe('prefilledSetIdsの行への伝播とfocusFirstSet()（ゴースト値�
           previousSessionExerciseId={null}
           nextSessionExerciseId={null}
           onToggleCollapsed={mockOnToggleCollapsed}
-          onInteract={mockOnInteract}
           prefilledSetIds={[]}
           hasHistory={true}
         />,
@@ -1109,7 +1097,6 @@ describe('prefilledSetIdsの行への伝播とfocusFirstSet()（ゴースト値�
           previousSessionExerciseId={null}
           nextSessionExerciseId={null}
           onToggleCollapsed={mockOnToggleCollapsed}
-          onInteract={mockOnInteract}
           prefilledSetIds={[10]}
           hasHistory={true}
         />,

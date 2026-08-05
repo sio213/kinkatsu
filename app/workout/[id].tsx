@@ -12,10 +12,10 @@ import { AddExerciseButton } from '@/components/workout/add-exercise-button';
 import { ExerciseEmptyState } from '@/components/workout/exercise-empty-state';
 import { SessionExerciseCard, type SessionExerciseCardHandle } from '@/components/workout/session-exercise-card';
 import { Colors, ScreenStyles, Typography } from '@/constants/theme';
-import { useAutoCollapseCompletedExercises } from '@/hooks/use-auto-collapse-completed-exercises';
 import { useDebouncedPush } from '@/hooks/use-debounced-push';
 import { useRoutines } from '@/hooks/use-routines';
 import { useScrollAfterKeyboardShow } from '@/hooks/use-scroll-after-keyboard-show';
+import { useSessionExerciseCollapse } from '@/hooks/use-session-exercise-collapse';
 import { useTickingNow } from '@/hooks/use-ticking-now';
 import {
   EMPTY_PREFILLED_SET_IDS,
@@ -108,16 +108,16 @@ export default function WorkoutScreen() {
     });
   }, [navigation, tryFocus]);
   // endedAtがあれば終了済み＝過去の記録を開いている（見た目は共用しつつ、進行中固有の
-  // UI（リアルタイムタイマー・「トレーニングを終了」ボタン・種目カードの自動折りたたみ）だけを
+  // UI（リアルタイムタイマー・「トレーニングを終了」ボタン・完了済み種目の初期折りたたみ）だけを
   // 出し分ける）。hooksはこの後の早期returnより前で無条件に呼ぶ必要があるため、sessionが
   // まだnullの間もここで安全に評価できる形にしている
   const isActive = session != null && session.endedAt == null;
   const now = useTickingNow(isActive);
-  const {
-    collapsedIds,
-    toggleCollapsed: handleToggleCollapsed,
-    handleInteract,
-  } = useAutoCollapseCompletedExercises(isActive, sessionExercises, sessionSets);
+  const { collapsedIds, toggleCollapsed: handleToggleCollapsed } = useSessionExerciseCollapse(
+    isActive,
+    sessionExercises,
+    sessionSets,
+  );
 
   // 種目追加/入れ替え画面はDB操作直後にrouter.back()で閉じるため、プリフィルが起きたことは
   // pub/sub経由でここに届く（lib/workout/prefill-feedback.ts）。他のセッション画面からの
@@ -371,7 +371,6 @@ export default function WorkoutScreen() {
                       previousSessionExerciseId={sessionExercises[index - 1]?.sessionExerciseId ?? null}
                       nextSessionExerciseId={sessionExercises[index + 1]?.sessionExerciseId ?? null}
                       onToggleCollapsed={handleToggleCollapsed}
-                      onInteract={handleInteract}
                       prefilledSetIds={prefilledEntry?.prefilledSetIds ?? EMPTY_PREFILLED_SET_IDS}
                       hasHistory={exercisesWithHistory.has(item.id)}
                     />
