@@ -229,19 +229,21 @@ test('グラフは種目ごとに別々の系列を引く（前の種目のも�
   render();
 
   const ids = mockUseExerciseProgress.mock.calls.map((c) => c[0]);
-  // 表示中と前後の3枠ぶん。それぞれ自分のidで引いている
-  expect(new Set(ids)).toEqual(new Set([1, 2]));
+  expect(new Set(ids)).toEqual(new Set([1, 2, 3]));
 });
 
-// 位置で並べると、送るたびに真ん中の中身が別の種目に差し替わって作り直され、
-// useLiveQueryが空から始まって一瞬「読み込み中」を挟む＝白くちらつく（@ユーザー報告）
-test('送っても、隣にマウント済みだったグラフは作り直さない', () => {
+// 送った先の種目がその瞬間に初めてマウントされると、系列の取得が終わるまで「読み込み中」
+// ＝白い枠が見える。連続で送るほど当たりやすかった（@ユーザー報告）ので、
+// 全種目を最初に載せて一度もアンマウントしない
+test('全種目を最初にマウントし、送っても作り直さない', () => {
   const root = render();
-  expect(mounted).toEqual([1, 2]);
+  expect(mounted).toEqual([1, 2, 3]);
 
   press(root, '次の種目');
+  press(root, '次の種目');
+  press(root, '前の種目');
 
-  // 新しく画面外に入ってきた3だけが増える。中央に来た2は作り直されない
+  // 送っても増えない＝どのグラフも作り直されていない
   expect(mounted).toEqual([1, 2, 3]);
 });
 

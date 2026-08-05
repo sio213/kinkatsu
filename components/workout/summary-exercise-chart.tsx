@@ -14,7 +14,7 @@ import {
   type ProgressPeriod,
 } from '@/lib/exercises/progress';
 import type { SummaryChartExercise } from '@/lib/workout/chart-exercises';
-import { useCallback, useLayoutEffect, useMemo, useRef, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { StyleSheet, Text, View, type LayoutChangeEvent } from 'react-native';
 import { Gesture, GestureDetector } from 'react-native-gesture-handler';
 import Animated, { runOnJS, useAnimatedStyle, useSharedValue, withTiming } from 'react-native-reanimated';
@@ -100,10 +100,8 @@ function ExerciseChart({
 }
 
 /**
- * トラックの1枠。種目が無い端（先頭の左・末尾の右）は幅だけ保った空枠にする。
- *
- * 枠と枠の間はgapではなくmarginRightで空ける。3枠をキー付きの配列として並べるため、
- * 間に別要素を挟むとキーによる並べ替えの対象がずれるため（下のtrackを参照）
+ * トラックの1枠。枠と枠の間はgapではなくmarginRightで空ける
+ * （キー付きの配列として並べるので、間に別要素を挟むとキーの対応がずれる）
  */
 function Slot({
   exercise,
@@ -111,14 +109,14 @@ function Slot({
   width,
   last,
 }: {
-  exercise: SummaryChartExercise | undefined;
+  exercise: SummaryChartExercise;
   period: ProgressPeriod;
   width: number;
   last: boolean;
 }) {
   return (
     <View style={[{ width }, !last && styles.slotSpacing]}>
-      {exercise && <ExerciseChart key={exercise.exerciseId} exercise={exercise} period={period} />}
+      <ExerciseChart exercise={exercise} period={period} />
     </View>
   );
 }
@@ -155,41 +153,48 @@ export function SummaryExerciseChart({
   const safeIndex = Math.min(index, Math.max(0, exercises.length - 1));
 
   // 期間は種目をまたいで保つ（3ヶ月で見比べたい、という見方を送るたびに壊さない）。
-  // グラフの内側の状態（選択中の点）はExerciseChart側に置き、種目が変わればリセットされる
+  // グラフの内側の状態（選択中の点）はExerciseChart側に置く
   const [period, setPeriod] = useState<ProgressPeriod>(DEFAULT_PROGRESS_PERIOD);
 
   const [containerWidth, setContainerWidth] = useState(0);
-  const translateX = useSharedValue(0);
-  // トラックが描く3枠の中心。indexより1テンポ遅らせて保持するのが要で、詳細は下のuseLayoutEffect
-  const [displayIndex, setDisplayIndex] = useState(0);
+  // 確定済みの位置と、指をドラッグしている間の差分。トラックの位置はこの2つの和だけで決まり、
+  // Reactの再レンダーには依存しない。送りを確定する瞬間に「baseを1枠ぶん進める」と
+  // 「dragを0に戻す」を同じ関数内で書くので、合計は変わらず見た目が飛ばない
+  const base = useSharedValue(0);
+  const drag = useSharedValue(0);
+
+  const step = containerWidth + SLOT_GAP;
 
   const handleLayout = useCallback((e: LayoutChangeEvent) => {
     setContainerWidth(e.nativeEvent.layout.width);
   }, []);
 
-  // indexの更新がコミットされた直後（描画される前）にtranslateXを0へ戻し、同じコミットで
-  // 枠の中身も新しい中心へ差し替える。useEffectだと描画後になり1フレーム分ズレて見える。
-  // 2つを別々のタイミングでやると、「まだ位置が戻っていないのに中身だけ次へ進む」＝
-  // 本来まだ見えてはいけない1つ先の種目が着地位置にちらつく（カレンダーで実機確認済みの現象）
-  useLayoutEffect(() => {
-    translateX.value = 0;
-    setDisplayIndex(safeIndex);
-  }, [safeIndex, translateX]);
-
-  // スナップし切ってから初めてindexを進める。先に進めると、位置が戻る前に中身が変わって見える
-  const commitIndexChange = useCallback((delta: number) => {
-    setIndex((i) => i + delta);
-    isSlidingRef.current = false;
-  }, []);
+  // 幅が確定したとき・種目が減って位置が丸められたときに、確定位置を現在地へ合わせ直す。
+  // 送りの確定時は既に同じ値になっているため、ここは実質何もしない
+  useEffect(() => {
+    if (containerWidth === 0) return;
+    base.value = -safeIndex * step;
+  }, [safeIndex, containerWidth, step, base]);
 
   // アニメーション中の二重発火を防ぐ。送りボタンやドットは連打できてしまい、
   // スナップの途中から別のスナップを始めると位置が中途半端なまま確定する
   const isSlidingRef = useRef(false);
 
+  const commitSlide = useCallback(
+    (delta: number) => {
+      // 2つのsharedValueを同じ関数内で書くことで、UIスレッドへ同じフレームで反映される。
+      // 片方だけ先に効くと1枠ぶん飛んで見える
+      base.value = base.value - delta * step;
+      drag.value = 0;
+      setIndex((i) => i + delta);
+      isSlidingRef.current = false;
+    },
+    [base, drag, step],
+  );
+
   /**
    * 隣の種目へスライドして送る。送りボタン・ドット・スワイプの共通経路。
-   * 隣以外（ドットで2つ以上先を指した場合）はトラックが3枠しか持たないためアニメーションできず、
-   * その場で切り替える
+   * 隣以外（ドットで2つ以上先を指した場合）はアニメーションせずその場で移す
    */
   const slideBy = useCallback(
     (delta: number) => {
@@ -201,17 +206,11 @@ export function SummaryExerciseChart({
         return;
       }
       isSlidingRef.current = true;
-      // 隣の枠は「枠の幅」ではなく「枠の幅+隙間」だけ離れている
-      const step = containerWidth + SLOT_GAP;
-      translateX.value = withTiming(
-        delta > 0 ? -step : step,
-        { duration: SNAP_DURATION_MS },
-        (finished) => {
-          if (finished) runOnJS(commitIndexChange)(delta);
-        },
-      );
+      drag.value = withTiming(delta > 0 ? -step : step, { duration: SNAP_DURATION_MS }, (finished) => {
+        if (finished) runOnJS(commitSlide)(delta);
+      });
     },
-    [safeIndex, exercises.length, containerWidth, commitIndexChange, translateX],
+    [safeIndex, exercises.length, containerWidth, step, drag, commitSlide],
   );
 
   const swipe = useMemo(
@@ -221,7 +220,7 @@ export function SummaryExerciseChart({
         // 縦に動いたら本文のスクロールへ譲る
         .failOffsetY([-16, 16])
         .onUpdate((e) => {
-          translateX.value = e.translationX;
+          drag.value = e.translationX;
         })
         .onEnd((e) => {
           const wantsNext =
@@ -232,13 +231,13 @@ export function SummaryExerciseChart({
           const canSlide = delta === 1 ? safeIndex < exercises.length - 1 : delta === -1 && safeIndex > 0;
           // 端では送らずに元の位置へ戻す。送りボタンが無効になっているのと同じ扱い
           if (canSlide) runOnJS(slideBy)(delta);
-          else translateX.value = withTiming(0, { duration: SNAP_DURATION_MS });
+          else drag.value = withTiming(0, { duration: SNAP_DURATION_MS });
         }),
-    [safeIndex, exercises.length, slideBy, translateX],
+    [safeIndex, exercises.length, slideBy, drag],
   );
 
   const animatedTrackStyle = useAnimatedStyle(() => ({
-    transform: [{ translateX: translateX.value - (containerWidth + SLOT_GAP) }],
+    transform: [{ translateX: base.value + drag.value }],
   }));
 
   const current = exercises[safeIndex];
@@ -268,25 +267,26 @@ export function SummaryExerciseChart({
           <View onLayout={handleLayout} style={styles.viewport}>
             {containerWidth > 0 && (
               <Animated.View
-                style={[styles.track, { width: containerWidth * 3 + SLOT_GAP * 2 }, animatedTrackStyle]}
+                style={[
+                  styles.track,
+                  { width: exercises.length * containerWidth + (exercises.length - 1) * SLOT_GAP },
+                  animatedTrackStyle,
+                ]}
               >
-                {/* **キーは位置ではなく種目id。** 位置で並べると、送るたびに真ん中の中身が別の種目に
-                    差し替わり、隣にマウント済みだったグラフが再利用されず作り直される。すると
-                    useLiveQueryが空から始まって一瞬「読み込み中」を挟み、白くちらつく（@ユーザー報告）。
-                    キーを種目に紐付ければ、Reactが同じ親の中で既存のサブツリーを移動して再利用でき、
-                    新しくマウントされるのは画面外に入ってきた端の1枚だけになる */}
-                {[displayIndex - 1, displayIndex, displayIndex + 1].map((slotIndex, position) => {
-                  const exercise = exercises[slotIndex];
-                  return (
-                    <Slot
-                      key={exercise ? `exercise-${exercise.exerciseId}` : `edge-${position}`}
-                      exercise={exercise}
-                      period={period}
-                      width={containerWidth}
-                      last={position === 2}
-                    />
-                  );
-                })}
+                {/* **全種目を並べて一度もアンマウントしない。** 前後3枠だけを持ち回す形だと、
+                    送った先の種目はその瞬間に初めてマウントされ、系列の取得が終わるまで
+                    「読み込み中」＝白い枠が見える。連続で送るほど当たりやすく、画面を開いた
+                    直後の1回目だけ出にくい、という現れ方になっていた（@ユーザー報告）。
+                    1セッションの種目数は多くても十数件なので、全部載せて先に読ませてしまう */}
+                {exercises.map((exercise, i) => (
+                  <Slot
+                    key={exercise.exerciseId}
+                    exercise={exercise}
+                    period={period}
+                    width={containerWidth}
+                    last={i === exercises.length - 1}
+                  />
+                ))}
               </Animated.View>
             )}
           </View>
