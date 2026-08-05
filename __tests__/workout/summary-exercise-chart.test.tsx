@@ -7,10 +7,10 @@ jest.mock('@/hooks/use-exercise-progress', () => ({
 // グラフ本体は種目詳細で検証済み。ここでは種目の切り替えとどの種目を渡したかだけを見たいので、
 // 描画をラベルに置き換えて中身の再描画コストとSVG依存を外す
 jest.mock('@/components/exercises/exercise-progress-chart', () => ({
-  ExerciseProgressChart: () => {
+  ExerciseProgressChart: (props: { scrubbable?: boolean }) => {
     const { Text } = require('react-native');
     const { createElement } = require('react');
-    return createElement(Text, null, 'グラフ');
+    return createElement(Text, { testID: 'chart', ...props }, 'グラフ');
   },
 }));
 
@@ -216,6 +216,16 @@ test('記録が0件でも実物のグラフを描き、点が無い理由を注�
   // 点が無い理由はグラフ下の注記で伝える（種目詳細の「自重の日＝…」と同じ形）
   expect(texts(root)).toContain('記録なし＝');
   expect(texts(root)).toContain('まだ✓を付けたセットがありません');
+});
+
+// グラフがブロックの過半を占めるため、ここが横ドラッグを握っていると種目送りの
+// 当たり判定が全体の1〜2割しか残らない。点の選択はタップで残す
+test('グラフのスクラブを切って、横ドラッグを種目送りへ明け渡す', () => {
+  const root = render();
+
+  for (const chart of root.findAllByProps({ testID: 'chart' })) {
+    expect(chart.props.scrubbable).toBe(false);
+  }
 });
 
 test('記録がある種目では注記を出さない', () => {

@@ -46,6 +46,7 @@ function render(options: {
   highlight?: ProgressPoint | null;
   points?: ProgressPoint[];
   leadIn?: ProgressLeadIn | null;
+  scrubbable?: boolean;
 }) {
   const points = options.points ?? POINTS;
   let instance!: ReturnType<typeof create>;
@@ -59,6 +60,7 @@ function render(options: {
         leadIn={options.leadIn ?? null}
         selectedIndex={options.selectedIndex ?? null}
         onSelect={jest.fn()}
+        scrubbable={options.scrubbable}
       />,
     );
   });
@@ -206,6 +208,25 @@ describe('ExerciseProgressChart: 期間の外から伸ばす線', () => {
 
     expect(root.findByProps({ accessibilityRole: 'image' }).props.accessibilityLabel).toContain(
       '期間の前の記録（2/8・65kg）から線が続いています',
+    );
+  });
+});
+
+// 完了サマリーは横ドラッグを種目送りに使うため、グラフ側のスクラブを切って明け渡す。
+// 切っても点の選択（タップ）は残るので、読み上げの案内も操作に合わせて変える
+describe('ExerciseProgressChart: スクラブの有無', () => {
+  const hint = (root: ReactTestInstance) =>
+    root.findByProps({ accessibilityRole: 'image' }).props.accessibilityHint;
+
+  it('既定では押す・なぞるの両方を案内する', () => {
+    expect(hint(render({ highlightKind: 'personal-best' }))).toBe(
+      'グラフを押すか横になぞると、その位置に一番近い記録を選びます',
+    );
+  });
+
+  it('スクラブを切ったら「なぞる」を案内しない', () => {
+    expect(hint(render({ highlightKind: 'personal-best', scrubbable: false }))).toBe(
+      'グラフを押すと、その位置に一番近い記録を選びます',
     );
   });
 });
