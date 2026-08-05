@@ -75,7 +75,7 @@ const CONTAINER_WIDTH = 350;
 function render(exercises = EXERCISES) {
   let instance!: ReturnType<typeof create>;
   act(() => {
-    instance = create(React.createElement(SummaryExerciseChart, { exercises }));
+    instance = create(React.createElement(SummaryExerciseChart, { exercises, horizontalInset: 16 }));
   });
   layout(instance.root);
   return instance.root;
@@ -89,15 +89,20 @@ function layout(root: ReactTestInstance) {
   });
 }
 
+/** 送り操作はスナップし切ってから確定するので、テストからアニメーション完了を発火させる */
+function flushSnap() {
+  const snap = mockTimingCalls.at(-1);
+  act(() => {
+    snap?.callback?.(true);
+  });
+}
+
 /** スワイプを離した瞬間を模擬し、スナップが完了したことにする */
 function swipe({ translationX, velocityX = 0 }: { translationX: number; velocityX?: number }) {
   act(() => {
     mockPanHandlers.onEnd?.({ translationX, velocityX });
   });
-  const snap = mockTimingCalls.at(-1);
-  act(() => {
-    snap?.callback?.(true);
-  });
+  flushSnap();
 }
 
 function texts(root: ReactTestInstance): string[] {
@@ -113,6 +118,7 @@ function press(root: ReactTestInstance, label: string) {
   act(() => {
     root.findAllByType(TouchableOpacity).find((b) => b.props.accessibilityLabel === label)!.props.onPress();
   });
+  flushSnap();
 }
 
 beforeEach(() => {
@@ -259,7 +265,7 @@ test('末尾で左へスワイプしても送らない', () => {
 test('表示中より種目が減ったら最後の種目に寄せる', () => {
   let instance!: ReturnType<typeof create>;
   act(() => {
-    instance = create(React.createElement(SummaryExerciseChart, { exercises: EXERCISES }));
+    instance = create(React.createElement(SummaryExerciseChart, { exercises: EXERCISES, horizontalInset: 16 }));
   });
   act(() => {
     instance.root
@@ -269,7 +275,7 @@ test('表示中より種目が減ったら最後の種目に寄せる', () => {
   });
   act(() => {
     instance.update(
-      React.createElement(SummaryExerciseChart, { exercises: [EXERCISES[0]] }),
+      React.createElement(SummaryExerciseChart, { exercises: [EXERCISES[0]], horizontalInset: 16 }),
     );
   });
 

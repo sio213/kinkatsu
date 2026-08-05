@@ -114,7 +114,7 @@ export default function WorkoutSummaryScreen() {
           weekOrdinal={weekOrdinal}
         />
         <CommunityMessageCard message={PLACEHOLDER_COMMUNITY_MESSAGE} />
-        <SummaryExerciseChart exercises={chartExercises} />
+        <SummaryExerciseChart exercises={chartExercises} horizontalInset={BODY_HORIZONTAL_PADDING} />
         {/* どのカードを押しても行き先は同じ記録編集画面。押した種目までスクロールさせる案は
             バックログ送りにしてあるため、onPressExerciseが渡すカードはここでは使わない */}
         <SummaryExerciseList
@@ -131,8 +131,16 @@ export default function WorkoutSummaryScreen() {
   );
 }
 
+// グラフブロックが「画面端までスワイプを拾う」ために同じ値を必要とするため定数にする
+const BODY_HORIZONTAL_PADDING = 16;
+
 const styles = StyleSheet.create({
   body: { flex: 1 },
   // ブロック間の縦の間隔はデザイン案指定の12px
-  bodyContent: { paddingHorizontal: 16, paddingTop: 12, paddingBottom: 12, gap: 12 },
+  bodyContent: {
+    paddingHorizontal: BODY_HORIZONTAL_PADDING,
+    paddingTop: 12,
+    paddingBottom: 12,
+    gap: 12,
+  },
 });

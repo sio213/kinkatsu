@@ -14,7 +14,7 @@ import {
   type ProgressPeriod,
 } from '@/lib/exercises/progress';
 import type { SummaryChartExercise } from '@/lib/workout/chart-exercises';
-import { useCallback, useLayoutEffect, useMemo, useState } from 'react';
+import { useCallback, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import { StyleSheet, Text, View, type LayoutChangeEvent } from 'react-native';
 import { Gesture, GestureDetector } from 'react-native-gesture-handler';
 import Animated, { runOnJS, useAnimatedStyle, useSharedValue, withTiming } from 'react-native-reanimated';
@@ -131,7 +131,18 @@ function Slot({
  * 前後の種目もマウントして指に追従させる（カレンダーと同じ3スロットのトラック）ため、
  * 表示中でない2種目分の系列取得も走る
  */
-export function SummaryExerciseChart({ exercises }: { exercises: SummaryChartExercise[] }) {
+export function SummaryExerciseChart({
+  exercises,
+  horizontalInset,
+}: {
+  exercises: SummaryChartExercise[];
+  /**
+   * 画面本文の左右パディング。その分だけブロックを外側へ広げ、内側で同じだけ戻すことで、
+   * **画面端までスワイプを拾えるようにする**（グラフは横幅いっぱいなので、そうしないと
+   * 「グラフの左右」に指を置ける場所が無い）。レイアウトは広げる前と変わらない
+   */
+  horizontalInset: number;
+}) {
   const [index, setIndex] = useState(0);
   // 記録編集で種目を消すと件数が縮む。範囲外を指したままにしない
   const safeIndex = Math.min(index, Math.max(0, exercises.length - 1));
@@ -161,7 +172,40 @@ export function SummaryExerciseChart({ exercises }: { exercises: SummaryChartExe
   // スナップし切ってから初めてindexを進める。先に進めると、位置が戻る前に中身が変わって見える
   const commitIndexChange = useCallback((delta: number) => {
     setIndex((i) => i + delta);
+    isSlidingRef.current = false;
   }, []);
+
+  // アニメーション中の二重発火を防ぐ。送りボタンやドットは連打できてしまい、
+  // スナップの途中から別のスナップを始めると位置が中途半端なまま確定する
+  const isSlidingRef = useRef(false);
+
+  /**
+   * 隣の種目へスライドして送る。送りボタン・ドット・スワイプの共通経路。
+   * 隣以外（ドットで2つ以上先を指した場合）はトラックが3枠しか持たないためアニメーションできず、
+   * その場で切り替える
+   */
+  const slideBy = useCallback(
+    (delta: number) => {
+      const next = safeIndex + delta;
+      if (next < 0 || next >= exercises.length) return;
+      if (isSlidingRef.current) return;
+      if (Math.abs(delta) !== 1 || containerWidth === 0) {
+        setIndex(next);
+        return;
+      }
+      isSlidingRef.current = true;
+      // 隣の枠は「枠の幅」ではなく「枠の幅+隙間」だけ離れている
+      const step = containerWidth + SLOT_GAP;
+      translateX.value = withTiming(
+        delta > 0 ? -step : step,
+        { duration: SNAP_DURATION_MS },
+        (finished) => {
+          if (finished) runOnJS(commitIndexChange)(delta);
+        },
+      );
+    },
+    [safeIndex, exercises.length, containerWidth, commitIndexChange, translateX],
+  );
 
   const swipe = useMemo(
     () =>
@@ -177,43 +221,34 @@ export function SummaryExerciseChart({ exercises }: { exercises: SummaryChartExe
             e.translationX < -SWIPE_DISTANCE_THRESHOLD || e.velocityX < -SWIPE_VELOCITY_THRESHOLD;
           const wantsPrev =
             e.translationX > SWIPE_DISTANCE_THRESHOLD || e.velocityX > SWIPE_VELOCITY_THRESHOLD;
-          // 隣の枠は「枠の幅」ではなく「枠の幅+隙間」だけ離れている
-          const step = containerWidth + SLOT_GAP;
+          const delta = wantsNext ? 1 : wantsPrev ? -1 : 0;
+          const canSlide = delta === 1 ? safeIndex < exercises.length - 1 : delta === -1 && safeIndex > 0;
           // 端では送らずに元の位置へ戻す。送りボタンが無効になっているのと同じ扱い
-          if (wantsNext && displayIndex < exercises.length - 1) {
-            translateX.value = withTiming(-step, { duration: SNAP_DURATION_MS }, (finished) => {
-              if (finished) runOnJS(commitIndexChange)(1);
-            });
-          } else if (wantsPrev && displayIndex > 0) {
-            translateX.value = withTiming(step, { duration: SNAP_DURATION_MS }, (finished) => {
-              if (finished) runOnJS(commitIndexChange)(-1);
-            });
-          } else {
-            translateX.value = withTiming(0, { duration: SNAP_DURATION_MS });
-          }
+          if (canSlide) runOnJS(slideBy)(delta);
+          else translateX.value = withTiming(0, { duration: SNAP_DURATION_MS });
         }),
-    [containerWidth, displayIndex, exercises.length, commitIndexChange, translateX],
+    [safeIndex, exercises.length, slideBy, translateX],
   );
 
   const animatedTrackStyle = useAnimatedStyle(() => ({
     transform: [{ translateX: translateX.value - (containerWidth + SLOT_GAP) }],
   }));
 
-  const goTo = (next: number) => {
-    if (next < 0 || next >= exercises.length) return;
-    setIndex(next);
-  };
-
   const current = exercises[safeIndex];
   if (!current) return null;
 
   return (
     <GestureDetector gesture={swipe}>
-      <View style={styles.container}>
+      <View
+        style={[
+          styles.container,
+          { marginHorizontal: -horizontalInset, paddingHorizontal: horizontalInset },
+        ]}
+      >
         <SummaryExerciseNav
           name={current.name}
-          onPrev={() => goTo(safeIndex - 1)}
-          onNext={() => goTo(safeIndex + 1)}
+          onPrev={() => slideBy(-1)}
+          onNext={() => slideBy(1)}
           hasPrev={safeIndex > 0}
           hasNext={safeIndex < exercises.length - 1}
         />
@@ -236,7 +271,11 @@ export function SummaryExerciseChart({ exercises }: { exercises: SummaryChartExe
               </Animated.View>
             )}
           </View>
-          <SummaryChartDots total={exercises.length} currentIndex={safeIndex} />
+          <SummaryChartDots
+            total={exercises.length}
+            currentIndex={safeIndex}
+            onSelect={(next) => slideBy(next - safeIndex)}
+          />
         </View>
       </View>
     </GestureDetector>
