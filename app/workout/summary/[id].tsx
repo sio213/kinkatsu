@@ -3,7 +3,7 @@ import { HeaderTitle } from '@/components/ui/header-title';
 import { PrimaryButton } from '@/components/ui/primary-button';
 import { ScreenFooter } from '@/components/ui/screen-footer';
 import { CommunityMessageCard } from '@/components/workout/community-message-card';
-import { PerformedExerciseList } from '@/components/workout/performed-exercise-list';
+import { SummaryExerciseList } from '@/components/workout/summary-exercise-list';
 import { SessionSummaryStats } from '@/components/workout/session-summary-stats';
 import { ScreenStyles } from '@/constants/theme';
 import { useSessionExerciseCards } from '@/hooks/use-session-exercise-cards';
@@ -47,12 +47,6 @@ export default function WorkoutSummaryScreen() {
     [session],
   );
   const { cards, retry: retryCards } = useSessionExerciseCards(sessionsForCards);
-  // ✓が1つも付いていない種目は「実施した」に数えない。開いただけ・値を入れただけの種目が
-  // 実績として並ぶと、総重量などの数値（確定セットのみで集計）と件数が食い違う
-  const performedCards = useMemo(
-    () => (Array.isArray(cards) ? cards.filter((c) => c.sets.some((s) => s.completedAt != null)) : cards),
-    [cards],
-  );
 
   // 記録編集画面の⋮「削除」は deleteSession → router.back() なので、サマリーから開いていると
   // 削除済みセッションのサマリーへ戻ってくる。NotFoundStateを見せる場面ではない（ユーザーは
@@ -119,8 +113,8 @@ export default function WorkoutSummaryScreen() {
         {/* グラフ（種目切替・期間チップ）はこの上に入る */}
         {/* どのカードを押しても行き先は同じ記録編集画面。押した種目までスクロールさせる案は
             バックログ送りにしてあるため、onPressExerciseが渡すカードはここでは使わない */}
-        <PerformedExerciseList
-          cards={performedCards}
+        <SummaryExerciseList
+          cards={cards}
           onPressExercise={handleEdit}
           onRetry={retryCards}
         />

@@ -214,18 +214,16 @@ test('みんなの声を表示する', () => {
   expect(texts(root)).toContain(PLACEHOLDER_COMMUNITY_MESSAGE.author);
 });
 
-// ✓が1つも付いていない種目は「実施した」に数えない。開いただけ・値を入れただけの種目が
-// 実績として並ぶと、総重量など確定セットのみで集計した数値と件数が食い違う
-test('✓が1つも付いていない種目は実施した種目の一覧から除く', () => {
+// ✓が付いていない種目も並べる（@ユーザー指摘）。実施していないことはカード自身が
+// 「0セット」と示すため、一覧から消して見えなくする必要がない
+test('✓が1つも付いていない種目も一覧に並べる', () => {
   const performed = exerciseCard({ workoutSessionExerciseId: 1, name: 'ベンチプレス', completed: true });
   const untouched = exerciseCard({ workoutSessionExerciseId: 2, name: 'ディップス', completed: false });
   mockUseSessionExerciseCards.mockReturnValue({ cards: [performed, untouched], retry: jest.fn() });
 
   const root = render();
 
-  expect(texts(root)).toContain('ベンチプレス');
-  expect(texts(root)).not.toContain('ディップス');
-  expect(texts(root)).toContain('全1件');
+  expect(texts(root)).toEqual(expect.arrayContaining(['ベンチプレス', 'ディップス', '全2件']));
 });
 
 test('「閉じる」を押すとrouter.dismissAllで元いたタブまで畳む', () => {

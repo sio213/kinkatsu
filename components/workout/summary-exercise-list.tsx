@@ -25,13 +25,16 @@ type Props = {
 };
 
 /**
- * 完了サマリーの「実施した種目」。カレンダーの選択日パネルと同じ種目カードを並べる。
+ * 完了サマリーの種目一覧。カレンダーの選択日パネルと同じ種目カードを並べる。
  *
- * ✓が1つも付いていないカードは呼び出し側で除いてある前提（開いただけの種目は実績ではない、
- * デザイン案①）。ここは受け取ったものをそのまま並べる
+ * ✓が1つも付いていない種目も並べる。そのカードは「0セット」と出るので、実施していないことは
+ * カード自身が語る。見出しを「実施した種目」ではなく「種目」にしているのはこのため
+ * （実施していないものを含む以上、件数と「実施した」が食い違う。@ユーザー指摘）。
+ *
+ * この結果、見出しの件数は総重量など✓確定セットのみで集計した数値とは母数が異なる
  */
-export function PerformedExerciseList({ cards, onPressExercise, onRetry }: Props) {
-  // 読み込み中に「全0件」を出すと、実施した種目が無かったように一瞬見えてしまう
+export function SummaryExerciseList({ cards, onPressExercise, onRetry }: Props) {
+  // 読み込み中に「全0件」を出すと、種目が1件も無かったように一瞬見えてしまう
   if (cards === null) return null;
 
   // 取得失敗を無かったことにしない。数値もみんなの声も出ている画面なので、この枠だけ理由を出す。
@@ -39,7 +42,7 @@ export function PerformedExerciseList({ cards, onPressExercise, onRetry }: Props
   if (cards === 'error') {
     return (
       <View style={styles.container}>
-        <RecordListHeading label="実施した種目" count={0} style={styles.heading} />
+        <RecordListHeading label="種目" count={0} style={styles.heading} />
         <View style={styles.error}>
           <IconSymbol name="exclamationmark.triangle.fill" size={18} color={Colors.danger} />
           <Text style={styles.errorText}>種目を読み込めませんでした</Text>
@@ -58,11 +61,11 @@ export function PerformedExerciseList({ cards, onPressExercise, onRetry }: Props
 
   return (
     <View style={styles.container}>
-      <RecordListHeading label="実施した種目" count={cards.length} style={styles.heading} />
+      <RecordListHeading label="種目" count={cards.length} style={styles.heading} />
       {cards.length === 0 ? (
-        // 記録編集で✓を全部外して戻ってくると到達する。見出しだけが浮くと消えたように見えるので、
-        // なぜ空なのか（✓が実績の条件であること）を1行で伝える
-        <Text style={styles.empty}>✓を付けた種目がありません</Text>
+        // 記録編集で種目を全部消して戻ってくると到達する。見出しだけが浮くと
+        // 「読み込みに失敗した」ようにも見えるので、空であることを明示する
+        <Text style={styles.empty}>種目がありません</Text>
       ) : (
         <RecordedExerciseCardList
           cards={cards}

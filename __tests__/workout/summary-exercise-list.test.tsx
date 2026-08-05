@@ -1,7 +1,7 @@
 import React from 'react';
 import { act, create, type ReactTestInstance } from 'react-test-renderer';
 import { Text, TouchableOpacity } from 'react-native';
-import { PerformedExerciseList } from '@/components/workout/performed-exercise-list';
+import { SummaryExerciseList } from '@/components/workout/summary-exercise-list';
 import type { RecordedExerciseCard } from '@/hooks/use-session-exercise-cards';
 
 const onPress = jest.fn();
@@ -28,7 +28,7 @@ function card(over: Partial<RecordedExerciseCard> = {}): RecordedExerciseCard {
 function render(cards: RecordedExerciseCard[] | 'error' | null) {
   let instance!: ReturnType<typeof create>;
   act(() => {
-    instance = create(React.createElement(PerformedExerciseList, { cards, onPressExercise: onPress, onRetry }));
+    instance = create(React.createElement(SummaryExerciseList, { cards, onPressExercise: onPress, onRetry }));
   });
   return instance.root;
 }
@@ -49,7 +49,7 @@ beforeEach(() => {
 test('見出しに件数を出し、渡されたカードを並べる', () => {
   const root = render([card(), card({ workoutSessionExerciseId: 2, name: 'ケーブルフライ' })]);
 
-  expect(texts(root)).toEqual(expect.arrayContaining(['実施した種目', '全2件', 'ベンチプレス', 'ケーブルフライ']));
+  expect(texts(root)).toEqual(expect.arrayContaining(['種目', '全2件', 'ベンチプレス', 'ケーブルフライ']));
 });
 
 test('カードをタップすると呼び出し側にそのカードを渡す', () => {
@@ -66,7 +66,7 @@ test('カードをタップすると呼び出し側にそのカードを渡す',
   expect(onPress).toHaveBeenCalledWith(target);
 });
 
-// 読み込み中に「全0件」を出すと、実施した種目が無かったように一瞬見えてしまう
+// 読み込み中に「全0件」を出すと、種目が1件も無かったように一瞬見えてしまう
 test('読み込み中は何も描かない', () => {
   const root = render(null);
 
@@ -78,7 +78,7 @@ test('読み込み中は何も描かない', () => {
 test('取得に失敗した場合は理由と見出しを出し、再試行できる', () => {
   const root = render('error');
 
-  expect(texts(root)).toEqual(expect.arrayContaining(['実施した種目', '種目を読み込めませんでした']));
+  expect(texts(root)).toEqual(expect.arrayContaining(['種目', '種目を読み込めませんでした']));
 
   const retryButton = root
     .findAllByType(TouchableOpacity)
@@ -94,6 +94,6 @@ test('0件なら見出しに加えて理由を1行出す', () => {
   const root = render([]);
 
   expect(texts(root)).toEqual(
-    expect.arrayContaining(['実施した種目', '全0件', '✓を付けた種目がありません']),
+    expect.arrayContaining(['種目', '全0件', '種目がありません']),
   );
 });

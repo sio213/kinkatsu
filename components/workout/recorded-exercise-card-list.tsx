@@ -2,7 +2,7 @@ import { CalendarExerciseCard } from '@/components/calendar/calendar-exercise-ca
 import type { RecordedExerciseCard } from '@/hooks/use-session-exercise-cards';
 import { StyleSheet, View } from 'react-native';
 
-// カレンダーの選択日パネル（今日・過去日）と完了サマリーの「実施した種目」で共通の文言。
+// カレンダーの選択日パネル（今日・過去日）と完了サマリーの種目一覧で共通の文言。
 // 同じ文言を各所に手打ちするとコピペでの食い違いが起きるため1箇所に集約する（@reviewer指摘）
 export const EDIT_RECORD_HINT = 'タップして記録を編集します';
 
