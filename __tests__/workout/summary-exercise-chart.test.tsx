@@ -14,17 +14,49 @@ jest.mock('@/components/exercises/exercise-progress-chart', () => ({
   },
 }));
 
-// ジェスチャ検出は素通しにする（スワイプの判定自体はRNGH側の責務）
-jest.mock('react-native-gesture-handler', () => ({
-  Gesture: {
-    Pan: () => {
-      const chain: Record<string, () => unknown> = {};
-      for (const key of ['runOnJS', 'activeOffsetX', 'failOffsetY', 'onEnd']) chain[key] = () => chain;
-      return chain;
+// ジェスチャ検出は素通しにする（スワイプの判定自体はRNGH側の責務）。
+// onEndのハンドラだけは捕まえて、テストからスワイプ確定を模擬できるようにする
+/* eslint-disable no-var */
+var mockPanHandlers: { onEnd?: (event: { translationX: number; velocityX: number }) => void };
+
+jest.mock('react-native-gesture-handler', () => {
+  mockPanHandlers = {};
+  return {
+    Gesture: {
+      Pan: () => {
+        const chain: Record<string, (arg?: unknown) => unknown> = {};
+        for (const key of ['runOnJS', 'activeOffsetX', 'failOffsetY', 'onUpdate']) {
+          chain[key] = () => chain;
+        }
+        chain.onEnd = (fn?: unknown) => {
+          mockPanHandlers.onEnd = fn as typeof mockPanHandlers.onEnd;
+          return chain;
+        };
+        return chain;
+      },
     },
-  },
-  GestureDetector: ({ children }: { children: React.ReactNode }) => children,
-}));
+    GestureDetector: ({ children }: { children: React.ReactNode }) => children,
+  };
+});
+
+// withTimingのスナップ完了コールバックを捕まえ、テストから任意のタイミングで発火させる
+// （__tests__/calendar/swipeable-month-view-gesture.test.tsx と同じ手法）
+var mockTimingCalls: { toValue: number; callback?: (finished: boolean) => void }[];
+
+jest.mock('react-native-reanimated', () => {
+  const actual = jest.requireActual('react-native-reanimated');
+  mockTimingCalls = [];
+  return {
+    ...actual,
+    __esModule: true,
+    default: actual.default,
+    withTiming: (toValue: number, _config: unknown, callback?: (finished: boolean) => void) => {
+      mockTimingCalls.push({ toValue, callback });
+      return toValue;
+    },
+    runOnJS: (fn: (...args: unknown[]) => unknown) => fn,
+  };
+});
 
 import React from 'react';
 import { act, create, type ReactTestInstance } from 'react-test-renderer';
@@ -37,12 +69,35 @@ const EXERCISES = [
   { exerciseId: 3, name: 'ディップス', measurementType: 'reps', pairedWeights: false },
 ];
 
+const CONTAINER_WIDTH = 350;
+
+/** トラックは幅が測れるまで描かれないので、onLayoutを流してから返す */
 function render(exercises = EXERCISES) {
   let instance!: ReturnType<typeof create>;
   act(() => {
     instance = create(React.createElement(SummaryExerciseChart, { exercises }));
   });
+  layout(instance.root);
   return instance.root;
+}
+
+function layout(root: ReactTestInstance) {
+  const viewport = root.findAll((n) => typeof n.props.onLayout === 'function')[0];
+  if (!viewport) return;
+  act(() => {
+    viewport.props.onLayout({ nativeEvent: { layout: { width: CONTAINER_WIDTH } } });
+  });
+}
+
+/** スワイプを離した瞬間を模擬し、スナップが完了したことにする */
+function swipe({ translationX, velocityX = 0 }: { translationX: number; velocityX?: number }) {
+  act(() => {
+    mockPanHandlers.onEnd?.({ translationX, velocityX });
+  });
+  const snap = mockTimingCalls.at(-1);
+  act(() => {
+    snap?.callback?.(true);
+  });
 }
 
 function texts(root: ReactTestInstance): string[] {
@@ -62,6 +117,7 @@ function press(root: ReactTestInstance, label: string) {
 
 beforeEach(() => {
   jest.clearAllMocks();
+  mockTimingCalls.length = 0;
   mockUseExerciseProgress.mockReturnValue({
     series: { points: [{ dateKey: 1, value: 100 }], unit: { label: 'kg' } },
     bestSeries: { points: [] },
@@ -87,7 +143,7 @@ test('次へで種目が切り替わり、その種目の系列を引き直す',
 
   expect(texts(root)).toContain('ダンベルフライ');
   // 左右2つ分を扱う種目かどうかもそのまま渡す（総重量の倍率に効く）
-  expect(mockUseExerciseProgress).toHaveBeenLastCalledWith(2, 'weight_reps', 'best', true);
+  expect(mockUseExerciseProgress).toHaveBeenCalledWith(2, 'weight_reps', 'best', true);
 });
 
 test('前へで1つ戻る', () => {
@@ -147,17 +203,56 @@ test('取得に失敗したら理由を出す', () => {
   expect(texts(root)).toContain('記録を読み込めませんでした');
 });
 
-// useLiveQueryはdeps変更後も前回のdataを保持するため、keyでマウントし直さないと
-// 切り替え直後に前の種目の系列が描かれ続ける
-test('種目を切り替えるとグラフが作り直される（前の種目の系列を描き続けない）', () => {
+// useLiveQueryはdeps変更後も前回のdataを保持するため、種目ごとにkeyでマウントし直さないと
+// 切り替え直後に前の種目の系列が描かれ続ける。各グラフが自分のidでフックを呼ぶことで担保する
+test('グラフは種目ごとに別々の系列を引く（前の種目のものを描き続けない）', () => {
+  render();
+
+  const ids = mockUseExerciseProgress.mock.calls.map((c) => c[0]);
+  // 表示中と前後の3枠ぶん。それぞれ自分のidで引いている
+  expect(new Set(ids)).toEqual(new Set([1, 2]));
+});
+
+// カレンダーの月送りと同じ3スロットのトラック。指を離した位置と速度で送るか戻すかを決める
+test('十分な距離のスワイプで次の種目へ送る', () => {
   const root = render();
-  const before = root.findAllByType(Text).length;
 
-  press(root, '次の種目');
+  swipe({ translationX: -80 });
 
-  // 新しい種目のidでフックが呼ばれ直していること（keyによる再マウントの結果）
-  expect(mockUseExerciseProgress).toHaveBeenLastCalledWith(2, 'weight_reps', 'best', true);
-  expect(root.findAllByType(Text).length).toBe(before);
+  expect(texts(root)).toContain('ダンベルフライ');
+});
+
+test('速いフリックなら距離が足りなくても送る', () => {
+  const root = render();
+
+  swipe({ translationX: -20, velocityX: -1200 });
+
+  expect(texts(root)).toContain('ダンベルフライ');
+});
+
+test('距離も速度も足りなければ元の種目へ戻す', () => {
+  const root = render();
+
+  swipe({ translationX: -20, velocityX: -100 });
+
+  expect(texts(root)).toContain('ベンチプレス');
+});
+
+// 送りボタンが無効になっているのと同じ扱い。端では送らずに元の位置へ戻す
+test('先頭で右へスワイプしても送らない', () => {
+  const root = render();
+
+  swipe({ translationX: 120 });
+
+  expect(texts(root)).toContain('ベンチプレス');
+});
+
+test('末尾で左へスワイプしても送らない', () => {
+  const root = render([EXERCISES[0]]);
+
+  swipe({ translationX: -120 });
+
+  expect(texts(root)).toContain('ベンチプレス');
 });
 
 // 種目が減って添字が範囲外になっても壊れない（記録編集で種目を消して戻ってきた場合）
