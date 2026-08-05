@@ -1,5 +1,8 @@
-import { CalendarExerciseCard } from '@/components/calendar/calendar-exercise-card';
 import { CategoryColorLegend } from '@/components/calendar/category-color-legend';
+import {
+  EDIT_RECORD_HINT,
+  RecordedExerciseCardList,
+} from '@/components/workout/recorded-exercise-card-list';
 import { DayEmptyState } from '@/components/calendar/day-empty-state';
 import { ReminderScheduleExerciseGroup } from '@/components/calendar/reminder-schedule-exercise-group';
 import { ScheduledWorkoutExerciseGroup } from '@/components/calendar/scheduled-workout-exercise-group';
@@ -44,10 +47,6 @@ const CALENDAR_FILTER_CATEGORIES = [CATEGORY_ALL, ...EXERCISE_CATEGORIES] as con
 const EMPTY_SCHEDULE: DaySchedule = { cards: [] };
 const EMPTY_MANUAL_SCHEDULE: ManualScheduleCard[] = [];
 
-// 今日パネル・過去日パネル（単一/複数セッションどちらも）で共通のDayCardList呼び出しに使う。
-// 3箇所とも同じ文言のため、コピペでの食い違いを避けて1箇所に集約する（@reviewer指摘）
-const EDIT_RECORD_HINT = 'タップして記録を編集します';
-
 function MonthNavButton({
   direction,
   onPress,
@@ -72,43 +71,6 @@ function MonthNavButton({
   );
 }
 
-// 時間帯グループ表示・フラット表示のどちらでもカード列の描画は同一のため共有する
-// （CalendarExerciseCardへ渡すpropsを2箇所に重複させない）。onPressExerciseはカード全体を
-// 受け取る形にしている（呼び出し元によって遷移先の判断材料(sessionId)が異なるため）。
-// 今日・過去日パネルとも記録編集画面へ遷移する（2026-07-21、@ユーザー指摘で統一）
-function DayCardList({
-  cards,
-  onPressExercise,
-  accessibilityHint,
-}: {
-  cards: CalendarDayCard[];
-  onPressExercise: (card: CalendarDayCard) => void;
-  // 遷移先の説明。呼び出し元は現状すべてEDIT_RECORD_HINTを渡すが、将来パネルごとに
-  // 文言を変える余地を残すため引数のままにしている（@designer指摘）
-  accessibilityHint: string;
-}) {
-  return (
-    <View style={styles.dayCardList}>
-      {cards.map((card) => (
-        <CalendarExerciseCard
-          key={card.workoutSessionExerciseId}
-          exerciseId={card.exerciseId}
-          name={card.name}
-          category={card.category}
-          source={card.source}
-          slug={card.slug}
-          measurementType={card.measurementType}
-          sets={card.sets}
-          isBest={card.isBest}
-          comparison={card.comparison}
-          onPress={() => onPressExercise(card)}
-          accessibilityHint={accessibilityHint}
-        />
-      ))}
-    </View>
-  );
-}
-
 // 1セッション分の時間帯見出し+カード列。今日パネル・過去日パネルの両方で同じ
 // 「SessionTimeGroupHeader + DayCardList」の組が完全一致するようになったため
 // （2026-07-22、常時見出し表示化で条件分岐が消えた際に重複が発生。@reviewer指摘）共通化する
@@ -122,7 +84,7 @@ function SessionRecordGroup({
   return (
     <View style={styles.dayGroup}>
       <SessionTimeGroupHeader sessionStartedAt={group.sessionStartedAt} />
-      <DayCardList cards={group.cards} onPressExercise={onPressExercise} accessibilityHint={EDIT_RECORD_HINT} />
+      <RecordedExerciseCardList cards={group.cards} onPressExercise={onPressExercise} accessibilityHint={EDIT_RECORD_HINT} />
     </View>
   );
 }
@@ -707,7 +669,6 @@ const styles = StyleSheet.create({
   dayErrorWrapper: { flexDirection: 'row', alignItems: 'center', gap: 8, flexWrap: 'wrap' },
   dayErrorText: { ...Typography.body, color: Colors.danger },
   dayRetryText: { ...Typography.bodyStrong, color: Colors.accent },
-  dayCardList: { gap: 8 },
   // 時間帯グループ間の余白はデザイン案「複数18」のheight:12px相当
   dayGroupList: { gap: 12 },
   dayGroup: { gap: 8 },
