@@ -39,8 +39,12 @@ const SNAP_DURATION_MS = 240;
  */
 const SLOT_GAP = 12;
 /**
- * グラフの下に置く注記の行。**記録の有無に関わらず常に確保する。**
- * 注記が出る種目と出ない種目でブロックの高さが変わると、送るたびに下の一覧が上下する
+ * グラフの下に置く注記の行の高さ。
+ *
+ * 確保するのは**セッション内に記録0件の種目が1つでもあるときだけ**。注記が出る種目と
+ * 出ない種目で高さが変わると送るたびに下の一覧が上下するので、セッション単位で揃える。
+ * 常時確保にすると、全種目に記録がある通常のセッションでグラフとドットの間に空の行が
+ * 挟まったままになる（デザイン案の8pxが29pxになる。@ユーザー指摘）
  */
 const CAPTION_ROW_HEIGHT = 21;
 
@@ -56,9 +60,15 @@ const CAPTION_ROW_HEIGHT = 21;
 function ExerciseChart({
   exercise,
   period,
+  captionRowHeight,
+  onEmptyChange,
 }: {
   exercise: SummaryChartExercise;
   period: ProgressPeriod;
+  /** 注記の行に割く高さ。セッション内で揃えるため親が決める */
+  captionRowHeight: number;
+  /** 記録0件かどうかを親へ伝える。親はこれを集めて行を確保するか決める */
+  onEmptyChange: (exerciseId: number, isEmpty: boolean) => void;
 }) {
   const { series, recordDays, loaded, failed } = useExerciseProgress(
     exercise.exerciseId,
@@ -90,6 +100,10 @@ function ExerciseChart({
   // 見本に差し替えると、自分の記録と取り違える余地が残るうえ、軸の単位も本物ではなくなる
   const isEmpty = loaded && !failed && recordDays.length === 0;
 
+  useEffect(() => {
+    onEmptyChange(exercise.exerciseId, isEmpty);
+  }, [exercise.exerciseId, isEmpty, onEmptyChange]);
+
   return (
     <View>
       {failed ? (
@@ -110,7 +124,7 @@ function ExerciseChart({
       )}
       {/* 点が無い理由を説明する注記。種目詳細のグラフ下の注記（「自重の日＝加重量が無いので
           点を出しません」）と同じ「太字の語＝説明」の形に揃える */}
-      <View style={styles.captionRow}>
+      <View style={[styles.captionRow, { height: captionRowHeight }]}>
         {isEmpty && (
           <Text style={styles.caption}>
             <Text style={styles.captionLead}>記録なし＝</Text>
@@ -131,15 +145,24 @@ function Slot({
   period,
   width,
   last,
+  captionRowHeight,
+  onEmptyChange,
 }: {
   exercise: SummaryChartExercise;
   period: ProgressPeriod;
   width: number;
   last: boolean;
+  captionRowHeight: number;
+  onEmptyChange: (exerciseId: number, isEmpty: boolean) => void;
 }) {
   return (
     <View style={[{ width }, !last && styles.slotSpacing]}>
-      <ExerciseChart exercise={exercise} period={period} />
+      <ExerciseChart
+        exercise={exercise}
+        period={period}
+        captionRowHeight={captionRowHeight}
+        onEmptyChange={onEmptyChange}
+      />
     </View>
   );
 }
@@ -178,6 +201,19 @@ export function SummaryExerciseChart({
   // 期間は種目をまたいで保つ（3ヶ月で見比べたい、という見方を送るたびに壊さない）。
   // グラフの内側の状態（選択中の点）はExerciseChart側に置く
   const [period, setPeriod] = useState<ProgressPeriod>(DEFAULT_PROGRESS_PERIOD);
+
+  // 記録0件の種目のid。各グラフが自分の状態を報告してくる。1つでもあれば注記の行を確保する
+  const [emptyExerciseIds, setEmptyExerciseIds] = useState<ReadonlySet<number>>(new Set());
+  const handleEmptyChange = useCallback((exerciseId: number, isEmpty: boolean) => {
+    setEmptyExerciseIds((prev) => {
+      if (prev.has(exerciseId) === isEmpty) return prev;
+      const next = new Set(prev);
+      if (isEmpty) next.add(exerciseId);
+      else next.delete(exerciseId);
+      return next;
+    });
+  }, []);
+  const captionRowHeight = emptyExerciseIds.size > 0 ? CAPTION_ROW_HEIGHT : 0;
 
   const [containerWidth, setContainerWidth] = useState(0);
   // 確定済みの位置と、指をドラッグしている間の差分。トラックの位置はこの2つの和だけで決まり、
@@ -287,7 +323,7 @@ export function SummaryExerciseChart({
           <PeriodFilterChips value={period} onChange={setPeriod} />
           {/* 高さを固定するのは、グラフと「読み込み中」等の1行表示で高さが変わると
               種目を送るたびに下の一覧が上下してしまうため */}
-          <View onLayout={handleLayout} style={styles.viewport}>
+          <View onLayout={handleLayout} style={[styles.viewport, { height: CHART_HEIGHT + captionRowHeight }]}>
             {containerWidth > 0 && (
               <Animated.View
                 style={[
@@ -308,6 +344,8 @@ export function SummaryExerciseChart({
                     period={period}
                     width={containerWidth}
                     last={i === exercises.length - 1}
+                    captionRowHeight={captionRowHeight}
+                    onEmptyChange={handleEmptyChange}
                   />
                 ))}
               </Animated.View>
@@ -327,11 +365,11 @@ export function SummaryExerciseChart({
 const styles = StyleSheet.create({
   container: { gap: 12 },
   chartBlock: { gap: 8 },
-  viewport: { height: CHART_HEIGHT + CAPTION_ROW_HEIGHT, overflow: 'hidden' },
+  viewport: { overflow: 'hidden' },
   track: { flexDirection: 'row', alignItems: 'flex-start' },
   // 枠と枠の間。ページ背景と同化させて「余白」に見せる（隣接する折れ線が繋がって見えるのを断ち切る）
   slotSpacing: { marginRight: SLOT_GAP, backgroundColor: Colors.background },
-  captionRow: { height: CAPTION_ROW_HEIGHT, justifyContent: 'flex-end' },
+  captionRow: { justifyContent: 'flex-end', overflow: 'hidden' },
   caption: { ...Typography.captionCompact, color: Colors.textSecondary },
   captionLead: { color: Colors.textPrimary, fontWeight: '700' },
   // グラフと同じ高さの枠の中で中央に置き、送るたびに高さが変わらないようにする

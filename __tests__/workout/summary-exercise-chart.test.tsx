@@ -60,7 +60,8 @@ jest.mock('react-native-reanimated', () => {
 
 import React from 'react';
 import { act, create, type ReactTestInstance } from 'react-test-renderer';
-import { Text, TouchableOpacity } from 'react-native';
+import { StyleSheet, Text, TouchableOpacity } from 'react-native';
+import { CHART_HEIGHT } from '@/lib/exercises/chart-layout';
 import { SummaryExerciseChart } from '@/components/workout/summary-exercise-chart';
 
 const EXERCISES = [
@@ -112,6 +113,12 @@ function texts(root: ReactTestInstance): string[] {
       [t.props.children].flat().filter((c) => typeof c === 'string' || typeof c === 'number').join(''),
     )
     .filter((s) => s.length > 0);
+}
+
+/** トラックを収める枠の高さ。注記の行を確保しているかどうかがここに出る */
+function viewportHeight(root: ReactTestInstance): number {
+  const viewport = root.findAll((n) => typeof n.props.onLayout === 'function')[0];
+  return StyleSheet.flatten(viewport.props.style).height;
 }
 
 function press(root: ReactTestInstance, label: string) {
@@ -215,6 +222,30 @@ test('記録がある種目では注記を出さない', () => {
   const root = render();
 
   expect(texts(root)).not.toContain('記録なし＝');
+});
+
+// 常時確保にすると、全種目に記録がある通常のセッションでグラフとドットの間に空の行が
+// 挟まったままになる（デザイン案の8pxが29pxになる）
+test('全種目に記録があれば注記の行を確保しない', () => {
+  const root = render();
+
+  expect(viewportHeight(root)).toBe(CHART_HEIGHT);
+});
+
+// 出る種目と出ない種目で高さが変わると、送るたびに下の一覧が上下する。セッション単位で揃える
+test('記録0件の種目が1つでもあれば、全種目ぶん注記の行を確保する', () => {
+  mockUseExerciseProgress.mockImplementation((exerciseId: number) => {
+    React.useEffect(() => {
+      mounted.push(exerciseId);
+      // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, []);
+    // 2種目目だけ記録0件
+    return exerciseId === 2 ? { ...PROGRESS_RESULT, recordDays: [] } : PROGRESS_RESULT;
+  });
+
+  const root = render();
+
+  expect(viewportHeight(root)).toBeGreaterThan(CHART_HEIGHT);
 });
 
 test('取得に失敗したら理由を出す', () => {
