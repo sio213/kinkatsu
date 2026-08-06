@@ -61,13 +61,25 @@ type RoutineDraftState = {
   lastSetsReplacement: { index: number; token: number } | null;
   setReminderEnabled: (enabled: boolean) => void;
   setReminder: (reminder: ReminderInput) => void;
+  // 完了サマリー「ルーティンとして保存」専用。フォームがマウントされる前に、空の下書きへ
+  // 種目だけを入れた状態を作る。hydrateとの違いは「resetを兼ねる」こと——hydrateは種目しか
+  // 差し替えないため、単体で呼ぶと前の下書きのリマインダー設定を引き継いだままになる
+  // （呼び出し側にreset→hydrateの順序を守らせる形にすると、順序が保証されるのがコメントだけになる）
+  seed: (exercises: DraftExercise[]) => void;
   reset: () => void;
 };
 
-export const useRoutineDraftStore = create<RoutineDraftState>((set) => ({
-  exercises: [],
+// create()の初期値とreset()で同じ並びを二度書かないための一元定義。seedもこれを土台にする
+const INITIAL_STATE = {
+  exercises: [] as DraftExercise[],
   reminderEnabled: true,
-  reminder: null,
+  reminder: null as ReminderInput | null,
+  lastAddedAt: null as RoutineDraftState['lastAddedAt'],
+  lastSetsReplacement: null as RoutineDraftState['lastSetsReplacement'],
+};
+
+export const useRoutineDraftStore = create<RoutineDraftState>((set) => ({
+  ...INITIAL_STATE,
   hydrate: (exercises) => set({ exercises, lastAddedAt: null }),
   hydrateReminder: ({ enabled, reminder }) => set({ reminderEnabled: enabled, reminder }),
   addExercises: (newExercises) =>
@@ -80,7 +92,6 @@ export const useRoutineDraftStore = create<RoutineDraftState>((set) => ({
           ? { index: state.exercises.length, token: Date.now() + Math.random(), shouldFocus: newExercises.length === 1 }
           : state.lastAddedAt,
     })),
-  lastAddedAt: null,
   removeExerciseAt: (index) => set((state) => ({ exercises: state.exercises.filter((_, i) => i !== index) })),
   moveExerciseAt: (index, direction) =>
     set((state) => {
@@ -99,7 +110,6 @@ export const useRoutineDraftStore = create<RoutineDraftState>((set) => ({
     set((state) => ({
       exercises: state.exercises.map((e, i) => (i === index ? { ...e, sets } : e)),
     })),
-  lastSetsReplacement: null,
   loadSetsIntoExerciseAt: (index, sets) =>
     set((state) => ({
       exercises: state.exercises.map((e, i) => (i === index ? { ...e, sets } : e)),
@@ -109,6 +119,6 @@ export const useRoutineDraftStore = create<RoutineDraftState>((set) => ({
     })),
   setReminderEnabled: (enabled) => set({ reminderEnabled: enabled }),
   setReminder: (reminder) => set({ reminder }),
-  reset: () =>
-    set({ exercises: [], reminderEnabled: true, reminder: null, lastSetsReplacement: null, lastAddedAt: null }),
+  seed: (exercises) => set({ ...INITIAL_STATE, exercises }),
+  reset: () => set(INITIAL_STATE),
 }));

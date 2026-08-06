@@ -1,9 +1,12 @@
 const mockBack = jest.fn();
 const mockPush = jest.fn();
 const mockCreateRoutine = jest.fn();
+// 完了サマリーの「ルーティンとして保存」から渡るkeepDraft/nameパラメータ
+let mockSearchParams: Record<string, string> = {};
 
 jest.mock('expo-router', () => ({
   useRouter: () => ({ back: mockBack, push: mockPush }),
+  useLocalSearchParams: () => mockSearchParams,
   // RoutineFormはキーボードを閉じるためだけにuseFocusEffectを使う(setValue等の状態更新は
   // 無いので、exercise-picker-screen.test.tsxと同じ「毎レンダーで即実行」の単純なモックで安全)
   useFocusEffect: (effect: () => (() => void) | void) => {
@@ -83,6 +86,7 @@ function disableReminderAfterRender() {
 
 beforeEach(() => {
   jest.clearAllMocks();
+  mockSearchParams = {};
   useRoutineDraftStore.getState().reset();
   mockCreateRoutine.mockResolvedValue(1);
   jest.spyOn(Alert, 'alert').mockImplementation(() => {});
@@ -329,4 +333,83 @@ describe('リマインダーセクション', () => {
     );
     expect(mockBack).toHaveBeenCalled();
   });
+});
+
+// 完了サマリーの「ルーティンとして保存」だけは、この画面がマウントされる前に下書きへ種目を積む
+// （ピッカー等の他フローは「この画面から出て戻ってくる」ので積むのはマウント後）。
+// マウント時resetをそのまま通すと積んだ種目が消えるため、keepDraftで飛ばす
+describe('完了サマリーからのkeepDraft遷移', () => {
+  test('keepDraft=1のときはマウント時にドラフトストアをリセットしない', () => {
+    mockSearchParams = { keepDraft: '1', name: '胸の日' };
+    useRoutineDraftStore.getState().addExercises([makeDraftExercise(1)]);
+
+    render();
+
+    expect(useRoutineDraftStore.getState().exercises).toHaveLength(1);
+  });
+
+  test('nameパラメータがルーティン名の初期値になる', async () => {
+    mockSearchParams = { keepDraft: '1', name: '胸の日' };
+    useRoutineDraftStore.getState().addExercises([makeDraftExercise(1)]);
+
+    const root = render();
+    disableReminderAfterRender();
+    const submitBtn = findButtonByLabel(root, '保存')!;
+
+    // 名前を一度も触らずに保存できる（空のまま着地させないための初期値）
+    await act(async () => {
+      await submitBtn.props.onPress();
+    });
+
+    expect(mockCreateRoutine).toHaveBeenCalledWith(expect.objectContaining({ name: '胸の日' }), expect.anything());
+  });
+
+  test('keepDraftが無ければ従来どおりマウント時にリセットする', () => {
+    mockSearchParams = { name: '胸の日' };
+    useRoutineDraftStore.getState().addExercises([makeDraftExercise(1)]);
+
+    render();
+
+    expect(useRoutineDraftStore.getState().exercises).toEqual([]);
+  });
+});
+
+// サマリー→下書き→フォーム→createRoutine の継ぎ目を1本だけ通しで見る。
+// 変換そのものはvalidation.test.ts、⋮側はworkout-summary-screen.test.tsxの担当
+test('keepDraftで積んだ種目のセット値がcreateRoutineまで壊れず届く', async () => {
+  mockSearchParams = { keepDraft: '1', name: '胸の日' };
+  act(() => {
+    useRoutineDraftStore.getState().seed([
+      {
+        ...makeDraftExercise(5),
+        sets: [
+          { weight: 100, reps: 5, durationSeconds: null, distanceMeters: null },
+          { weight: 90, reps: 8, durationSeconds: null, distanceMeters: null },
+        ],
+      },
+    ]);
+  });
+
+  const root = render();
+  disableReminderAfterRender();
+  const submitBtn = findButtonByLabel(root, '保存')!;
+  await act(async () => {
+    await submitBtn.props.onPress();
+  });
+
+  expect(mockCreateRoutine).toHaveBeenCalledWith(
+    {
+      name: '胸の日',
+      exercises: [
+        {
+          exerciseId: 5,
+          sets: [
+            { weight: 100, reps: 5, durationSeconds: null, distanceMeters: null },
+            { weight: 90, reps: 8, durationSeconds: null, distanceMeters: null },
+          ],
+        },
+      ],
+    },
+    { enabled: false, input: null },
+  );
 });

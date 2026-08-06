@@ -3,23 +3,32 @@ import { useDebouncedPush } from '@/hooks/use-debounced-push';
 import { useRoutines } from '@/hooks/use-routines';
 import { useRoutineDraftStore } from '@/lib/routines/draft-store';
 import { toRoutineInput, type RoutineFormValues } from '@/lib/routines/validation';
-import { useRouter } from 'expo-router';
+import { useLocalSearchParams, useRouter } from 'expo-router';
 import { useCallback, useEffect } from 'react';
 import { Alert } from 'react-native';
 
 export default function RoutineNewScreen() {
   const router = useRouter();
+  // keepDraft=1 は「呼び出し側がpush直前に下書きを積んであるので消すな」という申告。
+  // nameはその下書きに合わせた名前の初期値（完了サマリーの「ルーティンとして保存」から渡る）
+  const { keepDraft, name } = useLocalSearchParams<{ keepDraft?: string; name?: string }>();
   const { createRoutine } = useRoutines();
   const resetDraft = useRoutineDraftStore((state) => state.reset);
 
   // この画面に新規に遷移してきたとき（=真のマウント時）だけ下書きを空にする。
   // 種目追加ピッカーがpushされて戻ってきただけではこの画面は再マウントされないため、
-  // 追加した種目が消えることはない。呼び出し元(app/(tabs)/(record)/routine.tsxのhandleCreate)でも
+  // 追加した種目が消えることはない。呼び出し元(hooks/use-routine-create.tsのcreateRoutine)でも
   // push前に念のためresetしているため、この画面が初めて描画される瞬間に古い下書きが
-  // 一瞬だけ見える余地は無い
+  // 一瞬だけ見える余地は無い。
+  //
+  // keepDraft=1のときだけこのresetを飛ばす。完了サマリーからの「ルーティンとして保存」は
+  // この画面がマウントされる前に種目を積んでおり（積んでから戻ってくる他フローと逆）、
+  // ここでresetすると積んだ種目がそのまま消える。このresetを消して「呼び出し元が必ず
+  // resetしている」前提に寄せることはできない——このルートはディープリンクから直接開かれ得る
   useEffect(() => {
+    if (keepDraft === '1') return;
     resetDraft();
-  }, [resetDraft]);
+  }, [resetDraft, keepDraft]);
 
   const handleSubmit = useCallback(
     async (values: RoutineFormValues) => {
@@ -55,6 +64,7 @@ export default function RoutineNewScreen() {
 
   return (
     <RoutineFormScreen
+      initialName={name}
       onSubmit={handleSubmit}
       onAddExercise={handleAddExercise}
       onPressExercise={handlePressExercise}
