@@ -252,3 +252,43 @@ describe('toDraftReminder', () => {
     expect(result.reminder).toEqual(expect.objectContaining({ routineId: 1, title: '胸の日', kind: 'interval' }));
   });
 });
+
+// 完了サマリーの「ルーティンとして保存」で✓なしカードも持ち込むようになったため、
+// weight_reps以外の計測タイプ・値なしカードがこの変換を通るようになった
+describe('historyCardsToDraftExercises（weight_reps以外・値なし）', () => {
+  test('時間のみで計測する種目はdurationSecondsだけが残る', () => {
+    const card = makeHistoryCard({
+      measurementType: 'time',
+      sets: [{ setNumber: 1, weight: null, reps: null, durationSeconds: 60, distanceMeters: null, completedAt: 1 }],
+    });
+    expect(historyCardsToDraftExercises([card])[0].sets).toEqual([
+      { weight: null, reps: null, durationSeconds: 60, distanceMeters: null },
+    ]);
+  });
+
+  test('距離と時間で計測する種目は両方のカラムが残る', () => {
+    const card = makeHistoryCard({
+      measurementType: 'distance_time',
+      sets: [
+        { setNumber: 1, weight: null, reps: null, durationSeconds: 1800, distanceMeters: 5000, completedAt: 1 },
+      ],
+    });
+    expect(historyCardsToDraftExercises([card])[0].sets).toEqual([
+      { weight: null, reps: null, durationSeconds: 1800, distanceMeters: 5000 },
+    ]);
+  });
+
+  // 0セットのまま保存できると、ルーティンの種目行が「0セット」表示になる。
+  // 種目追加ピッカー経由(buildInitialRoutineSets)の「実績が無ければ空1セット」と揃える
+  test('値が1つも入っていないカードは種目を落とさず空1セットにする', () => {
+    const card = makeHistoryCard({
+      sets: [
+        { setNumber: 1, weight: null, reps: null, durationSeconds: null, distanceMeters: null, completedAt: null },
+      ],
+    });
+    const result = historyCardsToDraftExercises([card]);
+
+    expect(result).toHaveLength(1);
+    expect(result[0].sets).toEqual([{ weight: null, reps: null, durationSeconds: null, distanceMeters: null }]);
+  });
+});

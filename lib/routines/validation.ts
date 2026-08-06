@@ -80,19 +80,27 @@ export function historySetsToDraftSets(sets: HistorySetValues[]): DraftExercise[
   }));
 }
 
-// ヘッダー⋮「過去の記録から読み込む」(app/routine/session-history-load.tsx)用。選ばれた
-// 過去セッションのカード群(SessionHistoryCard、DBのworkoutSessionExercises+setsから取得した実データ)を
-// 下書きストアのaddExercisesにそのまま渡せるDraftExercise[]へ変換する
+// 過去セッションのカード群(SessionHistoryCard、DBのworkoutSessionExercises+setsから取得した
+// 実データ)を、下書きストアに渡せるDraftExercise[]へ変換する。呼び出し元は2つ:
+// ヘッダー⋮「過去の記録から読み込む」(app/routine/session-history-load.tsx)と、
+// 完了サマリーの「ルーティンとして保存」(app/workout/summary/[id].tsx)
 export function historyCardsToDraftExercises(cards: SessionHistoryCard[]): DraftExercise[] {
-  return cards.map((c) => ({
-    exerciseId: c.exerciseId,
-    name: c.name,
-    category: c.category,
-    measurementType: c.measurementType,
-    source: c.source,
-    slug: c.slug,
-    sets: historySetsToDraftSets(c.sets),
-  }));
+  return cards.map((c) => {
+    const sets = historySetsToDraftSets(c.sets);
+    return {
+      exerciseId: c.exerciseId,
+      name: c.name,
+      category: c.category,
+      measurementType: c.measurementType,
+      source: c.source,
+      slug: c.slug,
+      // 値が1行も無い種目(セットを追加しただけで実施せずに終えた等。完了サマリーからの
+      // ルーティン化は✓なしカードも持ち込むため実際に起こる)は空1セットに落とす。
+      // 0セットのまま保存できてしまうと、ルーティンの種目行が「0セット」表示になり、
+      // 種目追加ピッカー経由(buildInitialRoutineSets)の「実績が無ければ空1セット」と食い違う
+      sets: sets.length > 0 ? sets : [{ weight: null, reps: null, durationSeconds: null, distanceMeters: null }],
+    };
+  });
 }
 
 // 編集フォームの初期値読み込み用。getRoutineDetail()のDB行（種目メタ情報+セット）を

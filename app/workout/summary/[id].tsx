@@ -10,6 +10,9 @@ import { ScreenStyles } from '@/constants/theme';
 import { useSessionExerciseCards } from '@/hooks/use-session-exercise-cards';
 import { useSessionTotal, useSessionWeekOrdinal } from '@/hooks/use-session-summary';
 import { useWorkoutSession } from '@/hooks/use-workout-session';
+import { useRoutineDraftStore } from '@/lib/routines/draft-store';
+import { buildRoutineNameFromExercises } from '@/lib/routines/naming';
+import { historyCardsToDraftExercises } from '@/lib/routines/validation';
 import { toChartExercises } from '@/lib/workout/chart-exercises';
 import { PLACEHOLDER_COMMUNITY_MESSAGE } from '@/lib/workout/community-message';
 import { formatSessionDateGroup, formatSessionDurationLong } from '@/lib/workout/summary';
@@ -50,6 +53,7 @@ export default function WorkoutSummaryScreen() {
     [session],
   );
   const { cards, retry: retryCards } = useSessionExerciseCards(sessionsForCards);
+  const seedDraft = useRoutineDraftStore((state) => state.seed);
   // グラフは種目単位で切り替える（同じ種目の2枚目は同じ絵になるので畳む）
   const chartExercises = useMemo(() => (Array.isArray(cards) ? toChartExercises(cards) : []), [cards]);
 
@@ -78,15 +82,46 @@ export default function WorkoutSummaryScreen() {
     router.push(`/workout/${sessionId}`);
   };
 
+  // このトレーニングの種目構成を、次回以降使えるテンプレート（ルーティン）として保存する。
+  // 保存そのものはここでは行わず、ルーティン新規作成フォームに種目を入れた状態で着地させる
+  // （名前を付けさせる必要があり、不要な種目もそこで間引けるため）。
+  //
+  // 積むのはhydrateではなくseed（＝空の下書きから作り直す）。hydrateが差し替えるのは種目だけで、
+  // 前の下書きのリマインダー設定（reminderEnabled/reminder）はそのまま残るため、
+  // 「以前ルーティンを作りかけてやめたときのリマインダー」を引き継いだ状態で着地してしまう
+  const handleSaveAsRoutine = () => {
+    if (!Array.isArray(cards) || cards.length === 0) return;
+    seedDraft(historyCardsToDraftExercises(cards));
+    router.push({
+      pathname: '/routine/new',
+      // keepDraftを立てないと、着地した/routine/newがマウント時のresetで今積んだ種目を消す
+      params: { keepDraft: '1', name: buildRoutineNameFromExercises(cards) },
+    });
+  };
+
+  // ルーティンから開始したセッションでは出さない。同じ内容のルーティンが二重にできるため
+  // （そちらは「ルーティンを更新」として別途扱う）。カードが未取得・取得失敗・0件のときも、
+  // 積む種目が無いので出さない
+  const canSaveAsRoutine = session?.routineId == null && Array.isArray(cards) && cards.length > 0;
+
   // この記録に対する副次操作は⋮に集約する。ヘッダー左に戻るシェブロンを置いて編集へ入る形は
   // 採らない——下に積まれているのはタブなので、シェブロンは「戻る」ではなく前に進む遷移になり、
   // 記号と動きが食い違う（@ユーザー指摘、実機で確認）。
-  // 当面は「記録を編集」1項目だけだが、SNS共有・ルーティンとして登録が同じメニューに並ぶ予定。
-  // フッターにサブ導線を置く案（主ボタンの下のリンク）だと、⋮が増えた時点で副次操作の入口が
-  // 2箇所に割れるため、最初から最終形の器にしている
+  // 将来はSNS共有が同じメニューに並ぶ予定。フッターにサブ導線を置く案（主ボタンの下のリンク）
+  // だと、⋮が増えた時点で副次操作の入口が2箇所に割れるため、最初から最終形の器にしている。
+  // 「記録を削除」は入れない（記録編集画面の⋮に既にあり、祝いの導線に破壊的操作を混ぜると
+  // 「記録を編集」との誤タップコストが上がるため。2026-08-06判断）
   const menuItems: DropdownMenuItem[] = [
     { key: 'edit', label: '記録を編集', icon: 'edit', onPress: handleEdit },
   ];
+  if (canSaveAsRoutine) {
+    menuItems.push({
+      key: 'save-routine',
+      label: 'ルーティンとして保存',
+      icon: 'repeat',
+      onPress: handleSaveAsRoutine,
+    });
+  }
 
   if (!session) return null;
 

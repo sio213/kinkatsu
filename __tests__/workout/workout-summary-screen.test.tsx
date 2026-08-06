@@ -61,6 +61,7 @@ import { act, create, type ReactTestInstance } from 'react-test-renderer';
 import { Text, TouchableOpacity } from 'react-native';
 import WorkoutSummaryScreen from '@/app/workout/summary/[id]';
 import { PLACEHOLDER_COMMUNITY_MESSAGE } from '@/lib/workout/community-message';
+import { useRoutineDraftStore } from '@/lib/routines/draft-store';
 
 function findButtonByLabel(root: ReactTestInstance, label: string) {
   return root
@@ -93,22 +94,33 @@ function exerciseCard({
   name,
   completed,
   exerciseId,
+  measurementType,
+  sets,
 }: {
   workoutSessionExerciseId: number;
   name: string;
   completed: boolean;
   exerciseId?: number;
+  measurementType?: string;
+  sets?: {
+    setNumber: number;
+    weight: number | null;
+    reps: number | null;
+    durationSeconds: number | null;
+    distanceMeters: number | null;
+    completedAt: number | null;
+  }[];
 }) {
   return {
     workoutSessionExerciseId,
     exerciseId: exerciseId ?? workoutSessionExerciseId,
     name,
     category: 'chest',
-    measurementType: 'weight_reps',
+    measurementType: measurementType ?? 'weight_reps',
     source: 'preset',
     slug: null,
     pairedWeights: false,
-    sets: [
+    sets: sets ?? [
       {
         setNumber: 1,
         weight: 100,
@@ -292,4 +304,178 @@ test('idが数値でない場合もタブまで畳む', () => {
   render();
 
   expect(mockDismissAll).toHaveBeenCalled();
+});
+
+// このトレーニングの種目構成をルーティン化する導線。保存自体はここでは行わず、
+// ルーティン新規作成フォームに種目を積んだ状態で着地させる
+describe('⋮の「ルーティンとして保存」', () => {
+  const cards = [
+    exerciseCard({ workoutSessionExerciseId: 1, name: 'ベンチプレス', completed: true }),
+    // ✓が付いていない種目も持ち込む（ルーティンは実績ではなく「これから毎回やる型」のため）
+    exerciseCard({ workoutSessionExerciseId: 2, name: 'ディップス', completed: false, exerciseId: 7 }),
+  ];
+
+  function menuItem() {
+    return capturedMenuGroups.flat().find((i: any) => i.key === 'save-routine');
+  }
+
+  beforeEach(() => {
+    useRoutineDraftStore.getState().reset();
+    mockUseSessionExerciseCards.mockReturnValue({ cards, retry: jest.fn() });
+  });
+
+  test('フリー開始のセッションでは⋮に項目が出る', () => {
+    render();
+
+    expect(menuItem()?.label).toBe('ルーティンとして保存');
+  });
+
+  // ルーティンから始めたセッションで出すと、同じ内容のルーティンが二重にできる
+  // （そちらは「ルーティンを更新」として別途扱う）
+  test('ルーティンから開始したセッションでは項目を出さない', () => {
+    mockUseWorkoutSession.mockReturnValue({ session: { ...session, routineId: 5 }, loaded: true });
+
+    render();
+
+    expect(menuItem()).toBeUndefined();
+  });
+
+  // cardsは null=読み込み中 / 'error'=取得失敗 / 配列 の三値
+  test('カードが読み込み中・取得失敗・0件のときは項目を出さない', () => {
+    mockUseSessionExerciseCards.mockReturnValue({ cards: null, retry: jest.fn() });
+    render();
+    expect(menuItem()).toBeUndefined();
+
+    mockUseSessionExerciseCards.mockReturnValue({ cards: 'error', retry: jest.fn() });
+    render();
+    expect(menuItem()).toBeUndefined();
+
+    mockUseSessionExerciseCards.mockReturnValue({ cards: [], retry: jest.fn() });
+    render();
+    expect(menuItem()).toBeUndefined();
+  });
+
+  test('押すと下書きに全種目を積み、keepDraftとルーティン名つきで/routine/newへpushする', () => {
+    render();
+
+    act(() => {
+      menuItem().onPress();
+    });
+
+    // 表示用フィールドとセット値まで丸ごと積む（種目idだけ見ていると
+    // categoryとsourceの取り違えのような写し間違いを検知できない）
+    expect(useRoutineDraftStore.getState().exercises).toEqual([
+      {
+        exerciseId: 1,
+        name: 'ベンチプレス',
+        category: 'chest',
+        measurementType: 'weight_reps',
+        source: 'preset',
+        slug: null,
+        sets: [{ weight: 100, reps: 5, durationSeconds: null, distanceMeters: null }],
+      },
+      {
+        exerciseId: 7,
+        name: 'ディップス',
+        category: 'chest',
+        measurementType: 'weight_reps',
+        source: 'preset',
+        slug: null,
+        // ✓が付いていなくても、値が入っているセットはそのまま持ち込む
+        sets: [{ weight: 100, reps: 5, durationSeconds: null, distanceMeters: null }],
+      },
+    ]);
+    expect(mockPush).toHaveBeenCalledWith({
+      pathname: '/routine/new',
+      params: { keepDraft: '1', name: '胸の日' },
+    });
+  });
+
+  // グラフ(toChartExercises)は同じ種目の2枚目を畳むが、ルーティン化では畳まない。
+  // ウォームアップ用と本番用でカードを分けている構成をそのまま型にするため
+  test('同じ種目のカードが2枚あるセッションは2枚のまま積む', () => {
+    mockUseSessionExerciseCards.mockReturnValue({
+      cards: [
+        exerciseCard({ workoutSessionExerciseId: 1, name: 'ベンチプレス', completed: true, exerciseId: 3 }),
+        exerciseCard({ workoutSessionExerciseId: 2, name: 'ベンチプレス', completed: true, exerciseId: 3 }),
+      ],
+      retry: jest.fn(),
+    });
+
+    render();
+    act(() => {
+      menuItem().onPress();
+    });
+
+    expect(useRoutineDraftStore.getState().exercises.map((e) => e.exerciseId)).toEqual([3, 3]);
+  });
+
+  // 種目を追加しただけで実施せずに終えたカード。0セットのまま保存できると
+  // ルーティンの種目行が「0セット」表示になるため、空1セットに落とす
+  test('値が1つも入っていない種目は空1セットとして積む', () => {
+    mockUseSessionExerciseCards.mockReturnValue({
+      cards: [
+        exerciseCard({
+          workoutSessionExerciseId: 1,
+          name: 'ディップス',
+          completed: false,
+          sets: [
+            { setNumber: 1, weight: null, reps: null, durationSeconds: null, distanceMeters: null, completedAt: null },
+          ],
+        }),
+      ],
+      retry: jest.fn(),
+    });
+
+    render();
+    act(() => {
+      menuItem().onPress();
+    });
+
+    expect(useRoutineDraftStore.getState().exercises[0].sets).toEqual([
+      { weight: null, reps: null, durationSeconds: null, distanceMeters: null },
+    ]);
+  });
+
+  // weight_reps以外の計測タイプでも、埋まっているカラムだけが下書きへ渡る
+  test('時間で計測する種目はdurationSecondsのまま積む', () => {
+    mockUseSessionExerciseCards.mockReturnValue({
+      cards: [
+        exerciseCard({
+          workoutSessionExerciseId: 1,
+          name: 'プランク',
+          completed: true,
+          measurementType: 'time',
+          sets: [
+            { setNumber: 1, weight: null, reps: null, durationSeconds: 60, distanceMeters: null, completedAt: 1 },
+          ],
+        }),
+      ],
+      retry: jest.fn(),
+    });
+
+    render();
+    act(() => {
+      menuItem().onPress();
+    });
+
+    expect(useRoutineDraftStore.getState().exercises[0].sets).toEqual([
+      { weight: null, reps: null, durationSeconds: 60, distanceMeters: null },
+    ]);
+  });
+
+  // hydrateは種目しか差し替えないため、resetを挟まないと「以前ルーティンを作りかけて
+  // やめたときのリマインダー設定」を引き継いだ状態で新規作成フォームに着地する
+  test('前の下書きのリマインダー設定を引き継がない', () => {
+    act(() => {
+      useRoutineDraftStore.getState().setReminderEnabled(false);
+    });
+
+    render();
+    act(() => {
+      menuItem().onPress();
+    });
+
+    expect(useRoutineDraftStore.getState().reminderEnabled).toBe(true);
+  });
 });
