@@ -1,7 +1,7 @@
+import { ActionBanner } from '@/components/ui/action-banner';
 import { IconSymbol } from '@/components/ui/icon-symbol';
-import { Colors, Typography } from '@/constants/theme';
+import { Colors } from '@/constants/theme';
 import { openSettings } from '@/lib/notifications/permissions';
-import { StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 
 type Props = {
   state: 'denied' | 'undetermined';
@@ -9,55 +9,25 @@ type Props = {
 };
 
 // デザイン案(デザイン検討/ルーティン デザイン案.html「通知OFF時／端末通知が拒否の警告＋動線」)
-// に準拠。warningアイコン+タイトル+本文+アクションボタンの構成
+// に準拠。warningアイコン+タイトル+本文+アクションボタンの構成。
+// レイアウトはcomponents/ui/action-banner.tsxと共通（完了サマリーの「ルーティンとして保存」
+// カードが同じ寸法を要求したため切り出したもの）
 export function PermissionBanner({ state, onRequest }: Props) {
   const denied = state === 'denied';
 
   return (
-    <View style={styles.banner}>
-      <IconSymbol name="exclamationmark.triangle.fill" size={20} color={Colors.warningAccent} style={styles.icon} />
-      <View style={styles.body}>
-        <Text style={styles.title}>{denied ? '端末の通知がオフです' : '通知の許可が必要です'}</Text>
-        {denied && <Text style={styles.desc}>このままでは通知が届きません</Text>}
-        <TouchableOpacity
-          style={styles.btn}
-          onPress={denied ? openSettings : onRequest}
-          accessibilityRole="button"
-          accessibilityLabel={denied ? '設定を開く' : '許可する'}
-        >
-          {denied && <IconSymbol name="arrow.up.right.square" size={16} color={Colors.onAccent} />}
-          <Text style={styles.btnText}>{denied ? '設定を開く' : '許可する'}</Text>
-        </TouchableOpacity>
-      </View>
-    </View>
+    <ActionBanner
+      tone="warning"
+      icon={<IconSymbol name="exclamationmark.triangle.fill" size={20} color={Colors.warningAccent} />}
+      title={denied ? '端末の通知がオフです' : '通知の許可が必要です'}
+      description={denied ? 'このままでは通知が届きません' : undefined}
+      actions={[
+        {
+          label: denied ? '設定を開く' : '許可する',
+          onPress: denied ? openSettings : onRequest,
+          icon: denied ? <IconSymbol name="arrow.up.right.square" size={16} color={Colors.onAccent} /> : undefined,
+        },
+      ]}
+    />
   );
 }
-
-const styles = StyleSheet.create({
-  banner: {
-    flexDirection: 'row',
-    alignItems: 'flex-start',
-    gap: 10,
-    backgroundColor: Colors.warningSurface,
-    borderWidth: 1,
-    borderColor: Colors.warningBorder,
-    borderRadius: 10,
-    padding: 12,
-  },
-  icon: { flexShrink: 0 },
-  body: { flex: 1, gap: 6 },
-  title: { ...Typography.caption, fontWeight: '700', color: Colors.warningText },
-  desc: { ...Typography.caption, color: Colors.warningText, lineHeight: 16 },
-  btn: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    gap: 5,
-    alignSelf: 'flex-start',
-    backgroundColor: Colors.warning,
-    borderRadius: 8,
-    paddingVertical: 8,
-    paddingHorizontal: 13,
-  },
-  btnText: { ...Typography.caption, fontWeight: '700', color: Colors.onAccent },
-});

@@ -3,7 +3,7 @@
 // 集計側（useRoutineExerciseSummaries / useRoutineReminders）は use-routines.test.ts が
 // 見ているので、ここは未検証だった useRoutines に絞る。
 /* eslint-disable no-var */
-var mockLiveQueryResult: { data?: unknown };
+var mockLiveQueryResult: { data?: unknown; updatedAt?: Date; error?: Error };
 var mockRoutinesDb: Record<string, jest.Mock>;
 
 jest.mock('@/db/client', () => ({
@@ -13,6 +13,7 @@ jest.mock('@/db/client', () => ({
         orderBy: jest.fn().mockReturnThis(),
         innerJoin: jest.fn().mockReturnThis(),
         where: jest.fn().mockReturnThis(),
+        limit: jest.fn().mockReturnThis(),
       }),
     }),
   },
@@ -48,12 +49,24 @@ jest.mock('@/lib/routines/db', () => {
 import React from 'react';
 import { act, create } from 'react-test-renderer';
 import type { Routine } from '@/db/schema';
-import { useRoutines } from '@/hooks/use-routines';
+import { useHasRoutines, useRoutines } from '@/hooks/use-routines';
 
 function mount() {
   let captured: ReturnType<typeof useRoutines>;
   function Harness() {
     captured = useRoutines();
+    return null;
+  }
+  act(() => {
+    create(React.createElement(Harness));
+  });
+  return captured!;
+}
+
+function mountHasRoutines() {
+  let captured: ReturnType<typeof useHasRoutines>;
+  function Harness() {
+    captured = useHasRoutines();
     return null;
   }
   act(() => {
@@ -118,5 +131,37 @@ describe('useRoutines', () => {
     expect(mockRoutinesDb.deleteRoutine).toHaveBeenCalledWith(3);
     expect(mockRoutinesDb.swapRoutineOrder).toHaveBeenCalledWith(3, 4);
     expect(mockRoutinesDb.duplicateRoutine).toHaveBeenCalledWith(3);
+  });
+});
+
+
+// このフックの存在理由はloadedそのもの。useLiveQueryのdataは解決前もundefinedのままなので、
+// 「data.length === 0」だけを見ると解決前と本当に0件が区別できず、ルーティンを持っている
+// ユーザーの完了サマリーにも一瞬「保存しませんか」のカードが差し込まれる
+describe('useHasRoutines', () => {
+  it('updatedAt が無いうちは loaded=false（0件と区別する）', () => {
+    mockLiveQueryResult = { data: [] };
+
+    expect(mountHasRoutines()).toEqual({ hasRoutines: false, loaded: false });
+  });
+
+  it('解決して0件なら loaded=true / hasRoutines=false', () => {
+    mockLiveQueryResult = { data: [], updatedAt: new Date() };
+
+    expect(mountHasRoutines()).toEqual({ hasRoutines: false, loaded: true });
+  });
+
+  it('1件でもあれば hasRoutines=true', () => {
+    mockLiveQueryResult = { data: [{ id: 1 }], updatedAt: new Date() };
+
+    expect(mountHasRoutines()).toEqual({ hasRoutines: true, loaded: true });
+  });
+
+  // 取得に失敗したまま loaded=false で止めると、カードが永久に出ない側に倒れる
+  it('取得に失敗した場合も loaded=true にして先へ進める', () => {
+    jest.spyOn(console, 'error').mockImplementation(() => {});
+    mockLiveQueryResult = { data: undefined, error: new Error('boom') };
+
+    expect(mountHasRoutines()).toEqual({ hasRoutines: false, loaded: true });
   });
 });

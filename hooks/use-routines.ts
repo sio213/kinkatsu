@@ -28,6 +28,28 @@ export function useRoutines() {
   };
 }
 
+/**
+ * ルーティンを1件でも持っているか。完了サマリーの「ルーティンとして保存」カードのように、
+ * 「まだ1件も無い人にだけ出す」判定に使う。
+ *
+ * useRoutines().routines.length === 0 では代用できない。useLiveQueryのdataは解決前もundefined
+ * ではなく空配列相当（?? []）になるため、ルーティンを持っているユーザーにも一瞬「0件」と
+ * 見えてカードがちらつく。最初の解決時にだけ入るupdatedAtでloadedを判定する
+ * （hooks/use-workout-session.ts等と同じ理由）
+ */
+export function useHasRoutines(): { hasRoutines: boolean; loaded: boolean } {
+  const { data, updatedAt, error } = useLiveQuery(db.select({ id: routines.id }).from(routines).limit(1));
+
+  // 失敗時はhasRoutines=false（＝勧誘カードを出す側）に倒れる。害の少ない方向だが、
+  // ログが無いと原因を追えないため他の同型フックと同じく残す
+  if (error) console.error('[has routines]', error);
+
+  return {
+    hasRoutines: (data ?? []).length > 0,
+    loaded: updatedAt !== undefined || error !== undefined,
+  };
+}
+
 export type RoutineSummary = { exerciseCount: number; categories: string[] };
 
 // ルーティン一覧カードの「N種目」「カテゴリタグ」用。routineExercisesとexercisesを1クエリで

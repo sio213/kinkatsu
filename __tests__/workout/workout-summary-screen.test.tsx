@@ -9,6 +9,7 @@ const mockUseWorkoutSession = jest.fn();
 const mockUseSessionTotal = jest.fn();
 const mockUseSessionWeekOrdinal = jest.fn();
 const mockUseSessionExerciseCards = jest.fn();
+const mockUseHasRoutines = jest.fn();
 
 jest.mock('expo-router', () => ({
   useRouter: () => ({ dismissAll: mockDismissAll, push: mockPush }),
@@ -56,12 +57,19 @@ jest.mock('@/hooks/use-session-exercise-cards', () => ({
   useSessionExerciseCards: (...args: unknown[]) => mockUseSessionExerciseCards(...args),
 }));
 
+// ルーティン保有の有無は本文カードの表示条件。use-routines.tsはdb/client(expo-sqlite依存)を
+// トップレベルで読み込むため、フックごと差し替える
+jest.mock('@/hooks/use-routines', () => ({
+  useHasRoutines: () => mockUseHasRoutines(),
+}));
+
 import React from 'react';
 import { act, create, type ReactTestInstance } from 'react-test-renderer';
 import { Text, TouchableOpacity } from 'react-native';
 import WorkoutSummaryScreen from '@/app/workout/summary/[id]';
 import { PLACEHOLDER_COMMUNITY_MESSAGE } from '@/lib/workout/community-message';
 import { useRoutineDraftStore } from '@/lib/routines/draft-store';
+import { useRoutineSavePromptStore } from '@/lib/workout/routine-save-prompt-store';
 
 function findButtonByLabel(root: ReactTestInstance, label: string) {
   return root
@@ -81,13 +89,26 @@ function texts(root: ReactTestInstance): string[] {
     .filter((s) => s.length > 0);
 }
 
+// ドラフトストア・dismissストアはモジュール単位のシングルトンでテストを跨いで共有される。
+// 前のテストのレンダラーを残したままbeforeEachでストアを直接書き換えると、
+// 古いインスタンスがact()の外で更新を受けて警告が出るため、テストごとに破棄する
+const mountedInstances: ReturnType<typeof create>[] = [];
+
 function render() {
   let instance!: ReturnType<typeof create>;
   act(() => {
     instance = create(React.createElement(WorkoutSummaryScreen));
   });
+  mountedInstances.push(instance);
   return instance.root;
 }
+
+afterEach(() => {
+  act(() => {
+    for (const instance of mountedInstances) instance.unmount();
+  });
+  mountedInstances.length = 0;
+});
 
 function exerciseCard({
   workoutSessionExerciseId,
@@ -147,6 +168,8 @@ beforeEach(() => {
   mockUseSessionTotal.mockReturnValue({ total: { label: '総重量', value: '12,450', unit: 'kg' } });
   mockUseSessionWeekOrdinal.mockReturnValue(2);
   mockUseSessionExerciseCards.mockReturnValue({ cards: [], retry: jest.fn() });
+  mockUseHasRoutines.mockReturnValue({ hasRoutines: false, loaded: true });
+  useRoutineSavePromptStore.setState({ dismissed: false, hydrated: true });
 });
 
 test('ヘッダーにタイトルとセッションの日付を表示する', () => {
@@ -477,5 +500,90 @@ describe('⋮の「ルーティンとして保存」', () => {
     });
 
     expect(useRoutineDraftStore.getState().reminderEnabled).toBe(true);
+  });
+});
+
+// ⋮だけに置くと、いまの⋮が「記録を編集」から始まる副次操作の置き場でしかないため、
+// 一番届けたいルーティン未保有ユーザーに届かない。本文にも条件付きで出す
+describe('本文の「ルーティンとして保存」カード', () => {
+  const cards = [exerciseCard({ workoutSessionExerciseId: 1, name: 'ベンチプレス', completed: true })];
+
+  function card(root: ReactTestInstance) {
+    return root
+      .findAllByType(Text)
+      .find((t) => [t.props.children].flat().join('') === 'このメニューをルーティンとして保存');
+  }
+
+  beforeEach(() => {
+    useRoutineDraftStore.getState().reset();
+    mockUseSessionExerciseCards.mockReturnValue({ cards, retry: jest.fn() });
+  });
+
+  test('ルーティンを1件も持っていないフリー開始のセッションでは出す', () => {
+    expect(card(render())).toBeDefined();
+  });
+
+  test('ルーティンを持っていれば出さない（⋮の項目は残る）', () => {
+    mockUseHasRoutines.mockReturnValue({ hasRoutines: true, loaded: true });
+
+    const root = render();
+
+    expect(card(root)).toBeUndefined();
+    expect(capturedMenuGroups.flat().find((i: any) => i.key === 'save-routine')).toBeDefined();
+  });
+
+  // useLiveQueryのdataは解決前も空配列相当のため、loadedを見ないとルーティンを
+  // 持っている人の画面にも一瞬カードが差し込まれる
+  test('ルーティンの有無が未解決のうちは出さない', () => {
+    mockUseHasRoutines.mockReturnValue({ hasRoutines: false, loaded: false });
+
+    expect(card(render())).toBeUndefined();
+  });
+
+  // AsyncStorageからの復元は非同期。待たないと、閉じたはずのユーザーに数フレーム差し込まれる
+  test('dismissedの復元が終わるまでは出さない', () => {
+    useRoutineSavePromptStore.setState({ dismissed: false, hydrated: false });
+
+    expect(card(render())).toBeUndefined();
+  });
+
+  // ⋮の項目が出ない状態では本文カードも出ない（押しても何も起きないボタンを作らない）
+  test('カードの取得に失敗しているときは出さない', () => {
+    mockUseSessionExerciseCards.mockReturnValue({ cards: 'error', retry: jest.fn() });
+
+    expect(card(render())).toBeUndefined();
+  });
+
+  test('「保存する」は⋮と同じくルーティン新規作成フォームへ送る', () => {
+    const root = render();
+
+    act(() => {
+      root
+        .findAllByType(TouchableOpacity)
+        .find((b: ReactTestInstance) => b.props.accessibilityLabel === '保存する')!
+        .props.onPress();
+    });
+
+    expect(useRoutineDraftStore.getState().exercises).toHaveLength(1);
+    expect(mockPush).toHaveBeenCalledWith({
+      pathname: '/routine/new',
+      params: { keepDraft: '1', name: '胸の日' },
+    });
+  });
+
+  // 一度閉じたら永久に出さない（ルーティンを一生作らないユーザーに毎回勧誘を出さないため）
+  test('「今後表示しない」を押すとその場で消え、次に開いても出ない', () => {
+    const root = render();
+
+    act(() => {
+      root
+        .findAllByType(TouchableOpacity)
+        .find((b: ReactTestInstance) => b.props.accessibilityLabel === '今後表示しない')!
+        .props.onPress();
+    });
+
+    expect(card(root)).toBeUndefined();
+    expect(useRoutineSavePromptStore.getState().dismissed).toBe(true);
+    expect(card(render())).toBeUndefined();
   });
 });
