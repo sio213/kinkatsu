@@ -1,10 +1,11 @@
-import { SelectableExerciseRow } from '@/components/exercises/selectable-exercise-row';
+import { ExerciseRowFrame } from '@/components/exercises/exercise-row-frame';
 import { RoutineDiffSetRow } from '@/components/routines/routine-diff-set-row';
+import { Checkbox } from '@/components/ui/checkbox';
 import { IconSymbol } from '@/components/ui/icon-symbol';
 import { Colors, Typography } from '@/constants/theme';
 import { getCategoryLabel, resolveMeasurementType } from '@/lib/exercises/constants';
 import { isSetAccepted, resolveExerciseSets, type DiffExercise, type DiffSelection } from '@/lib/routines/diff';
-import { summarizeExerciseSets } from '@/lib/workout/set-format';
+import { formatHistorySetSummary, MEASUREMENT_COLUMNS, summarizeExerciseSets } from '@/lib/workout/set-format';
 import { StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 
 type Props = {
@@ -19,11 +20,17 @@ type Props = {
 /**
  * 差分確認画面の1行（デザイン案V14c）。
  *
- * 見た目の土台は「過去の記録から読み込む」等と同じ種目カード（SelectableExerciseRow）で、
- * 違いは**「値の変更」だけがアコーディオンを持つ**こと。追加・未実施は要約1行で、
- * セット列ごと丸ごと採否を決めるので内訳を開く意味が無い。
+ * 見た目の土台は「過去の記録から読み込む」等と同じ行（ExerciseRowFrame）だが、
+ * **タップの割り当てが違う**。読み込み系は行全体がチェックだが、この画面は
+ * **行全体がアコーディオンの開閉・チェックボックスだけがチェック**。
+ * 反映内容を変える操作（チェック）より、開くだけで取り消せる操作（展開）に大きいターゲットを
+ * 割り当てる——取り消せない書き込みの前段なので、誤タップで内容が静かに変わる方を避ける
+ * （2026-08-07 ユーザー判断。デザイン案の「チェックボックスは行全体がヒット領域」から変更）。
  *
- * 「今日」の行は resolveExerciseSets を通した結果を出す。子のチェックを外すと
+ * 3種類すべてが開ける。「値の変更」はセット単位のチェック、「追加した種目」「未実施の種目」は
+ * セット列の読み取り専用表示。同じ見た目の行に押せる行と押せない行が混ざるのを避けるため。
+ *
+ * 「今日」の行は resolveExerciseSets を通した結果を出す。セットのチェックを外すと
  * その場で元の値に戻り、確定したらどうなるかが常に見えている状態になる。
  */
 export function RoutineDiffExerciseRow({
@@ -36,108 +43,102 @@ export function RoutineDiffExerciseRow({
 }: Props) {
   const selected = selection.exercises.has(exercise.key);
   const measurementType = resolveMeasurementType(exercise.measurementType);
+  const columns = MEASUREMENT_COLUMNS[measurementType];
 
-  if (exercise.kind !== 'changed') {
-    // 追加した種目＝今日やった内容、未実施の種目＝ルーティンから消える内容（取り消し線）
-    const sets = exercise.kind === 'added' ? exercise.todaySets : exercise.routineSets;
-    // 「値の変更」の行と同じ「Nセット・代表セット」の言い回しに揃える。
-    // 行の既定（セットを全部並べる形）だと、同じ画面内で要約の書式が2種類になる
-    const summary = summarizeExerciseSets(measurementType, sets);
-    return (
-      <SelectableExerciseRow
-        id={0}
-        name={exercise.name}
-        category={exercise.category}
-        measurementType={exercise.measurementType}
-        source={exercise.source}
-        slug={exercise.slug}
-        sets={sets}
-        selected={selected}
-        onToggle={() => onToggleExercise(exercise.key)}
-        horizontalPadding={16}
-        body={
-          <Text style={[styles.singleSummary, exercise.kind === 'removed' && styles.struck]} numberOfLines={1}>
-            {summary}
-          </Text>
-        }
-        accessibilityLabelOverride={`${exercise.name}、${getCategoryLabel(exercise.category)}、${summary}を${
-          exercise.kind === 'added' ? '追加' : '削除'
-        }`}
-      />
-    );
-  }
-
-  const resolved = resolveExerciseSets(exercise, selection);
+  const isChanged = exercise.kind === 'changed';
+  const resolved = isChanged ? resolveExerciseSets(exercise, selection) : [];
   const routineSummary = summarizeExerciseSets(measurementType, exercise.routineSets);
-  const todaySummary = summarizeExerciseSets(measurementType, resolved);
+  const todaySummary = summarizeExerciseSets(measurementType, isChanged ? resolved : exercise.todaySets);
+  // 追加＝今日やった内容、未実施＝ルーティンから消える内容
+  const singleSummary = exercise.kind === 'added' ? todaySummary : routineSummary;
+  const detailSets = exercise.kind === 'added' ? exercise.todaySets : exercise.routineSets;
+
+  const valueLabel = isChanged
+    ? `ルーティン ${routineSummary} から 今日 ${todaySummary} へ`
+    : `${singleSummary}を${exercise.kind === 'added' ? '追加' : '削除'}`;
 
   return (
     <View style={styles.block}>
-      <SelectableExerciseRow
-        id={0}
+      <ExerciseRowFrame
+        checkbox={
+          <TouchableOpacity
+            onPress={() => onToggleExercise(exercise.key)}
+            accessibilityRole="checkbox"
+            accessibilityState={{ checked: selected }}
+            accessibilityLabel={`${exercise.name}、${valueLabel}`}
+            // 行全体をチェックのタップ領域にしない代わりに、当たり判定を広げて44ptを確保する
+            hitSlop={{ top: 12, bottom: 12, left: 12, right: 10 }}
+          >
+            <Checkbox checked={selected} />
+          </TouchableOpacity>
+        }
         name={exercise.name}
         category={exercise.category}
-        measurementType={exercise.measurementType}
         source={exercise.source}
         slug={exercise.slug}
-        sets={exercise.todaySets}
-        selected={selected}
-        onToggle={() => onToggleExercise(exercise.key)}
         horizontalPadding={16}
         // 展開部を含めて1つの塊にするため、境界線はblock側が引く
         hideBorder
-        accessibilityLabelOverride={`${exercise.name}、${getCategoryLabel(exercise.category)}、ルーティン ${routineSummary} から 今日 ${todaySummary} へ`}
-        // 行の中のボタンはVoiceOverから個別にフォーカスできないため、
-        // 同じ操作をローターのカスタムアクションからも届ける
-        accessibilityActions={[{ name: 'expand', label: expanded ? 'セットの内訳を閉じる' : 'セットの内訳を開く' }]}
-        onAccessibilityAction={(event) => {
-          if (event.nativeEvent.actionName === 'expand') onToggleExpanded(exercise.key);
+        content={{
+          onPress: () => onToggleExpanded(exercise.key),
+          accessibilityState: { expanded },
+          accessibilityLabel: `${exercise.name}、${getCategoryLabel(exercise.category)}、${valueLabel}。セットの内訳を${
+            expanded ? '閉じる' : '開く'
+          }`,
         }}
         trailing={
-          <TouchableOpacity
-              style={styles.chevron}
-              onPress={() => onToggleExpanded(exercise.key)}
-              accessibilityRole="button"
-              accessibilityState={{ expanded }}
-              accessibilityLabel={expanded ? 'セットの内訳を閉じる' : 'セットの内訳を開く'}
-              hitSlop={{ top: 12, bottom: 12, left: 12, right: 12 }}
-            >
-              <IconSymbol
-                name="chevron.down"
-                size={20}
-                color={Colors.textPlaceholder}
-                style={expanded ? styles.chevronOpen : undefined}
-              />
-          </TouchableOpacity>
+          <IconSymbol
+            name="chevron.down"
+            size={20}
+            color={Colors.textPlaceholder}
+            style={expanded ? styles.chevronOpen : styles.chevron}
+          />
         }
         body={
-          <View style={styles.compare}>
-            <View style={styles.compareLine}>
-              <Text style={styles.compareLabel}>ルーティン</Text>
-              <Text style={[styles.compareBefore, styles.struck]} numberOfLines={1}>
-                {routineSummary}
-              </Text>
+          isChanged ? (
+            <View style={styles.compare}>
+              <View style={styles.compareLine}>
+                <Text style={styles.compareLabel}>ルーティン</Text>
+                <Text style={[styles.compareBefore, styles.struck]} numberOfLines={1}>
+                  {routineSummary}
+                </Text>
+              </View>
+              <View style={styles.compareLine}>
+                <Text style={styles.compareLabel}>今日</Text>
+                <Text style={styles.compareAfter} numberOfLines={1}>
+                  {todaySummary}
+                </Text>
+              </View>
             </View>
-            <View style={styles.compareLine}>
-              <Text style={styles.compareLabel}>今日</Text>
-              <Text style={styles.compareAfter} numberOfLines={1}>
-                {todaySummary}
-              </Text>
-            </View>
-          </View>
+          ) : (
+            <Text style={[styles.singleSummary, exercise.kind === 'removed' && styles.struck]} numberOfLines={1}>
+              {singleSummary}
+            </Text>
+          )
         }
       />
       {expanded && (
         <View style={styles.setDetail}>
-          {exercise.setDiffs.map((diff) => (
-            <RoutineDiffSetRow
-              key={diff.setNumber}
-              diff={diff}
-              measurementType={measurementType}
-              checked={isSetAccepted(selection, exercise.key, diff.setNumber)}
-              onToggle={(setNumber) => onToggleSet(exercise.key, setNumber)}
-            />
-          ))}
+          {isChanged
+            ? exercise.setDiffs.map((diff) => (
+                <RoutineDiffSetRow
+                  key={diff.setNumber}
+                  diff={diff}
+                  measurementType={measurementType}
+                  checked={isSetAccepted(selection, exercise.key, diff.setNumber)}
+                  onToggle={(setNumber) => onToggleSet(exercise.key, setNumber)}
+                />
+              ))
+            : // 追加・未実施はセット列ごと丸ごと採否を決めるので内訳は読み取り専用。
+              // それでも開けるのは、何が足される／消えるかを確認できるようにするため
+              detailSets.map((set, index) => (
+                <View key={index} style={styles.readonlySet}>
+                  <Text style={styles.readonlyLabel}>{`${index + 1}セット目`}</Text>
+                  <Text style={[styles.readonlyValue, exercise.kind === 'removed' && styles.struck]}>
+                    {formatHistorySetSummary(columns, [set])}
+                  </Text>
+                </View>
+              ))}
         </View>
       )}
     </View>
@@ -145,10 +146,9 @@ export function RoutineDiffExerciseRow({
 }
 
 const styles = StyleSheet.create({
-  // 展開部を含めて1つの塊にするため、境界線は行ではなくこちらが引く
   block: { borderBottomWidth: 1, borderBottomColor: Colors.border },
   chevron: { marginLeft: 'auto' },
-  chevronOpen: { transform: [{ rotate: '180deg' }] },
+  chevronOpen: { marginLeft: 'auto', transform: [{ rotate: '180deg' }] },
   singleSummary: { ...Typography.footnote, color: Colors.textMuted },
   compare: { gap: 2 },
   compareLine: { flexDirection: 'row', gap: 6 },
@@ -159,4 +159,7 @@ const styles = StyleSheet.create({
   struck: { textDecorationLine: 'line-through' },
   // 左46pxはチェックボックス+サムネの分だけ内訳を字下げする（デザイン案の.setdetail2）
   setDetail: { paddingLeft: 46, paddingRight: 16, paddingBottom: 10, gap: 3, backgroundColor: Colors.surfaceMuted },
+  readonlySet: { flexDirection: 'row', alignItems: 'center', gap: 8, minHeight: 32 },
+  readonlyLabel: { ...Typography.captionCompact, color: Colors.textMuted },
+  readonlyValue: { ...Typography.captionCompact, fontWeight: '600', color: Colors.textPrimary },
 });

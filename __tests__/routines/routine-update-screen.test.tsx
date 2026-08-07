@@ -70,6 +70,17 @@ function texts(root: ReactTestInstance): string[] {
     .filter((s) => s.length > 0);
 }
 
+// 行全体（サムネ〜本文）がアコーディオンの開閉。種目名で目的の行を特定する
+function expandRow(root: ReactTestInstance, name: string) {
+  const target = root
+    .findAllByType(TouchableOpacity)
+    .find((b) => String(b.props.accessibilityLabel).startsWith(`${name}、`) && String(b.props.accessibilityLabel).includes('セットの内訳'));
+  if (!target) throw new Error(`row not found: ${name}`);
+  act(() => {
+    target.props.onPress();
+  });
+}
+
 function pressByLabel(root: ReactTestInstance, label: string) {
   const target = root.findAllByType(TouchableOpacity).find((b) => b.props.accessibilityLabel === label);
   if (!target) throw new Error(`not found: ${label}`);
@@ -106,8 +117,9 @@ test('既定チェックは追加＝ON・値の変更＝ON・未実施＝OFF', (
 
   // 件数の数字だけ入れ子のTextで強調しているため、2要素に分かれて拾われる
   expect(texts(root)).toEqual(expect.arrayContaining(['2', '/3種目を選択中']));
-  expect(checkboxState(root, 'ディップス、胸、1セット・12回を追加')?.checked).toBe(true);
-  expect(checkboxState(root, 'ペックフライ、胸、1セット・30kg×12を削除')?.checked).toBe(false);
+  // チェックボックスは行から独立したタップ領域（行全体はアコーディオンの開閉）
+  expect(checkboxState(root, 'ディップス、1セット・12回を追加')?.checked).toBe(true);
+  expect(checkboxState(root, 'ペックフライ、1セット・30kg×12を削除')?.checked).toBe(false);
 });
 
 test('「値の変更」の行はルーティンと今日の要約を両方出す', () => {
@@ -119,7 +131,7 @@ test('「値の変更」の行はルーティンと今日の要約を両方出�
 // デザイン案の「外すと要約が戻るので影響がその場で分かります」
 test('セットのチェックを外すと親の「今日」の要約がその場で戻る', () => {
   const root = render();
-  pressByLabel(root, 'セットの内訳を開く');
+  expandRow(root, 'ベンチプレス');
 
   expect(texts(root)).toEqual(expect.arrayContaining(['3セット・100kg×5']));
 
@@ -129,13 +141,17 @@ test('セットのチェックを外すと親の「今日」の要約がその�
   expect(texts(root)).toEqual(expect.arrayContaining(['2セット・100kg×5']));
 });
 
-test('アコーディオンは「値の変更」だけが持つ', () => {
+// 同じ見た目の行に押せる行と押せない行が混ざらないよう、3種類すべてが開ける。
+// 追加・未実施はセット列の読み取り専用表示
+test('追加した種目も開いてセット内訳を読める（チェックボックスは無い）', () => {
   const root = render();
+  expandRow(root, 'ディップス');
 
-  const chevrons = root
-    .findAllByType(TouchableOpacity)
-    .filter((b) => b.props.accessibilityLabel === 'セットの内訳を開く');
-  expect(chevrons).toHaveLength(1);
+  expect(texts(root)).toEqual(expect.arrayContaining(['1セット目', '12回']));
+  // セット行にチェックボックスは付かない
+  expect(
+    root.findAllByType(TouchableOpacity).filter((b) => String(b.props.accessibilityLabel).includes('セット目')),
+  ).toHaveLength(0);
 });
 
 test('チェックを全部外すと更新ボタンが無効になる', () => {
@@ -262,19 +278,16 @@ test('確定直前にルーティンの種目idが入れ替わっていたら書
   expect(mockBack).not.toHaveBeenCalled();
 });
 
-// 行の中に置いたシェブロンはVoiceOverから個別にフォーカスできないため、
-// 同じ操作をローターのカスタムアクションからも届ける
-test('アコーディオンはVoiceOverのカスタムアクションからも開ける', () => {
+// チェックと展開が別のタップ領域になっているので、VoiceOverからも別々にフォーカスできる
+test('チェックと展開はそれぞれ独立した読み上げ対象になる', () => {
   const root = render();
-  const changedRow = root
-    .findAllByType(TouchableOpacity)
-    .find((b) => String(b.props.accessibilityLabel).startsWith('ベンチプレス'))!;
+  const buttons = root.findAllByType(TouchableOpacity);
 
-  expect(changedRow.props.accessibilityActions).toEqual([{ name: 'expand', label: 'セットの内訳を開く' }]);
+  const checkbox = buttons.find((b) => b.props.accessibilityLabel === 'ベンチプレス、ルーティン 2セット・95kg×5 から 今日 3セット・100kg×5 へ');
+  const content = buttons.find((b) =>
+    String(b.props.accessibilityLabel).endsWith('セットの内訳を開く'),
+  );
 
-  act(() => {
-    changedRow.props.onAccessibilityAction({ nativeEvent: { actionName: 'expand' } });
-  });
-
-  expect(texts(root)).toEqual(expect.arrayContaining(['1セット目']));
+  expect(checkbox?.props.accessibilityRole).toBe('checkbox');
+  expect(content?.props.accessibilityRole).toBe('button');
 });
