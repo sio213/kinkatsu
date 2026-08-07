@@ -29,7 +29,7 @@ import { buildRoutineDiff } from '@/lib/routines/diff';
 import { useRoutineUpdatePromptStore } from '@/lib/workout/routine-update-prompt-store';
 import React from 'react';
 import { act, create, type ReactTestInstance } from 'react-test-renderer';
-import { Text, TouchableOpacity } from 'react-native';
+import { StyleSheet, Text, TouchableOpacity } from 'react-native';
 
 function set(weight: number | null, reps: number | null) {
   return { weight, reps, durationSeconds: null, distanceMeters: null };
@@ -342,5 +342,44 @@ describe('チェックの連動', () => {
     pressByLabel(root, 'ベンチプレス、ルーティン 2セット・95kg×5 から 今日 3セット・100kg×5 へ');
 
     expect(texts(root)).toEqual(expect.arrayContaining(['3セット・100kg×5']));
+  });
+});
+
+// 取り消し線と「今日」側の強調は「反映される」ことの印。チェックが外れている行に付けると、
+// 実際には残る値に「無くなる」と書くことになる
+describe('反映しない行の見せ方', () => {
+  function styleOf(root: ReactTestInstance, value: string) {
+    const target = root
+      .findAllByType(Text)
+      .find((t) => [t.props.children].flat().join('') === value);
+    return StyleSheet.flatten(target?.props.style);
+  }
+
+  test('チェックが付いている間はルーティン側に取り消し線、今日側を強調する', () => {
+    const root = render();
+
+    expect(styleOf(root, '2セット・95kg×5')?.textDecorationLine).toBe('line-through');
+    expect(styleOf(root, '3セット・100kg×5')?.fontWeight).toBe('600');
+  });
+
+  test('チェックを外すと取り消し線も強調も外れ、ただの比較になる', () => {
+    const root = render();
+    pressByLabel(root, 'ベンチプレス、ルーティン 2セット・95kg×5 から 今日 3セット・100kg×5 へ');
+
+    expect(styleOf(root, '2セット・95kg×5')?.textDecorationLine).toBeUndefined();
+    // ルーティン行と同じ（captionCompactの既定ウェイト）に戻る
+    expect(styleOf(root, '3セット・100kg×5')?.fontWeight).toBe('400');
+    expect(styleOf(root, '3セット・100kg×5')?.color).toBe(styleOf(root, '2セット・95kg×5')?.color);
+  });
+
+  // 未実施は既定オフ。既定のまま取り消し線が付いていると「消える」と読めてしまう
+  test('未実施の種目は、チェックしたときだけ取り消し線が付く', () => {
+    const root = render();
+
+    expect(styleOf(root, '1セット・30kg×12')?.textDecorationLine).toBeUndefined();
+
+    pressByLabel(root, 'ペックフライ、1セット・30kg×12を削除');
+
+    expect(styleOf(root, '1セット・30kg×12')?.textDecorationLine).toBe('line-through');
   });
 });

@@ -48,6 +48,10 @@ export function RoutineDiffExerciseRow({
   const columns = MEASUREMENT_COLUMNS[measurementType];
 
   const isChanged = exercise.kind === 'changed';
+  // 取り消し線と「今日」側の強調は「反映される」ことの印。チェックが外れている行に付けると、
+  // 実際には残る値に「無くなる」と書くことになるので外す。外れている行は
+  // 「ルーティンはこう、今日はこうだった」というただの比較に戻る
+  const applied = selected;
   const routineSummary = summarizeExerciseSets(measurementType, exercise.routineSets);
   // チェックが付いている間は「反映したらこうなる」を出す（セットのチェックを外すとその場で戻る）。
   // 外しているときは反映結果がルーティンのままになり、上下の行が同じ文字列で並んで読めなくなるため、
@@ -104,19 +108,22 @@ export function RoutineDiffExerciseRow({
             <View style={styles.compare}>
               <View style={styles.compareLine}>
                 <Text style={styles.compareLabel}>ルーティン</Text>
-                <Text style={[styles.compareBefore, styles.struck]} numberOfLines={1}>
+                <Text style={[styles.compareBefore, applied && styles.struck]} numberOfLines={1}>
                   {routineSummary}
                 </Text>
               </View>
               <View style={styles.compareLine}>
                 <Text style={styles.compareLabel}>今日</Text>
-                <Text style={styles.compareAfter} numberOfLines={1}>
+                <Text style={applied ? styles.compareAfter : styles.compareBefore} numberOfLines={1}>
                   {todaySummary}
                 </Text>
               </View>
             </View>
           ) : (
-            <Text style={[styles.singleSummary, exercise.kind === 'removed' && styles.struck]} numberOfLines={1}>
+            <Text
+              style={[styles.singleSummary, exercise.kind === 'removed' && applied && styles.struck]}
+              numberOfLines={1}
+            >
               {singleSummary}
             </Text>
           )
