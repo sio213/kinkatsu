@@ -61,7 +61,8 @@ test('追加は変更前を出さず「追加」チップを添える', () => {
 test('削除は変更前だけを出して「削除」チップを添える', () => {
   const { root } = render(removed);
 
-  expect(texts(root)).toEqual(['3セット目　50kg×10', '削除']);
+  // ラベルは幅68固定の独立した要素（矢印の位置を縦に揃えるため）
+  expect(texts(root)).toEqual(['3セット目', '50kg×10', '削除']);
   expect(row(root).props.accessibilityLabel).toBe('3セット目 50kg×10 を削除');
 });
 

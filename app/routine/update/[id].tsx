@@ -103,7 +103,9 @@ export default function RoutineUpdateScreen() {
   };
 
   // セット単位のチェック。Map未登録＝全セットONなので、初回のトグルでは
-  // 「全セット」から対象を1つ外した集合を作る
+  // 「全セット」から対象を1つ外した集合を作る。
+  // 親への逆連動も同時に行う——全部外れたら親も外し、全部付いたら親を付ける。
+  // 親だけ付いたまま子が全部外れていると、確定しても何も変わらない（no-op）操作になる
   const handleToggleSet = (key: string, setNumber: number) => {
     const exercise = resolved?.changed.find((e) => e.key === key);
     if (!exercise) return;
@@ -113,7 +115,19 @@ export default function RoutineUpdateScreen() {
     if (next.has(setNumber)) next.delete(setNumber);
     else next.add(setNumber);
     sets.set(key, next);
-    updateSelection({ exercises: selection.exercises, sets });
+
+    const exercises = new Set(selection.exercises);
+    if (next.size === 0) exercises.delete(key);
+    else exercises.add(key);
+
+    updateSelection({ exercises, sets });
+  };
+
+  // 一部のセットだけ外れている状態（親のチェックボックスを横棒にする）
+  const isPartiallySelected = (exercise: DiffExercise) => {
+    if (exercise.kind !== 'changed' || !selection.exercises.has(exercise.key)) return false;
+    const accepted = selection.sets.get(exercise.key);
+    return accepted != null && accepted.size > 0 && accepted.size < exercise.setDiffs.length;
   };
 
   const handleToggleExpanded = (key: string) => {
@@ -224,6 +238,7 @@ export default function RoutineUpdateScreen() {
                 key={exercise.key}
                 exercise={exercise}
                 selection={selection}
+                partiallySelected={isPartiallySelected(exercise)}
                 expanded={expandedKeys.has(exercise.key)}
                 onToggleExercise={handleToggleExercise}
                 onToggleSet={handleToggleSet}

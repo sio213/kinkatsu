@@ -1,9 +1,9 @@
-import { IconSymbol } from '@/components/ui/icon-symbol';
 import { Checkbox } from '@/components/ui/checkbox';
+import { IconSymbol } from '@/components/ui/icon-symbol';
 import { Colors, Typography } from '@/constants/theme';
+import type { MeasurementType } from '@/lib/exercises/constants';
 import type { DiffSet } from '@/lib/routines/diff';
 import { formatHistorySetSummary, MEASUREMENT_COLUMNS } from '@/lib/workout/set-format';
-import type { MeasurementType } from '@/lib/exercises/constants';
 import { StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 
 type Props = {
@@ -14,13 +14,17 @@ type Props = {
 };
 
 /**
- * 差分確認画面の、アコーディオンを開いたときに出るセット1行（デザイン案の`.setln2`）。
+ * 差分確認画面の、アコーディオンを開いたときに出るセット1行。
  *
  * セット単位のチェックは**この画面の中だけで完結**する。外すと親の要約行がその場で
  * 元の値に戻るので、影響が見える（lib/routines/diff.tsのresolveExerciseSetsが
  * 親の表示とDB書き込みの両方を同じ計算で賄っている）。
  *
  * 追加・削除されたセットは値の比較ができないため、値の代わりにチップで種別を示す。
+ *
+ * 左パディング24は親行の16に8のインデントを足したぶん。この8が階層の手がかりになるので、
+ * それ以上深くしない（デザイン仕様）。セットラベルの幅を68で固定するのは、可変にすると
+ * 「1セット目」「10セット目」で矢印の位置がずれて、縦に並んだときに読みにくくなるため。
  */
 export function RoutineDiffSetRow({ diff, measurementType, checked, onToggle }: Props) {
   const columns = MEASUREMENT_COLUMNS[measurementType];
@@ -43,43 +47,59 @@ export function RoutineDiffSetRow({ diff, measurementType, checked, onToggle }: 
       accessibilityState={{ checked }}
       accessibilityLabel={accessibilityLabel}
     >
-      <Checkbox checked={checked} size={18} />
-      {diff.kind === 'removed' ? (
-        <>
-          <Text style={[styles.label, styles.struck]}>{`${label}　${before}`}</Text>
-          <View style={styles.removedChip}>
-            <Text style={styles.removedChipText}>削除</Text>
-          </View>
-        </>
-      ) : diff.kind === 'added' ? (
-        <>
-          <Text style={styles.label}>{label}</Text>
-          <Text style={styles.after}>{after}</Text>
-          <View style={styles.addedChip}>
-            <Text style={styles.addedChipText}>追加</Text>
-          </View>
-        </>
-      ) : (
-        <>
-          <Text style={styles.label}>{label}</Text>
-          <Text style={styles.before}>{before}</Text>
-          <IconSymbol name="arrow.right" size={12} color={Colors.textPlaceholder} />
-          <Text style={styles.after}>{after}</Text>
-        </>
-      )}
+      <Checkbox checked={checked} size={19} />
+      <View style={styles.content}>
+        <Text style={styles.label}>{label}</Text>
+        {diff.kind === 'removed' ? (
+          <>
+            <Text style={[styles.before, styles.struck]}>{before}</Text>
+            <View style={styles.removedChip}>
+              <Text style={styles.removedChipText}>削除</Text>
+            </View>
+          </>
+        ) : diff.kind === 'added' ? (
+          <>
+            <Text style={styles.after}>{after}</Text>
+            <View style={styles.addedChip}>
+              <Text style={styles.addedChipText}>追加</Text>
+            </View>
+          </>
+        ) : (
+          <>
+            <Text style={styles.before}>{before}</Text>
+            <IconSymbol name="arrow.right" size={12} color={Colors.textPlaceholder} style={styles.arrow} />
+            <Text style={styles.after}>{after}</Text>
+          </>
+        )}
+      </View>
     </TouchableOpacity>
   );
 }
 
 const styles = StyleSheet.create({
-  // minHeight 44 はデザイン案の指定。チェックボックス単体ではなく行全体がヒット領域
-  row: { flexDirection: 'row', alignItems: 'center', gap: 8, minHeight: 44 },
-  label: { ...Typography.captionCompact, color: Colors.textMuted },
-  before: { ...Typography.captionCompact, color: Colors.textMuted },
-  after: { ...Typography.captionCompact, fontWeight: '600', color: Colors.textPrimary },
+  // 上下10で行の高さは約40。行全体がタップ領域（チェックボックス単体を狙わせない）
+  row: { flexDirection: 'row', alignItems: 'center', paddingVertical: 10, paddingLeft: 24, paddingRight: 16, gap: 12 },
+  content: { flex: 1, flexDirection: 'row', alignItems: 'center' },
+  // 幅固定で矢印の位置を縦に揃える
+  label: { ...Typography.footnote, color: Colors.textSecondary, width: 68 },
+  before: { ...Typography.footnote, color: Colors.textPlaceholder },
+  arrow: { marginHorizontal: 8 },
+  after: { ...Typography.footnote, fontWeight: '500', color: Colors.textPrimary },
   struck: { textDecorationLine: 'line-through' },
-  removedChip: { backgroundColor: Colors.dangerSurface, borderRadius: 4, paddingHorizontal: 6, paddingVertical: 1 },
+  removedChip: {
+    marginLeft: 8,
+    backgroundColor: Colors.dangerSurface,
+    borderRadius: 4,
+    paddingHorizontal: 6,
+    paddingVertical: 2,
+  },
   removedChipText: { ...Typography.captionCompact, fontWeight: '600', color: Colors.danger },
-  addedChip: { backgroundColor: Colors.accentSurface, borderRadius: 4, paddingHorizontal: 6, paddingVertical: 1 },
+  addedChip: {
+    marginLeft: 8,
+    backgroundColor: Colors.accentSurface,
+    borderRadius: 4,
+    paddingHorizontal: 6,
+    paddingVertical: 2,
+  },
   addedChipText: { ...Typography.captionCompact, fontWeight: '600', color: Colors.accent },
 });

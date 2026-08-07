@@ -11,6 +11,8 @@ import { StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 type Props = {
   exercise: DiffExercise;
   selection: DiffSelection;
+  // 「値の変更」で、一部のセットだけチェックが外れている状態。チェックマークの代わりに横棒を出す
+  partiallySelected: boolean;
   expanded: boolean;
   onToggleExercise: (key: string) => void;
   onToggleSet: (key: string, setNumber: number) => void;
@@ -38,6 +40,7 @@ type Props = {
 export function RoutineDiffExerciseRow({
   exercise,
   selection,
+  partiallySelected,
   expanded,
   onToggleExercise,
   onToggleSet,
@@ -73,12 +76,14 @@ export function RoutineDiffExerciseRow({
           <TouchableOpacity
             onPress={() => onToggleExercise(exercise.key)}
             accessibilityRole="checkbox"
-            accessibilityState={{ checked: selected }}
+            accessibilityState={{ checked: partiallySelected ? 'mixed' : selected }}
             accessibilityLabel={`${exercise.name}、${valueLabel}`}
             // 行全体をチェックのタップ領域にしない代わりに、当たり判定を広げて44ptを確保する
             hitSlop={{ top: 12, bottom: 12, left: 12, right: 10 }}
+            // 本文が2行の行なので、上揃え＋2で1行目の文字と光学的に揃える
+            style={styles.checkbox}
           >
-            <Checkbox checked={selected} />
+            <Checkbox checked={selected} indeterminate={partiallySelected} />
           </TouchableOpacity>
         }
         name={exercise.name}
@@ -86,6 +91,9 @@ export function RoutineDiffExerciseRow({
         source={exercise.source}
         slug={exercise.slug}
         horizontalPadding={16}
+        gap={12}
+        infoGap={4}
+        alignItems="flex-start"
         // 展開部を含めて1つの塊にするため、境界線はblock側が引く
         hideBorder
         content={{
@@ -159,6 +167,7 @@ export function RoutineDiffExerciseRow({
 
 const styles = StyleSheet.create({
   block: { borderBottomWidth: 1, borderBottomColor: Colors.border },
+  checkbox: { marginTop: 2 },
   chevron: { marginLeft: 'auto' },
   chevronOpen: { marginLeft: 'auto', transform: [{ rotate: '180deg' }] },
   singleSummary: { ...Typography.footnote, color: Colors.textMuted },
@@ -169,9 +178,10 @@ const styles = StyleSheet.create({
   compareBefore: { ...Typography.captionCompact, color: Colors.textPlaceholder, flex: 1 },
   compareAfter: { ...Typography.captionCompact, fontWeight: '600', color: Colors.textPrimary, flex: 1 },
   struck: { textDecorationLine: 'line-through' },
-  // 左46pxはチェックボックス+サムネの分だけ内訳を字下げする（デザイン案の.setdetail2）
-  setDetail: { paddingLeft: 46, paddingRight: 16, paddingBottom: 10, gap: 3, backgroundColor: Colors.surfaceMuted },
-  readonlySet: { flexDirection: 'row', alignItems: 'center', gap: 8, minHeight: 32 },
-  readonlyLabel: { ...Typography.captionCompact, color: Colors.textMuted },
-  readonlyValue: { ...Typography.captionCompact, fontWeight: '600', color: Colors.textPrimary },
+  // 左右のパディングは行が持つ（左24＝親の16＋インデント8）。最後のセット行が
+  // 区切り線に貼り付かないよう下に8だけ空ける
+  setDetail: { paddingBottom: 8, backgroundColor: Colors.surfaceMuted },
+  readonlySet: { flexDirection: 'row', alignItems: 'center', paddingVertical: 10, paddingLeft: 24, paddingRight: 16 },
+  readonlyLabel: { ...Typography.footnote, color: Colors.textSecondary, width: 68 },
+  readonlyValue: { ...Typography.footnote, fontWeight: '500', color: Colors.textPrimary },
 });

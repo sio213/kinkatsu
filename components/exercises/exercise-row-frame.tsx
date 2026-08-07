@@ -31,6 +31,12 @@ type Props = {
   horizontalPadding?: number;
   // 展開部を含めて1つの塊として囲む側が線を引く場合に消す
   hideBorder?: boolean;
+  // チェックボックス／サムネ／本文の間隔と、本文2行の間隔。既定は読み込み系の値
+  gap?: number;
+  infoGap?: number;
+  // 本文が2行以上ある行（差分確認画面の「ルーティン／今日」）は、チェックとサムネを
+  // 上揃えにして1行目の文字と光学的に揃える
+  alignItems?: 'center' | 'flex-start';
 };
 
 /**
@@ -52,13 +58,16 @@ export function ExerciseRowFrame({
   content,
   horizontalPadding = 0,
   hideBorder = false,
+  gap = 10,
+  infoGap = 3,
+  alignItems = 'center',
 }: Props) {
   const images = getExerciseImages({ source, slug });
 
   const inner = (
     <>
       <ExerciseThumbnail source={images.thumbnail} size={40} />
-      <View style={styles.info}>
+      <View style={[styles.info, { gap: infoGap }]}>
         <View style={styles.nameRow}>
           <Text style={styles.name} numberOfLines={1}>
             {name}
@@ -72,11 +81,13 @@ export function ExerciseRowFrame({
   );
 
   return (
-    <View style={[styles.row, { paddingHorizontal: horizontalPadding }, hideBorder && styles.rowBorderless]}>
+    <View
+      style={[styles.row, { paddingHorizontal: horizontalPadding, gap, alignItems }, hideBorder && styles.rowBorderless]}
+    >
       {checkbox}
       {content ? (
         <TouchableOpacity
-          style={styles.content}
+          style={[styles.content, { gap, alignItems }]}
           onPress={content.onPress}
           accessibilityRole="button"
           accessibilityState={content.accessibilityState}
@@ -94,15 +105,13 @@ export function ExerciseRowFrame({
 const styles = StyleSheet.create({
   row: {
     flexDirection: 'row',
-    alignItems: 'center',
-    gap: 10,
     paddingVertical: 12,
     borderBottomWidth: 1,
     borderBottomColor: Colors.border,
   },
   rowBorderless: { borderBottomWidth: 0 },
-  content: { flex: 1, flexDirection: 'row', alignItems: 'center', gap: 10 },
-  info: { flex: 1, gap: 3 },
+  content: { flex: 1, flexDirection: 'row' },
+  info: { flex: 1 },
   nameRow: { flexDirection: 'row', alignItems: 'center', gap: 6 },
   name: { ...Typography.cardTitle, color: Colors.textPrimary, flexShrink: 1 },
 });

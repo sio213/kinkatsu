@@ -383,3 +383,51 @@ describe('反映しない行の見せ方', () => {
     expect(styleOf(root, '1セット・30kg×12')?.textDecorationLine).toBe('line-through');
   });
 });
+
+// 親だけ付いたまま子が全部外れていると、確定しても何も変わらない操作になる
+describe('親チェックの中間状態と逆連動', () => {
+  // 「今日」の要約は選択状態で変わるため、種目名で引く（内訳を開くボタンは除く）
+  function parentCheckbox(root: ReactTestInstance) {
+    return root
+      .findAllByType(TouchableOpacity)
+      .find(
+        (b) =>
+          String(b.props.accessibilityLabel).startsWith('ベンチプレス、ルーティン') &&
+          b.props.accessibilityRole === 'checkbox',
+      );
+  }
+
+  test('セットを1つ外すと親は中間状態（mixed）になる', () => {
+    const root = render();
+    expandRow(root, 'ベンチプレス');
+
+    expect(parentCheckbox(root)?.props.accessibilityState.checked).toBe(true);
+
+    pressByLabel(root, '1セット目 95kg×5 から 100kg×5 へ変更');
+
+    expect(parentCheckbox(root)?.props.accessibilityState.checked).toBe('mixed');
+  });
+
+  test('セットを全部外すと親のチェックも外れる', () => {
+    const root = render();
+    expandRow(root, 'ベンチプレス');
+
+    pressByLabel(root, '1セット目 95kg×5 から 100kg×5 へ変更');
+    pressByLabel(root, '2セット目 95kg×5 から 100kg×5 へ変更');
+    pressByLabel(root, '3セット目 90kg×8 を追加');
+
+    expect(parentCheckbox(root)?.props.accessibilityState.checked).toBe(false);
+    expect(texts(root)).toEqual(expect.arrayContaining(['1', '/3種目を選択中']));
+  });
+
+  test('外れている状態からセットを1つ付けると親のチェックも戻る', () => {
+    const root = render();
+    expandRow(root, 'ベンチプレス');
+    pressByLabel(root, 'ベンチプレス、ルーティン 2セット・95kg×5 から 今日 3セット・100kg×5 へ');
+    expect(parentCheckbox(root)?.props.accessibilityState.checked).toBe(false);
+
+    pressByLabel(root, '1セット目 95kg×5 から 100kg×5 へ変更');
+
+    expect(parentCheckbox(root)?.props.accessibilityState.checked).toBe('mixed');
+  });
+});
