@@ -76,17 +76,29 @@ export default function RoutineUpdateScreen() {
 
   const updateSelection = (next: DiffSelection) => setSelectionState({ key: diffKey, value: next });
 
+  // 種目のチェックはその種目のセットにも波及させる。ONなら全セットON（＝Mapから消す。
+  // 未登録は全セットONの意味）、OFFなら全セットOFF。
+  // 親がOFFのとき反映結果はどのみちルーティンのままだが、開いた状態で子だけ付いたままだと
+  // 「何が反映されるのか」が読めなくなる
   const handleToggleExercise = (key: string) => {
     const exercises = new Set(selection.exercises);
-    if (exercises.has(key)) exercises.delete(key);
-    else exercises.add(key);
-    updateSelection({ exercises, sets: selection.sets });
+    const sets = new Map(selection.sets);
+    if (exercises.has(key)) {
+      exercises.delete(key);
+      sets.set(key, new Set());
+    } else {
+      exercises.add(key);
+      sets.delete(key);
+    }
+    updateSelection({ exercises, sets });
   };
 
   const handleToggleAll = () => {
+    const turningOff = selection.exercises.size === allKeys.length;
     updateSelection({
-      exercises: selection.exercises.size === allKeys.length ? new Set() : new Set(allKeys),
-      sets: selection.sets,
+      exercises: turningOff ? new Set() : new Set(allKeys),
+      // 全選択も同じく子まで波及させる
+      sets: turningOff ? new Map((resolved?.changed ?? []).map((e) => [e.key, new Set<number>()])) : new Map(),
     });
   };
 

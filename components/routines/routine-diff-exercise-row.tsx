@@ -32,6 +32,8 @@ type Props = {
  *
  * 「今日」の行は resolveExerciseSets を通した結果を出す。セットのチェックを外すと
  * その場で元の値に戻り、確定したらどうなるかが常に見えている状態になる。
+ *
+ * 種目のチェックを外すと、その種目のセットのチェックも全部外れる（画面側でまとめている）。
  */
 export function RoutineDiffExerciseRow({
   exercise,
@@ -46,9 +48,12 @@ export function RoutineDiffExerciseRow({
   const columns = MEASUREMENT_COLUMNS[measurementType];
 
   const isChanged = exercise.kind === 'changed';
-  const resolved = isChanged ? resolveExerciseSets(exercise, selection) : [];
   const routineSummary = summarizeExerciseSets(measurementType, exercise.routineSets);
-  const todaySummary = summarizeExerciseSets(measurementType, isChanged ? resolved : exercise.todaySets);
+  // チェックが付いている間は「反映したらこうなる」を出す（セットのチェックを外すとその場で戻る）。
+  // 外しているときは反映結果がルーティンのままになり、上下の行が同じ文字列で並んで読めなくなるため、
+  // 「チェックすればこうなる」＝今日の実績をそのまま出す
+  const todaySets = isChanged && selected ? resolveExerciseSets(exercise, selection) : exercise.todaySets;
+  const todaySummary = summarizeExerciseSets(measurementType, todaySets);
   // 追加＝今日やった内容、未実施＝ルーティンから消える内容
   const singleSummary = exercise.kind === 'added' ? todaySummary : routineSummary;
   const detailSets = exercise.kind === 'added' ? exercise.todaySets : exercise.routineSets;

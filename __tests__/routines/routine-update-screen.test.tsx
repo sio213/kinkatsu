@@ -291,3 +291,56 @@ test('チェックと展開はそれぞれ独立した読み上げ対象にな�
   expect(checkbox?.props.accessibilityRole).toBe('checkbox');
   expect(content?.props.accessibilityRole).toBe('button');
 });
+
+// 親のチェックはその種目のセットにも波及させる。親OFFのまま子だけ付いていると
+// 「何が反映されるのか」が読めなくなる
+describe('チェックの連動', () => {
+  function setRow(root: ReactTestInstance, label: string) {
+    return root.findAllByType(TouchableOpacity).find((b) => b.props.accessibilityLabel === label);
+  }
+
+  test('種目のチェックを外すと、その種目のセットのチェックも全部外れる', () => {
+    const root = render();
+    expandRow(root, 'ベンチプレス');
+    expect(setRow(root, '1セット目 95kg×5 から 100kg×5 へ変更')?.props.accessibilityState.checked).toBe(true);
+
+    pressByLabel(root, 'ベンチプレス、ルーティン 2セット・95kg×5 から 今日 3セット・100kg×5 へ');
+
+    expect(setRow(root, '1セット目 95kg×5 から 100kg×5 へ変更')?.props.accessibilityState.checked).toBe(false);
+    expect(setRow(root, '3セット目 90kg×8 を追加')?.props.accessibilityState.checked).toBe(false);
+  });
+
+  test('種目のチェックを入れ直すと、セットのチェックも全部戻る', () => {
+    const root = render();
+    expandRow(root, 'ベンチプレス');
+    // 1セット目だけ外してから、種目ごと外して入れ直す
+    pressByLabel(root, '1セット目 95kg×5 から 100kg×5 へ変更');
+    expect(setRow(root, '1セット目 95kg×5 から 100kg×5 へ変更')?.props.accessibilityState.checked).toBe(false);
+
+    pressByLabel(root, 'ベンチプレス、ルーティン 2セット・95kg×5 から 今日 3セット・100kg×5 へ');
+    pressByLabel(root, 'ベンチプレス、ルーティン 2セット・95kg×5 から 今日 3セット・100kg×5 へ');
+
+    expect(setRow(root, '1セット目 95kg×5 から 100kg×5 へ変更')?.props.accessibilityState.checked).toBe(true);
+  });
+
+  test('全選択をOFFにするとセットのチェックも全部外れ、ONに戻すと全部戻る', () => {
+    const root = render();
+    expandRow(root, 'ベンチプレス');
+
+    // 既定は3件中2件選択なので、1回目で全ON、2回目で全OFF
+    pressByLabel(root, '全選択');
+    pressByLabel(root, '全選択');
+    expect(setRow(root, '1セット目 95kg×5 から 100kg×5 へ変更')?.props.accessibilityState.checked).toBe(false);
+
+    pressByLabel(root, '全選択');
+    expect(setRow(root, '1セット目 95kg×5 から 100kg×5 へ変更')?.props.accessibilityState.checked).toBe(true);
+  });
+
+  // 外している間に反映結果を出すと、上下の行が同じ文字列で並んで読めなくなる
+  test('種目のチェックを外している間の「今日」は、チェックすればこうなる値を出す', () => {
+    const root = render();
+    pressByLabel(root, 'ベンチプレス、ルーティン 2セット・95kg×5 から 今日 3セット・100kg×5 へ');
+
+    expect(texts(root)).toEqual(expect.arrayContaining(['3セット・100kg×5']));
+  });
+});
