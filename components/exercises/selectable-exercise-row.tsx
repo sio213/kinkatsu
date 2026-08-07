@@ -5,7 +5,7 @@ import { Colors, Typography } from '@/constants/theme';
 import { getCategoryLabel, resolveMeasurementType } from '@/lib/exercises/constants';
 import { getExerciseImages } from '@/lib/exercises/images';
 import { formatHistorySetSummary, MEASUREMENT_COLUMNS, type SetFieldKey } from '@/lib/workout/set-format';
-import { memo } from 'react';
+import { memo, type ReactNode } from 'react';
 import { StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 
 type Props = {
@@ -25,6 +25,20 @@ type Props = {
   // 呼び出し元(getSessionExerciseCards)が✓確定セット0件のカードを除外済みのため実質発生しないが、
   // routine側は目標値を未入力のまま保存できるため、素の空白行に見えないよう明示的に指定させる
   emptyLabel?: string;
+  // 要約行（setsから組み立てる1行）の代わりに描く中身。ルーティンを更新の差分確認画面が
+  // 「ルーティン → 今日」の2段組を差し込むために使う。渡した場合setsは読み上げ用にだけ使われる
+  body?: ReactNode;
+  // 名前・カテゴリの右端に置く要素（アコーディオンのシェブロン等）
+  trailing?: ReactNode;
+  // 要約に取り消し線を引く。差分確認画面の「未実施の種目」（ルーティンから消える側）用
+  strikeSummary?: boolean;
+  // 行の下境界線を消す。アコーディオンの展開部を含めて1つの塊として囲む側が線を引く場合に使う
+  hideBorder?: boolean;
+  // 読み上げラベルを丸ごと差し替える。差分行は「変更前→変更後」を読ませたいため
+  accessibilityLabelOverride?: string;
+  // 行の左右パディング。読み込み系の画面はFlatListのcontentContainerが左右16pxを持つため0でよいが、
+  // 差分確認画面はアコーディオンの展開部を画面幅いっぱいに敷くため、行側で持つ必要がある
+  horizontalPadding?: number;
 };
 
 // components/workout/history-load-exercise-card.tsx（過去の記録から読み込む）・
@@ -43,6 +57,12 @@ export const SelectableExerciseRow = memo(function SelectableExerciseRow({
   onToggle,
   accessibilityValuePrefix,
   emptyLabel = '',
+  body,
+  trailing,
+  strikeSummary = false,
+  hideBorder = false,
+  accessibilityLabelOverride,
+  horizontalPadding = 0,
 }: Props) {
   const images = getExerciseImages({ source, slug });
   const resolvedType = resolveMeasurementType(measurementType);
@@ -53,11 +73,14 @@ export const SelectableExerciseRow = memo(function SelectableExerciseRow({
 
   return (
     <TouchableOpacity
-      style={styles.row}
+      style={[styles.row, { paddingHorizontal: horizontalPadding }, hideBorder && styles.rowBorderless]}
       onPress={handlePress}
       accessibilityRole="checkbox"
       accessibilityState={{ checked: selected }}
-      accessibilityLabel={`${name}、${getCategoryLabel(category)}、${accessibilityValuePrefix ?? ''}${displaySummary}`}
+      accessibilityLabel={
+        accessibilityLabelOverride ??
+        `${name}、${getCategoryLabel(category)}、${accessibilityValuePrefix ?? ''}${displaySummary}`
+      }
     >
       <Checkbox checked={selected} />
       <ExerciseThumbnail source={images.thumbnail} size={40} />
@@ -67,10 +90,16 @@ export const SelectableExerciseRow = memo(function SelectableExerciseRow({
             {name}
           </Text>
           <CategoryChip category={category} />
+          {trailing}
         </View>
-        <Text style={[styles.summary, summary === '' && styles.summaryEmpty]} numberOfLines={1}>
-          {displaySummary}
-        </Text>
+        {body ?? (
+          <Text
+            style={[styles.summary, summary === '' && styles.summaryEmpty, strikeSummary && styles.summaryStruck]}
+            numberOfLines={1}
+          >
+            {displaySummary}
+          </Text>
+        )}
       </View>
     </TouchableOpacity>
   );
@@ -88,6 +117,8 @@ const styles = StyleSheet.create({
   info: { flex: 1, gap: 3 },
   nameRow: { flexDirection: 'row', alignItems: 'center', gap: 6 },
   name: { ...Typography.cardTitle, color: Colors.textPrimary, flexShrink: 1 },
+  rowBorderless: { borderBottomWidth: 0 },
   summary: { ...Typography.footnote, color: Colors.textMuted },
   summaryEmpty: { color: Colors.textPlaceholder },
+  summaryStruck: { textDecorationLine: 'line-through' },
 });

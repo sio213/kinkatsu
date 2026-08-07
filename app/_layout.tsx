@@ -174,6 +174,8 @@ export default function RootLayout() {
               optionsを上書きする（workout/session-history-loadと同じ方針） */}
           <Stack.Screen name="routine/session-history-load" options={{ title: '' }} />
           <Stack.Screen name="routine/reminder" options={{ title: 'リマインダー' }} />
+          {/* ルーティンを更新の差分確認。タイトルはルーティン名をサブタイトルに出すため画面側で組む */}
+          <Stack.Screen name="routine/update/[id]" options={{ title: '' }} />
           <Stack.Screen name="workout/[id]" options={{ title: '' }} />
           {/* ヘッダーはセッションの日付をサブタイトルに動的表示するため、画面側でStack.Screen
               optionsを上書きする（workout/[id]と同じ方針）。トレーニング中画面の上にpushされ、

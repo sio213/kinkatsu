@@ -4,12 +4,14 @@ import { PrimaryButton } from '@/components/ui/primary-button';
 import { ScreenFooter } from '@/components/ui/screen-footer';
 import { CommunityMessageCard } from '@/components/workout/community-message-card';
 import { RoutineSavePromptCard } from '@/components/workout/routine-save-prompt-card';
+import { RoutineUpdatePromptCard } from '@/components/workout/routine-update-prompt-card';
 import { SummaryExerciseChart } from '@/components/workout/summary-exercise-chart';
 import { SummaryExerciseList } from '@/components/workout/summary-exercise-list';
 import { SessionSummaryStats } from '@/components/workout/session-summary-stats';
 import { ScreenStyles } from '@/constants/theme';
 import { useSessionExerciseCards } from '@/hooks/use-session-exercise-cards';
 import { useRoutineSavePrompt } from '@/hooks/use-routine-save-prompt';
+import { useRoutineUpdatePrompt } from '@/hooks/use-routine-update-prompt';
 import { useSessionTotal, useSessionWeekOrdinal } from '@/hooks/use-session-summary';
 import { useWorkoutSession } from '@/hooks/use-workout-session';
 import { toChartExercises } from '@/lib/workout/chart-exercises';
@@ -52,8 +54,18 @@ export default function WorkoutSummaryScreen() {
     [session],
   );
   const { cards, retry: retryCards } = useSessionExerciseCards(sessionsForCards);
-  // ⋮の項目・本文カード・保存の遷移をまとめて持つ（判定と下書きの積み方はフック側）
-  const { canSaveAsRoutine, showPrompt, saveAsRoutine, dismissPrompt } = useRoutineSavePrompt(session, cards);
+  // ⋮の項目・本文カード・保存の遷移をまとめて持つ（判定と下書きの積み方はフック側）。
+  // 保存（フリー開始）と更新（ルーティン開始）は排他で、同時に出ることはない
+  const { canSaveAsRoutine, showPrompt: showSavePrompt, saveAsRoutine, dismissPrompt: dismissSavePrompt } =
+    useRoutineSavePrompt(session, cards);
+  const {
+    canUpdateRoutine,
+    showPrompt: showUpdatePrompt,
+    routineName,
+    summary: diffSummary,
+    openDiffScreen,
+    dismissPrompt: dismissUpdatePrompt,
+  } = useRoutineUpdatePrompt(session);
   // グラフは種目単位で切り替える（同じ種目の2枚目は同じ絵になるので畳む）
   const chartExercises = useMemo(() => (Array.isArray(cards) ? toChartExercises(cards) : []), [cards]);
 
@@ -98,6 +110,14 @@ export default function WorkoutSummaryScreen() {
       label: 'ルーティンとして保存',
       icon: 'repeat',
       onPress: saveAsRoutine,
+    });
+  }
+  if (canUpdateRoutine) {
+    menuItems.push({
+      key: 'update-routine',
+      label: 'ルーティンを更新',
+      icon: 'repeat',
+      onPress: openDiffScreen,
     });
   }
 
@@ -146,7 +166,15 @@ export default function WorkoutSummaryScreen() {
         />
         {/* 種目一覧の下＝「今日やった構成」を見終わった直後に置く（デザイン案の採用案）。
             数値やグラフの間に挟むと、成果を見る流れをセールスが断ち切る形になる */}
-        {showPrompt && <RoutineSavePromptCard onSave={saveAsRoutine} onDismiss={dismissPrompt} />}
+        {showSavePrompt && <RoutineSavePromptCard onSave={saveAsRoutine} onDismiss={dismissSavePrompt} />}
+        {showUpdatePrompt && routineName != null && (
+          <RoutineUpdatePromptCard
+            routineName={routineName}
+            summary={diffSummary}
+            onConfirm={openDiffScreen}
+            onDismiss={dismissUpdatePrompt}
+          />
+        )}
       </ScrollView>
 
       <ScreenFooter>

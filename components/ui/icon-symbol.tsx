@@ -39,6 +39,10 @@ const MAPPING = {
   'heart.fill': 'favorite',
   'arrow.clockwise': 'refresh',
   'arrow.up.right.square': 'open-in-new',
+  // ルーティンを更新の差分行「変更前 → 変更後」（デザイン案のarrow_forward）と、
+  // 種目カードのアコーディオン（expand_more。開いているときは呼び出し側で180度回す）
+  'arrow.right': 'arrow-forward',
+  'chevron.down': 'expand-more',
 } as IconMapping;
 
 /**
