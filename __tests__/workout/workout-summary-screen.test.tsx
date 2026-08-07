@@ -10,6 +10,7 @@ const mockUseSessionTotal = jest.fn();
 const mockUseSessionWeekOrdinal = jest.fn();
 const mockUseSessionExerciseCards = jest.fn();
 const mockUseHasRoutines = jest.fn();
+const mockUseRoutineDiff = jest.fn();
 
 jest.mock('expo-router', () => ({
   useRouter: () => ({ dismissAll: mockDismissAll, push: mockPush }),
@@ -63,6 +64,12 @@ jest.mock('@/hooks/use-routines', () => ({
   useHasRoutines: () => mockUseHasRoutines(),
 }));
 
+// ルーティンとの差分（更新カード・⋮の「ルーティンを更新」の表示条件）。
+// 差分の計算そのものは__tests__/routines/diff.test.tsの担当で、ここでは出し分けだけを見る
+jest.mock('@/hooks/use-routine-diff', () => ({
+  useRoutineDiff: (...args: unknown[]) => mockUseRoutineDiff(...args),
+}));
+
 import React from 'react';
 import { act, create, type ReactTestInstance } from 'react-test-renderer';
 import { Text, TouchableOpacity } from 'react-native';
@@ -70,6 +77,7 @@ import WorkoutSummaryScreen from '@/app/workout/summary/[id]';
 import { PLACEHOLDER_COMMUNITY_MESSAGE } from '@/lib/workout/community-message';
 import { useRoutineDraftStore } from '@/lib/routines/draft-store';
 import { useRoutineSavePromptStore } from '@/lib/workout/routine-save-prompt-store';
+import { useRoutineUpdatePromptStore } from '@/lib/workout/routine-update-prompt-store';
 
 function findButtonByLabel(root: ReactTestInstance, label: string) {
   return root
@@ -169,6 +177,7 @@ beforeEach(() => {
   mockUseSessionWeekOrdinal.mockReturnValue(2);
   mockUseSessionExerciseCards.mockReturnValue({ cards: [], retry: jest.fn() });
   mockUseHasRoutines.mockReturnValue({ hasRoutines: false, loaded: true });
+  mockUseRoutineDiff.mockReturnValue({ diff: null, routineName: null, retry: jest.fn() });
   useRoutineSavePromptStore.setState({ dismissed: false, hydrated: true });
 });
 
@@ -585,5 +594,111 @@ describe('本文の「ルーティンとして保存」カード', () => {
     expect(card(root)).toBeUndefined();
     expect(useRoutineSavePromptStore.getState().dismissed).toBe(true);
     expect(card(render())).toBeUndefined();
+  });
+});
+
+// ルーティンから開始したセッションでは、保存の代わりに更新が出る（排他）
+describe('「ルーティンを更新」の導線', () => {
+  const cards = [exerciseCard({ workoutSessionExerciseId: 1, name: 'ベンチプレス', completed: true })];
+
+  function diffWith({ added = 0, changed = 0, removed = 0 }) {
+    const make = (n: number, kind: string) =>
+      Array.from({ length: n }, (_, i) => ({ key: `${kind}:${i}`, kind }));
+    return { added: make(added, 'added'), changed: make(changed, 'changed'), removed: make(removed, 'removed') };
+  }
+
+  function card(root: ReactTestInstance) {
+    return root
+      .findAllByType(Text)
+      .find((t) => [t.props.children].flat().join('') === '「胸の日」の内容が変わっています');
+  }
+
+  function menuItem() {
+    return capturedMenuGroups.flat().find((i: any) => i.key === 'update-routine');
+  }
+
+  beforeEach(() => {
+    useRoutineUpdatePromptStore.setState({ dismissed: false, hydrated: true });
+    mockUseWorkoutSession.mockReturnValue({ session: { ...session, routineId: 5 }, loaded: true });
+    mockUseSessionExerciseCards.mockReturnValue({ cards, retry: jest.fn() });
+    mockUseRoutineDiff.mockReturnValue({
+      diff: diffWith({ added: 1, changed: 2 }),
+      routineName: '胸の日',
+      retry: jest.fn(),
+    });
+  });
+
+  test('差分があればカードと⋮の項目が出る', () => {
+    const root = render();
+
+    expect(card(root)).toBeDefined();
+    expect(menuItem()?.label).toBe('ルーティンを更新');
+  });
+
+  test('説明文は差分の内訳（0件の要素は出さない）', () => {
+    const root = render();
+
+    expect(texts(root)).toEqual(expect.arrayContaining(['追加した種目1件・値の変更2件']));
+  });
+
+  // 保存カードと同時には出ない
+  test('ルーティン開始のセッションでは「ルーティンとして保存」は出ない', () => {
+    render();
+
+    expect(capturedMenuGroups.flat().find((i: any) => i.key === 'save-routine')).toBeUndefined();
+  });
+
+  // 時間切れで最後の1種目を飛ばした日。開いても既定オフの1行しかなく、何もすることがない
+  test('未実施しか差分が無い日はカードを出さない（⋮の項目は残る）', () => {
+    mockUseRoutineDiff.mockReturnValue({
+      diff: diffWith({ removed: 1 }),
+      routineName: '胸の日',
+      retry: jest.fn(),
+    });
+
+    const root = render();
+
+    expect(card(root)).toBeUndefined();
+    expect(menuItem()).toBeDefined();
+  });
+
+  test('差分が無ければどちらも出さない', () => {
+    mockUseRoutineDiff.mockReturnValue({ diff: diffWith({}), routineName: '胸の日', retry: jest.fn() });
+
+    const root = render();
+
+    expect(card(root)).toBeUndefined();
+    expect(menuItem()).toBeUndefined();
+  });
+
+  test('「今後表示しない」を押すとカードは消えるが⋮の項目は残る', () => {
+    const root = render();
+
+    act(() => {
+      root
+        .findAllByType(TouchableOpacity)
+        .find((b: ReactTestInstance) => b.props.accessibilityLabel === '今後表示しない')!
+        .props.onPress();
+    });
+
+    expect(card(root)).toBeUndefined();
+    expect(menuItem()).toBeDefined();
+    expect(useRoutineUpdatePromptStore.getState().dismissed).toBe(true);
+  });
+
+  test('「確認する」で差分確認画面へ遷移する', () => {
+    const root = render();
+
+    act(() => {
+      root
+        .findAllByType(TouchableOpacity)
+        .find((b: ReactTestInstance) => b.props.accessibilityLabel === '確認する')!
+        .props.onPress();
+    });
+
+    expect(mockPush).toHaveBeenCalledWith({
+      pathname: '/routine/update/[id]',
+      params: { id: '5', sessionId: '1' },
+    });
   });
 });

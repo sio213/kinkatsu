@@ -30,7 +30,12 @@ type Props = {
 // components/workout/history-load-exercise-card.tsx（過去の記録から読み込む）・
 // components/routines/routine-load-exercise-card.tsx（ルーティンから読み込む）で共通の
 // 「チェックボックス+サムネイル+名前+カテゴリ+セット値サマリ」の行。データの取得元(実績値/目標値)
-// が違うだけで表示の組み立ては同一のため、正規化した最小限のpropsだけを受け取る
+// が違うだけで表示の組み立ては同一のため、正規化した最小限のpropsだけを受け取る。
+// **行全体がチェックのタップ領域**（汗ばんだ指の前提で、チェックボックス単体を狙わせない）。
+//
+// ルーティンを更新の差分確認（components/routines/routine-diff-exercise-row.tsx）は
+// 一度この行を共有していたが、サムネイル・カテゴリを持たない別の構成に確定したため分離した。
+// あちらは「選ぶ」ではなく「反映するかを決める」画面で、種目の識別は直前のサマリーで済んでいる
 export const SelectableExerciseRow = memo(function SelectableExerciseRow({
   id,
   name,
@@ -49,12 +54,10 @@ export const SelectableExerciseRow = memo(function SelectableExerciseRow({
   const summary = formatHistorySetSummary(MEASUREMENT_COLUMNS[resolvedType], sets);
   const displaySummary = summary === '' ? emptyLabel : summary;
 
-  const handlePress = () => onToggle(id);
-
   return (
     <TouchableOpacity
       style={styles.row}
-      onPress={handlePress}
+      onPress={() => onToggle(id)}
       accessibilityRole="checkbox"
       accessibilityState={{ checked: selected }}
       accessibilityLabel={`${name}、${getCategoryLabel(category)}、${accessibilityValuePrefix ?? ''}${displaySummary}`}
