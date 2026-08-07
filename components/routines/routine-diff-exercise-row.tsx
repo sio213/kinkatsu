@@ -1,8 +1,8 @@
 import { ExerciseRowFrame } from '@/components/exercises/exercise-row-frame';
 import { RoutineDiffSetRow } from '@/components/routines/routine-diff-set-row';
 import { Checkbox } from '@/components/ui/checkbox';
-import { IconSymbol } from '@/components/ui/icon-symbol';
-import { Colors, Typography } from '@/constants/theme';
+import { DesignIcon } from '@/components/ui/design-icon';
+import { Colors, IconSizes, Typography } from '@/constants/theme';
 import { getCategoryLabel, resolveMeasurementType } from '@/lib/exercises/constants';
 import { isSetAccepted, resolveExerciseSets, type DiffExercise, type DiffSelection } from '@/lib/routines/diff';
 import { formatHistorySetSummary, MEASUREMENT_COLUMNS, summarizeExerciseSets } from '@/lib/workout/set-format';
@@ -104,9 +104,12 @@ export function RoutineDiffExerciseRow({
           }`,
         }}
         trailing={
-          <IconSymbol
-            name="chevron.down"
-            size={20}
+          // 種目カード右端のchevron（IconSizes.cardChevron）と同じアイコン・同じ大きさを使う。
+          // Material Symbolsのexpand_moreは同じpxでも字形が太く、行の中で悪目立ちする。
+          // chevron-rightを回して下向き（閉）／上向き（開）にする
+          <DesignIcon
+            name="chevron-right"
+            size={IconSizes.cardChevron}
             color={Colors.textPlaceholder}
             style={expanded ? styles.chevronOpen : styles.chevron}
           />
@@ -168,8 +171,8 @@ export function RoutineDiffExerciseRow({
 const styles = StyleSheet.create({
   block: { borderBottomWidth: 1, borderBottomColor: Colors.border },
   checkbox: { marginTop: 2 },
-  chevron: { marginLeft: 'auto' },
-  chevronOpen: { marginLeft: 'auto', transform: [{ rotate: '180deg' }] },
+  chevron: { marginLeft: 'auto', transform: [{ rotate: '90deg' }] },
+  chevronOpen: { marginLeft: 'auto', transform: [{ rotate: '270deg' }] },
   singleSummary: { ...Typography.footnote, color: Colors.textMuted },
   compare: { gap: 2 },
   compareLine: { flexDirection: 'row', gap: 6 },
