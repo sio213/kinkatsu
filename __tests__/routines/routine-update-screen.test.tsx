@@ -42,7 +42,8 @@ const routineExercises = [
 ];
 const sessionCards = [
   { workoutSessionExerciseId: 100, exerciseId: 10, name: 'ベンチプレス', ...meta, sets: [set(100, 5), set(100, 5), set(90, 8)] },
-  { workoutSessionExerciseId: 101, exerciseId: 30, name: 'ディップス', ...meta, sets: [set(null, 12)] },
+  // 自重種目は計測タイプが reps。重量カラムを持たないので要約は「1セット・12回」になる
+  { workoutSessionExerciseId: 101, exerciseId: 30, name: 'ディップス', ...meta, measurementType: 'reps', sets: [set(null, 12)] },
 ];
 const diff = buildRoutineDiff(routineExercises, sessionCards);
 
@@ -105,8 +106,8 @@ test('既定チェックは追加＝ON・値の変更＝ON・未実施＝OFF', (
 
   // 件数の数字だけ入れ子のTextで強調しているため、2要素に分かれて拾われる
   expect(texts(root)).toEqual(expect.arrayContaining(['2', '/3種目を選択中']));
-  expect(checkboxState(root, 'ディップス、胸、自重×12を追加')?.checked).toBe(true);
-  expect(checkboxState(root, 'ペックフライ、胸、30kg×12を削除')?.checked).toBe(false);
+  expect(checkboxState(root, 'ディップス、胸、1セット・12回を追加')?.checked).toBe(true);
+  expect(checkboxState(root, 'ペックフライ、胸、1セット・30kg×12を削除')?.checked).toBe(false);
 });
 
 test('「値の変更」の行はルーティンと今日の要約を両方出す', () => {
@@ -222,4 +223,58 @@ test('取得に失敗したら再試行を出す', () => {
   const root = render();
 
   expect(texts(root)).toEqual(expect.arrayContaining(['差分を読み込めませんでした', '再試行']));
+});
+
+// 差分が解決した最初のフレームで「0/3種目を選択中・更新ボタン無効」が一瞬描かれないこと。
+// 既定チェックをeffectでstateに書くとその状態を経由する
+test('最初のレンダーから既定チェックが乗っている', () => {
+  const root = render();
+
+  expect(texts(root)).toEqual(expect.arrayContaining(['2', '/3種目を選択中']));
+  const submit = root.findAllByType(TouchableOpacity).find((b) => b.props.accessibilityLabel === '更新する');
+  expect(submit?.props.accessibilityState?.disabled).toBe(false);
+});
+
+// updateRoutineは種目行を全削除・再挿入するため、他画面で保存されるとidが総入れ替えになる。
+// 気づかず書くと「何も反映されないまま閉じる」という一番静かな失敗になる
+test('確定直前にルーティンの種目idが入れ替わっていたら書き込まずに取り直させる', async () => {
+  const alert = jest.spyOn(require('react-native').Alert, 'alert').mockImplementation(() => {});
+  const retry = jest.fn();
+  mockUseRoutineDiff.mockReturnValue({ diff, routineName: '胸の日', retry });
+  mockGetRoutineDetail.mockResolvedValue({
+    routine: { id: 7, name: '胸の日' },
+    // 同じ内容だがidが振り直された状態
+    exercises: routineExercises.map((e) => ({ ...e, id: e.id + 100 })),
+    reminder: null,
+  });
+  const root = render();
+
+  await act(async () => {
+    root
+      .findAllByType(TouchableOpacity)
+      .find((b) => b.props.accessibilityLabel === '更新する')!
+      .props.onPress();
+  });
+
+  expect(mockUpdateRoutine).not.toHaveBeenCalled();
+  expect(alert).toHaveBeenCalled();
+  expect(retry).toHaveBeenCalled();
+  expect(mockBack).not.toHaveBeenCalled();
+});
+
+// 行の中に置いたシェブロンはVoiceOverから個別にフォーカスできないため、
+// 同じ操作をローターのカスタムアクションからも届ける
+test('アコーディオンはVoiceOverのカスタムアクションからも開ける', () => {
+  const root = render();
+  const changedRow = root
+    .findAllByType(TouchableOpacity)
+    .find((b) => String(b.props.accessibilityLabel).startsWith('ベンチプレス'))!;
+
+  expect(changedRow.props.accessibilityActions).toEqual([{ name: 'expand', label: 'セットの内訳を開く' }]);
+
+  act(() => {
+    changedRow.props.onAccessibilityAction({ nativeEvent: { actionName: 'expand' } });
+  });
+
+  expect(texts(root)).toEqual(expect.arrayContaining(['1セット目']));
 });

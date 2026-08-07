@@ -4,7 +4,7 @@ import { IconSymbol } from '@/components/ui/icon-symbol';
 import { Colors, Typography } from '@/constants/theme';
 import { getCategoryLabel, resolveMeasurementType } from '@/lib/exercises/constants';
 import { isSetAccepted, resolveExerciseSets, type DiffExercise, type DiffSelection } from '@/lib/routines/diff';
-import { formatHistorySetSummary, MEASUREMENT_COLUMNS, summarizeExerciseSets } from '@/lib/workout/set-format';
+import { summarizeExerciseSets } from '@/lib/workout/set-format';
 import { StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 
 type Props = {
@@ -36,11 +36,13 @@ export function RoutineDiffExerciseRow({
 }: Props) {
   const selected = selection.exercises.has(exercise.key);
   const measurementType = resolveMeasurementType(exercise.measurementType);
-  const expandable = exercise.kind === 'changed' && exercise.setDiffs.length > 0;
 
   if (exercise.kind !== 'changed') {
     // 追加した種目＝今日やった内容、未実施の種目＝ルーティンから消える内容（取り消し線）
     const sets = exercise.kind === 'added' ? exercise.todaySets : exercise.routineSets;
+    // 「値の変更」の行と同じ「Nセット・代表セット」の言い回しに揃える。
+    // 行の既定（セットを全部並べる形）だと、同じ画面内で要約の書式が2種類になる
+    const summary = summarizeExerciseSets(measurementType, sets);
     return (
       <SelectableExerciseRow
         id={0}
@@ -53,13 +55,14 @@ export function RoutineDiffExerciseRow({
         selected={selected}
         onToggle={() => onToggleExercise(exercise.key)}
         horizontalPadding={16}
-        strikeSummary={exercise.kind === 'removed'}
-        // 行に出ている要約と同じ文字列で読ませる（自重種目のように代表セットが決まらない
-        // ケースでsummarizeExerciseSetsが件数だけになるため、行と同じformatHistorySetSummaryを使う）
-        accessibilityLabelOverride={`${exercise.name}、${getCategoryLabel(exercise.category)}、${formatHistorySetSummary(
-          MEASUREMENT_COLUMNS[measurementType],
-          sets,
-        )}を${exercise.kind === 'added' ? '追加' : '削除'}`}
+        body={
+          <Text style={[styles.singleSummary, exercise.kind === 'removed' && styles.struck]} numberOfLines={1}>
+            {summary}
+          </Text>
+        }
+        accessibilityLabelOverride={`${exercise.name}、${getCategoryLabel(exercise.category)}、${summary}を${
+          exercise.kind === 'added' ? '追加' : '削除'
+        }`}
       />
     );
   }
@@ -84,9 +87,14 @@ export function RoutineDiffExerciseRow({
         // 展開部を含めて1つの塊にするため、境界線はblock側が引く
         hideBorder
         accessibilityLabelOverride={`${exercise.name}、${getCategoryLabel(exercise.category)}、ルーティン ${routineSummary} から 今日 ${todaySummary} へ`}
+        // 行の中のボタンはVoiceOverから個別にフォーカスできないため、
+        // 同じ操作をローターのカスタムアクションからも届ける
+        accessibilityActions={[{ name: 'expand', label: expanded ? 'セットの内訳を閉じる' : 'セットの内訳を開く' }]}
+        onAccessibilityAction={(event) => {
+          if (event.nativeEvent.actionName === 'expand') onToggleExpanded(exercise.key);
+        }}
         trailing={
-          expandable ? (
-            <TouchableOpacity
+          <TouchableOpacity
               style={styles.chevron}
               onPress={() => onToggleExpanded(exercise.key)}
               accessibilityRole="button"
@@ -100,8 +108,7 @@ export function RoutineDiffExerciseRow({
                 color={Colors.textPlaceholder}
                 style={expanded ? styles.chevronOpen : undefined}
               />
-            </TouchableOpacity>
-          ) : undefined
+          </TouchableOpacity>
         }
         body={
           <View style={styles.compare}>
@@ -142,6 +149,7 @@ const styles = StyleSheet.create({
   block: { borderBottomWidth: 1, borderBottomColor: Colors.border },
   chevron: { marginLeft: 'auto' },
   chevronOpen: { transform: [{ rotate: '180deg' }] },
+  singleSummary: { ...Typography.footnote, color: Colors.textMuted },
   compare: { gap: 2 },
   compareLine: { flexDirection: 'row', gap: 6 },
   // ラベル幅を揃えると値が縦に並び、視線が上下に流れて比較しやすい

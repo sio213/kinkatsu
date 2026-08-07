@@ -1,3 +1,5 @@
+import { resolveMeasurementType, type MeasurementType } from '@/lib/exercises/constants';
+import { pickRepresentativeSet, primaryMetric } from '@/lib/workout/set-format';
 import { hasAnyValue } from '@/lib/workout/set-values';
 
 /**
@@ -126,33 +128,70 @@ function diffSets(routineSets: DiffSetValues[], todaySets: DiffSetValues[]): Dif
   return diffs;
 }
 
+// 同じ種目のカードが1セッションに複数ある場合（ウォームアップ用と本番用でカードを分ける運用）に、
+// ルーティン側のどのカードと対応付けるかを決める。**主指標が最も近いカード**を選ぶ。
+//
+// 表示順の先頭から順に消費すると、ウォームアップを上に並べている人のルーティンが
+// ウォームアップの重量に下方修正される（しかも既定チェックONで壊れる向き、@reviewer指摘）。
+// 主指標で寄せれば、ルーティンの「100kg×5」は同じ100kg付近のカードと対応する
+function pickClosestCard<T extends { sets: DiffSetValues[] }>(
+  measurementType: MeasurementType,
+  routineSets: DiffSetValues[],
+  candidates: T[],
+): T | undefined {
+  if (candidates.length <= 1) return candidates[0];
+  const target = representativePrimary(measurementType, routineSets);
+  if (target == null) return candidates[0];
+
+  let best = candidates[0];
+  let bestDistance = Infinity;
+  for (const candidate of candidates) {
+    const primary = representativePrimary(measurementType, candidate.sets);
+    // 主指標が取れないカードは比較できないので、他に候補がある限り選ばない
+    const distance = primary == null ? Infinity : Math.abs(primary - target);
+    if (distance < bestDistance) {
+      best = candidate;
+      bestDistance = distance;
+    }
+  }
+  return best;
+}
+
+function representativePrimary(measurementType: MeasurementType, sets: DiffSetValues[]): number | null {
+  const best = pickRepresentativeSet(measurementType, sets);
+  return best ? primaryMetric(measurementType, best) : null;
+}
+
 /**
- * 同じ種目のカードが1セッションに複数ある場合（ウォームアップ用と本番用でカードを分ける運用）は、
- * ルーティン側の同じ種目と**先頭から順に**対応付ける。余ったカードは「追加した種目」になる。
- * 種目idだけで1対1に決め打ちすると、2枚目のカードが常に差分から漏れるか、
- * 1枚目を上書きしてしまうため
+ * ルーティンのテンプレートと今日の実績を突き合わせて差分を組み立てる。
  */
 export function buildRoutineDiff(
   routineExercises: RoutineExerciseLike[],
   sessionCards: SessionCardLike[],
 ): RoutineDiff {
-  // 種目idごとに、まだ対応付けていないセッションカードのキュー
-  const unmatched = new Map<number, SessionCardLike[]>();
+  // 種目idごとに、まだ対応付けていないセッションカード。値が1つも入っていないカード
+  // （追加しただけで実施しなかった）は、ルーティン側のスロットを食い潰さないよう最初から除く
+  const unmatched = new Map<number, { card: SessionCardLike; sets: DiffSetValues[] }[]>();
   for (const card of sessionCards) {
+    const sets = toValueSets(card.sets);
+    if (sets.length === 0) continue;
+    const entry = { card, sets };
     const list = unmatched.get(card.exerciseId);
-    if (list) list.push(card);
-    else unmatched.set(card.exerciseId, [card]);
+    if (list) list.push(entry);
+    else unmatched.set(card.exerciseId, [entry]);
   }
 
   const changed: DiffExercise[] = [];
   const removed: DiffExercise[] = [];
 
   for (const routineExercise of routineExercises) {
-    const queue = unmatched.get(routineExercise.exerciseId);
-    const card = queue?.shift();
     const routineSets = toValueSets(routineExercise.sets);
+    const candidates = unmatched.get(routineExercise.exerciseId) ?? [];
+    const measurementType = resolveMeasurementType(routineExercise.measurementType);
+    const matched = pickClosestCard(measurementType, routineSets, candidates);
+    if (matched) candidates.splice(candidates.indexOf(matched), 1);
 
-    if (!card) {
+    if (!matched) {
       removed.push({
         key: `routine:${routineExercise.id}`,
         kind: 'removed',
@@ -169,7 +208,7 @@ export function buildRoutineDiff(
       continue;
     }
 
-    const todaySets = toValueSets(card.sets);
+    const todaySets = matched.sets;
     const setDiffs = diffSets(routineSets, todaySets);
     if (setDiffs.length === 0) continue;
 
@@ -194,14 +233,11 @@ export function buildRoutineDiff(
   // 保つため、Mapに残った分をsessionCardsの順で拾い直す
   const leftover = new Set<number>();
   for (const list of unmatched.values()) {
-    for (const card of list) leftover.add(card.workoutSessionExerciseId);
+    for (const entry of list) leftover.add(entry.card.workoutSessionExerciseId);
   }
 
   const added: DiffExercise[] = sessionCards
     .filter((card) => leftover.has(card.workoutSessionExerciseId))
-    // 値が1つも入っていない種目（追加しただけで実施しなかった）は差分に出さない。
-    // ルーティンに空のセット列を足しても意味が無い
-    .filter((card) => toValueSets(card.sets).length > 0)
     .map((card) => ({
       key: `session:${card.workoutSessionExerciseId}`,
       kind: 'added' as const,
@@ -262,6 +298,9 @@ export function resolveExerciseSets(exercise: DiffExercise, selection: DiffSelec
   if (exercise.kind === 'added') return exercise.todaySets;
   if (exercise.kind === 'removed') return exercise.routineSets;
 
+  // 注意: 位置ごとの採否を混在させると、結果に同じ値のセットが並ぶことがある
+  // （ルーティン[A,B,C,D]／今日[A,C]で「3セット目の削除」だけ外すと[A,C,C]）。
+  // 実運用ではセット数の増減が末尾で起きるため表面化しにくいので、割り切っている
   const diffByPosition = new Map(exercise.setDiffs.map((d) => [d.setNumber, d]));
   const length = Math.max(exercise.routineSets.length, exercise.todaySets.length);
   const result: DiffSetValues[] = [];
@@ -287,6 +326,14 @@ export function resolveExerciseSets(exercise: DiffExercise, selection: DiffSelec
  * 選択された差分だけを反映した、ルーティンの新しい種目リストを組み立てる。
  * 差分に出てこない種目（ルーティン通りだった種目）はそのまま残す。追加した種目は末尾に足す。
  */
+// セット列が空になった種目は、空1セットに落とす。0セットのまま保存できてしまうと
+// ルーティンの種目行が「0セット」表示になり、種目追加ピッカー経由（buildInitialRoutineSets）の
+// 「実績が無ければ空1セット」と食い違う（lib/routines/validation.tsと同じ扱い）
+const EMPTY_SET: DiffSetValues = { weight: null, reps: null, durationSeconds: null, distanceMeters: null };
+function withFallback(sets: DiffSetValues[]): DiffSetValues[] {
+  return sets.length > 0 ? sets : [EMPTY_SET];
+}
+
 export function applyRoutineDiff(
   routineExercises: RoutineExerciseLike[],
   diff: RoutineDiff,
@@ -304,26 +351,26 @@ export function applyRoutineDiff(
     const removedEntry = removedByRoutineExerciseId.get(key);
     // 「未実施の種目」はチェック＝ルーティンから削除。外れていれば据え置き
     if (removedEntry) {
-      if (!checked) result.push({ exerciseId: routineExercise.exerciseId, sets: removedEntry.routineSets });
+      if (!checked) result.push({ exerciseId: routineExercise.exerciseId, sets: withFallback(removedEntry.routineSets) });
       continue;
     }
 
     const changedEntry = changedByRoutineExerciseId.get(key);
     if (changedEntry) {
-      const sets = checked
-        ? resolveExerciseSets(changedEntry, selection)
-        : changedEntry.routineSets;
-      result.push({ exerciseId: routineExercise.exerciseId, sets });
+      const sets = checked ? resolveExerciseSets(changedEntry, selection) : changedEntry.routineSets;
+      result.push({ exerciseId: routineExercise.exerciseId, sets: withFallback(sets) });
       continue;
     }
 
-    // 差分の無かった種目
-    result.push({ exerciseId: routineExercise.exerciseId, sets: toValueSets(routineExercise.sets) });
+    // 差分の無かった種目＝ユーザーが一切触っていない種目。toValueSetsを通すと
+    // 目標値を未入力のまま保存された空セット行が黙って消えるため、そのまま写す
+    // （「チェックしたものだけ反映」を守る。@reviewer Major指摘）
+    result.push({ exerciseId: routineExercise.exerciseId, sets: routineExercise.sets.map(toValues) });
   }
 
   for (const addedEntry of diff.added) {
     if (selection.exercises.has(addedEntry.key)) {
-      result.push({ exerciseId: addedEntry.exerciseId, sets: addedEntry.todaySets });
+      result.push({ exerciseId: addedEntry.exerciseId, sets: withFallback(addedEntry.todaySets) });
     }
   }
 

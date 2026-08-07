@@ -30,8 +30,6 @@ type Props = {
   body?: ReactNode;
   // 名前・カテゴリの右端に置く要素（アコーディオンのシェブロン等）
   trailing?: ReactNode;
-  // 要約に取り消し線を引く。差分確認画面の「未実施の種目」（ルーティンから消える側）用
-  strikeSummary?: boolean;
   // 行の下境界線を消す。アコーディオンの展開部を含めて1つの塊として囲む側が線を引く場合に使う
   hideBorder?: boolean;
   // 読み上げラベルを丸ごと差し替える。差分行は「変更前→変更後」を読ませたいため
@@ -39,6 +37,10 @@ type Props = {
   // 行の左右パディング。読み込み系の画面はFlatListのcontentContainerが左右16pxを持つため0でよいが、
   // 差分確認画面はアコーディオンの展開部を画面幅いっぱいに敷くため、行側で持つ必要がある
   horizontalPadding?: number;
+  // 行の中に置いたボタン（trailingのシェブロン等）はVoiceOverから個別にフォーカスできない
+  // （行自体がaccessible）。代わりにローターのカスタムアクションとして届ける
+  accessibilityActions?: { name: string; label?: string }[];
+  onAccessibilityAction?: (event: { nativeEvent: { actionName: string } }) => void;
 };
 
 // components/workout/history-load-exercise-card.tsx（過去の記録から読み込む）・
@@ -59,10 +61,11 @@ export const SelectableExerciseRow = memo(function SelectableExerciseRow({
   emptyLabel = '',
   body,
   trailing,
-  strikeSummary = false,
   hideBorder = false,
   accessibilityLabelOverride,
   horizontalPadding = 0,
+  accessibilityActions,
+  onAccessibilityAction,
 }: Props) {
   const images = getExerciseImages({ source, slug });
   const resolvedType = resolveMeasurementType(measurementType);
@@ -77,6 +80,8 @@ export const SelectableExerciseRow = memo(function SelectableExerciseRow({
       onPress={handlePress}
       accessibilityRole="checkbox"
       accessibilityState={{ checked: selected }}
+      accessibilityActions={accessibilityActions}
+      onAccessibilityAction={onAccessibilityAction}
       accessibilityLabel={
         accessibilityLabelOverride ??
         `${name}、${getCategoryLabel(category)}、${accessibilityValuePrefix ?? ''}${displaySummary}`
@@ -94,7 +99,7 @@ export const SelectableExerciseRow = memo(function SelectableExerciseRow({
         </View>
         {body ?? (
           <Text
-            style={[styles.summary, summary === '' && styles.summaryEmpty, strikeSummary && styles.summaryStruck]}
+            style={[styles.summary, summary === '' && styles.summaryEmpty]}
             numberOfLines={1}
           >
             {displaySummary}
@@ -120,5 +125,4 @@ const styles = StyleSheet.create({
   rowBorderless: { borderBottomWidth: 0 },
   summary: { ...Typography.footnote, color: Colors.textMuted },
   summaryEmpty: { color: Colors.textPlaceholder },
-  summaryStruck: { textDecorationLine: 'line-through' },
 });

@@ -65,7 +65,7 @@ export default function WorkoutSummaryScreen() {
     summary: diffSummary,
     openDiffScreen,
     dismissPrompt: dismissUpdatePrompt,
-  } = useRoutineUpdatePrompt(session);
+  } = useRoutineUpdatePrompt(session, cards);
   // グラフは種目単位で切り替える（同じ種目の2枚目は同じ絵になるので畳む）
   const chartExercises = useMemo(() => (Array.isArray(cards) ? toChartExercises(cards) : []), [cards]);
 

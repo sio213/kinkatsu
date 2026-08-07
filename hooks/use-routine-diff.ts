@@ -1,6 +1,6 @@
 import { getRoutineDetail } from '@/lib/routines/db';
 import { buildRoutineDiff, type RoutineDiff } from '@/lib/routines/diff';
-import { getSessionExerciseCards } from '@/lib/workout/history';
+import { getSessionExerciseCards, type SessionHistoryCard } from '@/lib/workout/history';
 import { useFocusEffect } from 'expo-router';
 import { useCallback, useEffect, useRef, useState } from 'react';
 
@@ -22,43 +22,60 @@ export type RoutineDiffResult = {
  * 単純なクエリ購読には落とし込めない（use-session-exercise-cards.tsと同じ理由）。
  * 代わりに画面の再フォーカス時に取り直すので、記録編集やルーティン編集から戻れば最新になる。
  */
-export function useRoutineDiff(sessionId: number | null, routineId: number | null): RoutineDiffResult {
-  const [diff, setDiff] = useState<RoutineDiff | 'error' | null>(null);
-  const [routineName, setRoutineName] = useState<string | null>(null);
+export function useRoutineDiff(
+  sessionId: number | null,
+  routineId: number | null,
+  // 既に同じセッションのカードを取得済みの呼び出し元（完了サマリー）はそれを渡す。
+  // 省略すると自前で取りに行く（差分確認画面はこちら）
+  providedCards?: SessionHistoryCard[] | 'error' | null,
+): RoutineDiffResult {
+  // **どのセッション・ルーティンに対する結果なのかをキーで持つ。** 値だけを持って再取得のたびに
+  // nullへ戻すと、画面に戻るたび（useFocusEffect経由の取り直し）に一瞬「読み込み中」へ落ちて
+  // カードや⋮の項目が消えて出直す。対象が変わったときだけ読み込み中に戻す
+  // （use-session-exercise-cards.tsで同じ問題を潰したのと同じ形、@reviewer指摘）
+  const key = `${sessionId}:${routineId}`;
+  const [state, setState] = useState<{ key: string; diff: RoutineDiff | 'error'; routineName: string | null } | null>(
+    null,
+  );
   const [reloadToken, setReloadToken] = useState(0);
 
   const retry = useCallback(() => setReloadToken((n) => n + 1), []);
 
   useEffect(() => {
     if (sessionId == null || routineId == null) {
-      setDiff(null);
-      setRoutineName(null);
+      setState(null);
+      return;
+    }
+    if (providedCards === 'error') {
+      setState({ key, diff: 'error', routineName: null });
       return;
     }
     let cancelled = false;
-    setDiff(null);
 
-    Promise.all([getRoutineDetail(routineId), getSessionExerciseCards(sessionId, { includeUnconfirmedCards: true })])
+    Promise.all([
+      getRoutineDetail(routineId),
+      providedCards ?? getSessionExerciseCards(sessionId, { includeUnconfirmedCards: true }),
+    ])
       .then(([detail, cards]) => {
         if (cancelled) return;
         if (!detail) {
           // ルーティンが削除済み。差分の出しようが無いので「差分なし」と同じ扱いにする
-          setDiff({ added: [], changed: [], removed: [] });
-          setRoutineName(null);
+          setState({ key, diff: { added: [], changed: [], removed: [] }, routineName: null });
           return;
         }
-        setRoutineName(detail.routine.name);
-        setDiff(buildRoutineDiff(detail.exercises, cards));
+        setState({ key, diff: buildRoutineDiff(detail.exercises, cards), routineName: detail.routine.name });
       })
       .catch((e) => {
         console.error('[routine diff]', e);
-        if (!cancelled) setDiff('error');
+        if (!cancelled) setState({ key, diff: 'error', routineName: null });
       });
 
     return () => {
       cancelled = true;
     };
-  }, [sessionId, routineId, reloadToken]);
+    // providedCardsは呼び出し元が取り直すたびに新しい配列になるため、依存に入れると
+    // そのたび差分も計算し直される（＝カードと差分が常に同じ世代になる）
+  }, [sessionId, routineId, reloadToken, key, providedCards]);
 
   // 記録編集・ルーティン編集から戻ったときに取り直す。初回マウント時のフォーカスは
   // 上のeffectが既に取得を担うため、二重取得を避けて最初の1回だけスキップする
@@ -74,5 +91,8 @@ export function useRoutineDiff(sessionId: number | null, routineId: number | nul
     }, [retry]),
   );
 
-  return { diff, routineName, retry };
+  // 対象が切り替わった直後の1フレームに前の対象の結果を描かないよう、keyが一致するときだけ返す
+  const current = state?.key === key ? state : null;
+
+  return { diff: current?.diff ?? null, routineName: current?.routineName ?? null, retry };
 }

@@ -10,7 +10,7 @@ import { getRoutineDetail, updateRoutine } from '@/lib/routines/db';
 import { applyRoutineDiff, diffTotalCount, type DiffExercise, type DiffSelection } from '@/lib/routines/diff';
 import { useRoutineUpdatePromptStore } from '@/lib/workout/routine-update-prompt-store';
 import { Stack, useLocalSearchParams, useRouter } from 'expo-router';
-import { useEffect, useMemo, useRef, useState } from 'react';
+import { useMemo, useRef, useState } from 'react';
 import { ActivityIndicator, Alert, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
@@ -39,23 +39,12 @@ export default function RoutineUpdateScreen() {
     Number.isFinite(routineId) ? routineId : null,
   );
 
-  const [selection, setSelection] = useState<DiffSelection>({ exercises: new Set(), sets: new Map() });
+  const [selectionState, setSelectionState] = useState<{ key: string; value: DiffSelection } | null>(null);
   const [expandedKeys, setExpandedKeys] = useState<Set<string>>(() => new Set());
   const isSubmittingRef = useRef(false);
   const [submitting, setSubmitting] = useState(false);
 
   const resolved = diff !== null && diff !== 'error' ? diff : null;
-
-  // 差分を取り直すたびに既定のチェック状態へ戻す。行が入れ替わっているのに前の選択が
-  // 残っていると、ユーザーが見ていない差分にチェックが付いたままになる
-  useEffect(() => {
-    if (!resolved) return;
-    const defaults = new Set<string>();
-    for (const e of resolved.added) defaults.add(e.key);
-    for (const e of resolved.changed) defaults.add(e.key);
-    setSelection({ exercises: defaults, sets: new Map() });
-    setExpandedKeys(new Set());
-  }, [resolved]);
 
   const sections: Section[] = useMemo(() => {
     if (!resolved) return [];
@@ -70,22 +59,35 @@ export default function RoutineUpdateScreen() {
     () => (resolved ? [...resolved.added, ...resolved.changed, ...resolved.removed].map((e) => e.key) : []),
     [resolved],
   );
+
+  // 既定チェックは「行の顔ぶれ」から導出する。effectでstateに書くと、差分が解決した最初の
+  // 1フレームだけ全項目未チェック・更新ボタン無効という別の状態が描かれてしまう。
+  // 顔ぶれが変わらない再取得（画面に戻ったとき）ではユーザーの選択がそのまま残る
+  const diffKey = allKeys.join('|');
+  const selection: DiffSelection = useMemo(() => {
+    if (selectionState?.key === diffKey) return selectionState.value;
+    const defaults = new Set<string>();
+    for (const e of resolved?.added ?? []) defaults.add(e.key);
+    for (const e of resolved?.changed ?? []) defaults.add(e.key);
+    return { exercises: defaults, sets: new Map() };
+  }, [selectionState, diffKey, resolved]);
+
   const allSelected = allKeys.length > 0 && selection.exercises.size === allKeys.length;
 
+  const updateSelection = (next: DiffSelection) => setSelectionState({ key: diffKey, value: next });
+
   const handleToggleExercise = (key: string) => {
-    setSelection((prev) => {
-      const exercises = new Set(prev.exercises);
-      if (exercises.has(key)) exercises.delete(key);
-      else exercises.add(key);
-      return { exercises, sets: prev.sets };
-    });
+    const exercises = new Set(selection.exercises);
+    if (exercises.has(key)) exercises.delete(key);
+    else exercises.add(key);
+    updateSelection({ exercises, sets: selection.sets });
   };
 
   const handleToggleAll = () => {
-    setSelection((prev) => ({
-      exercises: prev.exercises.size === allKeys.length ? new Set() : new Set(allKeys),
-      sets: prev.sets,
-    }));
+    updateSelection({
+      exercises: selection.exercises.size === allKeys.length ? new Set() : new Set(allKeys),
+      sets: selection.sets,
+    });
   };
 
   // セット単位のチェック。Map未登録＝全セットONなので、初回のトグルでは
@@ -93,15 +95,13 @@ export default function RoutineUpdateScreen() {
   const handleToggleSet = (key: string, setNumber: number) => {
     const exercise = resolved?.changed.find((e) => e.key === key);
     if (!exercise) return;
-    setSelection((prev) => {
-      const sets = new Map(prev.sets);
-      const current = sets.get(key) ?? new Set(exercise.setDiffs.map((d) => d.setNumber));
-      const next = new Set(current);
-      if (next.has(setNumber)) next.delete(setNumber);
-      else next.add(setNumber);
-      sets.set(key, next);
-      return { exercises: prev.exercises, sets };
-    });
+    const sets = new Map(selection.sets);
+    const current = sets.get(key) ?? new Set(exercise.setDiffs.map((d) => d.setNumber));
+    const next = new Set(current);
+    if (next.has(setNumber)) next.delete(setNumber);
+    else next.add(setNumber);
+    sets.set(key, next);
+    updateSelection({ exercises: selection.exercises, sets });
   };
 
   const handleToggleExpanded = (key: string) => {
@@ -123,6 +123,17 @@ export default function RoutineUpdateScreen() {
       // リマインダーを更新しない（lib/routines/db.ts参照）
       const detail = await getRoutineDetail(routineId);
       if (!detail) throw new Error(`routine not found: ${routineId}`);
+      // updateRoutineはroutineExercisesを全削除・再挿入するため、他画面でこのルーティンが
+      // 保存されているとidが総入れ替えになり、差分のkey（routine:<id>）と一致しなくなる。
+      // 気づかずに書くと「何も反映されないまま閉じる」という一番静かな失敗になるので、
+      // 差分を取り直させる（@reviewer指摘）
+      const knownIds = new Set(detail.exercises.map((e) => `routine:${e.id}`));
+      const stale = [...resolved.changed, ...resolved.removed].some((e) => !knownIds.has(e.key));
+      if (stale) {
+        Alert.alert('ルーティンが変更されました', 'もう一度内容を確認してください。');
+        retry();
+        return;
+      }
       const exercises = applyRoutineDiff(detail.exercises, resolved, selection);
       await updateRoutine(routineId, { name: detail.routine.name, exercises });
       // 「今後表示しない」は「同期しない」という表明なので、実際に更新したなら撤回したと読む
