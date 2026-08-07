@@ -11,6 +11,12 @@ type Props = {
   measurementType: MeasurementType;
   checked: boolean;
   onToggle: (setNumber: number) => void;
+} | {
+  diff: DiffSet;
+  measurementType: MeasurementType;
+  // 「追加した種目」「未実施の種目」はセット列ごと丸ごと採否を決めるので、内訳は読み取り専用。
+  // チェックボックスの場所は空けたまま（同じ画面のセット行が縦に揃う）
+  readOnly: true;
 };
 
 /**
@@ -22,11 +28,13 @@ type Props = {
  *
  * 追加・削除されたセットは値の比較ができないため、値の代わりにチップで種別を示す。
  *
- * 左パディング24は親行の16に8のインデントを足したぶん。この8が階層の手がかりになるので、
- * それ以上深くしない（デザイン仕様）。セットラベルの幅を68で固定するのは、可変にすると
+ * 左パディング32は親行の16にインデントを足したぶん（デザイン仕様は24だが、実機で見て
+ * 階層の手がかりとしては浅かったため広げている）。セットラベルの幅を68で固定するのは、可変にすると
  * 「1セット目」「10セット目」で矢印の位置がずれて、縦に並んだときに読みにくくなるため。
  */
-export function RoutineDiffSetRow({ diff, measurementType, checked, onToggle }: Props) {
+export function RoutineDiffSetRow(props: Props) {
+  const { diff, measurementType } = props;
+  const readOnly = 'readOnly' in props;
   const columns = MEASUREMENT_COLUMNS[measurementType];
   const before = diff.before ? formatHistorySetSummary(columns, [diff.before]) : '';
   const after = diff.after ? formatHistorySetSummary(columns, [diff.after]) : '';
@@ -39,15 +47,9 @@ export function RoutineDiffSetRow({ diff, measurementType, checked, onToggle }: 
         ? `${label} ${before} を削除`
         : `${label} ${before} から ${after} へ変更`;
 
-  return (
-    <TouchableOpacity
-      style={styles.row}
-      onPress={() => onToggle(diff.setNumber)}
-      accessibilityRole="checkbox"
-      accessibilityState={{ checked }}
-      accessibilityLabel={accessibilityLabel}
-    >
-      <Checkbox checked={checked} size={19} />
+  const body = (
+    <>
+      {readOnly ? <View style={styles.checkboxSpacer} /> : <Checkbox checked={props.checked} size={19} />}
       <View style={styles.content}>
         <Text style={styles.label}>{label}</Text>
         {diff.kind === 'removed' ? (
@@ -72,14 +74,35 @@ export function RoutineDiffSetRow({ diff, measurementType, checked, onToggle }: 
           </>
         )}
       </View>
+    </>
+  );
+
+  if (readOnly) {
+    return (
+      <View style={styles.row} accessible accessibilityLabel={accessibilityLabel}>
+        {body}
+      </View>
+    );
+  }
+
+  return (
+    <TouchableOpacity
+      style={styles.row}
+      onPress={() => props.onToggle(diff.setNumber)}
+      accessibilityRole="checkbox"
+      accessibilityState={{ checked: props.checked }}
+      accessibilityLabel={accessibilityLabel}
+    >
+      {body}
     </TouchableOpacity>
   );
 }
 
 const styles = StyleSheet.create({
   // 上下10で行の高さは約40。行全体がタップ領域（チェックボックス単体を狙わせない）
-  row: { flexDirection: 'row', alignItems: 'center', paddingVertical: 10, paddingLeft: 24, paddingRight: 16, gap: 12 },
+  row: { flexDirection: 'row', alignItems: 'center', paddingVertical: 10, paddingLeft: 32, paddingRight: 16, gap: 12 },
   content: { flex: 1, flexDirection: 'row', alignItems: 'center' },
+  checkboxSpacer: { width: 19 },
   // 幅固定で矢印の位置を縦に揃える
   label: { ...Typography.footnote, color: Colors.textSecondary, width: 68 },
   before: { ...Typography.footnote, color: Colors.textPlaceholder },

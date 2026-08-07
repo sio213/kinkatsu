@@ -14,10 +14,11 @@ type Props = {
   indeterminate?: boolean;
 };
 
-// チェックマークはボックスの62%の大きさ・線幅3・線端と角は丸（デザイン仕様）。
-// MaterialIconsのcheckは線端が角ばっていて線も細く、同じ62%でも別物に見えるため自前で描く
+// チェックマークはボックスの62%の大きさ・線端と角は丸（デザイン仕様）。
+// MaterialIconsのcheckは線端が角ばっていて線も細く、同じ62%でも別物に見えるため自前で描く。
+// 線幅は仕様が3だが、22/19pxのボックスに対しては太く見えたため2.0に落としている
 const GLYPH_RATIO = 0.62;
-const STROKE_WIDTH = 3;
+const STROKE_WIDTH = 2;
 const VIEW_BOX = 24;
 
 // 見た目のみのプレゼンテーショナルコンポーネント。タップ処理は呼び出し側のTouchableOpacityが持つ

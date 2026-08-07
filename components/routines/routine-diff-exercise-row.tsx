@@ -4,8 +4,14 @@ import { Checkbox } from '@/components/ui/checkbox';
 import { DesignIcon } from '@/components/ui/design-icon';
 import { Colors, IconSizes, Typography } from '@/constants/theme';
 import { getCategoryLabel, resolveMeasurementType } from '@/lib/exercises/constants';
-import { isSetAccepted, resolveExerciseSets, type DiffExercise, type DiffSelection } from '@/lib/routines/diff';
-import { formatHistorySetSummary, MEASUREMENT_COLUMNS, summarizeExerciseSets } from '@/lib/workout/set-format';
+import {
+  isSetAccepted,
+  resolveExerciseSets,
+  type DiffExercise,
+  type DiffSelection,
+  type DiffSet,
+} from '@/lib/routines/diff';
+import { summarizeExerciseSets } from '@/lib/workout/set-format';
 import { StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 
 type Props = {
@@ -48,7 +54,6 @@ export function RoutineDiffExerciseRow({
 }: Props) {
   const selected = selection.exercises.has(exercise.key);
   const measurementType = resolveMeasurementType(exercise.measurementType);
-  const columns = MEASUREMENT_COLUMNS[measurementType];
 
   const isChanged = exercise.kind === 'changed';
   // 取り消し線と「今日」側の強調は「反映される」ことの印。チェックが外れている行に付けると、
@@ -63,7 +68,13 @@ export function RoutineDiffExerciseRow({
   const todaySummary = summarizeExerciseSets(measurementType, todaySets);
   // 追加＝今日やった内容、未実施＝ルーティンから消える内容
   const singleSummary = exercise.kind === 'added' ? todaySummary : routineSummary;
-  const detailSets = exercise.kind === 'added' ? exercise.todaySets : exercise.routineSets;
+  // 追加・未実施はセット列ごと丸ごと採否を決めるため、内訳は読み取り専用。
+  // 「値の変更」のセット行と同じ組み立て（ラベル・値・種別チップ）を通したいので、
+  // セット列をそのままDiffSetの形に写して渡す
+  const detailDiffs: DiffSet[] =
+    exercise.kind === 'added'
+      ? exercise.todaySets.map((set, i) => ({ setNumber: i + 1, kind: 'added', before: null, after: set }))
+      : exercise.routineSets.map((set, i) => ({ setNumber: i + 1, kind: 'removed', before: set, after: null }));
 
   const valueLabel = isChanged
     ? `ルーティン ${routineSummary} から 今日 ${todaySummary} へ`
@@ -152,15 +163,9 @@ export function RoutineDiffExerciseRow({
                   onToggle={(setNumber) => onToggleSet(exercise.key, setNumber)}
                 />
               ))
-            : // 追加・未実施はセット列ごと丸ごと採否を決めるので内訳は読み取り専用。
-              // それでも開けるのは、何が足される／消えるかを確認できるようにするため
-              detailSets.map((set, index) => (
-                <View key={index} style={styles.readonlySet}>
-                  <Text style={styles.readonlyLabel}>{`${index + 1}セット目`}</Text>
-                  <Text style={[styles.readonlyValue, exercise.kind === 'removed' && styles.struck]}>
-                    {formatHistorySetSummary(columns, [set])}
-                  </Text>
-                </View>
+            : // 開けるようにしているのは、何が足される／消えるかを確認できるようにするため
+              detailDiffs.map((diff) => (
+                <RoutineDiffSetRow key={diff.setNumber} diff={diff} measurementType={measurementType} readOnly />
               ))}
         </View>
       )}
@@ -171,20 +176,20 @@ export function RoutineDiffExerciseRow({
 const styles = StyleSheet.create({
   block: { borderBottomWidth: 1, borderBottomColor: Colors.border },
   checkbox: { marginTop: 2 },
-  chevron: { marginLeft: 'auto', transform: [{ rotate: '90deg' }] },
-  chevronOpen: { marginLeft: 'auto', transform: [{ rotate: '270deg' }] },
+  chevron: { transform: [{ rotate: '90deg' }] },
+  chevronOpen: { transform: [{ rotate: '270deg' }] },
   singleSummary: { ...Typography.footnote, color: Colors.textMuted },
   compare: { gap: 2 },
   compareLine: { flexDirection: 'row', gap: 6 },
-  // ラベル幅を揃えると値が縦に並び、視線が上下に流れて比較しやすい
+  // ラベル幅を揃えると値が縦に並び、視線が上下に流れて比較しやすい。
+  // ラベルだけ一段小さいのは行の説明であって値ではないため。値は「追加した種目」「未実施の種目」の
+  // 要約行と同じfootnote(13px)にする——同じ「その種目がどうなるか」を伝える行なので、
+  // セクションによって文字サイズが変わる理由が無い
   compareLabel: { ...Typography.captionCompact, fontWeight: '600', color: Colors.textPlaceholder, width: 58 },
-  compareBefore: { ...Typography.captionCompact, color: Colors.textPlaceholder, flex: 1 },
-  compareAfter: { ...Typography.captionCompact, fontWeight: '600', color: Colors.textPrimary, flex: 1 },
+  compareBefore: { ...Typography.footnote, color: Colors.textPlaceholder, flex: 1 },
+  compareAfter: { ...Typography.footnote, fontWeight: '600', color: Colors.textPrimary, flex: 1 },
   struck: { textDecorationLine: 'line-through' },
   // 左右のパディングは行が持つ（左24＝親の16＋インデント8）。最後のセット行が
   // 区切り線に貼り付かないよう下に8だけ空ける
   setDetail: { paddingBottom: 8, backgroundColor: Colors.surfaceMuted },
-  readonlySet: { flexDirection: 'row', alignItems: 'center', paddingVertical: 10, paddingLeft: 24, paddingRight: 16 },
-  readonlyLabel: { ...Typography.footnote, color: Colors.textSecondary, width: 68 },
-  readonlyValue: { ...Typography.footnote, fontWeight: '500', color: Colors.textPrimary },
 });

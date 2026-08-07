@@ -87,3 +87,17 @@ test('チェック状態を読み上げに乗せ、行全体でトグルする',
   });
   expect(onToggle).toHaveBeenCalledWith(1);
 });
+
+// 「追加した種目」「未実施の種目」の内訳。チェックボックスの場所は空けたまま、
+// 値と種別チップは「値の変更」の行と同じ組み立てにする
+test('readOnlyではチェックボックスもタップも無いが、値とチップは同じに出る', () => {
+  let instance!: ReturnType<typeof create>;
+  act(() => {
+    instance = create(<RoutineDiffSetRow diff={added} measurementType="weight_reps" readOnly />);
+  });
+  currentInstance = instance;
+  const root = instance.root;
+
+  expect(texts(root)).toEqual(['4セット目', '90kg×8', '追加']);
+  expect(root.findAllByType(TouchableOpacity)).toHaveLength(0);
+});

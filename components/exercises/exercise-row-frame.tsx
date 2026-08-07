@@ -73,6 +73,10 @@ export function ExerciseRowFrame({
             {name}
           </Text>
           <CategoryChip category={category} />
+          {/* trailingを右端に寄せるのは、marginLeft:'auto'ではなく伸びる余白で行う。
+              auto marginは行が1ptでも溢れた瞬間に縮小の配分を壊し、種目名が
+              「ペ…」のように1文字まで潰れる（390pt端末で発生。393ptでは出ない） */}
+          {trailing != null && <View style={styles.spacer} />}
           {trailing}
         </View>
         {body}
@@ -113,5 +117,7 @@ const styles = StyleSheet.create({
   content: { flex: 1, flexDirection: 'row' },
   info: { flex: 1 },
   nameRow: { flexDirection: 'row', alignItems: 'center', gap: 6 },
+  // flexBasis 0なので、溢れたときの縮小はすべて種目名側が引き受ける（余白は0まで潰れるだけ）
+  spacer: { flex: 1 },
   name: { ...Typography.cardTitle, color: Colors.textPrimary, flexShrink: 1 },
 });

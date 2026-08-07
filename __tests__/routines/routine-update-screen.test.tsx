@@ -143,15 +143,23 @@ test('セットのチェックを外すと親の「今日」の要約がその�
 
 // 同じ見た目の行に押せる行と押せない行が混ざらないよう、3種類すべてが開ける。
 // 追加・未実施はセット列の読み取り専用表示
-test('追加した種目も開いてセット内訳を読める（チェックボックスは無い）', () => {
+test('追加した種目も開いてセット内訳を読める（チェックボックスは無く、種別チップは付く）', () => {
   const root = render();
   expandRow(root, 'ディップス');
 
-  expect(texts(root)).toEqual(expect.arrayContaining(['1セット目', '12回']));
+  // 「値の変更」のセット行と同じ組み立て（ラベル・値・種別チップ）
+  expect(texts(root)).toEqual(expect.arrayContaining(['1セット目', '12回', '追加']));
   // セット行にチェックボックスは付かない
   expect(
     root.findAllByType(TouchableOpacity).filter((b) => String(b.props.accessibilityLabel).includes('セット目')),
   ).toHaveLength(0);
+});
+
+test('未実施の種目の内訳は取り消し線＋「削除」チップになる', () => {
+  const root = render();
+  expandRow(root, 'ペックフライ');
+
+  expect(texts(root)).toEqual(expect.arrayContaining(['1セット目', '30kg×12', '削除']));
 });
 
 test('チェックを全部外すと更新ボタンが無効になる', () => {
