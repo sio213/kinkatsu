@@ -28,8 +28,8 @@ type Props = {
  *
  * 追加・削除されたセットは値の比較ができないため、値の代わりにチップで種別を示す。
  *
- * 左パディング32は親行の16にインデントを足したぶん（デザイン仕様は24だが、実機で見て
- * 階層の手がかりとしては浅かったため広げている）。セットラベルの幅を68で固定するのは、可変にすると
+ * 左パディング24は親行の16に8のインデントを足したぶん。この8が階層の手がかりになるので、
+ * それ以上深くしない（デザイン仕様）。セットラベルの幅を68で固定するのは、可変にすると
  * 「1セット目」「10セット目」で矢印の位置がずれて、縦に並んだときに読みにくくなるため。
  */
 export function RoutineDiffSetRow(props: Props) {
@@ -69,7 +69,7 @@ export function RoutineDiffSetRow(props: Props) {
         ) : (
           <>
             <Text style={styles.before}>{before}</Text>
-            <IconSymbol name="arrow.right" size={12} color={Colors.textPlaceholder} style={styles.arrow} />
+            <IconSymbol name="arrow.right" size={13} color={Colors.borderStrong} style={styles.arrow} />
             <Text style={styles.after}>{after}</Text>
           </>
         )}
@@ -100,11 +100,11 @@ export function RoutineDiffSetRow(props: Props) {
 
 const styles = StyleSheet.create({
   // 上下10で行の高さは約40。行全体がタップ領域（チェックボックス単体を狙わせない）
-  row: { flexDirection: 'row', alignItems: 'center', paddingVertical: 10, paddingLeft: 32, paddingRight: 16, gap: 12 },
+  row: { flexDirection: 'row', alignItems: 'center', paddingVertical: 10, paddingLeft: 24, paddingRight: 16, gap: 12 },
   content: { flex: 1, flexDirection: 'row', alignItems: 'center' },
   checkboxSpacer: { width: 19 },
   // 幅固定で矢印の位置を縦に揃える
-  label: { ...Typography.footnote, color: Colors.textSecondary, width: 68 },
+  label: { ...Typography.footnote, color: Colors.textMuted, width: 68 },
   before: { ...Typography.footnote, color: Colors.textPlaceholder },
   arrow: { marginHorizontal: 8 },
   after: { ...Typography.footnote, fontWeight: '500', color: Colors.textPrimary },

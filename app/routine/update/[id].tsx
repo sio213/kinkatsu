@@ -227,18 +227,20 @@ export default function RoutineUpdateScreen() {
       />
 
       <ScrollView style={styles.list} contentContainerStyle={styles.content}>
-        {sections.map((section) => (
+        {sections.map((section, sectionIndex) => (
           <View key={section.title}>
             <View style={styles.sectionHeader}>
               <Text style={styles.sectionTitle}>{section.title}</Text>
               <Text style={styles.sectionCount}>{`${section.exercises.length}件`}</Text>
             </View>
-            {section.exercises.map((exercise) => (
+            {section.exercises.map((exercise, index) => (
               <RoutineDiffExerciseRow
                 key={exercise.key}
                 exercise={exercise}
                 selection={selection}
                 partiallySelected={isPartiallySelected(exercise)}
+                // リストの最後の行だけ区切り線を引かない（下に何も続かないため）
+                isLast={sectionIndex === sections.length - 1 && index === section.exercises.length - 1}
                 expanded={expandedKeys.has(exercise.key)}
                 onToggleExercise={handleToggleExercise}
                 onToggleSet={handleToggleSet}

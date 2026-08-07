@@ -1,10 +1,12 @@
-import { ExerciseRowFrame } from '@/components/exercises/exercise-row-frame';
+import { CategoryChip } from '@/components/exercises/category-chip';
+import { ExerciseThumbnail } from '@/components/exercises/exercise-thumbnail';
 import { Checkbox } from '@/components/ui/checkbox';
 import { Colors, Typography } from '@/constants/theme';
 import { getCategoryLabel, resolveMeasurementType } from '@/lib/exercises/constants';
+import { getExerciseImages } from '@/lib/exercises/images';
 import { formatHistorySetSummary, MEASUREMENT_COLUMNS, type SetFieldKey } from '@/lib/workout/set-format';
 import { memo } from 'react';
-import { StyleSheet, Text, TouchableOpacity } from 'react-native';
+import { StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 
 type Props = {
   id: number;
@@ -26,9 +28,14 @@ type Props = {
 };
 
 // components/workout/history-load-exercise-card.tsx（過去の記録から読み込む）・
-// components/routines/routine-load-exercise-card.tsx（ルーティンから読み込む）で共通の行。
+// components/routines/routine-load-exercise-card.tsx（ルーティンから読み込む）で共通の
+// 「チェックボックス+サムネイル+名前+カテゴリ+セット値サマリ」の行。データの取得元(実績値/目標値)
+// が違うだけで表示の組み立ては同一のため、正規化した最小限のpropsだけを受け取る。
 // **行全体がチェックのタップ領域**（汗ばんだ指の前提で、チェックボックス単体を狙わせない）。
-// 見た目の組み立てはcomponents/exercises/exercise-row-frame.tsxと共有する
+//
+// ルーティンを更新の差分確認（components/routines/routine-diff-exercise-row.tsx）は
+// 一度この行を共有していたが、サムネイル・カテゴリを持たない別の構成に確定したため分離した。
+// あちらは「選ぶ」ではなく「反映するかを決める」画面で、種目の識別は直前のサマリーで済んでいる
 export const SelectableExerciseRow = memo(function SelectableExerciseRow({
   id,
   name,
@@ -42,34 +49,48 @@ export const SelectableExerciseRow = memo(function SelectableExerciseRow({
   accessibilityValuePrefix,
   emptyLabel = '',
 }: Props) {
+  const images = getExerciseImages({ source, slug });
   const resolvedType = resolveMeasurementType(measurementType);
   const summary = formatHistorySetSummary(MEASUREMENT_COLUMNS[resolvedType], sets);
   const displaySummary = summary === '' ? emptyLabel : summary;
 
   return (
     <TouchableOpacity
+      style={styles.row}
       onPress={() => onToggle(id)}
       accessibilityRole="checkbox"
       accessibilityState={{ checked: selected }}
       accessibilityLabel={`${name}、${getCategoryLabel(category)}、${accessibilityValuePrefix ?? ''}${displaySummary}`}
     >
-      <ExerciseRowFrame
-        checkbox={<Checkbox checked={selected} />}
-        name={name}
-        category={category}
-        source={source}
-        slug={slug}
-        body={
-          <Text style={[styles.summary, summary === '' && styles.summaryEmpty]} numberOfLines={1}>
-            {displaySummary}
+      <Checkbox checked={selected} />
+      <ExerciseThumbnail source={images.thumbnail} size={40} />
+      <View style={styles.info}>
+        <View style={styles.nameRow}>
+          <Text style={styles.name} numberOfLines={1}>
+            {name}
           </Text>
-        }
-      />
+          <CategoryChip category={category} />
+        </View>
+        <Text style={[styles.summary, summary === '' && styles.summaryEmpty]} numberOfLines={1}>
+          {displaySummary}
+        </Text>
+      </View>
     </TouchableOpacity>
   );
 });
 
 const styles = StyleSheet.create({
+  row: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 10,
+    paddingVertical: 12,
+    borderBottomWidth: 1,
+    borderBottomColor: Colors.border,
+  },
+  info: { flex: 1, gap: 3 },
+  nameRow: { flexDirection: 'row', alignItems: 'center', gap: 6 },
+  name: { ...Typography.cardTitle, color: Colors.textPrimary, flexShrink: 1 },
   summary: { ...Typography.footnote, color: Colors.textMuted },
   summaryEmpty: { color: Colors.textPlaceholder },
 });

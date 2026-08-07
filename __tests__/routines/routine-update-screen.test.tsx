@@ -122,10 +122,13 @@ test('既定チェックは追加＝ON・値の変更＝ON・未実施＝OFF', (
   expect(checkboxState(root, 'ペックフライ、1セット・30kg×12を削除')?.checked).toBe(false);
 });
 
-test('「値の変更」の行はルーティンと今日の要約を両方出す', () => {
+// サムネイル・カテゴリ・「ルーティン／今日」ラベルは持たず、変更前→変更後を1行で出す
+test('「値の変更」の行は変更前と変更後を並べる（ラベルは持たない）', () => {
   const root = render();
 
-  expect(texts(root)).toEqual(expect.arrayContaining(['ルーティン', '2セット・95kg×5', '今日', '3セット・100kg×5']));
+  expect(texts(root)).toEqual(expect.arrayContaining(['2セット・95kg×5', '3セット・100kg×5']));
+  expect(texts(root)).not.toContain('ルーティン');
+  expect(texts(root)).not.toContain('今日');
 });
 
 // デザイン案の「外すと要約が戻るので影響がその場で分かります」
@@ -291,7 +294,9 @@ test('チェックと展開はそれぞれ独立した読み上げ対象にな�
   const root = render();
   const buttons = root.findAllByType(TouchableOpacity);
 
-  const checkbox = buttons.find((b) => b.props.accessibilityLabel === 'ベンチプレス、ルーティン 2セット・95kg×5 から 今日 3セット・100kg×5 へ');
+  const checkbox = buttons.find(
+    (b) => b.props.accessibilityLabel === 'ベンチプレス、2セット・95kg×5 から 3セット・100kg×5 へ変更',
+  );
   const content = buttons.find((b) =>
     String(b.props.accessibilityLabel).endsWith('セットの内訳を開く'),
   );
@@ -312,7 +317,7 @@ describe('チェックの連動', () => {
     expandRow(root, 'ベンチプレス');
     expect(setRow(root, '1セット目 95kg×5 から 100kg×5 へ変更')?.props.accessibilityState.checked).toBe(true);
 
-    pressByLabel(root, 'ベンチプレス、ルーティン 2セット・95kg×5 から 今日 3セット・100kg×5 へ');
+    pressByLabel(root, 'ベンチプレス、2セット・95kg×5 から 3セット・100kg×5 へ変更');
 
     expect(setRow(root, '1セット目 95kg×5 から 100kg×5 へ変更')?.props.accessibilityState.checked).toBe(false);
     expect(setRow(root, '3セット目 90kg×8 を追加')?.props.accessibilityState.checked).toBe(false);
@@ -325,8 +330,8 @@ describe('チェックの連動', () => {
     pressByLabel(root, '1セット目 95kg×5 から 100kg×5 へ変更');
     expect(setRow(root, '1セット目 95kg×5 から 100kg×5 へ変更')?.props.accessibilityState.checked).toBe(false);
 
-    pressByLabel(root, 'ベンチプレス、ルーティン 2セット・95kg×5 から 今日 3セット・100kg×5 へ');
-    pressByLabel(root, 'ベンチプレス、ルーティン 2セット・95kg×5 から 今日 3セット・100kg×5 へ');
+    pressByLabel(root, 'ベンチプレス、2セット・95kg×5 から 3セット・100kg×5 へ変更');
+    pressByLabel(root, 'ベンチプレス、2セット・95kg×5 から 3セット・100kg×5 へ変更');
 
     expect(setRow(root, '1セット目 95kg×5 から 100kg×5 へ変更')?.props.accessibilityState.checked).toBe(true);
   });
@@ -347,7 +352,7 @@ describe('チェックの連動', () => {
   // 外している間に反映結果を出すと、上下の行が同じ文字列で並んで読めなくなる
   test('種目のチェックを外している間の「今日」は、チェックすればこうなる値を出す', () => {
     const root = render();
-    pressByLabel(root, 'ベンチプレス、ルーティン 2セット・95kg×5 から 今日 3セット・100kg×5 へ');
+    pressByLabel(root, 'ベンチプレス、2セット・95kg×5 から 3セット・100kg×5 へ変更');
 
     expect(texts(root)).toEqual(expect.arrayContaining(['3セット・100kg×5']));
   });
@@ -363,19 +368,18 @@ describe('反映しない行の見せ方', () => {
     return StyleSheet.flatten(target?.props.style);
   }
 
-  test('チェックが付いている間はルーティン側に取り消し線、今日側を強調する', () => {
+  test('チェックが付いている間は変更後だけを強調する', () => {
     const root = render();
 
-    expect(styleOf(root, '2セット・95kg×5')?.textDecorationLine).toBe('line-through');
     expect(styleOf(root, '3セット・100kg×5')?.fontWeight).toBe('600');
+    // 変更前は矢印の左にあり、常に控えめなまま
+    expect(styleOf(root, '2セット・95kg×5')?.fontWeight).toBe('400');
   });
 
-  test('チェックを外すと取り消し線も強調も外れ、ただの比較になる', () => {
+  test('チェックを外すと変更後も変更前と同じスタイルに戻り、ただの比較になる', () => {
     const root = render();
-    pressByLabel(root, 'ベンチプレス、ルーティン 2セット・95kg×5 から 今日 3セット・100kg×5 へ');
+    pressByLabel(root, 'ベンチプレス、2セット・95kg×5 から 3セット・100kg×5 へ変更');
 
-    expect(styleOf(root, '2セット・95kg×5')?.textDecorationLine).toBeUndefined();
-    // ルーティン行と同じ（captionCompactの既定ウェイト）に戻る
     expect(styleOf(root, '3セット・100kg×5')?.fontWeight).toBe('400');
     expect(styleOf(root, '3セット・100kg×5')?.color).toBe(styleOf(root, '2セット・95kg×5')?.color);
   });
@@ -394,13 +398,13 @@ describe('反映しない行の見せ方', () => {
 
 // 親だけ付いたまま子が全部外れていると、確定しても何も変わらない操作になる
 describe('親チェックの中間状態と逆連動', () => {
-  // 「今日」の要約は選択状態で変わるため、種目名で引く（内訳を開くボタンは除く）
+  // 変更後の要約は選択状態で変わるため、種目名で引く（内訳を開くボタンは除く）
   function parentCheckbox(root: ReactTestInstance) {
     return root
       .findAllByType(TouchableOpacity)
       .find(
         (b) =>
-          String(b.props.accessibilityLabel).startsWith('ベンチプレス、ルーティン') &&
+          String(b.props.accessibilityLabel).startsWith('ベンチプレス、') &&
           b.props.accessibilityRole === 'checkbox',
       );
   }
@@ -431,7 +435,7 @@ describe('親チェックの中間状態と逆連動', () => {
   test('外れている状態からセットを1つ付けると親のチェックも戻る', () => {
     const root = render();
     expandRow(root, 'ベンチプレス');
-    pressByLabel(root, 'ベンチプレス、ルーティン 2セット・95kg×5 から 今日 3セット・100kg×5 へ');
+    pressByLabel(root, 'ベンチプレス、2セット・95kg×5 から 3セット・100kg×5 へ変更');
     expect(parentCheckbox(root)?.props.accessibilityState.checked).toBe(false);
 
     pressByLabel(root, '1セット目 95kg×5 から 100kg×5 へ変更');
