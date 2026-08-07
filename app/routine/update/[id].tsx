@@ -22,10 +22,9 @@ type Section = { title: string; exercises: DiffExercise[] };
  * ルーティンのテンプレートと今日の実績の差分を種目単位で並べ、チェックしたものだけを反映する。
  * **確定ボタンを押すまでルーティンは一切変わらない。**
  *
- * 既定チェックは 追加=ON / 値の変更=ON / 未実施=OFF。未実施だけ既定オフなのは、
- * その日やらなかっただけの種目を型から消すのが多くの場合やってほしくない操作だから。
- * 下がった値も一律ONにするのは、確認画面まで来た人は「更新しに来ている」ため
- * （個々の値は行の「ルーティン → 今日」で確認できる）。
+ * **既定は全チェック**（未実施の種目も含む）。確認画面まで来た人は「更新しに来ている」ため、
+ * 個々の値は行の「変更前 → 変更後」で確認できるという前提（2026-08-07 ユーザー判断。
+ * それまでは未実施だけ既定オフだった）。
  */
 export default function RoutineUpdateScreen() {
   const { id, sessionId: sessionIdParam } = useLocalSearchParams<{ id: string; sessionId: string }>();
@@ -66,11 +65,9 @@ export default function RoutineUpdateScreen() {
   const diffKey = allKeys.join('|');
   const selection: DiffSelection = useMemo(() => {
     if (selectionState?.key === diffKey) return selectionState.value;
-    const defaults = new Set<string>();
-    for (const e of resolved?.added ?? []) defaults.add(e.key);
-    for (const e of resolved?.changed ?? []) defaults.add(e.key);
-    return { exercises: defaults, sets: new Map() };
-  }, [selectionState, diffKey, resolved]);
+    // 既定は全チェック（未実施の種目も含む）
+    return { exercises: new Set(allKeys), sets: new Map() };
+  }, [selectionState, diffKey, allKeys]);
 
   const allSelected = allKeys.length > 0 && selection.exercises.size === allKeys.length;
 

@@ -112,14 +112,15 @@ test('3つのセクションを差分の件数つきで並べる', () => {
 });
 
 // 未実施だけ既定オフ。その日やらなかっただけの種目を型から消すのは、多くの場合やってほしくない
-test('既定チェックは追加＝ON・値の変更＝ON・未実施＝OFF', () => {
+// 確認画面まで来た人は「更新しに来ている」ので、未実施の種目も含めて既定は全チェック
+test('既定は未実施の種目も含めて全チェック', () => {
   const root = render();
 
   // 件数の数字だけ入れ子のTextで強調しているため、2要素に分かれて拾われる
-  expect(texts(root)).toEqual(expect.arrayContaining(['2', '/3種目を選択中']));
+  expect(texts(root)).toEqual(expect.arrayContaining(['3', '/3種目を選択中']));
   // チェックボックスは行から独立したタップ領域（行全体はアコーディオンの開閉）
   expect(checkboxState(root, 'ディップス、1セット・12回を追加')?.checked).toBe(true);
-  expect(checkboxState(root, 'ペックフライ、1セット・30kg×12を削除')?.checked).toBe(false);
+  expect(checkboxState(root, 'ペックフライ、1セット・30kg×12を削除')?.checked).toBe(true);
 });
 
 // サムネイル・カテゴリ・「ルーティン／今日」ラベルは持たず、変更前→変更後を1行で出す
@@ -167,8 +168,7 @@ test('未実施の種目の内訳は取り消し線＋「削除」チップに�
 
 test('チェックを全部外すと更新ボタンが無効になる', () => {
   const root = render();
-  // 既定は3件中2件選択なので、1回目の全選択で3件になり、2回目で0件になる
-  pressByLabel(root, '全選択');
+  // 既定が全選択なので、1回押すと0件になる
   pressByLabel(root, '全選択');
 
   const submit = root.findAllByType(TouchableOpacity).find((b) => b.props.accessibilityLabel === '更新する');
@@ -190,8 +190,7 @@ test('更新するとチェック済みの差分だけがupdateRoutineに渡り�
     exercises: [
       // 値の変更（チェック済み）
       { exerciseId: 10, sets: [set(100, 5), set(100, 5), set(90, 8)] },
-      // 未実施は既定オフなので残る
-      { exerciseId: 20, sets: [set(30, 12)] },
+      // 未実施もチェック済みなのでルーティンから消える（exerciseId 20は出てこない）
       // 追加した種目は末尾
       { exerciseId: 30, sets: [set(null, 12)] },
     ],
@@ -257,7 +256,7 @@ test('取得に失敗したら再試行を出す', () => {
 test('最初のレンダーから既定チェックが乗っている', () => {
   const root = render();
 
-  expect(texts(root)).toEqual(expect.arrayContaining(['2', '/3種目を選択中']));
+  expect(texts(root)).toEqual(expect.arrayContaining(['3', '/3種目を選択中']));
   const submit = root.findAllByType(TouchableOpacity).find((b) => b.props.accessibilityLabel === '更新する');
   expect(submit?.props.accessibilityState?.disabled).toBe(false);
 });
@@ -340,8 +339,7 @@ describe('チェックの連動', () => {
     const root = render();
     expandRow(root, 'ベンチプレス');
 
-    // 既定は3件中2件選択なので、1回目で全ON、2回目で全OFF
-    pressByLabel(root, '全選択');
+    // 既定が全選択なので、1回押すと全OFF
     pressByLabel(root, '全選択');
     expect(setRow(root, '1セット目 95kg×5 から 100kg×5 へ変更')?.props.accessibilityState.checked).toBe(false);
 
@@ -384,15 +382,15 @@ describe('反映しない行の見せ方', () => {
     expect(styleOf(root, '3セット・100kg×5')?.color).toBe(styleOf(root, '2セット・95kg×5')?.color);
   });
 
-  // 未実施は既定オフ。既定のまま取り消し線が付いていると「消える」と読めてしまう
-  test('未実施の種目は、チェックしたときだけ取り消し線が付く', () => {
+  // 取り消し線は「消える」の印なので、チェックを外したら引かない
+  test('未実施の種目は、チェックしているときだけ取り消し線が付く', () => {
     const root = render();
 
-    expect(styleOf(root, '1セット・30kg×12')?.textDecorationLine).toBeUndefined();
+    expect(styleOf(root, '1セット・30kg×12')?.textDecorationLine).toBe('line-through');
 
     pressByLabel(root, 'ペックフライ、1セット・30kg×12を削除');
 
-    expect(styleOf(root, '1セット・30kg×12')?.textDecorationLine).toBe('line-through');
+    expect(styleOf(root, '1セット・30kg×12')?.textDecorationLine).toBeUndefined();
   });
 });
 
@@ -429,7 +427,7 @@ describe('親チェックの中間状態と逆連動', () => {
     pressByLabel(root, '3セット目 90kg×8 を追加');
 
     expect(parentCheckbox(root)?.props.accessibilityState.checked).toBe(false);
-    expect(texts(root)).toEqual(expect.arrayContaining(['1', '/3種目を選択中']));
+    expect(texts(root)).toEqual(expect.arrayContaining(['2', '/3種目を選択中']));
   });
 
   test('外れている状態からセットを1つ付けると親のチェックも戻る', () => {
